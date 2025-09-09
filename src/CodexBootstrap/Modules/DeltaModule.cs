@@ -21,8 +21,9 @@ public sealed record PatchDoc(
     IReadOnlyList<PatchOp> Ops
 );
 
-public sealed class DeltaModule : IModule
+public sealed class DeltaModule : IModule, IOpenApiProvider
 {
+    private NodeRegistry? _registry;
 
     public Node GetModuleNode()
     {
@@ -34,8 +35,21 @@ public sealed class DeltaModule : IModule
         );
     }
 
+    public object GetOpenApiSpec()
+    {
+        if (_registry == null)
+        {
+            return new { error = "Registry not available" };
+        }
+
+        var moduleNode = GetModuleNode();
+        return OpenApiHelper.GenerateOpenApiSpec("codex.delta", moduleNode, _registry);
+    }
+
     public void Register(NodeRegistry registry)
     {
+        _registry = registry; // Store registry reference for OpenAPI generation
+        
         // Register the module node
         registry.Upsert(GetModuleNode());
 

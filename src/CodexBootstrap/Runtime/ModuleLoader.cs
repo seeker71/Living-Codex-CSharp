@@ -10,6 +10,7 @@ public sealed class ModuleLoader
     private readonly NodeRegistry _registry;
     private readonly IApiRouter _router;
     private readonly IServiceProvider _serviceProvider;
+    private readonly List<IModule> _loadedModules = new();
 
     public ModuleLoader(NodeRegistry registry, IApiRouter router, IServiceProvider serviceProvider)
     {
@@ -17,6 +18,8 @@ public sealed class ModuleLoader
         _router = router;
         _serviceProvider = serviceProvider;
     }
+
+    public IReadOnlyList<IModule> GetLoadedModules() => _loadedModules.AsReadOnly();
 
     public void LoadBuiltInModules()
     {
@@ -79,6 +82,9 @@ public sealed class ModuleLoader
         _registry.Upsert(moduleNode);
         module.Register(_registry);
         module.RegisterApiHandlers(_router, _registry);
+        
+        // Track loaded modules
+        _loadedModules.Add(module);
         
         var name = moduleNode.Meta?.GetValueOrDefault("name")?.ToString() ?? moduleNode.Title;
         var version = moduleNode.Meta?.GetValueOrDefault("version")?.ToString() ?? "0.1.0";

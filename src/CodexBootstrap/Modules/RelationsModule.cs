@@ -67,7 +67,7 @@ public sealed record ValidationRequest(
     bool IncludeWarnings = true
 );
 
-public sealed class RelationsModule : IModule
+public sealed class RelationsModule : IModule, IOpenApiProvider
 {
     private readonly NodeRegistry _registry;
 
@@ -84,6 +84,12 @@ public sealed class RelationsModule : IModule
             version: "0.1.0",
             description: "Module for modeling relations, constraints, and validation rules."
         );
+    }
+
+    public object GetOpenApiSpec()
+    {
+        var moduleNode = GetModuleNode();
+        return OpenApiHelper.GenerateOpenApiSpec("codex.relations", moduleNode, _registry);
     }
 
     public void Register(NodeRegistry registry)

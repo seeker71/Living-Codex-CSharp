@@ -58,7 +58,7 @@ public sealed record OpenApiDocument(
     Dictionary<string, OpenApiPathItem>? Paths = null
 );
 
-public sealed class OpenApiModule : IModule
+public sealed class OpenApiModule : IModule, IOpenApiProvider
 {
     private readonly NodeRegistry _registry;
 
@@ -75,6 +75,12 @@ public sealed class OpenApiModule : IModule
             version: "0.1.0",
             description: "Module for generating deterministic OpenAPI specifications from module types and APIs."
         );
+    }
+
+    public object GetOpenApiSpec()
+    {
+        var moduleNode = GetModuleNode();
+        return OpenApiHelper.GenerateOpenApiSpec("codex.openapi", moduleNode, _registry);
     }
 
     public void Register(NodeRegistry registry)

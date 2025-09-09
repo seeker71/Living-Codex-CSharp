@@ -9,8 +9,10 @@ public record ReflectResponse(List<Node> MetaNodes, string SpecId);
 
 public record IngestResponse(ModuleSpec Spec, bool Success, string Message);
 
-public sealed class SpecReflectionModule : IModule
+public sealed class SpecReflectionModule : IModule, IOpenApiProvider
 {
+    private NodeRegistry? _registry;
+
     public Node GetModuleNode()
     {
         return NodeStorage.CreateModuleNode(
@@ -21,8 +23,21 @@ public sealed class SpecReflectionModule : IModule
         );
     }
 
+    public object GetOpenApiSpec()
+    {
+        if (_registry == null)
+        {
+            return new { error = "Registry not available" };
+        }
+
+        var moduleNode = GetModuleNode();
+        return OpenApiHelper.GenerateOpenApiSpec("codex.reflect", moduleNode, _registry);
+    }
+
     public void Register(NodeRegistry registry)
     {
+        _registry = registry; // Store registry reference for OpenAPI generation
+        
         // Register the module node
         registry.Upsert(GetModuleNode());
 

@@ -3,8 +3,10 @@ using CodexBootstrap.Core;
 
 namespace CodexBootstrap.Modules;
 
-public sealed class HelloModule : IModule
+public sealed class HelloModule : IModule, IOpenApiProvider
 {
+    private NodeRegistry? _registry;
+
     public Node GetModuleNode()
     {
         return NodeStorage.CreateModuleNode(
@@ -15,8 +17,21 @@ public sealed class HelloModule : IModule
         );
     }
 
+    public object GetOpenApiSpec()
+    {
+        if (_registry == null)
+        {
+            return new { error = "Registry not available" };
+        }
+
+        var moduleNode = GetModuleNode();
+        return OpenApiHelper.GenerateOpenApiSpec("codex.hello", moduleNode, _registry);
+    }
+
     public void Register(NodeRegistry registry)
     {
+        _registry = registry; // Store registry reference for OpenAPI generation
+        
         // Register API nodes
         var echoApi = NodeStorage.CreateApiNode("codex.hello", "echo", "/route", "Echos args back");
         var helloApi = NodeStorage.CreateApiNode("codex.hello", "hello", "/route", "Greets and returns a node id");

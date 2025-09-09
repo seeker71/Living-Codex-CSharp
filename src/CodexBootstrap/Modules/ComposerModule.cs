@@ -7,8 +7,10 @@ namespace CodexBootstrap.Modules;
 // Composer module specific response types
 public record ComposeResponse(object Spec);
 
-public sealed class ComposerModule : IModule
+public sealed class ComposerModule : IModule, IOpenApiProvider
 {
+    private NodeRegistry? _registry;
+
     public Node GetModuleNode()
     {
         return NodeStorage.CreateModuleNode(
@@ -19,8 +21,21 @@ public sealed class ComposerModule : IModule
         );
     }
 
+    public object GetOpenApiSpec()
+    {
+        if (_registry == null)
+        {
+            return new { error = "Registry not available" };
+        }
+
+        var moduleNode = GetModuleNode();
+        return OpenApiHelper.GenerateOpenApiSpec("codex.composer", moduleNode, _registry);
+    }
+
     public void Register(NodeRegistry registry)
     {
+        _registry = registry; // Store registry reference for OpenAPI generation
+        
         // Register API nodes
         var composeApi = NodeStorage.CreateApiNode("codex.composer", "compose", "/compose", "Compose module specification from atoms");
         var registerAtomsApi = NodeStorage.CreateApiNode("codex.composer", "register-atoms", "/register-atoms", "Register atoms in the core system");

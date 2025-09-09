@@ -28,8 +28,10 @@ public record OneshotResponse(
     string Message
 );
 
-public sealed class BreathModule : IModule
+public sealed class BreathModule : IModule, IOpenApiProvider
 {
+    private NodeRegistry? _registry;
+
     public Node GetModuleNode()
     {
         return NodeStorage.CreateModuleNode(
@@ -40,8 +42,21 @@ public sealed class BreathModule : IModule
         );
     }
 
+    public object GetOpenApiSpec()
+    {
+        if (_registry == null)
+        {
+            return new { error = "Registry not available" };
+        }
+
+        var moduleNode = GetModuleNode();
+        return OpenApiHelper.GenerateOpenApiSpec("codex.breath", moduleNode, _registry);
+    }
+
     public void Register(NodeRegistry registry)
     {
+        _registry = registry; // Store registry reference for OpenAPI generation
+        
         // Register API nodes
         var expandApi = NodeStorage.CreateApiNode("codex.breath", "expand", "/breath/expand/{id}", "Expand a module specification");
         var validateApi = NodeStorage.CreateApiNode("codex.breath", "validate", "/breath/validate/{id}", "Validate a module specification");

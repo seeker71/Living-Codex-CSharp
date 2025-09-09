@@ -69,6 +69,37 @@ app.MapGet("/modules/{id}", (string id) =>
     return module != null ? Results.Ok(module) : Results.NotFound();
 });
 
+// OpenAPI specifications for modules
+app.MapGet("/openapi/{moduleId}", (string moduleId) =>
+{
+    try
+    {
+        // Get the module node to find the module instance
+        var moduleNode = coreApi.GetModule(moduleId);
+        if (moduleNode == null)
+        {
+            return Results.NotFound($"Module '{moduleId}' not found");
+        }
+
+        // Find the module instance that implements IOpenApiProvider
+        var moduleInstances = moduleLoader.GetLoadedModules();
+        var openApiModule = moduleInstances.OfType<IOpenApiProvider>()
+            .FirstOrDefault(m => ((IModule)m).GetModuleNode().Id == moduleId);
+
+        if (openApiModule == null)
+        {
+            return Results.NotFound($"Module '{moduleId}' does not support OpenAPI");
+        }
+
+        var openApiSpec = openApiModule.GetOpenApiSpec();
+        return Results.Ok(openApiSpec);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"Failed to get OpenAPI spec for module '{moduleId}': {ex.Message}");
+    }
+});
+
 // Dynamic API route — self‑describing invocation
 app.MapPost("/route", (DynamicCall req) =>
 {
