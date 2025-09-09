@@ -13,32 +13,11 @@ public sealed class SpecReflectionModule : IModule
 {
     public Node GetModuleNode()
     {
-        return new Node(
-            Id: "codex.reflect",
-            TypeId: "codex.meta/module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Spec Reflection Module",
-            Description: "Converts specs to meta-nodes and back, enabling self-describing system architecture",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    version = "0.1.0",
-                    name = "Spec Reflection",
-                    dependencies = new[] { new { id = "codex.core", version = "0.1.x" } },
-                    capabilities = new[] { "reflect", "ingest", "meta-nodes" }
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.reflect",
-                ["name"] = "Spec Reflection Module",
-                ["version"] = "0.1.0",
-                ["description"] = "Converts specs to meta-nodes and back"
-            }
+        return NodeStorage.CreateModuleNode(
+            id: "codex.reflect",
+            name: "Spec Reflection Module",
+            version: "0.1.0",
+            description: "Converts specs to meta-nodes and back, enabling self-describing system architecture"
         );
     }
 
