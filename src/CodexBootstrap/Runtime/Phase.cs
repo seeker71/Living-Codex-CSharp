@@ -21,12 +21,12 @@ public sealed class PhaseEngine
 
 public interface IResonanceChecker
 {
-    Task<ResonanceReport> CheckAsync(ResonanceProposal proposal, IRegistry registry);
+    Task<ResonanceReport> CheckAsync(ResonanceProposal proposal, NodeRegistry registry);
 }
 
 public sealed class TrivialResonanceChecker : IResonanceChecker
 {
     // Minimal: always OK. Future coils: compare anchors' cache keys/types for compatibility.
-    public Task<ResonanceReport> CheckAsync(ResonanceProposal proposal, IRegistry registry)
+    public Task<ResonanceReport> CheckAsync(ResonanceProposal proposal, NodeRegistry registry)
         => Task.FromResult(new ResonanceReport(true, "trivial-ok"));
 }

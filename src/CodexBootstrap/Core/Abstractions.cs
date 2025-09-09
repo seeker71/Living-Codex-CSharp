@@ -67,33 +67,26 @@ public sealed record ModuleSpec(
 
 public interface IModule
 {
-    ModuleSpec Spec { get; }
-    void Register(IApiRouter router, IRegistry registry);
+    Node GetModuleNode();
+    void Register(NodeRegistry registry);
 }
 
 public interface IApiRouter
 {
-    void Register(string moduleId, string api, Func<JsonElement?, Task<object?>> handler);
-}
-
-public interface IRegistry
-{
-    void Upsert(Node node);
-    void Upsert(Edge edge);
-    bool TryGet(string id, out Node node);
-    IEnumerable<Edge> AllEdges();
+    void Register(string moduleId, string api, Func<JsonElement?, Task<object>> handler);
+    bool TryGetHandler(string moduleId, string api, out Func<JsonElement?, Task<object>> handler);
 }
 
 public interface ISynthesizer
 {
-    Task<Node> SynthesizeAsync(Node node, IRegistry registry);
+    Task<Node> SynthesizeAsync(Node node, NodeRegistry registry);
 }
 
 // External source adapters resolve ContentRef.ExternalUri and/or Query
 public interface ISourceAdapter
 {
     string Scheme { get; } // e.g., http, https, file, ipfs, data, prompt
-    Task<ContentRef?> ResolveAsync(ContentRef reference, IRegistry registry);
+    Task<ContentRef?> ResolveAsync(ContentRef reference, NodeRegistry registry);
 }
 
 public interface IAdapterRegistry
