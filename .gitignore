@@ -1,2 +1,3 @@
-src/CodexBootstrap/bin/
-src/CodexBootstrap/obj/
+**/bin/
+**/obj/
+.DS_Store
