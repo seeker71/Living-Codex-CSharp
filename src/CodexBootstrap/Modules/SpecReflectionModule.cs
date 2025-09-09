@@ -115,7 +115,7 @@ public sealed class SpecReflectionModule : IModule
                 }
 
                 // Convert spec to meta-nodes
-                var metaNodes = ReflectSpecToMetaNodes(specNode, registry);
+                var metaNodes = await Task.Run(() => ReflectSpecToMetaNodes(specNode, registry));
                 
                 return new ReflectResponse(metaNodes, specId);
             }
@@ -152,7 +152,7 @@ public sealed class SpecReflectionModule : IModule
                 }
 
                 // Convert meta-nodes back to spec
-                var spec = IngestMetaNodesToSpec(metaNodes);
+                var spec = await Task.Run(() => IngestMetaNodesToSpec(metaNodes));
                 
                 return new IngestResponse(spec, true, "Successfully ingested meta-nodes to spec");
             }

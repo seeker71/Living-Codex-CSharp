@@ -234,11 +234,11 @@ public sealed class OpenApiModule : IModule
         );
     }
 
-    private async Task<ApiSpec?> ParseApiSpec(Node apiNode)
+    private Task<ApiSpec?> ParseApiSpec(Node apiNode)
     {
         try
         {
-            if (apiNode.Content?.InlineJson == null) return null;
+            if (apiNode.Content?.InlineJson == null) return Task.FromResult<ApiSpec?>(null);
 
             var apiData = JsonSerializer.Deserialize<JsonElement>(apiNode.Content.InlineJson);
             
@@ -248,7 +248,7 @@ public sealed class OpenApiModule : IModule
             var description = apiData.TryGetProperty("description", out var descElement) ? descElement.GetString() : null;
 
             if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(verb) || string.IsNullOrEmpty(route))
-                return null;
+                return Task.FromResult<ApiSpec?>(null);
 
             // Parse parameters
             var parameters = new List<ParameterSpec>();
@@ -273,17 +273,17 @@ public sealed class OpenApiModule : IModule
                 }
             }
 
-            return new ApiSpec(
+            return Task.FromResult<ApiSpec?>(new ApiSpec(
                 Name: name,
                 Verb: verb,
                 Route: route,
                 Description: description,
                 Parameters: parameters.Any() ? parameters : null
-            );
+            ));
         }
         catch
         {
-            return null;
+            return Task.FromResult<ApiSpec?>(null);
         }
     }
 

@@ -250,6 +250,7 @@ public sealed class PhaseModule : IModule
                 registry.Upsert(meltedNode);
 
                 // Record the phase change
+                await Task.Run(() => {
                 var phaseChange = new PhaseChange(
                     NodeId: nodeId,
                     FromState: ContentState.Ice,
@@ -280,6 +281,7 @@ public sealed class PhaseModule : IModule
                     }
                 );
                 registry.Upsert(phaseChangeNode);
+                });
 
                 return new MeltResponse(NodeId: nodeId, Success: true);
             }
@@ -361,7 +363,7 @@ public sealed class PhaseModule : IModule
                         ["timestamp"] = DateTime.UtcNow
                     }
                 );
-                registry.Upsert(phaseChangeNode);
+                await Task.Run(() => registry.Upsert(phaseChangeNode));
 
                 return new RefreezeResponse(NodeId: nodeId, Success: true);
             }
@@ -405,13 +407,14 @@ public sealed class PhaseModule : IModule
                 }
 
                 // Check resonance with anchor nodes
-                var conflicts = new List<string>();
+                var conflicts = await Task.Run(() => {
+                var conflictsList = new List<string>();
 
                 foreach (var anchorId in proposal.Anchors)
                 {
                     if (!registry.TryGet(anchorId, out var anchorNode))
                     {
-                        conflicts.Add($"Anchor node '{anchorId}' not found");
+                        conflictsList.Add($"Anchor node '{anchorId}' not found");
                         continue;
                     }
 
@@ -419,15 +422,18 @@ public sealed class PhaseModule : IModule
                     // This is a simplified implementation - in a real system, this would be more sophisticated
                     if (anchorNode.TypeId != targetNode.TypeId && !IsCompatibleType(anchorNode.TypeId, targetNode.TypeId))
                     {
-                        conflicts.Add($"Type mismatch: target node type '{targetNode.TypeId}' is not compatible with anchor node type '{anchorNode.TypeId}'");
+                        conflictsList.Add($"Type mismatch: target node type '{targetNode.TypeId}' is not compatible with anchor node type '{anchorNode.TypeId}'");
                     }
 
                     // Check if the proposed changes would break structural integrity
                     if (proposal.Changes.ContainsKey("typeId") && proposal.Changes["typeId"]?.ToString() != anchorNode.TypeId)
                     {
-                        conflicts.Add($"Proposed type change would break compatibility with anchor node '{anchorId}'");
+                        conflictsList.Add($"Proposed type change would break compatibility with anchor node '{anchorId}'");
                     }
                 }
+
+                return conflictsList;
+                });
 
                 var isResonant = conflicts.Count == 0;
                 var message = isResonant 

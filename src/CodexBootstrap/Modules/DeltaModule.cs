@@ -198,7 +198,7 @@ public sealed class DeltaModule : IModule
                 }
 
                 // Generate patch operations by comparing the two nodes
-                var ops = GeneratePatchOps(againstNode, sourceNode);
+                var ops = await Task.Run(() => GeneratePatchOps(againstNode, sourceNode));
 
                 var patch = new PatchDoc(TargetId: againstId, Ops: ops);
 
@@ -244,7 +244,7 @@ public sealed class DeltaModule : IModule
                 }
 
                 // Apply the patch operations
-                var patchedNode = ApplyPatch(targetNode, patch);
+                var patchedNode = await Task.Run(() => ApplyPatch(targetNode, patch));
                 registry.Upsert(patchedNode);
 
                 return new PatchResponse(TargetId: targetId, Success: true);

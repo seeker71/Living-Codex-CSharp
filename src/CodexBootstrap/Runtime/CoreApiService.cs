@@ -70,7 +70,7 @@ public sealed class CoreApiService
     {
         return new ModuleInfo(
             Id: moduleNode.Meta?.GetValueOrDefault("moduleId", moduleNode.Id)?.ToString() ?? moduleNode.Id,
-            Name: moduleNode.Meta?.GetValueOrDefault("name", moduleNode.Title)?.ToString() ?? moduleNode.Title ?? "Unknown",
+            Name: moduleNode.Meta?.GetValueOrDefault("name", moduleNode.Title ?? "Unknown")?.ToString() ?? moduleNode.Title ?? "Unknown",
             Version: moduleNode.Meta?.GetValueOrDefault("version", "0.1.0")?.ToString() ?? "0.1.0",
             Description: moduleNode.Description,
             Title: moduleNode.Title ?? "Unknown"

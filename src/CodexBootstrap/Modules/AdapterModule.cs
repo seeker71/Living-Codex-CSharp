@@ -277,7 +277,7 @@ public sealed class AdapterModule : IModule
             {
                 if (args == null || !args.HasValue)
                 {
-                    return new ErrorResponse("Missing request body");
+                    return Task.FromResult<object>(new ErrorResponse("Missing request body"));
                 }
 
                 var adapterJson = args.Value.TryGetProperty("adapter", out var adapterElement) ? adapterElement.GetRawText() : null;
@@ -309,6 +309,7 @@ public sealed class AdapterModule : IModule
                 );
 
                 // Store adapter info in registry
+                await Task.Run(() => {
                 var adapterNode = new Node(
                     Id: adapterId,
                     TypeId: "codex.adapters/adapter",
@@ -330,6 +331,7 @@ public sealed class AdapterModule : IModule
                     }
                 );
                 registry.Upsert(adapterNode);
+                });
 
                 return new AdapterRegistrationResponse(AdapterId: adapterId, Success: true);
             }
@@ -357,6 +359,7 @@ public sealed class AdapterModule : IModule
 
                 // This would need to be passed from the calling context
                 // For now, we'll return a placeholder response
+                await Task.Run(() => { /* Placeholder for future hydration logic */ });
                 return new HydrateResponse(NodeId: nodeId, Success: true, Message: "Hydration not yet implemented - requires registry access");
             }
             catch (Exception ex)
