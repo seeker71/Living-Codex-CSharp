@@ -9,8 +9,36 @@ namespace CodexBootstrap.Modules;
 // OpenAPI module specific response types
 public record OpenApiGenerationResponse(string ModuleId, bool Success, string Message = "OpenAPI generated successfully", object? OpenApiSpec = null);
 
+public record OpenApiSpecResponse(
+    string OpenApi = "3.0.3",
+    OpenApiInfo? Info = null,
+    Dictionary<string, object>? Components = null,
+    Dictionary<string, object>? Paths = null
+);
+
+public record OpenApiInfo(
+    string Title,
+    string Version,
+    string Description
+);
+
+public record OpenApiSpecsListResponse(
+    List<OpenApiSpecInfo> Specs,
+    int Count
+);
+
+public record OpenApiSpecInfo(
+    string Id,
+    string? ModuleId,
+    string? Title,
+    string? Description,
+    string? GeneratedAt,
+    string? Version,
+    string? SpecType
+);
+
 // OpenAPI data structures
-public sealed record OpenApiInfo(
+public sealed record OpenApiInfoData(
     string Title,
     string Version,
     string? Description = null
@@ -84,7 +112,7 @@ public sealed class OpenApiModule : IModule
         // Get the module node to find the module instance
         if (!_registry.TryGet(moduleId, out var moduleNode))
         {
-            return new { error = $"Module '{moduleId}' not found" };
+            return new ErrorResponse($"Module '{moduleId}' not found");
         }
 
         // Check if OpenAPI spec already exists as a node
@@ -92,7 +120,19 @@ public sealed class OpenApiModule : IModule
         if (_registry.TryGet(existingSpecId, out var existingSpec))
         {
             // Return the existing spec from the node
-            return JsonSerializer.Deserialize<object>(existingSpec.Content?.InlineJson ?? "{}") ?? new { error = "Failed to deserialize existing spec" };
+            try
+            {
+                var deserialized = JsonSerializer.Deserialize<OpenApiSpecResponse>(existingSpec.Content?.InlineJson ?? "{}");
+                if (deserialized == null)
+                {
+                    return new ErrorResponse("Failed to deserialize existing spec");
+                }
+                return deserialized;
+            }
+            catch
+            {
+                return new ErrorResponse("Failed to deserialize existing spec");
+            }
         }
 
         // Generate and store the OpenAPI spec as a node
@@ -234,13 +274,16 @@ public sealed class OpenApiModule : IModule
             }
         }
 
-        return new
-        {
-            openapi = "3.0.3",
-            info = info,
-            components = components.Any() ? components : null,
-            paths = paths.Any() ? paths : null
-        };
+        return new OpenApiSpecResponse(
+            OpenApi: "3.0.3",
+            Info: new OpenApiInfo(
+                Title: moduleName,
+                Version: moduleVersion,
+                Description: moduleDescription
+            ),
+            Components: components.Any() ? components : null,
+            Paths: paths.Any() ? paths : null
+        );
     }
 
     private ApiSpec? ParseApiSpec(Node apiNode)
@@ -531,23 +574,21 @@ public sealed class OpenApiModule : IModule
             {
                 // Get all OpenAPI spec nodes
                 var specNodes = _registry.GetNodesByType("codex.openapi/spec")
-                    .Select(node => new
-                    {
-                        id = node.Id,
-                        moduleId = node.Meta?.GetValueOrDefault("moduleId")?.ToString(),
-                        title = node.Title,
-                        description = node.Description,
-                        generatedAt = node.Meta?.GetValueOrDefault("generatedAt")?.ToString(),
-                        version = node.Meta?.GetValueOrDefault("version")?.ToString(),
-                        specType = node.Meta?.GetValueOrDefault("specType")?.ToString()
-                    })
+                    .Select(node => new OpenApiSpecInfo(
+                        Id: node.Id,
+                        ModuleId: node.Meta?.GetValueOrDefault("moduleId")?.ToString(),
+                        Title: node.Title,
+                        Description: node.Description,
+                        GeneratedAt: node.Meta?.GetValueOrDefault("generatedAt")?.ToString(),
+                        Version: node.Meta?.GetValueOrDefault("version")?.ToString(),
+                        SpecType: node.Meta?.GetValueOrDefault("specType")?.ToString()
+                    ))
                     .ToList();
 
-                return Task.FromResult<object>(new
-                {
-                    specs = specNodes,
-                    count = specNodes.Count
-                });
+                return Task.FromResult<object>(new OpenApiSpecsListResponse(
+                    Specs: specNodes,
+                    Count: specNodes.Count
+                ));
             }
             catch (Exception ex)
             {
