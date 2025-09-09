@@ -35,18 +35,35 @@ public sealed record Edge(
     Dictionary<string, object>? Meta
 );
 
-// Minimal type system to self‑describe payloads and APIs
+// Enhanced type system to self‑describe payloads and APIs
 public sealed record TypeSpec(
     string Name,
     string? Description,
-    IReadOnlyList<FieldSpec>? Fields
+    IReadOnlyList<FieldSpec>? Fields,
+    TypeKind Kind = TypeKind.Object,
+    string? ArrayItemType = null,
+    string? ReferenceType = null,
+    IReadOnlyList<string>? EnumValues = null
 );
+
+public enum TypeKind
+{
+    Object,
+    Array,
+    Reference,
+    Enum,
+    Primitive
+}
 
 public sealed record FieldSpec(
     string Name,
     string Type,
     bool Required,
-    string? Description
+    string? Description,
+    TypeKind Kind = TypeKind.Primitive,
+    string? ArrayItemType = null,
+    string? ReferenceType = null,
+    IReadOnlyList<string>? EnumValues = null
 );
 
 public sealed record ParameterSpec(
