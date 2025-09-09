@@ -54,6 +54,34 @@ public sealed class RouteDiscovery
                         args = JsonSerializer.Deserialize<JsonElement>(body);
                     }
                     
+                    // Extract route parameters and merge with request body
+                    var routeParams = new Dictionary<string, object>();
+                    foreach (var param in context.Request.RouteValues)
+                    {
+                        if (param.Key != null && param.Value != null)
+                        {
+                            routeParams[param.Key] = param.Value;
+                        }
+                    }
+                    
+                    // Merge route parameters with request body
+                    if (routeParams.Any())
+                    {
+                        var mergedArgs = new Dictionary<string, object>();
+                        if (args.HasValue)
+                        {
+                            foreach (var prop in args.Value.EnumerateObject())
+                            {
+                                mergedArgs[prop.Name] = prop.Value;
+                            }
+                        }
+                        foreach (var param in routeParams)
+                        {
+                            mergedArgs[param.Key] = param.Value;
+                        }
+                        args = JsonSerializer.SerializeToElement(mergedArgs);
+                    }
+                    
                     // Call the module's API handler
                     if (_router.TryGetHandler(moduleId, apiName, out var handler))
                     {

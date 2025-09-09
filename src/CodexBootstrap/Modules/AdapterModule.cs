@@ -236,39 +236,10 @@ public sealed class AdapterModule : IModule
         );
         registry.Upsert(registerApiNode);
 
-        var hydrateApiNode = new Node(
-            Id: "codex.adapters/hydrate-api",
-            TypeId: "codex.meta/api",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Hydrate Node API",
-            Description: "Hydrate a node's content from external resources",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    name = "hydrate",
-                    verb = "POST",
-                    route = "/hydrate/{id}",
-                    parameters = new[]
-                    {
-                        new { name = "id", type = "string", required = true, description = "Node ID to hydrate" }
-                    }
-                }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.adapters",
-                ["apiName"] = "hydrate"
-            }
-        );
-        registry.Upsert(hydrateApiNode);
+        // Hydrate API is now handled by HydrateModule
 
         // Register edges
         registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.adapters", "register"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.adapters", "hydrate"));
     }
 
     public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
@@ -343,32 +314,7 @@ public sealed class AdapterModule : IModule
             }
         });
 
-        router.Register("codex.adapters", "hydrate", async args =>
-        {
-            try
-            {
-                if (args == null || !args.HasValue)
-                {
-                    return new ErrorResponse("Missing request parameters");
-                }
-
-                var nodeId = args.Value.TryGetProperty("id", out var idElement) ? idElement.GetString() : null;
-
-                if (string.IsNullOrEmpty(nodeId))
-                {
-                    return new ErrorResponse("Node ID is required");
-                }
-
-                // This would need to be passed from the calling context
-                // For now, we'll return a placeholder response
-                await Task.Run(() => { /* Placeholder for future hydration logic */ });
-                return new HydrateResponse(NodeId: nodeId, Success: true, Message: "Hydration not yet implemented - requires registry access");
-            }
-            catch (Exception ex)
-            {
-                return new ErrorResponse($"Failed to hydrate node: {ex.Message}");
-            }
-        });
+        // Hydrate API is now handled by HydrateModule
     }
 
     private void RegisterBuiltInAdapters()
