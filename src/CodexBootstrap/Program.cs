@@ -21,9 +21,13 @@ builder.Services.AddSingleton<ApiRouter>();
 builder.Services.AddSingleton<IApiRouter>(sp => sp.GetRequiredService<ApiRouter>());
 
 // Generic services
-builder.Services.AddSingleton<ModuleLoader>();
+builder.Services.AddSingleton<ModuleLoader>(sp => 
+    new ModuleLoader(sp.GetRequiredService<NodeRegistry>(), sp.GetRequiredService<IApiRouter>(), sp));
 builder.Services.AddSingleton<RouteDiscovery>();
 builder.Services.AddSingleton<CoreApiService>();
+
+// HTTP client for adapters
+builder.Services.AddHttpClient();
 
 var app = builder.Build();
 

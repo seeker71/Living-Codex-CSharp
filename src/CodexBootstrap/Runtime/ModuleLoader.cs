@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Runtime.Loader;
+using Microsoft.Extensions.DependencyInjection;
 using CodexBootstrap.Core;
 
 namespace CodexBootstrap.Runtime;
@@ -8,11 +9,13 @@ public sealed class ModuleLoader
 {
     private readonly NodeRegistry _registry;
     private readonly IApiRouter _router;
+    private readonly IServiceProvider _serviceProvider;
 
-    public ModuleLoader(NodeRegistry registry, IApiRouter router)
+    public ModuleLoader(NodeRegistry registry, IApiRouter router, IServiceProvider serviceProvider)
     {
         _registry = registry;
         _router = router;
+        _serviceProvider = serviceProvider;
     }
 
     public void LoadBuiltInModules()
@@ -27,7 +30,8 @@ public sealed class ModuleLoader
         {
             try
             {
-                if (Activator.CreateInstance(moduleType) is IModule module)
+                var module = ActivatorUtilities.CreateInstance(_serviceProvider, moduleType) as IModule;
+                if (module != null)
                 {
                     LoadModule(module);
                 }
