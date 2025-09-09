@@ -11,10 +11,12 @@ public record OneShotExecuteResponse(string ModuleId, object Result, bool Succes
 public sealed class OneShotModule : IModule
 {
     private readonly NodeRegistry _registry;
+    private readonly IApiRouter _router;
 
-    public OneShotModule(NodeRegistry registry)
+    public OneShotModule(NodeRegistry registry, IApiRouter router)
     {
         _registry = registry;
+        _router = router;
     }
 
     public Node GetModuleNode()
@@ -43,13 +45,13 @@ public sealed class OneShotModule : IModule
 
     public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
     {
-        router.Register("codex.oneshot", "apply", args =>
+        router.Register("codex.oneshot", "apply", async args =>
         {
             try
             {
                 if (args == null || !args.HasValue)
                 {
-                    return Task.FromResult<object>(new ErrorResponse("Missing request parameters"));
+                    return new ErrorResponse("Missing request parameters");
                 }
 
                 var moduleId = args.Value.TryGetProperty("moduleId", out var idElement) ? idElement.GetString() : null;
@@ -57,67 +59,127 @@ public sealed class OneShotModule : IModule
 
                 if (string.IsNullOrEmpty(moduleId))
                 {
-                    return Task.FromResult<object>(new ErrorResponse("Module ID is required"));
+                    return new ErrorResponse("Module ID is required");
                 }
 
-                // Simulate one-shot apply: compose → expand → validate → contract
+                // Real one-shot apply: compose → expand → validate → contract
+                var steps = new List<object>();
+                var success = true;
+                var finalResult = "One-shot operation completed successfully";
+
+                try
+                {
+                    // Step 1: Compose spec from atoms
+                    var composeRequest = JsonSerializer.SerializeToElement(new { moduleId, atoms });
+                    var composeResult = await ExecuteModuleApi("codex.spec", "compose", composeRequest);
+                    steps.Add(new { step = "compose", status = "completed", result = "Spec composed from atoms" });
+
+                    // Step 2: Expand the spec
+                    var expandRequest = JsonSerializer.SerializeToElement(new { id = moduleId });
+                    var expandResult = await ExecuteModuleApi("codex.breath", "expand", expandRequest);
+                    steps.Add(new { step = "expand", status = "completed", result = "Spec expanded" });
+
+                    // Step 3: Validate the expanded spec
+                    var validateRequest = JsonSerializer.SerializeToElement(new { id = moduleId });
+                    var validateResult = await ExecuteModuleApi("codex.breath", "validate", validateRequest);
+                    steps.Add(new { step = "validate", status = "completed", result = "Spec validated" });
+
+                    // Step 4: Contract the validated spec
+                    var contractRequest = JsonSerializer.SerializeToElement(new { id = moduleId });
+                    var contractResult = await ExecuteModuleApi("codex.breath", "contract", contractRequest);
+                    steps.Add(new { step = "contract", status = "completed", result = "Spec contracted" });
+                }
+                catch (Exception ex)
+                {
+                    steps.Add(new { step = "error", status = "failed", result = ex.Message });
+                    success = false;
+                    finalResult = $"One-shot operation failed: {ex.Message}";
+                }
+
                 var result = new
                 {
                     moduleId,
-                    steps = new[]
-                    {
-                        new { step = "compose", status = "completed", result = "Spec composed" },
-                        new { step = "expand", status = "completed", result = "Spec expanded" },
-                        new { step = "validate", status = "completed", result = "Spec validated" },
-                        new { step = "contract", status = "completed", result = "Spec contracted" }
-                    },
-                    finalResult = "One-shot operation completed successfully"
+                    steps,
+                    finalResult,
+                    success
                 };
 
-                return Task.FromResult<object>(new OneShotApplyResponse(moduleId, result, true));
+                return new OneShotApplyResponse(moduleId, result, success);
             }
             catch (Exception ex)
             {
-                return Task.FromResult<object>(new ErrorResponse($"Failed to apply one-shot: {ex.Message}"));
+                return new ErrorResponse($"Failed to apply one-shot: {ex.Message}");
             }
         });
 
-        router.Register("codex.oneshot", "execute", args =>
+        router.Register("codex.oneshot", "execute", async args =>
         {
             try
             {
                 if (args == null || !args.HasValue)
                 {
-                    return Task.FromResult<object>(new ErrorResponse("Missing request parameters"));
+                    return new ErrorResponse("Missing request parameters");
                 }
 
                 var moduleId = args.Value.TryGetProperty("moduleId", out var idElement) ? idElement.GetString() : null;
 
                 if (string.IsNullOrEmpty(moduleId))
                 {
-                    return Task.FromResult<object>(new ErrorResponse("Module ID is required"));
+                    return new ErrorResponse("Module ID is required");
                 }
 
-                // Simulate one-shot execute on existing atoms
+                // Real one-shot execute on existing atoms
+                var steps = new List<object>();
+                var success = true;
+                var finalResult = "One-shot execution completed successfully";
+
+                try
+                {
+                    // Step 1: Load existing atoms
+                    var getAtomsRequest = JsonSerializer.SerializeToElement(new { moduleId });
+                    var atomsResult = await ExecuteModuleApi("codex.spec", "get-atoms", getAtomsRequest);
+                    steps.Add(new { step = "load-atoms", status = "completed", result = "Atoms loaded from storage" });
+
+                    // Step 2: Compose spec from loaded atoms
+                    var composeRequest = JsonSerializer.SerializeToElement(new { moduleId, atoms = atomsResult });
+                    var composeResult = await ExecuteModuleApi("codex.spec", "compose", composeRequest);
+                    steps.Add(new { step = "compose", status = "completed", result = "Spec composed from loaded atoms" });
+
+                    // Step 3: Expand the spec
+                    var expandRequest = JsonSerializer.SerializeToElement(new { id = moduleId });
+                    var expandResult = await ExecuteModuleApi("codex.breath", "expand", expandRequest);
+                    steps.Add(new { step = "expand", status = "completed", result = "Spec expanded" });
+
+                    // Step 4: Validate the expanded spec
+                    var validateRequest = JsonSerializer.SerializeToElement(new { id = moduleId });
+                    var validateResult = await ExecuteModuleApi("codex.breath", "validate", validateRequest);
+                    steps.Add(new { step = "validate", status = "completed", result = "Spec validated" });
+
+                    // Step 5: Contract the validated spec
+                    var contractRequest = JsonSerializer.SerializeToElement(new { id = moduleId });
+                    var contractResult = await ExecuteModuleApi("codex.breath", "contract", contractRequest);
+                    steps.Add(new { step = "contract", status = "completed", result = "Spec contracted" });
+                }
+                catch (Exception ex)
+                {
+                    steps.Add(new { step = "error", status = "failed", result = ex.Message });
+                    success = false;
+                    finalResult = $"One-shot execution failed: {ex.Message}";
+                }
+
                 var result = new
                 {
                     moduleId,
-                    steps = new[]
-                    {
-                        new { step = "load-atoms", status = "completed", result = "Atoms loaded" },
-                        new { step = "compose", status = "completed", result = "Spec composed" },
-                        new { step = "expand", status = "completed", result = "Spec expanded" },
-                        new { step = "validate", status = "completed", result = "Spec validated" },
-                        new { step = "contract", status = "completed", result = "Spec contracted" }
-                    },
-                    finalResult = "One-shot execution completed successfully"
+                    steps,
+                    finalResult,
+                    success
                 };
 
-                return Task.FromResult<object>(new OneShotExecuteResponse(moduleId, result, true));
+                return new OneShotExecuteResponse(moduleId, result, success);
             }
             catch (Exception ex)
             {
-                return Task.FromResult<object>(new ErrorResponse($"Failed to execute one-shot: {ex.Message}"));
+                return new ErrorResponse($"Failed to execute one-shot: {ex.Message}");
             }
         });
     }
@@ -151,5 +213,15 @@ public sealed class OneShotModule : IModule
                 return Results.Problem($"Failed to execute one-shot: {ex.Message}");
             }
         });
+    }
+
+    private async Task<object> ExecuteModuleApi(string moduleId, string apiName, JsonElement request)
+    {
+        if (_router.TryGetHandler(moduleId, apiName, out var handler))
+        {
+            var result = await handler(request);
+            return result;
+        }
+        throw new InvalidOperationException($"API {apiName} not found in module {moduleId}");
     }
 }

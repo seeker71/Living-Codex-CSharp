@@ -57,13 +57,13 @@ public sealed class SpecModule : IModule
 
     public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
     {
-        router.Register("codex.spec", "atoms", args =>
+        router.Register("codex.spec", "atoms", async args =>
         {
             try
             {
                 if (args == null || !args.HasValue)
                 {
-                    return Task.FromResult<object>(new ErrorResponse("Missing request parameters"));
+                    return new ErrorResponse("Missing request parameters");
                 }
 
                 var moduleId = args.Value.TryGetProperty("moduleId", out var idElement) ? idElement.GetString() : null;
@@ -71,85 +71,83 @@ public sealed class SpecModule : IModule
 
                 if (string.IsNullOrEmpty(moduleId))
                 {
-                    return Task.FromResult<object>(new ErrorResponse("Module ID is required"));
+                    return new ErrorResponse("Module ID is required");
                 }
 
                 // Store atoms as nodes
                 if (atoms.HasValue)
                 {
-                    // Parse atoms and store as nodes
-                    var atomsJson = atoms.Value.GetRawText();
-                    // This would parse and store the atoms - simplified for now
-                    return Task.FromResult<object>(new SpecAtomsResponse(moduleId, true, "Atoms stored successfully"));
+                    await StoreAtomsAsNodes(moduleId, atoms.Value, registry);
+                    return new SpecAtomsResponse(moduleId, true, "Atoms stored successfully");
                 }
 
-                return Task.FromResult<object>(new SpecAtomsResponse(moduleId, true));
+                return new SpecAtomsResponse(moduleId, true);
             }
             catch (Exception ex)
             {
-                return Task.FromResult<object>(new ErrorResponse($"Failed to process atoms: {ex.Message}"));
+                return new ErrorResponse($"Failed to process atoms: {ex.Message}");
             }
         });
 
-        router.Register("codex.spec", "compose", args =>
+        router.Register("codex.spec", "compose", async args =>
         {
             try
             {
                 if (args == null || !args.HasValue)
                 {
-                    return Task.FromResult<object>(new ErrorResponse("Missing request parameters"));
+                    return new ErrorResponse("Missing request parameters");
                 }
 
                 var moduleId = args.Value.TryGetProperty("moduleId", out var idElement) ? idElement.GetString() : null;
 
                 if (string.IsNullOrEmpty(moduleId))
                 {
-                    return Task.FromResult<object>(new ErrorResponse("Module ID is required"));
+                    return new ErrorResponse("Module ID is required");
                 }
 
                 // Compose spec from stored atoms
-                var spec = new { id = moduleId, name = "Composed Spec", version = "1.0.0" };
-                return Task.FromResult<object>(new SpecComposeResponse(spec, true));
+                var spec = await ComposeSpecFromAtoms(moduleId, registry);
+                return new SpecComposeResponse(spec, true);
             }
             catch (Exception ex)
             {
-                return Task.FromResult<object>(new ErrorResponse($"Failed to compose spec: {ex.Message}"));
+                return new ErrorResponse($"Failed to compose spec: {ex.Message}");
             }
         });
 
-        router.Register("codex.spec", "export", args =>
+        router.Register("codex.spec", "export", async args =>
         {
             try
             {
                 if (args == null || !args.HasValue)
                 {
-                    return Task.FromResult<object>(new ErrorResponse("Missing request parameters"));
+                    return new ErrorResponse("Missing request parameters");
                 }
 
                 var moduleId = args.Value.TryGetProperty("moduleId", out var idElement) ? idElement.GetString() : null;
 
                 if (string.IsNullOrEmpty(moduleId))
                 {
-                    return Task.FromResult<object>(new ErrorResponse("Module ID is required"));
+                    return new ErrorResponse("Module ID is required");
                 }
 
                 // Export atoms for the module
-                var atoms = new { moduleId, nodes = new object[0], edges = new object[0] };
-                return Task.FromResult<object>(new SpecExportResponse(moduleId, atoms, true));
+                var atoms = await ExportModuleAtoms(moduleId, registry);
+                return new SpecExportResponse(moduleId, atoms, true);
             }
             catch (Exception ex)
             {
-                return Task.FromResult<object>(new ErrorResponse($"Failed to export atoms: {ex.Message}"));
+                return new ErrorResponse($"Failed to export atoms: {ex.Message}");
             }
         });
 
-        router.Register("codex.spec", "import", args =>
+        router.Register("codex.spec", "import", async args =>
         {
             try
             {
                 if (args == null || !args.HasValue)
                 {
-                    return Task.FromResult<object>(new ErrorResponse("Missing request parameters"));
+                    return new ErrorResponse("Missing request parameters");
                 }
 
                 var moduleId = args.Value.TryGetProperty("moduleId", out var idElement) ? idElement.GetString() : null;
@@ -157,67 +155,71 @@ public sealed class SpecModule : IModule
 
                 if (string.IsNullOrEmpty(moduleId))
                 {
-                    return Task.FromResult<object>(new ErrorResponse("Module ID is required"));
+                    return new ErrorResponse("Module ID is required");
                 }
 
                 // Import atoms for the module
-                return Task.FromResult<object>(new SpecImportResponse(moduleId, true));
+                if (atoms.HasValue)
+                {
+                    await StoreAtomsAsNodes(moduleId, atoms.Value, registry);
+                }
+                return new SpecImportResponse(moduleId, true);
             }
             catch (Exception ex)
             {
-                return Task.FromResult<object>(new ErrorResponse($"Failed to import atoms: {ex.Message}"));
+                return new ErrorResponse($"Failed to import atoms: {ex.Message}");
             }
         });
 
-        router.Register("codex.spec", "get-atoms", args =>
+        router.Register("codex.spec", "get-atoms", async args =>
         {
             try
             {
                 if (args == null || !args.HasValue)
                 {
-                    return Task.FromResult<object>(new ErrorResponse("Missing request parameters"));
+                    return new ErrorResponse("Missing request parameters");
                 }
 
                 var moduleId = args.Value.TryGetProperty("moduleId", out var idElement) ? idElement.GetString() : null;
 
                 if (string.IsNullOrEmpty(moduleId))
                 {
-                    return Task.FromResult<object>(new ErrorResponse("Module ID is required"));
+                    return new ErrorResponse("Module ID is required");
                 }
 
                 // Get atoms for the module
-                var atoms = new { moduleId, nodes = new object[0], edges = new object[0] };
-                return Task.FromResult<object>(atoms);
+                var atoms = await ExportModuleAtoms(moduleId, registry);
+                return atoms;
             }
             catch (Exception ex)
             {
-                return Task.FromResult<object>(new ErrorResponse($"Failed to get atoms: {ex.Message}"));
+                return new ErrorResponse($"Failed to get atoms: {ex.Message}");
             }
         });
 
-        router.Register("codex.spec", "get-spec", args =>
+        router.Register("codex.spec", "get-spec", async args =>
         {
             try
             {
                 if (args == null || !args.HasValue)
                 {
-                    return Task.FromResult<object>(new ErrorResponse("Missing request parameters"));
+                    return new ErrorResponse("Missing request parameters");
                 }
 
                 var moduleId = args.Value.TryGetProperty("moduleId", out var idElement) ? idElement.GetString() : null;
 
                 if (string.IsNullOrEmpty(moduleId))
                 {
-                    return Task.FromResult<object>(new ErrorResponse("Module ID is required"));
+                    return new ErrorResponse("Module ID is required");
                 }
 
                 // Get spec for the module
-                var spec = new { id = moduleId, name = "Module Spec", version = "1.0.0" };
-                return Task.FromResult<object>(spec);
+                var spec = await ComposeSpecFromAtoms(moduleId, registry);
+                return spec;
             }
             catch (Exception ex)
             {
-                return Task.FromResult<object>(new ErrorResponse($"Failed to get spec: {ex.Message}"));
+                return new ErrorResponse($"Failed to get spec: {ex.Message}");
             }
         });
     }
@@ -305,5 +307,179 @@ public sealed class SpecModule : IModule
                 return Results.Problem($"Failed to get spec: {ex.Message}");
             }
         });
+    }
+
+    private async Task StoreAtomsAsNodes(string moduleId, JsonElement atoms, NodeRegistry registry)
+    {
+        try
+        {
+            // Parse atoms JSON
+            var atomsData = JsonSerializer.Deserialize<AtomsData>(atoms.GetRawText());
+            if (atomsData == null) return;
+
+            // Store nodes
+            foreach (var nodeData in atomsData.Nodes ?? new List<NodeData>())
+            {
+                var node = new Node(
+                    Id: nodeData.Id ?? Guid.NewGuid().ToString(),
+                    TypeId: nodeData.TypeId ?? "unknown",
+                    State: Enum.TryParse<ContentState>(nodeData.State, out var state) ? state : ContentState.Ice,
+                    Locale: nodeData.Locale,
+                    Title: nodeData.Title,
+                    Description: nodeData.Description,
+                    Content: nodeData.Content != null ? new ContentRef(
+                        MediaType: "application/json",
+                        InlineJson: JsonSerializer.Serialize(nodeData.Content),
+                        InlineBytes: null,
+                        ExternalUri: null
+                    ) : null,
+                    Meta: new Dictionary<string, object>
+                    {
+                        ["moduleId"] = moduleId,
+                        ["storedAt"] = DateTime.UtcNow.ToString("O")
+                    }
+                );
+                registry.Upsert(node);
+            }
+
+            // Store edges
+            foreach (var edgeData in atomsData.Edges ?? new List<EdgeData>())
+            {
+                var edge = new Edge(
+                    FromId: edgeData.FromId ?? "",
+                    ToId: edgeData.ToId ?? "",
+                    Role: edgeData.Role ?? "related",
+                    Weight: null,
+                    Meta: null
+                );
+                registry.Upsert(edge);
+            }
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to store atoms: {ex.Message}");
+        }
+    }
+
+    private async Task<object> ComposeSpecFromAtoms(string moduleId, NodeRegistry registry)
+    {
+        try
+        {
+            // Get module node
+            if (!registry.TryGet(moduleId, out var moduleNode))
+            {
+                throw new InvalidOperationException($"Module '{moduleId}' not found");
+            }
+
+            // Get module's API nodes
+            var apiNodes = registry.GetNodesByType("api")
+                .Where(api => api.Meta?.GetValueOrDefault("moduleId")?.ToString() == moduleId)
+                .ToList();
+
+            // Get module's edges
+            var moduleEdges = registry.AllEdges()
+                .Where(edge => edge.FromId == moduleId || edge.ToId == moduleId)
+                .ToList();
+
+            // Compose spec from actual module data
+            var spec = new
+            {
+                id = moduleId,
+                name = moduleNode.Title ?? moduleId,
+                version = moduleNode.Meta?.GetValueOrDefault("version")?.ToString() ?? "1.0.0",
+                description = moduleNode.Description ?? $"Spec for {moduleId}",
+                state = moduleNode.State.ToString(),
+                apis = apiNodes.Select(api => new
+                {
+                    name = api.Meta?.GetValueOrDefault("apiName")?.ToString() ?? "unknown",
+                    route = api.Meta?.GetValueOrDefault("route")?.ToString(),
+                    description = api.Description
+                }).ToList(),
+                dependencies = moduleEdges
+                    .Where(e => e.FromId == moduleId)
+                    .Select(e => e.ToId)
+                    .ToList(),
+                dependents = moduleEdges
+                    .Where(e => e.ToId == moduleId)
+                    .Select(e => e.FromId)
+                    .ToList(),
+                composedAt = DateTime.UtcNow.ToString("O")
+            };
+
+            return spec;
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to compose spec: {ex.Message}");
+        }
+    }
+
+    private async Task<object> ExportModuleAtoms(string moduleId, NodeRegistry registry)
+    {
+        try
+        {
+            // Get all nodes related to this module
+            var moduleNodes = registry.AllNodes()
+                .Where(node => node.Meta?.GetValueOrDefault("moduleId")?.ToString() == moduleId)
+                .ToList();
+
+            // Get all edges related to this module
+            var moduleEdges = registry.AllEdges()
+                .Where(edge => moduleNodes.Any(n => n.Id == edge.FromId || n.Id == edge.ToId))
+                .ToList();
+
+            var atoms = new
+            {
+                moduleId,
+                exportedAt = DateTime.UtcNow.ToString("O"),
+                nodes = moduleNodes.Select(node => new
+                {
+                    id = node.Id,
+                    typeId = node.TypeId,
+                    state = node.State.ToString(),
+                    locale = node.Locale,
+                    title = node.Title,
+                    description = node.Description,
+                    content = node.Content?.InlineJson
+                }).ToList(),
+                edges = moduleEdges.Select(edge => new
+                {
+                    fromId = edge.FromId,
+                    toId = edge.ToId,
+                    role = edge.Role
+                }).ToList()
+            };
+
+            return atoms;
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to export atoms: {ex.Message}");
+        }
+    }
+
+    // Data classes for atoms parsing
+    private class AtomsData
+    {
+        public List<NodeData>? Nodes { get; set; }
+        public List<EdgeData>? Edges { get; set; }
+    }
+
+    private class NodeData
+    {
+        public string? Id { get; set; }
+        public string? TypeId { get; set; }
+        public string? State { get; set; }
+        public string? Locale { get; set; }
+        public string? Title { get; set; }
+        public string? Description { get; set; }
+        public object? Content { get; set; }
+    }
+
+    private class EdgeData
+    {
+        public string? FromId { get; set; }
+        public string? ToId { get; set; }
+        public string? Role { get; set; }
     }
 }

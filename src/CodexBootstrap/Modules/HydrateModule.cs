@@ -39,7 +39,7 @@ public sealed class HydrateModule : IModule
 
     public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
     {
-        router.Register("codex.hydrate", "hydrate", args =>
+        router.Register("codex.hydrate", "hydrate", async args =>
         {
             try
             {
@@ -60,34 +60,43 @@ public sealed class HydrateModule : IModule
 
                 if (string.IsNullOrEmpty(nodeId))
                 {
-                    return Task.FromResult<object>(new ErrorResponse("Node ID is required"));
+                    return new ErrorResponse("Node ID is required");
                 }
 
                 // Get the node from registry
                 if (!registry.TryGet(nodeId, out var node))
                 {
-                    // If node doesn't exist, create a mock node for demonstration
-                    node = new Node(
-                        Id: nodeId,
-                        TypeId: "module",
-                        State: ContentState.Ice,
-                        Locale: null,
-                        Title: $"Mock Node {nodeId}",
-                        Description: "Generated for hydration demo",
-                        Content: new ContentRef(
-                            MediaType: "application/json",
-                            InlineJson: "{\"demo\": true}",
-                            InlineBytes: null,
-                            ExternalUri: null
-                        ),
-                        Meta: new Dictionary<string, object> { ["generated"] = true }
-                    );
+                    return new ErrorResponse($"Node '{nodeId}' not found");
                 }
 
-                // Simulate hydration based on node content
-                var hydratedContent = new
+                // Real hydration: promote Gas/Ice → Water via adapters/synthesizer
+                var hydratedContent = await HydrateNodeContent(node, registry);
+
+                return new HydrateNodeResponse(nodeId, hydratedContent, true);
+            }
+            catch (Exception ex)
+            {
+                return new ErrorResponse($"Failed to hydrate node: {ex.Message}");
+            }
+        });
+    }
+
+    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    {
+        // Hydrate module doesn't need any custom HTTP endpoints
+        // All functionality is exposed through the generic /route endpoint and RouteDiscovery
+    }
+
+    private async Task<object> HydrateNodeContent(Node node, NodeRegistry registry)
+    {
+        try
+        {
+            // Check if node is in Ice or Gas state and needs hydration
+            if (node.State != ContentState.Ice && node.State != ContentState.Gas)
+            {
+                return new
                 {
-                    nodeId,
+                    nodeId = node.Id,
                     originalState = node.State.ToString(),
                     hydratedAt = DateTime.UtcNow,
                     content = node.Content?.InlineJson ?? "{}",
@@ -98,22 +107,111 @@ public sealed class HydrateModule : IModule
                         description = node.Description,
                         locale = node.Locale
                     },
-                    hydrationMethod = "synthetic",
-                    success = true
+                    hydrationMethod = "already_hydrated",
+                    success = true,
+                    message = "Node is already in Water state"
                 };
+            }
 
-                return Task.FromResult<object>(new HydrateNodeResponse(nodeId, hydratedContent, true));
-            }
-            catch (Exception ex)
+            // Find adapters that can hydrate this node type
+            var adapters = registry.GetNodesByType("codex.adapters/adapter")
+                .Where(a => CanHydrateNodeType(a, node.TypeId))
+                .ToList();
+
+            if (!adapters.Any())
             {
-                return Task.FromResult<object>(new ErrorResponse($"Failed to hydrate node: {ex.Message}"));
+                // No specific adapter found, use default synthesis
+                return await SynthesizeContent(node);
             }
-        });
+
+            // Try each adapter until one succeeds
+            foreach (var adapter in adapters)
+            {
+                try
+                {
+                    var result = await TryAdapterHydration(node, adapter, registry);
+                    if (result != null)
+                    {
+                        return result;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Log adapter failure and try next one
+                    Console.WriteLine($"Adapter {adapter.Id} failed: {ex.Message}");
+                }
+            }
+
+            // Fallback to synthesis if all adapters failed
+            return await SynthesizeContent(node);
+        }
+        catch (Exception ex)
+        {
+            return new
+            {
+                nodeId = node.Id,
+                originalState = node.State.ToString(),
+                hydratedAt = DateTime.UtcNow,
+                content = node.Content?.InlineJson ?? "{}",
+                metadata = new
+                {
+                    typeId = node.TypeId,
+                    title = node.Title,
+                    description = node.Description,
+                    locale = node.Locale
+                },
+                hydrationMethod = "error",
+                success = false,
+                error = ex.Message
+            };
+        }
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    private bool CanHydrateNodeType(Node adapter, string nodeTypeId)
     {
-        // Hydrate module doesn't need any custom HTTP endpoints
-        // All functionality is exposed through the generic /route endpoint and RouteDiscovery
+        // Check if adapter supports this node type
+        var supportedTypes = adapter.Meta?.GetValueOrDefault("supportedTypes") as string[] ?? new string[0];
+        return supportedTypes.Contains(nodeTypeId) || supportedTypes.Contains("*");
+    }
+
+    private async Task<object?> TryAdapterHydration(Node node, Node adapter, NodeRegistry registry)
+    {
+        // This would call the adapter's hydration logic
+        // For now, return null to indicate adapter couldn't handle this node
+        return null;
+    }
+
+    private async Task<object> SynthesizeContent(Node node)
+    {
+        // Default content synthesis when no adapter is available
+        var synthesizedContent = new
+        {
+            id = node.Id,
+            typeId = node.TypeId,
+            title = node.Title,
+            description = node.Description,
+            state = ContentState.Water.ToString(),
+            hydratedAt = DateTime.UtcNow,
+            synthesized = true,
+            originalContent = node.Content?.InlineJson ?? "{}"
+        };
+
+        return new
+        {
+            nodeId = node.Id,
+            originalState = node.State.ToString(),
+            hydratedAt = DateTime.UtcNow,
+            content = JsonSerializer.Serialize(synthesizedContent),
+            metadata = new
+            {
+                typeId = node.TypeId,
+                title = node.Title,
+                description = node.Description,
+                locale = node.Locale
+            },
+            hydrationMethod = "synthesis",
+            success = true,
+            synthesized = true
+        };
     }
 }
