@@ -21,6 +21,21 @@ public sealed class ModuleLoader
 
     public IReadOnlyList<IModule> GetLoadedModules() => _loadedModules.AsReadOnly();
 
+    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi)
+    {
+        foreach (var module in _loadedModules)
+        {
+            try
+            {
+                module.RegisterHttpEndpoints(app, registry, coreApi, this);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to register HTTP endpoints for module {module.GetModuleNode().Id}: {ex.Message}");
+            }
+        }
+    }
+
     public void LoadBuiltInModules()
     {
         // Load all built-in modules from the Modules namespace

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using CodexBootstrap.Core;
+using CodexBootstrap.Runtime;
 
 namespace CodexBootstrap.Modules;
 
@@ -434,5 +435,11 @@ public sealed class SpecReflectionModule : IModule
         {
             throw new InvalidOperationException($"Failed to ingest meta-nodes to spec: {ex.Message}", ex);
         }
+    }
+
+    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    {
+        // Spec Reflection module doesn't need any custom HTTP endpoints
+        // All functionality is exposed through the generic /route endpoint
     }
 }

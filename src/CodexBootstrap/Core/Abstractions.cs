@@ -1,4 +1,5 @@
 using System.Text.Json;
+using CodexBootstrap.Runtime;
 
 namespace CodexBootstrap.Core;
 
@@ -99,6 +100,7 @@ public interface IModule
     Node GetModuleNode();
     void Register(NodeRegistry registry);
     void RegisterApiHandlers(IApiRouter router, NodeRegistry registry);
+    void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader);
 }
 
 public interface IApiRouter

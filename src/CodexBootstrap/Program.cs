@@ -45,6 +45,9 @@ moduleLoader.LoadBuiltInModules();
 var moduleDir = Path.Combine(AppContext.BaseDirectory, "modules");
 moduleLoader.LoadExternalModules(moduleDir);
 
+// Register HTTP endpoints from all modules
+moduleLoader.RegisterHttpEndpoints(app, registry, coreApi);
+
 // ---- Core API Routes (Node/Edge only) ----
 app.MapGet("/nodes", () => coreApi.GetNodes());
 app.MapGet("/nodes/{id}", (string id) => 
@@ -67,60 +70,6 @@ app.MapGet("/modules/{id}", (string id) =>
 {
     var module = coreApi.GetModule(id);
     return module != null ? Results.Ok(module) : Results.NotFound();
-});
-
-// OpenAPI specifications for modules
-app.MapGet("/openapi/{moduleId}", (string moduleId) =>
-{
-    try
-    {
-        // Get the module node to find the module instance
-        var moduleNode = coreApi.GetModule(moduleId);
-        if (moduleNode == null)
-        {
-            return Results.NotFound($"Module '{moduleId}' not found");
-        }
-
-        // Find the OpenAPI module instance
-        var moduleInstances = moduleLoader.GetLoadedModules();
-        var openApiModule = moduleInstances.OfType<OpenApiModule>().FirstOrDefault();
-
-        if (openApiModule == null)
-        {
-            return Results.NotFound("OpenAPI module not found");
-        }
-
-        var openApiSpec = openApiModule.GetOpenApiSpec(moduleId);
-        return Results.Ok(openApiSpec);
-    }
-    catch (Exception ex)
-    {
-        return Results.Problem($"Failed to get OpenAPI spec for module '{moduleId}': {ex.Message}");
-    }
-});
-
-// List all OpenAPI specifications as nodes
-app.MapGet("/openapi-specs", () =>
-{
-    try
-    {
-        // Find the OpenAPI module instance
-        var moduleInstances = moduleLoader.GetLoadedModules();
-        var openApiModule = moduleInstances.OfType<OpenApiModule>().FirstOrDefault();
-
-        if (openApiModule == null)
-        {
-            return Results.NotFound("OpenAPI module not found");
-        }
-
-        // Use the list-specs API
-        var result = coreApi.ExecuteDynamicCall(new DynamicCall("codex.openapi", "list-specs", null));
-        return Results.Ok(result);
-    }
-    catch (Exception ex)
-    {
-        return Results.Problem($"Failed to list OpenAPI specs: {ex.Message}");
-    }
 });
 
 // Dynamic API route — self‑describing invocation

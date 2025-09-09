@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using CodexBootstrap.Core;
+using CodexBootstrap.Runtime;
 
 namespace CodexBootstrap.Modules;
 
@@ -484,5 +485,11 @@ public sealed class RelationsModule : IModule
                 Path: "relations.role"
             ));
         }
+    }
+
+    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    {
+        // Relations module doesn't need any custom HTTP endpoints
+        // All functionality is exposed through the generic /route endpoint
     }
 }

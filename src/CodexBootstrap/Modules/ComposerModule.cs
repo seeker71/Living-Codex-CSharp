@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using CodexBootstrap.Core;
+using CodexBootstrap.Runtime;
 
 namespace CodexBootstrap.Modules;
 
@@ -143,5 +144,11 @@ public sealed class ComposerModule : IModule
                 return Task.FromResult<object>(new ErrorResponse($"Registration failed: {ex.Message}"));
             }
         });
+    }
+
+    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    {
+        // Composer module doesn't need any custom HTTP endpoints
+        // All functionality is exposed through the generic /route endpoint
     }
 }

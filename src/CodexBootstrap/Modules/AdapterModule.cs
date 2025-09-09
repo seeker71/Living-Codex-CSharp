@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using CodexBootstrap.Core;
+using CodexBootstrap.Runtime;
 
 namespace CodexBootstrap.Modules;
 
@@ -390,5 +391,11 @@ public sealed class AdapterModule : IModule
     public IEnumerable<IContentAdapter> GetAllAdapters()
     {
         return _adapters.Values;
+    }
+
+    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    {
+        // Adapter module doesn't need any custom HTTP endpoints
+        // All functionality is exposed through the generic /route endpoint
     }
 }

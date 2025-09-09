@@ -1,5 +1,6 @@
 using System.Text.Json;
 using CodexBootstrap.Core;
+using CodexBootstrap.Runtime;
 
 namespace CodexBootstrap.Modules;
 
@@ -207,6 +208,12 @@ public sealed class BreathModule : IModule
                 return Task.FromResult<object>(new ErrorResponse($"Oneshot failed: {ex.Message}"));
             }
         });
+    }
+
+    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    {
+        // Breath module doesn't need any custom HTTP endpoints
+        // All functionality is exposed through the generic /route endpoint
     }
 }
 

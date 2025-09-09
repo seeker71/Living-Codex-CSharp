@@ -1,5 +1,6 @@
 using System.Text.Json;
 using CodexBootstrap.Core;
+using CodexBootstrap.Runtime;
 
 namespace CodexBootstrap.Modules;
 
@@ -55,5 +56,11 @@ public sealed class HelloModule : IModule
             registry.Upsert(node);
             return Task.FromResult<object>(new SuccessResponse($"Hello, {name}! NodeId={node.Id}"));
         });
+    }
+
+    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    {
+        // Hello module doesn't need any custom HTTP endpoints
+        // All functionality is exposed through the generic /route endpoint
     }
 }

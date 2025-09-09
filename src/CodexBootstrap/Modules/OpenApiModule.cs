@@ -1,6 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Builder;
 using CodexBootstrap.Core;
+using CodexBootstrap.Runtime;
 
 namespace CodexBootstrap.Modules;
 
@@ -554,6 +556,43 @@ public sealed class OpenApiModule : IModule
         });
     }
 
+    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    {
+        // OpenAPI specifications for modules
+        app.MapGet("/openapi/{moduleId}", (string moduleId) =>
+        {
+            try
+            {
+                // Get the module node to find the module instance
+                var moduleNode = coreApi.GetModule(moduleId);
+                if (moduleNode == null)
+                {
+                    return Results.NotFound($"Module '{moduleId}' not found");
+                }
 
+                var openApiSpec = GetOpenApiSpec(moduleId);
+                return Results.Ok(openApiSpec);
+            }
+            catch (Exception ex)
+            {
+                return Results.Problem($"Failed to get OpenAPI spec for module '{moduleId}': {ex.Message}");
+            }
+        });
+
+        // List all OpenAPI specifications as nodes
+        app.MapGet("/openapi-specs", () =>
+        {
+            try
+            {
+                // Use the list-specs API
+                var result = coreApi.ExecuteDynamicCall(new DynamicCall("codex.openapi", "list-specs", null));
+                return Results.Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return Results.Problem($"Failed to list OpenAPI specs: {ex.Message}");
+            }
+        });
+    }
 
 }
