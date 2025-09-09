@@ -141,11 +141,10 @@ public sealed class HttpAdapter : IContentAdapter
     }
 }
 
-public sealed class AdapterModule : IModule, IOpenApiProvider
+public sealed class AdapterModule : IModule
 {
     private readonly Dictionary<string, IContentAdapter> _adapters = new();
     private readonly HttpClient _httpClient;
-    private NodeRegistry? _registry;
 
     public AdapterModule(HttpClient httpClient)
     {
@@ -165,21 +164,9 @@ public sealed class AdapterModule : IModule, IOpenApiProvider
         );
     }
 
-    public object GetOpenApiSpec()
-    {
-        if (_registry == null)
-        {
-            return new { error = "Registry not available" };
-        }
-
-        var moduleNode = GetModuleNode();
-        return OpenApiHelper.GenerateOpenApiSpec("codex.adapters", moduleNode, _registry);
-    }
 
     public void Register(NodeRegistry registry)
     {
-        _registry = registry; // Store registry reference for OpenAPI generation
-        
         // Register the module node
         registry.Upsert(GetModuleNode());
 

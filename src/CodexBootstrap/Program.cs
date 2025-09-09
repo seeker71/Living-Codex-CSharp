@@ -81,22 +81,45 @@ app.MapGet("/openapi/{moduleId}", (string moduleId) =>
             return Results.NotFound($"Module '{moduleId}' not found");
         }
 
-        // Find the module instance that implements IOpenApiProvider
+        // Find the OpenAPI module instance
         var moduleInstances = moduleLoader.GetLoadedModules();
-        var openApiModule = moduleInstances.OfType<IOpenApiProvider>()
-            .FirstOrDefault(m => ((IModule)m).GetModuleNode().Id == moduleId);
+        var openApiModule = moduleInstances.OfType<OpenApiModule>().FirstOrDefault();
 
         if (openApiModule == null)
         {
-            return Results.NotFound($"Module '{moduleId}' does not support OpenAPI");
+            return Results.NotFound("OpenAPI module not found");
         }
 
-        var openApiSpec = openApiModule.GetOpenApiSpec();
+        var openApiSpec = openApiModule.GetOpenApiSpec(moduleId);
         return Results.Ok(openApiSpec);
     }
     catch (Exception ex)
     {
         return Results.Problem($"Failed to get OpenAPI spec for module '{moduleId}': {ex.Message}");
+    }
+});
+
+// List all OpenAPI specifications as nodes
+app.MapGet("/openapi-specs", () =>
+{
+    try
+    {
+        // Find the OpenAPI module instance
+        var moduleInstances = moduleLoader.GetLoadedModules();
+        var openApiModule = moduleInstances.OfType<OpenApiModule>().FirstOrDefault();
+
+        if (openApiModule == null)
+        {
+            return Results.NotFound("OpenAPI module not found");
+        }
+
+        // Use the list-specs API
+        var result = coreApi.ExecuteDynamicCall(new DynamicCall("codex.openapi", "list-specs", null));
+        return Results.Ok(result);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"Failed to list OpenAPI specs: {ex.Message}");
     }
 });
 

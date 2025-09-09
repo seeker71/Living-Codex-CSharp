@@ -25,10 +25,8 @@ public sealed record ResonanceProposal(
     string Justification
 );
 
-public sealed class PhaseModule : IModule, IOpenApiProvider
+public sealed class PhaseModule : IModule
 {
-    private NodeRegistry? _registry;
-
     public Node GetModuleNode()
     {
         return NodeStorage.CreateModuleNode(
@@ -39,21 +37,9 @@ public sealed class PhaseModule : IModule, IOpenApiProvider
         );
     }
 
-    public object GetOpenApiSpec()
-    {
-        if (_registry == null)
-        {
-            return new { error = "Registry not available" };
-        }
-
-        var moduleNode = GetModuleNode();
-        return OpenApiHelper.GenerateOpenApiSpec("codex.phase", moduleNode, _registry);
-    }
 
     public void Register(NodeRegistry registry)
     {
-        _registry = registry; // Store registry reference for OpenAPI generation
-        
         // Register the module node
         registry.Upsert(GetModuleNode());
 

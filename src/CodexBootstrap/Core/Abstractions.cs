@@ -125,11 +125,6 @@ public interface IAdapterRegistry
     bool TryGet(string scheme, out ISourceAdapter adapter);
 }
 
-// Interface for modules to provide their OpenAPI specifications
-public interface IOpenApiProvider
-{
-    object GetOpenApiSpec();
-}
 
 public sealed record DynamicCall(string ModuleId, string Api, JsonElement? Args);
 
