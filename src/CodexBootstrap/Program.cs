@@ -34,13 +34,8 @@ var coreApi = app.Services.GetRequiredService<CoreApiService>();
 var moduleLoader = app.Services.GetRequiredService<ModuleLoader>();
 var routeDiscovery = app.Services.GetRequiredService<RouteDiscovery>();
 
-// Load modules generically
+// Load modules generically (includes API handler registration)
 moduleLoader.LoadBuiltInModules();
-
-// Register API handlers for loaded modules
-ComposerModule.RegisterApiHandlers(router, registry);
-BreathModule.RegisterApiHandlers(router, registry);
-HelloModule.RegisterApiHandlers(router, registry);
 
 // Load external modules from ./modules/*.dll
 var moduleDir = Path.Combine(AppContext.BaseDirectory, "modules");

@@ -74,6 +74,7 @@ public sealed class ModuleLoader
         var moduleNode = module.GetModuleNode();
         _registry.Upsert(moduleNode);
         module.Register(_registry);
+        module.RegisterApiHandlers(_router, _registry);
         
         var name = moduleNode.Meta?.GetValueOrDefault("name")?.ToString() ?? moduleNode.Title;
         var version = moduleNode.Meta?.GetValueOrDefault("version")?.ToString() ?? "0.1.0";

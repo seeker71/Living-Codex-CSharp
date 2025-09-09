@@ -36,7 +36,7 @@ public sealed class ComposerModule : IModule
         registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.composer", "register-spec"));
     }
 
-    public static void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
     {
         router.Register("codex.composer", "compose", args =>
         {
@@ -62,17 +62,17 @@ public sealed class ComposerModule : IModule
                     registry.Upsert(edge);
                 }
 
-                // Create a simple spec
-                var spec = new
-                {
-                    id = atoms.Id,
-                    version = "0.1.0",
-                    name = $"Module {atoms.Id}",
-                    description = $"Composed from {atoms.Nodes.Count} nodes",
-                    dependencies = new object[0],
-                    types = new object[0],
-                    apis = new object[0]
-                };
+                // Create a proper ModuleSpec
+                var spec = new ModuleSpec(
+                    Id: atoms.Id,
+                    Name: $"Module {atoms.Id}",
+                    Version: "0.1.0",
+                    Description: $"Composed from {atoms.Nodes.Count} nodes",
+                    Title: $"Module {atoms.Id}",
+                    Dependencies: new List<ModuleRef>(),
+                    Types: new List<TypeSpec>(),
+                    Apis: new List<ApiSpec>()
+                );
 
                 // Store spec as a node
                 var specNode = NodeStorage.CreateSpecNode(atoms.Id, $"Module {atoms.Id}", "0.1.0", spec);

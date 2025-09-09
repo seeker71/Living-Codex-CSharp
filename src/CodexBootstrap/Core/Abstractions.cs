@@ -38,28 +38,40 @@ public sealed record Edge(
 // Minimal type system to self‑describe payloads and APIs
 public sealed record TypeSpec(
     string Name,
-    string Kind, // "object" | "string" | "number" | "boolean" | "array" | "ref"
-    Dictionary<string, TypeSpec>? Properties = null,
-    TypeSpec? Items = null,
-    string? Ref = null,
-    string? MediaType = null
+    string? Description,
+    IReadOnlyList<FieldSpec>? Fields
+);
+
+public sealed record FieldSpec(
+    string Name,
+    string Type,
+    bool Required,
+    string? Description
+);
+
+public sealed record ParameterSpec(
+    string Name,
+    string Type,
+    bool Required,
+    string? Description
 );
 
 public sealed record ApiSpec(
     string Name,
+    string Verb,
     string Route,
     string? Description,
-    TypeSpec? Input,
-    TypeSpec? Output
+    IReadOnlyList<ParameterSpec>? Parameters
 );
 
 public sealed record ModuleRef(string Id, string Version);
 
 public sealed record ModuleSpec(
     string Id,
-    string Version,
     string Name,
+    string Version,
     string? Description,
+    string? Title,
     IReadOnlyList<ModuleRef> Dependencies,
     IReadOnlyList<TypeSpec> Types,
     IReadOnlyList<ApiSpec> Apis
@@ -69,6 +81,7 @@ public interface IModule
 {
     Node GetModuleNode();
     void Register(NodeRegistry registry);
+    void RegisterApiHandlers(IApiRouter router, NodeRegistry registry);
 }
 
 public interface IApiRouter

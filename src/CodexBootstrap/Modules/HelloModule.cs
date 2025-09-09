@@ -29,7 +29,7 @@ public sealed class HelloModule : IModule
         registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.hello", "hello"));
     }
 
-    public static void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
     {
         router.Register("codex.hello", "echo", args => Task.FromResult<object>(args ?? new object()));
 

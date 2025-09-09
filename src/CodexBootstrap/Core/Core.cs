@@ -91,7 +91,7 @@ public static class NodeStorage
     {
         return new Node(
             Id: id,
-            TypeId: "spec",
+            TypeId: "codex.meta/spec",
             State: ContentState.Ice,
             Locale: "en",
             Title: name,

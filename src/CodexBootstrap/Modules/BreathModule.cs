@@ -63,7 +63,7 @@ public sealed class BreathModule : IModule
         registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.breath", "oneshot"));
     }
 
-    public static void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
     {
         router.Register("codex.breath", "expand", args =>
         {
