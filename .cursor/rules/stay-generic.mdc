@@ -1,0 +1,26 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+Everything is a Node. Data, structure, flow, state, deltas, policies, specs — all have node forms. Runtime types are scaffolding that must round‑trip ⇄ nodes.
+
+Meta‑Nodes Describe Structure. Schemas, APIs, layers, code (structure/flow/state) are expressed as codex.meta/* or codex.code/* nodes with edges.
+
+Prefer Generalization to Duplication. If a new variant emerges, generalize the existing construct until both are instances. Avoid partial forks.
+
+Keep Ice Tiny. Persist only atoms, deltas, essential indices. Let water (materialized) and gas (derivable) carry weight.
+
+Tiny Deltas. All changes are minimal patches on nodes/edges (git‑like). Large rewrites must be proven irreducible.
+
+Single Lifecycle. Use the breath loop: compose → expand → validate → (melt/patch/refreeze) → contract.
+
+Resonance Before Refreeze. Structural edits must harmonize with anchors; otherwise generalize or stay as water/gas.
+
+Adapters Over Features. External I/O (web, files, DB, AI) is adapterized; the core stays thin.
+
+Deterministic Projections. OpenAPI/JSON‑Schema/codegen derive deterministically from meta‑nodes.
+
+One‑Shot First. Each coil should be runnable from atoms via a single call (prove minimal sufficiency).
+
+Do not overstate success, only after validation has completed without any warnings or errors.
