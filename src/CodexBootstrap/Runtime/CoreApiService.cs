@@ -49,7 +49,9 @@ public sealed class CoreApiService
             return new ErrorResponse(error);
         }
         
+        _logger.Debug($"CoreApiService: About to call handler for {call.ModuleId}.{call.Api}");
         var result = await handler(call.Args);
+        _logger.Debug($"CoreApiService: Handler returned result: {result != null}");
         return result ?? new ErrorResponse("Handler returned null");
     }
     

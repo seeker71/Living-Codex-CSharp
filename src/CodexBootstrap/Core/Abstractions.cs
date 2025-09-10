@@ -108,6 +108,7 @@ public interface IApiRouter
 {
     void Register(string moduleId, string api, Func<JsonElement?, Task<object>> handler);
     bool TryGetHandler(string moduleId, string api, out Func<JsonElement?, Task<object>> handler);
+    NodeRegistry GetRegistry();
 }
 
 public interface ISynthesizer

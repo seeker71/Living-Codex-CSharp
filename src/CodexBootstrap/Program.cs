@@ -36,6 +36,7 @@ builder.Services.AddSingleton<NodeRegistry>();
 builder.Services.AddSingleton<ApiRouter>();
 builder.Services.AddSingleton<IApiRouter>(sp => sp.GetRequiredService<ApiRouter>());
 
+
 // Generic services
 builder.Services.AddSingleton<ModuleLoader>(sp => 
     new ModuleLoader(sp.GetRequiredService<NodeRegistry>(), sp.GetRequiredService<IApiRouter>(), sp));

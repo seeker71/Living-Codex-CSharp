@@ -29,10 +29,12 @@ public sealed class ApiRouter : IApiRouter
 {
     private readonly Dictionary<(string module, string api), Func<JsonElement?, Task<object>>> _handlers = new();
     private readonly Core.ILogger _logger;
+    private readonly NodeRegistry _registry;
     
-    public ApiRouter()
+    public ApiRouter(NodeRegistry registry)
     {
         _logger = new Log4NetLogger(typeof(ApiRouter));
+        _registry = registry;
     }
     
     public void Register(string moduleId, string api, Func<JsonElement?, Task<object>> handler)
@@ -50,6 +52,11 @@ public sealed class ApiRouter : IApiRouter
             _logger.Debug($"ApiRouter: Available handlers: {string.Join(", ", _handlers.Keys.Select(k => $"{k.module}.{k.api}"))}");
         }
         return found;
+    }
+    
+    public NodeRegistry GetRegistry()
+    {
+        return _registry;
     }
 }
 
