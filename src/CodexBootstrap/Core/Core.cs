@@ -28,12 +28,29 @@ public sealed class NodeRegistry
 public sealed class ApiRouter : IApiRouter
 {
     private readonly Dictionary<(string module, string api), Func<JsonElement?, Task<object>>> _handlers = new();
+    private readonly Core.ILogger _logger;
     
-    public void Register(string moduleId, string api, Func<JsonElement?, Task<object>> handler) =>
+    public ApiRouter()
+    {
+        _logger = new Log4NetLogger(typeof(ApiRouter));
+    }
+    
+    public void Register(string moduleId, string api, Func<JsonElement?, Task<object>> handler)
+    {
+        _logger.Debug($"ApiRouter: Registering {moduleId}.{api}");
         _handlers[(moduleId, api)] = handler;
+    }
     
-    public bool TryGetHandler(string moduleId, string api, out Func<JsonElement?, Task<object>> handler) =>
-        _handlers.TryGetValue((moduleId, api), out handler!);
+    public bool TryGetHandler(string moduleId, string api, out Func<JsonElement?, Task<object>> handler)
+    {
+        var found = _handlers.TryGetValue((moduleId, api), out handler!);
+        _logger.Debug($"ApiRouter: TryGetHandler({moduleId}, {api}) = {found}");
+        if (!found)
+        {
+            _logger.Debug($"ApiRouter: Available handlers: {string.Join(", ", _handlers.Keys.Select(k => $"{k.module}.{k.api}"))}");
+        }
+        return found;
+    }
 }
 
 // Node-based storage for everything

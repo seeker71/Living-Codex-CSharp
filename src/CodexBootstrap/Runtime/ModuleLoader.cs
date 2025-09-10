@@ -11,12 +11,14 @@ public sealed class ModuleLoader
     private readonly IApiRouter _router;
     private readonly IServiceProvider _serviceProvider;
     private readonly List<IModule> _loadedModules = new();
+    private readonly Core.ILogger _logger;
 
     public ModuleLoader(NodeRegistry registry, IApiRouter router, IServiceProvider serviceProvider)
     {
         _registry = registry;
         _router = router;
         _serviceProvider = serviceProvider;
+        _logger = new Log4NetLogger(typeof(ModuleLoader));
     }
 
     public IReadOnlyList<IModule> GetLoadedModules() => _loadedModules.AsReadOnly();
@@ -31,7 +33,7 @@ public sealed class ModuleLoader
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to register HTTP endpoints for module {module.GetModuleNode().Id}: {ex.Message}");
+                _logger.Error($"Failed to register HTTP endpoints for module {module.GetModuleNode().Id}: {ex.Message}", ex);
             }
         }
     }
@@ -56,7 +58,7 @@ public sealed class ModuleLoader
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to load module {moduleType.Name}: {ex.Message}");
+                _logger.Error($"Failed to load module {moduleType.Name}: {ex.Message}", ex);
             }
         }
     }
@@ -75,7 +77,7 @@ public sealed class ModuleLoader
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to load assembly {dll}: {ex.Message}");
+                _logger.Error($"Failed to load assembly {dll}: {ex.Message}", ex);
             }
         }
     }
@@ -103,6 +105,6 @@ public sealed class ModuleLoader
         
         var name = moduleNode.Meta?.GetValueOrDefault("name")?.ToString() ?? moduleNode.Title;
         var version = moduleNode.Meta?.GetValueOrDefault("version")?.ToString() ?? "0.1.0";
-        Console.WriteLine($"Loaded module: {name} v{version}");
+        _logger.Info($"Loaded module: {name} v{version}");
     }
 }

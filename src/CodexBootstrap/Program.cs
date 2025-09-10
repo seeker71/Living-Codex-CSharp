@@ -3,7 +3,23 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Http.Json;
 using CodexBootstrap.Core;
 using CodexBootstrap.Runtime;
+using log4net;
+using log4net.Config;
 using CodexBootstrap.Modules;
+
+// Configure log4net
+var configFile = new FileInfo("log4net.config");
+if (configFile.Exists)
+{
+    XmlConfigurator.Configure(configFile);
+    Console.WriteLine($"Log4net configured with config file: {configFile.FullName}");
+}
+else
+{
+    Console.WriteLine($"Log4net config file not found at: {configFile.FullName}");
+    // Fallback to basic configuration
+    BasicConfigurator.Configure();
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -73,11 +89,11 @@ app.MapGet("/modules/{id}", (string id) =>
 });
 
 // Dynamic API route — self‑describing invocation
-app.MapPost("/route", (DynamicCall req) =>
+app.MapPost("/route", async (DynamicCall req) =>
 {
     try
     {
-        var result = coreApi.ExecuteDynamicCall(req);
+        var result = await coreApi.ExecuteDynamicCall(req);
         return Results.Ok(result);
     }
     catch (InvalidOperationException ex)

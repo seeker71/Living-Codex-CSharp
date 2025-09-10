@@ -7,20 +7,26 @@ public sealed class RouteDiscovery
 {
     private readonly IApiRouter _router;
     private readonly NodeRegistry _registry;
+    private readonly Core.ILogger _logger;
 
     public RouteDiscovery(IApiRouter router, NodeRegistry registry)
     {
         _router = router;
         _registry = registry;
+        _logger = new Log4NetLogger(typeof(RouteDiscovery));
     }
 
     public void DiscoverAndRegisterRoutes(WebApplication app)
     {
         // Find all API nodes and register their routes
-        var apiNodes = _registry.GetNodesByType("api");
+        var apiNodes = _registry.GetNodesByType("api")
+            .Concat(_registry.GetNodesByType("codex.meta/api"));
+        
+        _logger.Info($"RouteDiscovery: Found {apiNodes.Count()} API nodes");
         
         foreach (var apiNode in apiNodes)
         {
+            _logger.Debug($"RouteDiscovery: Processing API node {apiNode.Id}");
             RegisterApiRoute(app, apiNode);
         }
     }
@@ -29,12 +35,17 @@ public sealed class RouteDiscovery
     {
         try
         {
-            var moduleId = apiNode.Meta?.GetValueOrDefault("moduleId")?.ToString();
-            var apiName = apiNode.Meta?.GetValueOrDefault("apiName")?.ToString();
-            var route = apiNode.Meta?.GetValueOrDefault("route")?.ToString();
+        var moduleId = apiNode.Meta?.GetValueOrDefault("moduleId")?.ToString();
+        var apiName = apiNode.Meta?.GetValueOrDefault("apiName")?.ToString();
+        var route = apiNode.Meta?.GetValueOrDefault("route")?.ToString();
 
-            if (string.IsNullOrEmpty(moduleId) || string.IsNullOrEmpty(apiName) || string.IsNullOrEmpty(route))
-                return;
+        _logger.Debug($"RouteDiscovery: Registering {apiNode.Id} - moduleId: {moduleId}, apiName: {apiName}, route: {route}");
+
+        if (string.IsNullOrEmpty(moduleId) || string.IsNullOrEmpty(apiName) || string.IsNullOrEmpty(route))
+        {
+            _logger.Warn($"RouteDiscovery: Skipping {apiNode.Id} - missing required properties");
+            return;
+        }
 
             // Create route pattern
             var routePattern = CreateRoutePattern(route);
@@ -99,7 +110,7 @@ public sealed class RouteDiscovery
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to register route for API {apiNode.Id}: {ex.Message}");
+            _logger.Error($"Failed to register route for API {apiNode.Id}: {ex.Message}", ex);
         }
     }
 

@@ -72,22 +72,26 @@ public sealed class OneShotModule : IModule
                     // Step 1: Compose spec from atoms
                     var composeRequest = JsonSerializer.SerializeToElement(new { moduleId, atoms });
                     var composeResult = await ExecuteModuleApi("codex.spec", "compose", composeRequest);
-                    steps.Add(new { step = "compose", status = "completed", result = "Spec composed from atoms" });
+                    var composeMessage = ExtractMessageFromResult(composeResult);
+                    steps.Add(new { step = "compose", status = "completed", result = composeMessage });
 
                     // Step 2: Expand the spec
                     var expandRequest = JsonSerializer.SerializeToElement(new { id = moduleId });
                     var expandResult = await ExecuteModuleApi("codex.breath", "expand", expandRequest);
-                    steps.Add(new { step = "expand", status = "completed", result = "Spec expanded" });
+                    var expandMessage = ExtractMessageFromResult(expandResult);
+                    steps.Add(new { step = "expand", status = "completed", result = expandMessage });
 
                     // Step 3: Validate the expanded spec
                     var validateRequest = JsonSerializer.SerializeToElement(new { id = moduleId });
                     var validateResult = await ExecuteModuleApi("codex.breath", "validate", validateRequest);
-                    steps.Add(new { step = "validate", status = "completed", result = "Spec validated" });
+                    var validateMessage = ExtractMessageFromResult(validateResult);
+                    steps.Add(new { step = "validate", status = "completed", result = validateMessage });
 
                     // Step 4: Contract the validated spec
                     var contractRequest = JsonSerializer.SerializeToElement(new { id = moduleId });
                     var contractResult = await ExecuteModuleApi("codex.breath", "contract", contractRequest);
-                    steps.Add(new { step = "contract", status = "completed", result = "Spec contracted" });
+                    var contractMessage = ExtractMessageFromResult(contractResult);
+                    steps.Add(new { step = "contract", status = "completed", result = contractMessage });
                 }
                 catch (Exception ex)
                 {
@@ -223,5 +227,47 @@ public sealed class OneShotModule : IModule
             return result;
         }
         throw new InvalidOperationException($"API {apiName} not found in module {moduleId}");
+    }
+
+    private string ExtractMessageFromResult(object result)
+    {
+        try
+        {
+            // Try to extract message from common response types
+            var resultType = result.GetType();
+            
+            // Check for Message property
+            var messageProperty = resultType.GetProperty("Message");
+            if (messageProperty != null)
+            {
+                var message = messageProperty.GetValue(result)?.ToString();
+                if (!string.IsNullOrEmpty(message))
+                    return message;
+            }
+
+            // Check for result property
+            var resultProperty = resultType.GetProperty("Result");
+            if (resultProperty != null)
+            {
+                var resultValue = resultProperty.GetValue(result)?.ToString();
+                if (!string.IsNullOrEmpty(resultValue))
+                    return resultValue;
+            }
+
+            // Check for success property
+            var successProperty = resultType.GetProperty("Success");
+            if (successProperty != null)
+            {
+                var success = successProperty.GetValue(result);
+                return success?.ToString() == "True" ? "Operation successful" : "Operation failed";
+            }
+
+            // Fallback to type name
+            return $"{resultType.Name} completed";
+        }
+        catch
+        {
+            return "Operation completed";
+        }
     }
 }

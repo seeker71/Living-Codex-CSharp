@@ -40,6 +40,17 @@ public sealed class DeltaModule : IModule
         // Register the module node
         registry.Upsert(GetModuleNode());
 
+        // Register API nodes
+        var diffApi = NodeStorage.CreateApiNode("codex.delta", "diff", "/delta/diff", "Generate diff between two nodes");
+        var patchApi = NodeStorage.CreateApiNode("codex.delta", "patch", "/delta/patch", "Apply patch to a node");
+        
+        registry.Upsert(diffApi);
+        registry.Upsert(patchApi);
+        
+        // Register edges
+        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.delta", "diff"));
+        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.delta", "patch"));
+
         // Register PatchOp and PatchDoc type definitions as nodes
         var patchOpType = new Node(
             Id: "codex.delta/patchop",
@@ -101,68 +112,7 @@ public sealed class DeltaModule : IModule
         );
         registry.Upsert(patchDocType);
 
-        // Register API nodes
-        var diffApiNode = new Node(
-            Id: "codex.delta/diff-api",
-            TypeId: "codex.meta/api",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Diff API",
-            Description: "Compare two nodes and generate a patch",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    name = "diff",
-                    verb = "GET",
-                    route = "/diff/{id}",
-                    parameters = new[]
-                    {
-                        new { name = "id", type = "string", required = true, description = "Source node ID" },
-                        new { name = "against", type = "string", required = true, description = "Base node ID to compare against" }
-                    }
-                }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.delta",
-                ["apiName"] = "diff"
-            }
-        );
-        registry.Upsert(diffApiNode);
-
-        var patchApiNode = new Node(
-            Id: "codex.delta/patch-api",
-            TypeId: "codex.meta/api",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Patch API",
-            Description: "Apply a patch to a target node",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    name = "patch",
-                    verb = "POST",
-                    route = "/patch/{targetId}",
-                    parameters = new[]
-                    {
-                        new { name = "targetId", type = "string", required = true, description = "Target node ID" },
-                        new { name = "patch", type = "PatchDoc", required = true, description = "Patch document to apply" }
-                    }
-                }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.delta",
-                ["apiName"] = "patch"
-            }
-        );
-        registry.Upsert(patchApiNode);
+        // API nodes are registered via NodeStorage.CreateApiNode() below
 
         // Register edges
         registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.delta", "diff"));

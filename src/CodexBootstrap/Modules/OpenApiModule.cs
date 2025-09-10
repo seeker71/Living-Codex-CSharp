@@ -470,63 +470,14 @@ public sealed class OpenApiModule : IModule
         );
         registry.Upsert(openApiType);
 
-        // Register API nodes
-        var generateApiNode = new Node(
-            Id: "codex.openapi/generate-api",
-            TypeId: "codex.meta/api",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Generate OpenAPI API",
-            Description: "Generate OpenAPI specification for a module",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    name = "generate",
-                    verb = "GET",
-                    route = "/openapi/{id}",
-                    parameters = new[]
-                    {
-                        new { name = "id", type = "string", required = true, description = "Module ID to generate OpenAPI for" }
-                    }
-                }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.openapi",
-                ["apiName"] = "generate"
-            }
-        );
-        registry.Upsert(generateApiNode);
+        // API nodes are registered via NodeStorage.CreateApiNode() below
 
-        var listSpecsApiNode = new Node(
-            Id: "codex.openapi/list-specs-api",
-            TypeId: "codex.meta/api",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "List OpenAPI Specs API",
-            Description: "List all OpenAPI specifications as nodes",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    name = "list-specs",
-                    verb = "GET",
-                    route = "/openapi/specs",
-                    description = "List all OpenAPI specifications stored as nodes"
-                }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.openapi",
-                ["apiName"] = "list-specs"
-            }
-        );
-        registry.Upsert(listSpecsApiNode);
+        // Register API nodes for RouteDiscovery
+        var generateApi = NodeStorage.CreateApiNode("codex.openapi", "generate", "/openapi/generate", "Generate OpenAPI specification for a module");
+        var listSpecsApi = NodeStorage.CreateApiNode("codex.openapi", "list-specs", "/openapi/list-specs", "List all available OpenAPI specifications");
+        
+        registry.Upsert(generateApi);
+        registry.Upsert(listSpecsApi);
 
         // Register edges
         registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.openapi", "generate"));
@@ -573,7 +524,7 @@ public sealed class OpenApiModule : IModule
             try
             {
                 // Get all OpenAPI spec nodes
-                var specNodes = _registry.GetNodesByType("codex.openapi/spec")
+                var specNodes = registry.GetNodesByType("codex.openapi/spec")
                     .Select(node => new OpenApiSpecInfo(
                         Id: node.Id,
                         ModuleId: node.Meta?.GetValueOrDefault("moduleId")?.ToString(),
@@ -599,8 +550,8 @@ public sealed class OpenApiModule : IModule
 
     public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
-        // OpenAPI specifications for modules
-        app.MapGet("/openapi/{moduleId}", (string moduleId) =>
+        // OpenAPI specifications for modules - use a different route to avoid conflicts
+        app.MapGet("/openapi/spec/{moduleId}", (string moduleId) =>
         {
             try
             {
@@ -620,13 +571,13 @@ public sealed class OpenApiModule : IModule
             }
         });
 
-        // List all OpenAPI specifications as nodes
-        app.MapGet("/openapi-specs", () =>
+        // List all OpenAPI specifications as nodes - use a different route to avoid conflicts
+        app.MapGet("/openapi-specs", async () =>
         {
             try
             {
                 // Use the list-specs API
-                var result = coreApi.ExecuteDynamicCall(new DynamicCall("codex.openapi", "list-specs", null));
+                var result = await coreApi.ExecuteDynamicCall(new DynamicCall("codex.openapi", "list-specs", null));
                 return Results.Ok(result);
             }
             catch (Exception ex)

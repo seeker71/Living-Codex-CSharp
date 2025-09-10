@@ -85,7 +85,7 @@ public sealed class PlanModule : IModule
         });
     }
 
-    private async Task<object> GenerateTopologyPlan(string moduleId, NodeRegistry registry)
+    private Task<object> GenerateTopologyPlan(string moduleId, NodeRegistry registry)
     {
         try
         {
@@ -171,7 +171,7 @@ public sealed class PlanModule : IModule
             // Determine required resources
             var requiredResources = DetermineRequiredResources(moduleNode, moduleApis);
 
-            return new
+            return Task.FromResult<object>(new
             {
                 moduleId,
                 topology = new
@@ -189,7 +189,7 @@ public sealed class PlanModule : IModule
                     hasContent = moduleNode.Content != null,
                     moduleState = moduleNode.State.ToString()
                 }
-            };
+            });
         }
         catch (Exception ex)
         {

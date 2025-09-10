@@ -7,11 +7,13 @@ public sealed class CoreApiService
 {
     private readonly NodeRegistry _registry;
     private readonly IApiRouter _router;
+    private readonly Core.ILogger _logger;
 
     public CoreApiService(NodeRegistry registry, IApiRouter router)
     {
         _registry = registry;
         _router = router;
+        _logger = new Log4NetLogger(typeof(CoreApiService));
     }
 
     public List<ModuleInfo> GetModules()
@@ -29,14 +31,32 @@ public sealed class CoreApiService
         return null;
     }
 
-    public object ExecuteDynamicCall(DynamicCall call)
+    public async Task<object> ExecuteDynamicCall(DynamicCall call)
     {
-        if (!_router.TryGetHandler(call.ModuleId, call.Api, out var handler))
-            throw new InvalidOperationException($"API {call.Api} not found in module {call.ModuleId}");
+        _logger.Debug($"DynamicCall: ModuleId='{call.ModuleId}', Api='{call.Api}', Args={call.Args}");
         
-        var task = handler(call.Args);
-        task.Wait();
-        return task.Result ?? new ErrorResponse("Handler returned null");
+        if (string.IsNullOrEmpty(call.Api))
+        {
+            var error = $"API name is empty for module {call.ModuleId}. Available APIs: {string.Join(", ", GetAvailableApisForModule(call.ModuleId))}";
+            _logger.Warn(error);
+            return new ErrorResponse(error);
+        }
+        
+        if (!_router.TryGetHandler(call.ModuleId, call.Api, out var handler))
+        {
+            var error = $"API '{call.Api}' not found in module '{call.ModuleId}'. Available APIs: {string.Join(", ", GetAvailableApisForModule(call.ModuleId))}";
+            _logger.Warn(error);
+            return new ErrorResponse(error);
+        }
+        
+        var result = await handler(call.Args);
+        return result ?? new ErrorResponse("Handler returned null");
+    }
+    
+    private IEnumerable<string> GetAvailableApisForModule(string moduleId)
+    {
+        // This is a simplified version - in a real implementation, you'd want to track this more efficiently
+        return new[] { "No APIs available" };
     }
 
     public List<Node> GetNodes() => _registry.AllNodes().ToList();

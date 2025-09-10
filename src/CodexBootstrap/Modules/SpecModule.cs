@@ -309,13 +309,13 @@ public sealed class SpecModule : IModule
         });
     }
 
-    private async Task StoreAtomsAsNodes(string moduleId, JsonElement atoms, NodeRegistry registry)
+    private Task StoreAtomsAsNodes(string moduleId, JsonElement atoms, NodeRegistry registry)
     {
         try
         {
             // Parse atoms JSON
             var atomsData = JsonSerializer.Deserialize<AtomsData>(atoms.GetRawText());
-            if (atomsData == null) return;
+            if (atomsData == null) return Task.CompletedTask;
 
             // Store nodes
             foreach (var nodeData in atomsData.Nodes ?? new List<NodeData>())
@@ -359,9 +359,11 @@ public sealed class SpecModule : IModule
         {
             throw new InvalidOperationException($"Failed to store atoms: {ex.Message}");
         }
+        
+        return Task.CompletedTask;
     }
 
-    private async Task<object> ComposeSpecFromAtoms(string moduleId, NodeRegistry registry)
+    private Task<object> ComposeSpecFromAtoms(string moduleId, NodeRegistry registry)
     {
         try
         {
@@ -406,7 +408,7 @@ public sealed class SpecModule : IModule
                 composedAt = DateTime.UtcNow.ToString("O")
             };
 
-            return spec;
+            return Task.FromResult<object>(spec);
         }
         catch (Exception ex)
         {
@@ -414,7 +416,7 @@ public sealed class SpecModule : IModule
         }
     }
 
-    private async Task<object> ExportModuleAtoms(string moduleId, NodeRegistry registry)
+    private Task<object> ExportModuleAtoms(string moduleId, NodeRegistry registry)
     {
         try
         {
@@ -450,7 +452,7 @@ public sealed class SpecModule : IModule
                 }).ToList()
             };
 
-            return atoms;
+            return Task.FromResult<object>(atoms);
         }
         catch (Exception ex)
         {

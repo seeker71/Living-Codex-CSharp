@@ -159,67 +159,9 @@ public sealed class RelationsModule : IModule
         );
         registry.Upsert(validationRuleType);
 
-        // Register API nodes
-        var registerRelationApiNode = new Node(
-            Id: "codex.relations/register-relation-api",
-            TypeId: "codex.meta/api",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Register Relation API",
-            Description: "Register a new relation between types",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    name = "register-relation",
-                    verb = "POST",
-                    route = "/relations/register",
-                    parameters = new[]
-                    {
-                        new { name = "relation", type = "RelationRegistration", required = true, description = "Relation registration information" }
-                    }
-                }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.relations",
-                ["apiName"] = "register-relation"
-            }
-        );
-        registry.Upsert(registerRelationApiNode);
-
-        var validateApiNode = new Node(
-            Id: "codex.relations/validate-api",
-            TypeId: "codex.meta/api",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Validate Node API",
-            Description: "Validate a node against registered relations and constraints",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    name = "validate",
-                    verb = "POST",
-                    route = "/breath/validate/{id}",
-                    parameters = new[]
-                    {
-                        new { name = "id", type = "string", required = true, description = "Node ID to validate" },
-                        new { name = "request", type = "ValidationRequest", required = false, description = "Validation request parameters" }
-                    }
-                }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.relations",
-                ["apiName"] = "validate"
-            }
-        );
-        registry.Upsert(validateApiNode);
+        // Register API nodes for RouteDiscovery
+        var registerRelationApi = NodeStorage.CreateApiNode("codex.relations", "register-relation", "/relations/register", "Register a new relation between types");
+        var validateApi = NodeStorage.CreateApiNode("codex.relations", "validate", "/relations/validate", "Validate a node against registered relations and constraints");
 
         // Register edges
         registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.relations", "register-relation"));

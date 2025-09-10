@@ -108,103 +108,20 @@ public sealed class PhaseModule : IModule
         );
         registry.Upsert(resonanceProposalType);
 
-        // Register API nodes
-        var meltApiNode = new Node(
-            Id: "codex.phase/melt-api",
-            TypeId: "codex.meta/api",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Melt API",
-            Description: "Convert an ice node to water state for editing",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    name = "melt",
-                    verb = "POST",
-                    route = "/phase/melt/{id}",
-                    parameters = new[]
-                    {
-                        new { name = "id", type = "string", required = true, description = "Node ID to melt" },
-                        new { name = "reason", type = "string", required = false, description = "Reason for melting" }
-                    }
-                }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.phase",
-                ["apiName"] = "melt"
-            }
-        );
-        registry.Upsert(meltApiNode);
 
-        var refreezeApiNode = new Node(
-            Id: "codex.phase/refreeze-api",
-            TypeId: "codex.meta/api",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Refreeze API",
-            Description: "Convert a water node back to ice state after editing",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    name = "refreeze",
-                    verb = "POST",
-                    route = "/phase/refreeze/{id}",
-                    parameters = new[]
-                    {
-                        new { name = "id", type = "string", required = true, description = "Node ID to refreeze" },
-                        new { name = "reason", type = "string", required = false, description = "Reason for refreezing" }
-                    }
-                }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.phase",
-                ["apiName"] = "refreeze"
-            }
-        );
-        registry.Upsert(refreezeApiNode);
-
-        var resonanceApiNode = new Node(
-            Id: "codex.phase/resonance-api",
-            TypeId: "codex.meta/api",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Resonance Check API",
-            Description: "Check if proposed changes resonate with anchor nodes",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    name = "check",
-                    verb = "POST",
-                    route = "/resonance/check",
-                    parameters = new[]
-                    {
-                        new { name = "proposal", type = "ResonanceProposal", required = true, description = "Resonance proposal to check" }
-                    }
-                }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.phase",
-                ["apiName"] = "check"
-            }
-        );
-        registry.Upsert(resonanceApiNode);
+        // Register API nodes for RouteDiscovery
+        var meltApi = NodeStorage.CreateApiNode("codex.phase", "melt", "/phase/melt", "Convert an ice node to water state for editing");
+        var refreezeApi = NodeStorage.CreateApiNode("codex.phase", "refreeze", "/phase/refreeze", "Convert a water node back to ice state after editing");
+        var resonanceApi = NodeStorage.CreateApiNode("codex.phase", "resonance", "/phase/resonance", "Check if proposed changes resonate with anchor nodes");
+        
+        registry.Upsert(meltApi);
+        registry.Upsert(refreezeApi);
+        registry.Upsert(resonanceApi);
 
         // Register edges
         registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.phase", "melt"));
         registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.phase", "refreeze"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.phase", "check"));
+        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.phase", "resonance"));
     }
 
     public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
@@ -375,7 +292,7 @@ public sealed class PhaseModule : IModule
             }
         });
 
-        router.Register("codex.phase", "check", async args =>
+        router.Register("codex.phase", "resonance", async args =>
         {
             try
             {

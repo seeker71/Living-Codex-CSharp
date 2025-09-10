@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using CodexBootstrap.Runtime;
 
 namespace CodexBootstrap.Core;
@@ -128,7 +129,7 @@ public interface IAdapterRegistry
 }
 
 
-public sealed record DynamicCall(string ModuleId, string Api, JsonElement? Args);
+public sealed record DynamicCall(string ModuleId, [property: JsonPropertyName("apiName")] string Api, JsonElement? Args);
 
 // Additional types needed for the API
 public sealed record ModuleAtoms(string Id, IReadOnlyList<Node> Nodes, IReadOnlyList<Edge> Edges);

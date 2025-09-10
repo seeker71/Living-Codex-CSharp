@@ -174,14 +174,14 @@ public sealed class HydrateModule : IModule
         return supportedTypes.Contains(nodeTypeId) || supportedTypes.Contains("*");
     }
 
-    private async Task<object?> TryAdapterHydration(Node node, Node adapter, NodeRegistry registry)
+    private Task<object?> TryAdapterHydration(Node node, Node adapter, NodeRegistry registry)
     {
         // This would call the adapter's hydration logic
         // For now, return null to indicate adapter couldn't handle this node
-        return null;
+        return Task.FromResult<object?>(null);
     }
 
-    private async Task<object> SynthesizeContent(Node node)
+    private Task<object> SynthesizeContent(Node node)
     {
         // Default content synthesis when no adapter is available
         var synthesizedContent = new
@@ -196,7 +196,7 @@ public sealed class HydrateModule : IModule
             originalContent = node.Content?.InlineJson ?? "{}"
         };
 
-        return new
+        return Task.FromResult<object>(new
         {
             nodeId = node.Id,
             originalState = node.State.ToString(),
@@ -212,6 +212,6 @@ public sealed class HydrateModule : IModule
             hydrationMethod = "synthesis",
             success = true,
             synthesized = true
-        };
+        });
     }
 }

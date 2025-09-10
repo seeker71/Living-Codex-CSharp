@@ -205,41 +205,20 @@ public sealed class AdapterModule : IModule
         );
         registry.Upsert(adapterInfoType);
 
-        // Register API nodes
-        var registerApiNode = new Node(
-            Id: "codex.adapters/register-api",
-            TypeId: "codex.meta/api",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Register Adapter API",
-            Description: "Register a new content adapter",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    name = "register",
-                    verb = "POST",
-                    route = "/adapters/register",
-                    parameters = new[]
-                    {
-                        new { name = "adapter", type = "AdapterRegistration", required = true, description = "Adapter registration information" }
-                    }
-                }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.adapters",
-                ["apiName"] = "register"
-            }
-        );
-        registry.Upsert(registerApiNode);
+        // API nodes are registered via NodeStorage.CreateApiNode() below
 
         // Hydrate API is now handled by HydrateModule
 
+        // Register API nodes for RouteDiscovery
+        var registerApi = NodeStorage.CreateApiNode("codex.adapters", "register", "/adapter/register", "Register a new content adapter");
+        var listApi = NodeStorage.CreateApiNode("codex.adapters", "list", "/adapter/list", "List all registered adapters");
+        
+        registry.Upsert(registerApi);
+        registry.Upsert(listApi);
+
         // Register edges
         registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.adapters", "register"));
+        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.adapters", "list"));
     }
 
     public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
@@ -315,6 +294,31 @@ public sealed class AdapterModule : IModule
         });
 
         // Hydrate API is now handled by HydrateModule
+
+        router.Register("codex.adapters", "list", args =>
+        {
+            try
+            {
+                var adapters = _adapters.Values.Select(adapter => new AdapterInfo(
+                    Id: adapter.Scheme,
+                    Scheme: adapter.Scheme,
+                    Name: adapter.GetType().Name,
+                    Description: $"Built-in {adapter.Scheme} adapter",
+                    SupportedMediaTypes: new[] { "text/plain", "application/json" },
+                    Configuration: null
+                )).ToList();
+
+                return Task.FromResult<object>(new
+                {
+                    adapters,
+                    count = adapters.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                return Task.FromResult<object>(new ErrorResponse($"Failed to list adapters: {ex.Message}"));
+            }
+        });
     }
 
     private void RegisterBuiltInAdapters()

@@ -5,11 +5,11 @@ using CodexBootstrap.Runtime;
 namespace CodexBootstrap.Modules;
 
 // Breath module specific response types
-public record ExpandResponse(string Id, string Phase, bool Expanded);
+public record ExpandResponse(string Id, string Phase, bool Expanded, string? Message = null);
 
 public record ValidateResponse(string Id, bool Valid, string Message);
 
-public record ContractResponse(string Id, string Phase, bool Contracted);
+public record ContractResponse(string Id, string Phase, bool Contracted, string? Message = null);
 
 public record BreathLoopResult(string Operation, object Result);
 
@@ -67,9 +67,9 @@ public sealed class BreathModule : IModule
 
     public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
     {
-        router.Register("codex.breath", "expand", args =>
+        router.Register("codex.breath", "expand", async args =>
         {
-            if (args is null) return Task.FromResult<object>(new ErrorResponse("Missing request body"));
+            if (args is null) return new ErrorResponse("Missing request body");
 
             try
             {
@@ -78,21 +78,21 @@ public sealed class BreathModule : IModule
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase
                 });
 
-                if (request?.Id == null) return Task.FromResult<object>(new ErrorResponse("Missing or invalid id"));
+                if (request?.Id == null) return new ErrorResponse("Missing or invalid id");
 
-                // Simple expand operation
-                var result = new ExpandResponse(request.Id, "expanded", true);
-                return Task.FromResult<object>(result);
+                // Real expand operation - promote Ice → Gas
+                var expandedResult = await ExpandModule(request.Id, registry);
+                return expandedResult;
             }
             catch (Exception ex)
             {
-                return Task.FromResult<object>(new ErrorResponse($"Expand failed: {ex.Message}"));
+                return new ErrorResponse($"Expand failed: {ex.Message}");
             }
         });
 
-        router.Register("codex.breath", "validate", args =>
+        router.Register("codex.breath", "validate", async args =>
         {
-            if (args is null) return Task.FromResult<object>(new ErrorResponse("Missing request body"));
+            if (args is null) return new ErrorResponse("Missing request body");
 
             try
             {
@@ -101,21 +101,21 @@ public sealed class BreathModule : IModule
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase
                 });
 
-                if (request?.Id == null) return Task.FromResult<object>(new ErrorResponse("Missing or invalid id"));
+                if (request?.Id == null) return new ErrorResponse("Missing or invalid id");
 
-                // Simple validate operation
-                var result = new ValidateResponse(request.Id, true, "Validation successful");
-                return Task.FromResult<object>(result);
+                // Real validate operation - check Gas state integrity
+                var validationResult = await ValidateModule(request.Id, registry);
+                return validationResult;
             }
             catch (Exception ex)
             {
-                return Task.FromResult<object>(new ErrorResponse($"Validate failed: {ex.Message}"));
+                return new ErrorResponse($"Validate failed: {ex.Message}");
             }
         });
 
-        router.Register("codex.breath", "contract", args =>
+        router.Register("codex.breath", "contract", async args =>
         {
-            if (args is null) return Task.FromResult<object>(new ErrorResponse("Missing request body"));
+            if (args is null) return new ErrorResponse("Missing request body");
 
             try
             {
@@ -124,15 +124,15 @@ public sealed class BreathModule : IModule
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase
                 });
 
-                if (request?.Id == null) return Task.FromResult<object>(new ErrorResponse("Missing or invalid id"));
+                if (request?.Id == null) return new ErrorResponse("Missing or invalid id");
 
-                // Simple contract operation
-                var result = new ContractResponse(request.Id, "contracted", true);
-                return Task.FromResult<object>(result);
+                // Real contract operation - promote Gas → Water
+                var contractResult = await ContractModule(request.Id, registry);
+                return contractResult;
             }
             catch (Exception ex)
             {
-                return Task.FromResult<object>(new ErrorResponse($"Contract failed: {ex.Message}"));
+                return new ErrorResponse($"Contract failed: {ex.Message}");
             }
         });
 
@@ -214,6 +214,229 @@ public sealed class BreathModule : IModule
     {
         // Breath module doesn't need any custom HTTP endpoints
         // All functionality is exposed through the generic /route endpoint
+    }
+
+    private Task<ExpandResponse> ExpandModule(string moduleId, NodeRegistry registry)
+    {
+        try
+        {
+            // Get the module node
+            if (!registry.TryGet(moduleId, out var moduleNode))
+            {
+                throw new InvalidOperationException($"Module '{moduleId}' not found");
+            }
+
+            // Check if module is in Ice state (ready to expand)
+            if (moduleNode.State != ContentState.Ice)
+            {
+                return Task.FromResult(new ExpandResponse(moduleId, moduleNode.State.ToString(), false, $"Module is in {moduleNode.State} state, cannot expand from Ice"));
+            }
+
+            // Get all nodes related to this module
+            var moduleNodes = registry.AllNodes()
+                .Where(node => node.Meta?.GetValueOrDefault("moduleId")?.ToString() == moduleId)
+                .ToList();
+
+            // Get all edges related to this module
+            var moduleEdges = registry.AllEdges()
+                .Where(edge => moduleNodes.Any(n => n.Id == edge.FromId || n.Id == edge.ToId))
+                .ToList();
+
+            // Expand: promote Ice → Gas by materializing dependencies
+            var expandedNodes = new List<Node>();
+            var expandedEdges = new List<Edge>();
+
+            foreach (var node in moduleNodes)
+            {
+                if (node.State == ContentState.Ice)
+                {
+                    // Create expanded version in Gas state
+                    var expandedNode = node with 
+                    { 
+                        State = ContentState.Gas,
+                        Meta = new Dictionary<string, object>(node.Meta ?? new Dictionary<string, object>())
+                        {
+                            ["expandedAt"] = DateTime.UtcNow.ToString("O"),
+                            ["expandedFrom"] = node.Id
+                        }
+                    };
+                    expandedNodes.Add(expandedNode);
+                    registry.Upsert(expandedNode);
+                }
+            }
+
+            // Expand edges to show full dependency graph
+            foreach (var edge in moduleEdges)
+            {
+                var expandedEdge = edge with
+                {
+                    Meta = new Dictionary<string, object>(edge.Meta ?? new Dictionary<string, object>())
+                    {
+                        ["expandedAt"] = DateTime.UtcNow.ToString("O")
+                    }
+                };
+                expandedEdges.Add(expandedEdge);
+                registry.Upsert(expandedEdge);
+            }
+
+            return Task.FromResult(new ExpandResponse(
+                moduleId, 
+                "expanded", 
+                true, 
+                $"Expanded {expandedNodes.Count} nodes and {expandedEdges.Count} edges from Ice to Gas state"
+            ));
+        }
+        catch (Exception ex)
+        {
+            return Task.FromResult(new ExpandResponse(moduleId, "error", false, $"Expand failed: {ex.Message}"));
+        }
+    }
+
+    private Task<ValidateResponse> ValidateModule(string moduleId, NodeRegistry registry)
+    {
+        try
+        {
+            // Get the module node
+            if (!registry.TryGet(moduleId, out var moduleNode))
+            {
+                throw new InvalidOperationException($"Module '{moduleId}' not found");
+            }
+
+            // Check if module is in Gas state (ready to validate)
+            if (moduleNode.State != ContentState.Gas)
+            {
+                return Task.FromResult(new ValidateResponse(moduleId, false, $"Module is in {moduleNode.State} state, cannot validate from Gas"));
+            }
+
+            // Get all nodes related to this module
+            var moduleNodes = registry.AllNodes()
+                .Where(node => node.Meta?.GetValueOrDefault("moduleId")?.ToString() == moduleId)
+                .ToList();
+
+            // Get all edges related to this module
+            var moduleEdges = registry.AllEdges()
+                .Where(edge => moduleNodes.Any(n => n.Id == edge.FromId || n.Id == edge.ToId))
+                .ToList();
+
+            var validationErrors = new List<string>();
+
+            // Validate node integrity
+            foreach (var node in moduleNodes)
+            {
+                if (node.State == ContentState.Gas)
+                {
+                    // Check required fields
+                    if (string.IsNullOrEmpty(node.Id))
+                        validationErrors.Add($"Node {node.Id} has empty ID");
+                    if (string.IsNullOrEmpty(node.TypeId))
+                        validationErrors.Add($"Node {node.Id} has empty TypeId");
+                    if (node.Content == null && node.State == ContentState.Gas)
+                        validationErrors.Add($"Node {node.Id} in Gas state has no content");
+                }
+            }
+
+            // Validate edge integrity
+            foreach (var edge in moduleEdges)
+            {
+                if (string.IsNullOrEmpty(edge.FromId) || string.IsNullOrEmpty(edge.ToId))
+                    validationErrors.Add($"Edge has empty FromId or ToId");
+                if (string.IsNullOrEmpty(edge.Role))
+                    validationErrors.Add($"Edge {edge.FromId}->{edge.ToId} has empty Role");
+            }
+
+            // Validate module structure
+            if (!moduleNodes.Any())
+                validationErrors.Add("Module has no nodes");
+            if (moduleNodes.Count(n => n.State == ContentState.Gas) == 0)
+                validationErrors.Add("Module has no nodes in Gas state");
+
+            var isValid = !validationErrors.Any();
+            var message = isValid 
+                ? $"Validation successful: {moduleNodes.Count} nodes, {moduleEdges.Count} edges"
+                : $"Validation failed: {string.Join("; ", validationErrors)}";
+
+            return Task.FromResult(new ValidateResponse(moduleId, isValid, message));
+        }
+        catch (Exception ex)
+        {
+            return Task.FromResult(new ValidateResponse(moduleId, false, $"Validate failed: {ex.Message}"));
+        }
+    }
+
+    private Task<ContractResponse> ContractModule(string moduleId, NodeRegistry registry)
+    {
+        try
+        {
+            // Get the module node
+            if (!registry.TryGet(moduleId, out var moduleNode))
+            {
+                throw new InvalidOperationException($"Module '{moduleId}' not found");
+            }
+
+            // Check if module is in Gas state (ready to contract)
+            if (moduleNode.State != ContentState.Gas)
+            {
+                return Task.FromResult(new ContractResponse(moduleId, moduleNode.State.ToString(), false, $"Module is in {moduleNode.State} state, cannot contract from Gas"));
+            }
+
+            // Get all nodes related to this module
+            var moduleNodes = registry.AllNodes()
+                .Where(node => node.Meta?.GetValueOrDefault("moduleId")?.ToString() == moduleId)
+                .ToList();
+
+            // Get all edges related to this module
+            var moduleEdges = registry.AllEdges()
+                .Where(edge => moduleNodes.Any(n => n.Id == edge.FromId || n.Id == edge.ToId))
+                .ToList();
+
+            // Contract: promote Gas → Water by consolidating and optimizing
+            var contractedNodes = new List<Node>();
+            var contractedEdges = new List<Edge>();
+
+            foreach (var node in moduleNodes)
+            {
+                if (node.State == ContentState.Gas)
+                {
+                    // Create contracted version in Water state
+                    var contractedNode = node with 
+                    { 
+                        State = ContentState.Water,
+                        Meta = new Dictionary<string, object>(node.Meta ?? new Dictionary<string, object>())
+                        {
+                            ["contractedAt"] = DateTime.UtcNow.ToString("O"),
+                            ["contractedFrom"] = node.Id
+                        }
+                    };
+                    contractedNodes.Add(contractedNode);
+                    registry.Upsert(contractedNode);
+                }
+            }
+
+            // Contract edges to show optimized relationships
+            foreach (var edge in moduleEdges)
+            {
+                var contractedEdge = edge with
+                {
+                    Meta = new Dictionary<string, object>(edge.Meta ?? new Dictionary<string, object>())
+                    {
+                        ["contractedAt"] = DateTime.UtcNow.ToString("O")
+                    }
+                };
+                contractedEdges.Add(contractedEdge);
+                registry.Upsert(contractedEdge);
+            }
+
+            return Task.FromResult(new ContractResponse(
+                moduleId, 
+                "contracted", 
+                true, 
+                $"Contracted {contractedNodes.Count} nodes and {contractedEdges.Count} edges from Gas to Water state"
+            ));
+        }
+        catch (Exception ex)
+        {
+            return Task.FromResult(new ContractResponse(moduleId, "error", false, $"Contract failed: {ex.Message}"));
+        }
     }
 }
 
