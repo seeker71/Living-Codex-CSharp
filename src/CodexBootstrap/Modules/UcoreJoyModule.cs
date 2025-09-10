@@ -6,7 +6,7 @@ namespace CodexBootstrap.Modules;
 
 // U-CORE Joy Amplification Data Types
 
-[MetaNode("codex.ucore.joy-frequency", "codex.meta/type", "JoyFrequency", "Positive frequency that amplifies joy and consciousness")]
+[MetaNodeAttribute("codex.ucore.joy-frequency", "codex.meta/type", "JoyFrequency", "Positive frequency that amplifies joy and consciousness")]
 public record JoyFrequency(
     string Id,
     string Name,
@@ -18,7 +18,7 @@ public record JoyFrequency(
     string Description
 );
 
-[MetaNode("codex.ucore.pain-transformation", "codex.meta/type", "PainTransformation", "Transformation of pain into sacred experience")]
+[MetaNodeAttribute("codex.ucore.pain-transformation", "codex.meta/type", "PainTransformation", "Transformation of pain into sacred experience")]
 public record PainTransformation(
     string Id,
     string PainType,
@@ -30,7 +30,7 @@ public record PainTransformation(
     DateTime CreatedAt
 );
 
-[MetaNode("codex.ucore.consciousness-amplification", "codex.meta/type", "ConsciousnessAmplification", "Amplification of consciousness through positive resonance")]
+[MetaNodeAttribute("codex.ucore.consciousness-amplification", "codex.meta/type", "ConsciousnessAmplification", "Amplification of consciousness through positive resonance")]
 public record ConsciousnessAmplification(
     string Id,
     string Level,
@@ -41,7 +41,7 @@ public record ConsciousnessAmplification(
     DateTime ActivatedAt
 );
 
-[MetaNode("codex.ucore.harmony-field", "codex.meta/type", "HarmonyField", "Harmonic field that creates positive resonance")]
+[MetaNodeAttribute("codex.ucore.harmony-field", "codex.meta/type", "HarmonyField", "Harmonic field that creates positive resonance")]
 public record HarmonyField(
     string Id,
     string Name,

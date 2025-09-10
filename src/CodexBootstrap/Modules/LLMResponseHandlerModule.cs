@@ -10,7 +10,7 @@ namespace CodexBootstrap.Modules;
 /// <summary>
 /// LLM Response Handler Module - Converts LLM responses into nodes and edges as diff patch flow
 /// </summary>
-[MetaNode(
+[MetaNodeAttribute(
     id: "codex.llm.response-handler",
     typeId: "codex.meta/module",
     name: "LLM Response Handler Module",
@@ -652,7 +652,7 @@ public class LLMResponseHandlerModule : IModule
 
 // Data types
 
-[MetaNode("codex.llm.parsed-response", "codex.meta/type", "ParsedLLMResponse", "Parsed LLM response structure")]
+[MetaNodeAttribute("codex.llm.parsed-response", "codex.meta/type", "ParsedLLMResponse", "Parsed LLM response structure")]
 public record ParsedLLMResponse(
     string OriginalResponse,
     string ResponseType,
@@ -661,7 +661,7 @@ public record ParsedLLMResponse(
     Dictionary<string, object> Metadata
 );
 
-[MetaNode("codex.llm.entity", "codex.meta/type", "Entity", "Entity extracted from LLM response")]
+[MetaNodeAttribute("codex.llm.entity", "codex.meta/type", "Entity", "Entity extracted from LLM response")]
 public record Entity(
     string Id,
     string Name,
@@ -669,7 +669,7 @@ public record Entity(
     Dictionary<string, object> Properties
 );
 
-[MetaNode("codex.llm.relationship", "codex.meta/type", "Relationship", "Relationship extracted from LLM response")]
+[MetaNodeAttribute("codex.llm.relationship", "codex.meta/type", "Relationship", "Relationship extracted from LLM response")]
 public record Relationship(
     string Id,
     string SourceId,
@@ -678,7 +678,7 @@ public record Relationship(
     Dictionary<string, object> Properties
 );
 
-[MetaNode("codex.llm.diff-patch", "codex.meta/type", "DiffPatch", "Diff patch for bootstrap integration")]
+[MetaNodeAttribute("codex.llm.diff-patch", "codex.meta/type", "DiffPatch", "Diff patch for bootstrap integration")]
 public record DiffPatch(
     string Id,
     string Type,
@@ -687,7 +687,7 @@ public record DiffPatch(
     DateTime Timestamp
 );
 
-[MetaNode("codex.llm.bootstrap-log", "codex.meta/type", "BootstrapLogEntry", "Bootstrap process log entry")]
+[MetaNodeAttribute("codex.llm.bootstrap-log", "codex.meta/type", "BootstrapLogEntry", "Bootstrap process log entry")]
 public record BootstrapLogEntry(
     string Step,
     string Message,
@@ -695,7 +695,7 @@ public record BootstrapLogEntry(
     string Level
 );
 
-[MetaNode("codex.llm.integration-validation", "codex.meta/type", "IntegrationValidation", "Integration validation result")]
+[MetaNodeAttribute("codex.llm.integration-validation", "codex.meta/type", "IntegrationValidation", "Integration validation result")]
 public record IntegrationValidation(
     bool IsValid,
     string? ErrorMessage,

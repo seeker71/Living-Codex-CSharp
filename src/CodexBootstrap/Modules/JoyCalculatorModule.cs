@@ -6,7 +6,7 @@ namespace CodexBootstrap.Modules;
 
 // Joy Calculation Data Types
 
-[MetaNode("codex.joy.calculation", "codex.meta/type", "JoyCalculation", "Mathematical calculation of joy amplification")]
+[MetaNodeAttribute("codex.joy.calculation", "codex.meta/type", "JoyCalculation", "Mathematical calculation of joy amplification")]
 public record JoyCalculation(
     string Id,
     string UserId,
@@ -19,7 +19,7 @@ public record JoyCalculation(
     DateTime CalculatedAt
 );
 
-[MetaNode("codex.joy.progression", "codex.meta/type", "JoyProgression", "Track joy progression over time")]
+[MetaNodeAttribute("codex.joy.progression", "codex.meta/type", "JoyProgression", "Track joy progression over time")]
 public record JoyProgression(
     string Id,
     string UserId,

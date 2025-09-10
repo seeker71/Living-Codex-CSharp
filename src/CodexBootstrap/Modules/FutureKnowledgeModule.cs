@@ -6,7 +6,7 @@ namespace CodexBootstrap.Modules;
 
 // Future Knowledge Data Types
 
-[MetaNode("codex.future.knowledge", "codex.meta/type", "FutureKnowledge", "Knowledge retrieved from future states")]
+[MetaNodeAttribute("codex.future.knowledge", "codex.meta/type", "FutureKnowledge", "Knowledge retrieved from future states")]
 public record FutureKnowledge(
     string Id,
     object Content,
@@ -15,7 +15,7 @@ public record FutureKnowledge(
     string Source
 );
 
-[MetaNode("codex.future.delta", "codex.meta/type", "FutureDelta", "Delta representing future changes")]
+[MetaNodeAttribute("codex.future.delta", "codex.meta/type", "FutureDelta", "Delta representing future changes")]
 public record FutureDelta(
     string Id,
     string TargetNodeId,

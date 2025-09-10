@@ -13,7 +13,7 @@ namespace CodexBootstrap.Modules;
 /// Dynamic Module Example - Demonstrates replacement of static data with dynamic, reflection-generated content
 /// All static descriptions and mock data are replaced with LLM-generated, contextually aware content
 /// </summary>
-[MetaNode(
+[MetaNodeAttribute(
     id: "codex.dynamic.module-example",
     typeId: "codex.meta/module",
     name: "Dynamic Module Example",

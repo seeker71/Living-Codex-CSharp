@@ -10,7 +10,7 @@ namespace CodexBootstrap.Core;
 /// Endpoint Generator - Generates missing endpoints using attribute-based code generation
 /// Integrates with the breath framework to create U-CORE delta diffs
 /// </summary>
-[MetaNode("codex.endpoint.generator", "codex.meta/type", "EndpointGenerator", "Endpoint generation system with U-CORE delta diffs")]
+[MetaNodeAttribute("codex.endpoint.generator", "codex.meta/type", "EndpointGenerator", "Endpoint generation system with U-CORE delta diffs")]
 [ApiType(
     Name = "Endpoint Generator",
     Type = "object",
@@ -76,7 +76,7 @@ public class EndpointGenerator
     /// <summary>
     /// U-CORE Delta - Represents a change in the U-CORE system
     /// </summary>
-    [MetaNode("codex.ucore.delta", "codex.meta/type", "UcoreDelta", "U-CORE system delta change")]
+    [MetaNodeAttribute("codex.ucore.delta", "codex.meta/type", "UcoreDelta", "U-CORE system delta change")]
     [ApiType(
         Name = "U-CORE Delta",
         Type = "object",
@@ -555,7 +555,7 @@ public class EndpointGenerator
 /// <summary>
 /// Missing Endpoint - Represents an endpoint that needs to be generated
 /// </summary>
-[MetaNode("codex.endpoint.missing", "codex.meta/type", "MissingEndpoint", "Missing endpoint definition")]
+[MetaNodeAttribute("codex.endpoint.missing", "codex.meta/type", "MissingEndpoint", "Missing endpoint definition")]
 public record MissingEndpoint(
     string HttpMethod,
     string Route,

@@ -9,7 +9,7 @@ namespace CodexBootstrap.Modules;
 
 // Concept Image Generation Data Types
 
-[MetaNode("codex.image.config", "codex.meta/type", "ImageConfig", "Configuration for image generation models")]
+[MetaNodeAttribute("codex.image.config", "codex.meta/type", "ImageConfig", "Configuration for image generation models")]
 [ApiType(
     Name = "Image Configuration",
     Type = "object",
@@ -41,7 +41,7 @@ public record ImageConfig(
     Dictionary<string, object> Parameters
 );
 
-[MetaNode("codex.image.concept", "codex.meta/type", "ConceptImage", "Concept to be rendered as an image")]
+[MetaNodeAttribute("codex.image.concept", "codex.meta/type", "ConceptImage", "Concept to be rendered as an image")]
 [ApiType(
     Name = "Concept Image",
     Type = "object",
@@ -69,7 +69,7 @@ public record ConceptImage(
     Dictionary<string, object> Metadata
 );
 
-[MetaNode("codex.image.generation", "codex.meta/type", "ImageGeneration", "Image generation request and result")]
+[MetaNodeAttribute("codex.image.generation", "codex.meta/type", "ImageGeneration", "Image generation request and result")]
 [ApiType(
     Name = "Image Generation",
     Type = "object",
@@ -98,7 +98,7 @@ public record ImageGeneration(
 /// <summary>
 /// Concept Image Generation Module - Renders concepts into images using configurable image generation models
 /// </summary>
-[MetaNode(
+[MetaNodeAttribute(
     id: "codex.image.concept-module",
     typeId: "codex.meta/module",
     name: "Concept Image Generation Module",

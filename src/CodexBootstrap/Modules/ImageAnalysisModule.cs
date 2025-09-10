@@ -9,7 +9,7 @@ namespace CodexBootstrap.Modules;
 
 // Image Analysis Data Types
 
-[MetaNode("codex.analysis.config", "codex.meta/type", "AnalysisConfig", "Configuration for image analysis models")]
+[MetaNodeAttribute("codex.analysis.config", "codex.meta/type", "AnalysisConfig", "Configuration for image analysis models")]
 [ApiType(
     Name = "Analysis Configuration",
     Type = "object",
@@ -39,7 +39,7 @@ public record AnalysisConfig(
     Dictionary<string, object> Parameters
 );
 
-[MetaNode("codex.analysis.image", "codex.meta/type", "ImageAnalysis", "Image to be analyzed for node/edge extraction")]
+[MetaNodeAttribute("codex.analysis.image", "codex.meta/type", "ImageAnalysis", "Image to be analyzed for node/edge extraction")]
 [ApiType(
     Name = "Image Analysis",
     Type = "object",
@@ -62,7 +62,7 @@ public record ImageAnalysis(
     Dictionary<string, object> Metadata
 );
 
-[MetaNode("codex.analysis.result", "codex.meta/type", "AnalysisResult", "Result of image analysis with extracted nodes and edges")]
+[MetaNodeAttribute("codex.analysis.result", "codex.meta/type", "AnalysisResult", "Result of image analysis with extracted nodes and edges")]
 [ApiType(
     Name = "Analysis Result",
     Type = "object",
@@ -105,7 +105,7 @@ public record AnalysisResult(
     DateTime AnalyzedAt
 );
 
-[MetaNode("codex.analysis.extracted-node", "codex.meta/type", "ExtractedNode", "Node extracted from image analysis")]
+[MetaNodeAttribute("codex.analysis.extracted-node", "codex.meta/type", "ExtractedNode", "Node extracted from image analysis")]
 [ApiType(
     Name = "Extracted Node",
     Type = "object",
@@ -135,7 +135,7 @@ public record ExtractedNode(
     Dictionary<string, object>? BoundingBox
 );
 
-[MetaNode("codex.analysis.extracted-edge", "codex.meta/type", "ExtractedEdge", "Edge extracted from image analysis")]
+[MetaNodeAttribute("codex.analysis.extracted-edge", "codex.meta/type", "ExtractedEdge", "Edge extracted from image analysis")]
 [ApiType(
     Name = "Extracted Edge",
     Type = "object",
@@ -167,7 +167,7 @@ public record ExtractedEdge(
 /// <summary>
 /// Image Analysis Module - Analyzes images to extract nodes and edges for the node-based system
 /// </summary>
-[MetaNode(
+[MetaNodeAttribute(
     id: "codex.analysis.image-module",
     typeId: "codex.meta/module",
     name: "Image Analysis Module",

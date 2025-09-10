@@ -11,7 +11,7 @@ namespace CodexBootstrap.Modules;
 /// U-CORE LLM Response Handler - Enhanced handler that maps LLM responses to U-CORE ontology
 /// Performs resonance field optimization calculations based on user belief systems
 /// </summary>
-[MetaNode(
+[MetaNodeAttribute(
     id: "codex.ucore.llm-response-handler",
     typeId: "codex.meta/module",
     name: "U-CORE LLM Response Handler",

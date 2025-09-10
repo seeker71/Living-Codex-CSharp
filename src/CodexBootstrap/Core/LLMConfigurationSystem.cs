@@ -8,7 +8,7 @@ namespace CodexBootstrap.Core;
 /// LLM Configuration System - Generic provider, model, and mode attributes for optimal Ollama integration
 /// Provides reusable configuration attributes for different use cases across all modules
 /// </summary>
-[MetaNode("codex.llm.configuration-system", "codex.meta/type", "LLMConfigurationSystem", "Generic LLM configuration system with Ollama optimization")]
+[MetaNodeAttribute("codex.llm.configuration-system", "codex.meta/type", "LLMConfigurationSystem", "Generic LLM configuration system with Ollama optimization")]
 [ApiType(
     Name = "LLM Configuration System",
     Type = "object",
@@ -114,7 +114,7 @@ public static class LLMConfigurationSystem
     /// <summary>
     /// LLM Configuration - Complete configuration for a specific use case
     /// </summary>
-    [MetaNode("codex.llm.configuration", "codex.meta/type", "LLMConfiguration", "Complete LLM configuration for specific use case")]
+    [MetaNodeAttribute("codex.llm.configuration", "codex.meta/type", "LLMConfiguration", "Complete LLM configuration for specific use case")]
     [ApiType(
         Name = "LLM Configuration",
         Type = "object",

@@ -5,7 +5,7 @@ namespace CodexBootstrap.Core;
 /// <summary>
 /// Core node entity meta-node
 /// </summary>
-[MetaNode(
+[MetaNodeAttribute(
     id: "codex.meta/type/node",
     typeId: "codex.meta/type",
     name: "Node",
@@ -41,7 +41,7 @@ public class NodeMetaNode
 /// <summary>
 /// Core edge entity meta-node
 /// </summary>
-[MetaNode(
+[MetaNodeAttribute(
     id: "codex.meta/type/edge",
     typeId: "codex.meta/type",
     name: "Edge",
@@ -68,7 +68,7 @@ public class EdgeMetaNode
 /// <summary>
 /// Content reference meta-node
 /// </summary>
-[MetaNode(
+[MetaNodeAttribute(
     id: "codex.meta/type/content-ref",
     typeId: "codex.meta/type",
     name: "ContentRef",
@@ -107,7 +107,7 @@ public class ContentRefMetaNode
 /// <summary>
 /// Ice state meta-node
 /// </summary>
-[MetaNode(
+[MetaNodeAttribute(
     id: "codex.meta/state/ice",
     typeId: "codex.meta/state",
     name: "Ice",
@@ -131,7 +131,7 @@ public class IceStateMetaNode
 /// <summary>
 /// Water state meta-node
 /// </summary>
-[MetaNode(
+[MetaNodeAttribute(
     id: "codex.meta/state/water",
     typeId: "codex.meta/state",
     name: "Water",
@@ -155,7 +155,7 @@ public class WaterStateMetaNode
 /// <summary>
 /// Gas state meta-node
 /// </summary>
-[MetaNode(
+[MetaNodeAttribute(
     id: "codex.meta/state/gas",
     typeId: "codex.meta/state",
     name: "Gas",
@@ -179,7 +179,7 @@ public class GasStateMetaNode
 /// <summary>
 /// Object type kind meta-node
 /// </summary>
-[MetaNode(
+[MetaNodeAttribute(
     id: "codex.meta/type-kind/object",
     typeId: "codex.meta/type-kind",
     name: "Object",
@@ -203,7 +203,7 @@ public class ObjectTypeKindMetaNode
 /// <summary>
 /// Array type kind meta-node
 /// </summary>
-[MetaNode(
+[MetaNodeAttribute(
     id: "codex.meta/type-kind/array",
     typeId: "codex.meta/type-kind",
     name: "Array",
@@ -227,7 +227,7 @@ public class ArrayTypeKindMetaNode
 /// <summary>
 /// Reference type kind meta-node
 /// </summary>
-[MetaNode(
+[MetaNodeAttribute(
     id: "codex.meta/type-kind/reference",
     typeId: "codex.meta/type-kind",
     name: "Reference",
@@ -251,7 +251,7 @@ public class ReferenceTypeKindMetaNode
 /// <summary>
 /// Enum type kind meta-node
 /// </summary>
-[MetaNode(
+[MetaNodeAttribute(
     id: "codex.meta/type-kind/enum",
     typeId: "codex.meta/type-kind",
     name: "Enum",
@@ -275,7 +275,7 @@ public class EnumTypeKindMetaNode
 /// <summary>
 /// Primitive type kind meta-node
 /// </summary>
-[MetaNode(
+[MetaNodeAttribute(
     id: "codex.meta/type-kind/primitive",
     typeId: "codex.meta/type-kind",
     name: "Primitive",

@@ -9,7 +9,7 @@ namespace CodexBootstrap.Modules;
 
 // LLM Configuration Data Types
 
-[MetaNode("codex.llm.config", "codex.meta/type", "LLMConfig", "Configuration for LLM integration")]
+[MetaNodeAttribute("codex.llm.config", "codex.meta/type", "LLMConfig", "Configuration for LLM integration")]
 [ApiType(
     Name = "LLM Configuration",
     Type = "object",
@@ -39,7 +39,7 @@ public record LLMConfig(
     Dictionary<string, object> Parameters
 );
 
-[MetaNode("codex.llm.future-query", "codex.meta/type", "FutureQuery", "Query for future knowledge using LLM")]
+[MetaNodeAttribute("codex.llm.future-query", "codex.meta/type", "FutureQuery", "Query for future knowledge using LLM")]
 [ApiType(
     Name = "Future Query",
     Type = "object",
@@ -64,7 +64,7 @@ public record FutureQuery(
     Dictionary<string, object> Metadata
 );
 
-[MetaNode("codex.llm.future-response", "codex.meta/type", "FutureResponse", "LLM-generated future knowledge response")]
+[MetaNodeAttribute("codex.llm.future-response", "codex.meta/type", "FutureResponse", "LLM-generated future knowledge response")]
 [ApiType(
     Name = "Future Response",
     Type = "object",
@@ -94,7 +94,7 @@ public record FutureResponse(
 /// <summary>
 /// LLM-Enhanced Future Knowledge Module - Uses configurable LLMs for future knowledge retrieval
 /// </summary>
-[MetaNode(
+[MetaNodeAttribute(
     id: "codex.llm.future-module",
     typeId: "codex.meta/module",
     name: "LLM-Enhanced Future Knowledge Module",

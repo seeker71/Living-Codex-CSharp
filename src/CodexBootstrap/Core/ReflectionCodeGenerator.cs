@@ -10,7 +10,7 @@ namespace CodexBootstrap.Core;
 /// Reflection Code Generator - Generates code and structure using reflection and LLM
 /// Replaces static/mock data with dynamic, contextually aware content
 /// </summary>
-[MetaNode("codex.reflection.code-generator", "codex.meta/type", "ReflectionCodeGenerator", "Reflection-based code generation system")]
+[MetaNodeAttribute("codex.reflection.code-generator", "codex.meta/type", "ReflectionCodeGenerator", "Reflection-based code generation system")]
 [ApiType(
     Name = "Reflection Code Generator",
     Type = "object",
@@ -873,7 +873,7 @@ public class ReflectionCodeGenerator
 /// <summary>
 /// Generated Code - Stores generated code with expiration
 /// </summary>
-[MetaNode("codex.reflection.generated-code", "codex.meta/type", "GeneratedCode", "Generated code with expiration")]
+[MetaNodeAttribute("codex.reflection.generated-code", "codex.meta/type", "GeneratedCode", "Generated code with expiration")]
 public record GeneratedCode(
     string Code,
     DateTime GeneratedAt,

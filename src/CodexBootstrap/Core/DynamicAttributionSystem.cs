@@ -11,7 +11,7 @@ namespace CodexBootstrap.Core;
 /// Dynamic Attribution System - Replaces static descriptions with real-time LLM responses
 /// Uses reflection to transform static content into dynamic, contextually aware responses
 /// </summary>
-[MetaNode("codex.dynamic.attribution", "codex.meta/type", "DynamicAttributionSystem", "Dynamic LLM-powered attribution system")]
+[MetaNodeAttribute("codex.dynamic.attribution", "codex.meta/type", "DynamicAttributionSystem", "Dynamic LLM-powered attribution system")]
 [ApiType(
     Name = "Dynamic Attribution System",
     Type = "object",
@@ -492,7 +492,7 @@ public class DynamicAttributionSystem
 /// <summary>
 /// Cached Response - Stores LLM-generated content with expiration
 /// </summary>
-[MetaNode("codex.dynamic.cached-response", "codex.meta/type", "CachedResponse", "Cached LLM response with expiration")]
+[MetaNodeAttribute("codex.dynamic.cached-response", "codex.meta/type", "CachedResponse", "Cached LLM response with expiration")]
 public record CachedResponse(
     string Content,
     DateTime GeneratedAt,
@@ -505,7 +505,7 @@ public record CachedResponse(
 /// <summary>
 /// Dynamic Content Generator - Utility for generating dynamic content
 /// </summary>
-[MetaNode("codex.dynamic.content-generator", "codex.meta/type", "DynamicContentGenerator", "Dynamic content generation utility")]
+[MetaNodeAttribute("codex.dynamic.content-generator", "codex.meta/type", "DynamicContentGenerator", "Dynamic content generation utility")]
 public static class DynamicContentGenerator
 {
     private static readonly DynamicAttributionSystem _attributionSystem = new(null, null);

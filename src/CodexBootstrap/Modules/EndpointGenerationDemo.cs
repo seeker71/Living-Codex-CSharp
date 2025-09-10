@@ -12,7 +12,7 @@ namespace CodexBootstrap.Modules;
 /// Endpoint Generation Demo - Demonstrates missing endpoint generation with U-CORE delta diffs
 /// Shows how the breath framework can dynamically generate missing functionality
 /// </summary>
-[MetaNode(
+[MetaNodeAttribute(
     id: "codex.endpoint.generation-demo",
     typeId: "codex.meta/module",
     name: "Endpoint Generation Demo",
