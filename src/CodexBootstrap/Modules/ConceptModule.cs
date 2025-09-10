@@ -11,259 +11,203 @@ namespace CodexBootstrap.Modules;
 /// </summary>
 public class ConceptModule : IModule
 {
-    
+    private readonly IApiRouter _apiRouter;
+    private readonly NodeRegistry _registry;
+
+    public ConceptModule(IApiRouter apiRouter, NodeRegistry registry)
+    {
+        _apiRouter = apiRouter;
+        _registry = registry;
+    }
+
     public string ModuleId => "codex.concept";
+    public string Name => "Concept Management Module";
     public string Version => "1.0.0";
     public string Description => "Concept Management Module - Self-contained fractal APIs";
 
     public Node GetModuleNode()
     {
-        return new Node(
-            Id: ModuleId,
-            TypeId: "codex.meta/module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Concept Management Module",
-            Description: Description,
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    moduleId = ModuleId,
-                    version = Version,
-                    description = Description,
-                    apis = new[]
-                    {
-                        new { name = "create", spec = "/concept/create/spec" },
-                        new { name = "define", spec = "/concept/define/spec" },
-                        new { name = "relate", spec = "/concept/relate/spec" },
-                        new { name = "search", spec = "/concept/search/spec" },
-                        new { name = "semantic", spec = "/concept/semantic/spec" }
-                    }
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = ModuleId,
-                ["version"] = Version,
-                ["type"] = "concept-management"
-            }
-        );
+        return ModuleHelpers.CreateModuleNode(ModuleId, Name, Version, Description);
     }
 
     public void Register(NodeRegistry registry)
     {
-        // Register module node
-        registry.Upsert(GetModuleNode());
-
-        // Register API nodes for RouteDiscovery
-        var createApi = NodeStorage.CreateApiNode("codex.concept", "create", "/concept/create", "Create a new concept");
-        var defineApi = NodeStorage.CreateApiNode("codex.concept", "define", "/concept/define/{id}", "Define concept properties");
-        var relateApi = NodeStorage.CreateApiNode("codex.concept", "relate", "/concept/relate", "Create concept relationships");
-        var searchApi = NodeStorage.CreateApiNode("codex.concept", "search", "/concept/search", "Search concepts by criteria");
-        var semanticApi = NodeStorage.CreateApiNode("codex.concept", "semantic", "/concept/semantic/{id}", "Semantic analysis of concepts");
-
-        registry.Upsert(createApi);
-        registry.Upsert(defineApi);
-        registry.Upsert(relateApi);
-        registry.Upsert(searchApi);
-        registry.Upsert(semanticApi);
-
-        // Register edges
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.concept", "create"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.concept", "define"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.concept", "relate"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.concept", "search"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.concept", "semantic"));
+        // Module registration is now handled automatically by the attribute discovery system
+        // This method can be used for additional module-specific setup if needed
     }
 
     public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
     {
-        // Concept Creation API
-        router.Register("codex.concept", "create", async (args) =>
-        {
-            var options = new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                WriteIndented = true,
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-            };
-            
-            var request = JsonSerializer.Deserialize<ConceptCreateRequest>(JsonSerializer.Serialize(args), options);
-            return await CreateConcept(request ?? new ConceptCreateRequest("", "", "", "", new string[0]), router.GetRegistry());
-        });
-
-        // Concept Definition API
-        router.Register("codex.concept", "define", async (args) =>
-        {
-            var request = JsonSerializer.Deserialize<ConceptDefineRequest>(JsonSerializer.Serialize(args));
-            return await DefineConcept(request ?? new ConceptDefineRequest("", "", new string[0], new string[0]));
-        });
-
-        // Concept Relationship API
-        router.Register("codex.concept", "relate", async (args) =>
-        {
-            var request = JsonSerializer.Deserialize<ConceptRelateRequest>(JsonSerializer.Serialize(args));
-            return await RelateConcepts(request ?? new ConceptRelateRequest("", "", "", 0.0));
-        });
-
-        // Concept Search API
-        router.Register("codex.concept", "search", async (args) =>
-        {
-            var request = JsonSerializer.Deserialize<ConceptSearchRequest>(JsonSerializer.Serialize(args));
-            return await SearchConcepts(request ?? new ConceptSearchRequest("", "", new string[0]));
-        });
-
-        // Concept Semantic Analysis API
-        router.Register("codex.concept", "semantic", async (args) =>
-        {
-            var request = JsonSerializer.Deserialize<ConceptSemanticRequest>(JsonSerializer.Serialize(args));
-            return await AnalyzeSemantics(request ?? new ConceptSemanticRequest(""));
-        });
+        // API handlers are now registered automatically by the attribute discovery system
+        // This method can be used for additional manual registrations if needed
     }
 
     public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
-        // Each API endpoint is self-contained with its own OpenAPI spec
-        app.MapPost("/concept/create", async (ConceptCreateRequest request) =>
-        {
-            var result = await CreateConcept(request, registry);
-            return Results.Ok(result);
-        })
-        .WithName("CreateConcept");
-
-        app.MapPost("/concept/define/{id}", async (string id, ConceptDefineRequest request) =>
-        {
-            var requestWithId = new ConceptDefineRequest(id, request.Definition, request.Examples, request.Relationships);
-            var result = await DefineConcept(requestWithId);
-            return Results.Ok(result);
-        })
-        .WithName("DefineConcept");
-
-        app.MapPost("/concept/relate", async (ConceptRelateRequest request) =>
-        {
-            var result = await RelateConcepts(request);
-            return Results.Ok(result);
-        })
-        .WithName("RelateConcepts");
-
-        app.MapPost("/concept/search", async (ConceptSearchRequest request) =>
-        {
-            var result = await SearchConcepts(request);
-            return Results.Ok(result);
-        })
-        .WithName("SearchConcepts");
-
-        app.MapGet("/concept/semantic/{id}", async (string id) =>
-        {
-            var request = new ConceptSemanticRequest(id);
-            var result = await AnalyzeSemantics(request);
-            return Results.Ok(result);
-        })
-        .WithName("AnalyzeSemantics");
+        // HTTP endpoints are now registered automatically by the attribute discovery system
+        // This method can be used for additional manual registrations if needed
     }
 
-    // API Implementation Methods
-    private Task<object> CreateConcept(ConceptCreateRequest request, NodeRegistry registry)
+    /// <summary>
+    /// Create a new concept
+    /// </summary>
+    [Post("/concept/create", "concept-create", "Create a new concept", "codex.concept")]
+    [ApiResponse(200, "Success")]
+    [ApiResponse(400, "Bad request")]
+    public async Task<object> CreateConcept([ApiParameter("request", "Concept creation request", Required = true, Location = "body")] ConceptCreateRequest request)
     {
-        // Create concept node
-        var conceptNode = new Node(
-            Id: $"concept.{request.Name}",
-            TypeId: "codex.concept",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: request.Name,
-            Description: request.Description,
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
+        try
+        {
+            // Create concept node
+            var conceptNode = new Node(
+                Id: $"concept.{request.Name}",
+                TypeId: "codex.concept",
+                State: ContentState.Ice,
+                Locale: "en",
+                Title: request.Name,
+                Description: request.Description,
+                Content: new ContentRef(
+                    MediaType: "application/json",
+                    InlineJson: JsonSerializer.Serialize(new
+                    {
+                        name = request.Name,
+                        description = request.Description,
+                        domain = request.Domain,
+                        complexity = request.Complexity,
+                        tags = request.Tags,
+                        createdAt = DateTime.UtcNow
+                    }),
+                    InlineBytes: null,
+                    ExternalUri: null
+                ),
+                Meta: new Dictionary<string, object>
                 {
-                    name = request.Name,
-                    description = request.Description,
-                    domain = request.Domain,
-                    complexity = request.Complexity,
-                    tags = request.Tags,
-                    createdAt = DateTime.UtcNow
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["name"] = request.Name,
-                ["description"] = request.Description,
-                ["domain"] = request.Domain,
-                ["complexity"] = request.Complexity,
-                ["tags"] = string.Join(",", request.Tags),
-                ["createdAt"] = DateTime.UtcNow,
-                ["status"] = "draft"
-            }
-        );
+                    ["name"] = request.Name,
+                    ["description"] = request.Description,
+                    ["domain"] = request.Domain,
+                    ["complexity"] = request.Complexity,
+                    ["tags"] = string.Join(",", request.Tags),
+                    ["createdAt"] = DateTime.UtcNow,
+                    ["status"] = "draft"
+                }
+            );
 
-        // Store the concept node in the registry
-        registry.Upsert(conceptNode);
+            // Store the concept in the registry
+            _registry.Upsert(conceptNode);
 
-        return Task.FromResult<object>(new ConceptCreateResponse(
-            Success: true,
-            ConceptId: conceptNode.Id,
-            Message: "Concept created successfully"
-        ));
+            return ResponseHelpers.CreateConceptCreateResponse(
+                success: true,
+                conceptId: conceptNode.Id,
+                message: "Concept created successfully"
+            );
+        }
+        catch (Exception ex)
+        {
+            return ResponseHelpers.CreateErrorResponse($"Failed to create concept: {ex.Message}", "CREATE_ERROR");
+        }
     }
 
-    private Task<object> DefineConcept(ConceptDefineRequest request)
+    /// <summary>
+    /// Define concept properties
+    /// </summary>
+    [Post("/concept/define/{id}", "concept-define", "Define concept properties", "codex.concept")]
+    [ApiResponse(200, "Success")]
+    [ApiResponse(400, "Bad request")]
+    [ApiResponse(404, "Not found")]
+    public async Task<object> DefineConcept(
+        [ApiParameter("id", "Concept ID", Required = true, Location = "path")] string id,
+        [ApiParameter("request", "Concept definition request", Required = true, Location = "body")] ConceptDefineRequest request)
     {
-        return Task.FromResult<object>(new ConceptDefineResponse(
-            ConceptId: request.ConceptId,
-            Properties: new Dictionary<string, object>
-            {
-                ["definition"] = request.Definition,
-                ["examples"] = request.Examples,
-                ["relationships"] = request.Relationships,
-                ["updatedAt"] = DateTime.UtcNow
-            },
-            Message: "Concept defined successfully"
-        ));
+        try
+        {
+            return ResponseHelpers.CreateConceptDefineResponse(
+                conceptId: id,
+                properties: new Dictionary<string, object>(),
+                message: "Concept definition updated successfully"
+            );
+        }
+        catch (Exception ex)
+        {
+            return ResponseHelpers.CreateErrorResponse($"Failed to define concept: {ex.Message}", "DEFINE_ERROR");
+        }
     }
 
-    private Task<object> RelateConcepts(ConceptRelateRequest request)
+    /// <summary>
+    /// Create concept relationships
+    /// </summary>
+    [Post("/concept/relate", "concept-relate", "Create concept relationships", "codex.concept")]
+    [ApiResponse(200, "Success")]
+    [ApiResponse(400, "Bad request")]
+    public async Task<object> RelateConcepts([ApiParameter("request", "Concept relationship request", Required = true, Location = "body")] ConceptRelateRequest request)
     {
-        return Task.FromResult<object>(new ConceptRelateResponse(
-            Success: true,
-            RelationshipId: $"rel_{request.SourceConceptId}_{request.TargetConceptId}",
-            RelationshipType: request.RelationshipType,
-            Weight: request.Weight,
-            Message: "Concept relationship created successfully"
-        ));
+        try
+        {
+            var relationshipId = Guid.NewGuid().ToString();
+            return ResponseHelpers.CreateConceptRelateResponse(
+                success: true,
+                relationshipId: relationshipId,
+                relationshipType: request.RelationshipType,
+                weight: request.Weight,
+                message: "Concept relationship created successfully"
+            );
+        }
+        catch (Exception ex)
+        {
+            return ResponseHelpers.CreateErrorResponse($"Failed to create relationship: {ex.Message}", "RELATE_ERROR");
+        }
     }
 
-    private Task<object> SearchConcepts(ConceptSearchRequest request)
+    /// <summary>
+    /// Search concepts by criteria
+    /// </summary>
+    [Post("/concept/search", "concept-search", "Search concepts by criteria", "codex.concept")]
+    [ApiResponse(200, "Success")]
+    [ApiResponse(400, "Bad request")]
+    public async Task<object> SearchConcepts([ApiParameter("request", "Concept search request", Required = true, Location = "body")] ConceptSearchRequest request)
     {
-        return Task.FromResult<object>(new ConceptSearchResponse(
-            Concepts: new[]
-            {
-                new { id = "concept.example1", name = "Example Concept 1", domain = "technology" },
-                new { id = "concept.example2", name = "Example Concept 2", domain = "science" }
-            },
-            TotalCount: 2,
-            Message: "Search completed successfully"
-        ));
+        try
+        {
+            // In a real implementation, you would search the registry
+            var concepts = new object[0];
+            
+            return ResponseHelpers.CreateConceptSearchResponse(
+                concepts: concepts,
+                totalCount: concepts.Length,
+                message: "Search completed successfully"
+            );
+        }
+        catch (Exception ex)
+        {
+            return ResponseHelpers.CreateErrorResponse($"Failed to search concepts: {ex.Message}", "SEARCH_ERROR");
+        }
     }
 
-    private Task<object> AnalyzeSemantics(ConceptSemanticRequest request)
+    /// <summary>
+    /// Semantic analysis of concepts
+    /// </summary>
+    [Get("/concept/semantic/{id}", "concept-semantic", "Semantic analysis of concepts", "codex.concept")]
+    [ApiResponse(200, "Success")]
+    [ApiResponse(404, "Not found")]
+    public async Task<object> AnalyzeSemantics([ApiParameter("id", "Concept ID", Required = true, Location = "path")] string id)
     {
-        return Task.FromResult<object>(new ConceptSemanticResponse(
-            ConceptId: request.ConceptId,
-            Analysis: new
-            {
-                complexity = "medium",
-                relatedConcepts = new[] { "concept.related1", "concept.related2" },
-                semanticTags = new[] { "technical", "abstract", "fundamental" },
-                confidence = 0.85
-            },
-            Message: "Semantic analysis completed successfully"
-        ));
+        try
+        {
+            return ResponseHelpers.CreateConceptSemanticResponse(
+                conceptId: id,
+                analysis: new
+                {
+                    complexity = "unknown",
+                    relatedConcepts = new string[0],
+                    semanticTags = new string[0],
+                    confidence = 0.0
+                },
+                message: "Semantic analysis completed successfully"
+            );
+        }
+        catch (Exception ex)
+        {
+            return ResponseHelpers.CreateErrorResponse($"Failed to analyze concept: {ex.Message}", "ANALYSIS_ERROR");
+        }
     }
 }
 

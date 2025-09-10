@@ -3,6 +3,11 @@ using CodexBootstrap.Core;
 
 namespace CodexBootstrap.Runtime;
 
+/// <summary>
+/// Information about a module
+/// </summary>
+public record ModuleInfo(string Id, string Name, string Version, string? Description, string? Title);
+
 public sealed class CoreApiService
 {
     private readonly NodeRegistry _registry;

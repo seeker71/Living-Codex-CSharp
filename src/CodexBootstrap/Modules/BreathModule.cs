@@ -5,22 +5,29 @@ using CodexBootstrap.Runtime;
 namespace CodexBootstrap.Modules;
 
 // Breath module specific response types
+[ResponseType("codex.breath.expand-response", "ExpandResponse", "Expand response")]
 public record ExpandResponse(string Id, string Phase, bool Expanded, string? Message = null);
 
+[ResponseType("codex.breath.validate-response", "ValidateResponse", "Validate response")]
 public record ValidateResponse(string Id, bool Valid, string Message);
 
+[ResponseType("codex.breath.contract-response", "ContractResponse", "Contract response")]
 public record ContractResponse(string Id, string Phase, bool Contracted, string? Message = null);
 
+[ResponseType("codex.breath.breath-loop-result", "BreathLoopResult", "Breath loop result")]
 public record BreathLoopResult(string Operation, object Result);
 
+[ResponseType("codex.breath.breath-loop-response", "BreathLoopResponse", "Breath loop response")]
 public record BreathLoopResponse(string Id, List<BreathLoopResult> Results, bool Success);
 
+[ResponseType("codex.breath.oneshot-result", "OneshotResult", "Oneshot result")]
 public record OneshotResult(
     ExpandResponse Expand,
     ValidateResponse Validate, 
     ContractResponse Contract
 );
 
+[ResponseType("codex.breath.oneshot-response", "OneshotResponse", "Oneshot response")]
 public record OneshotResponse(
     string Id, 
     string Operation, 
@@ -31,6 +38,14 @@ public record OneshotResponse(
 
 public sealed class BreathModule : IModule
 {
+    private readonly IApiRouter _apiRouter;
+    private readonly NodeRegistry _registry;
+
+    public BreathModule(IApiRouter apiRouter, NodeRegistry registry)
+    {
+        _apiRouter = apiRouter;
+        _registry = registry;
+    }
     public Node GetModuleNode()
     {
         return NodeStorage.CreateModuleNode(
@@ -67,178 +82,38 @@ public sealed class BreathModule : IModule
 
     public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
     {
-        router.Register("codex.breath", "expand", async args =>
-        {
-            if (args is null) return new ErrorResponse("Missing request body");
-
-            try
-            {
-                var request = JsonSerializer.Deserialize<ExpandRequest>(args.Value, new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                });
-
-                if (request?.Id == null) return new ErrorResponse("Missing or invalid id");
-
-                // Real expand operation - promote Ice → Gas
-                var expandedResult = await ExpandModule(request.Id, registry);
-                return expandedResult;
-            }
-            catch (Exception ex)
-            {
-                return new ErrorResponse($"Expand failed: {ex.Message}");
-            }
-        });
-
-        router.Register("codex.breath", "validate", async args =>
-        {
-            if (args is null) return new ErrorResponse("Missing request body");
-
-            try
-            {
-                var request = JsonSerializer.Deserialize<ValidateRequest>(args.Value, new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                });
-
-                if (request?.Id == null) return new ErrorResponse("Missing or invalid id");
-
-                // Real validate operation - check Gas state integrity
-                var validationResult = await ValidateModule(request.Id, registry);
-                return validationResult;
-            }
-            catch (Exception ex)
-            {
-                return new ErrorResponse($"Validate failed: {ex.Message}");
-            }
-        });
-
-        router.Register("codex.breath", "contract", async args =>
-        {
-            if (args is null) return new ErrorResponse("Missing request body");
-
-            try
-            {
-                var request = JsonSerializer.Deserialize<ContractRequest>(args.Value, new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                });
-
-                if (request?.Id == null) return new ErrorResponse("Missing or invalid id");
-
-                // Real contract operation - promote Gas → Water
-                var contractResult = await ContractModule(request.Id, registry);
-                return contractResult;
-            }
-            catch (Exception ex)
-            {
-                return new ErrorResponse($"Contract failed: {ex.Message}");
-            }
-        });
-
-        router.Register("codex.breath", "breath-loop", args =>
-        {
-            if (args is null) return Task.FromResult<object>(new ErrorResponse("Missing request body"));
-
-            try
-            {
-                var request = JsonSerializer.Deserialize<BreathLoopRequest>(args.Value, new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                });
-
-                if (request?.Id == null) return Task.FromResult<object>(new ErrorResponse("Missing or invalid id"));
-
-                var results = new List<BreathLoopResult>();
-                var success = true;
-
-                foreach (var operation in request.Operations ?? new[] { "expand", "validate", "contract" })
-                {
-                    try
-                    {
-                        object result = operation.ToLowerInvariant() switch
-                        {
-                            "expand" => new ExpandResponse(request.Id, "expanded", true),
-                            "validate" => new ValidateResponse(request.Id, true, "Validation successful"),
-                            "contract" => new ContractResponse(request.Id, "contracted", true),
-                            _ => new ErrorResponse($"Unknown operation: {operation}")
-                        };
-                        results.Add(new BreathLoopResult(operation, result));
-                    }
-                    catch (Exception ex)
-                    {
-                        results.Add(new BreathLoopResult(operation, new ErrorResponse(ex.Message)));
-                        success = false;
-                    }
-                }
-
-                var response = new BreathLoopResponse(request.Id, results, success);
-                return Task.FromResult<object>(response);
-            }
-            catch (Exception ex)
-            {
-                return Task.FromResult<object>(new ErrorResponse($"Breath loop failed: {ex.Message}"));
-            }
-        });
-
-        router.Register("codex.breath", "oneshot", args =>
-        {
-            if (args is null) return Task.FromResult<object>(new ErrorResponse("Missing request body"));
-
-            try
-            {
-                var request = JsonSerializer.Deserialize<BreathRequest>(args.Value, new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                });
-
-                if (request?.Id == null) return Task.FromResult<object>(new ErrorResponse("Missing or invalid id"));
-
-                // Execute the breath loop: expand, validate, contract
-                var expandResult = new ExpandResponse(request.Id, "expanded", true);
-                var validateResult = new ValidateResponse(request.Id, true, "Validation successful");
-                var contractResult = new ContractResponse(request.Id, "contracted", true);
-
-                var result = new OneshotResult(expandResult, validateResult, contractResult);
-                var response = new OneshotResponse(request.Id, "oneshot", result, true, "Oneshot completed");
-                return Task.FromResult<object>(response);
-            }
-            catch (Exception ex)
-            {
-                return Task.FromResult<object>(new ErrorResponse($"Oneshot failed: {ex.Message}"));
-            }
-        });
+        // This method is now handled by attribute-based discovery
     }
 
     public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
-        // Breath module doesn't need any custom HTTP endpoints
-        // All functionality is exposed through the generic /route endpoint
+        // This method is now handled by attribute-based discovery
     }
 
-    private Task<ExpandResponse> ExpandModule(string moduleId, NodeRegistry registry)
+    [ApiRoute("POST", "/breath/expand/{id}", "breath-expand", "Expand a module specification", "codex.breath")]
+    public async Task<object> ExpandModule([ApiParameter("id", "Module ID to expand", Required = true, Location = "path")] string id)
     {
         try
         {
             // Get the module node
-            if (!registry.TryGet(moduleId, out var moduleNode))
+            if (!_registry.TryGet(id, out var moduleNode))
             {
-                throw new InvalidOperationException($"Module '{moduleId}' not found");
+                return new ErrorResponse($"Module '{id}' not found");
             }
 
             // Check if module is in Ice state (ready to expand)
             if (moduleNode.State != ContentState.Ice)
             {
-                return Task.FromResult(new ExpandResponse(moduleId, moduleNode.State.ToString(), false, $"Module is in {moduleNode.State} state, cannot expand from Ice"));
+                return new ExpandResponse(id, moduleNode.State.ToString(), false, $"Module is in {moduleNode.State} state, cannot expand from Ice");
             }
 
             // Get all nodes related to this module
-            var moduleNodes = registry.AllNodes()
-                .Where(node => node.Meta?.GetValueOrDefault("moduleId")?.ToString() == moduleId)
+            var moduleNodes = _registry.AllNodes()
+                .Where(node => node.Meta?.GetValueOrDefault("moduleId")?.ToString() == id)
                 .ToList();
 
             // Get all edges related to this module
-            var moduleEdges = registry.AllEdges()
+            var moduleEdges = _registry.AllEdges()
                 .Where(edge => moduleNodes.Any(n => n.Id == edge.FromId || n.Id == edge.ToId))
                 .ToList();
 
@@ -261,7 +136,7 @@ public sealed class BreathModule : IModule
                         }
                     };
                     expandedNodes.Add(expandedNode);
-                    registry.Upsert(expandedNode);
+                    _registry.Upsert(expandedNode);
                 }
             }
 
@@ -276,45 +151,46 @@ public sealed class BreathModule : IModule
                     }
                 };
                 expandedEdges.Add(expandedEdge);
-                registry.Upsert(expandedEdge);
+                _registry.Upsert(expandedEdge);
             }
 
-            return Task.FromResult(new ExpandResponse(
-                moduleId, 
+            return new ExpandResponse(
+                id, 
                 "expanded", 
                 true, 
                 $"Expanded {expandedNodes.Count} nodes and {expandedEdges.Count} edges from Ice to Gas state"
-            ));
+            );
         }
         catch (Exception ex)
         {
-            return Task.FromResult(new ExpandResponse(moduleId, "error", false, $"Expand failed: {ex.Message}"));
+            return new ExpandResponse(id, "error", false, $"Expand failed: {ex.Message}");
         }
     }
 
-    private Task<ValidateResponse> ValidateModule(string moduleId, NodeRegistry registry)
+    [ApiRoute("POST", "/breath/validate/{id}", "breath-validate", "Validate a module specification", "codex.breath")]
+    public async Task<object> ValidateModule([ApiParameter("id", "Module ID to validate", Required = true, Location = "path")] string id)
     {
         try
         {
             // Get the module node
-            if (!registry.TryGet(moduleId, out var moduleNode))
+            if (!_registry.TryGet(id, out var moduleNode))
             {
-                throw new InvalidOperationException($"Module '{moduleId}' not found");
+                return new ErrorResponse($"Module '{id}' not found");
             }
 
             // Check if module is in Gas state (ready to validate)
             if (moduleNode.State != ContentState.Gas)
             {
-                return Task.FromResult(new ValidateResponse(moduleId, false, $"Module is in {moduleNode.State} state, cannot validate from Gas"));
+                return new ValidateResponse(id, false, $"Module is in {moduleNode.State} state, cannot validate from Gas");
             }
 
             // Get all nodes related to this module
-            var moduleNodes = registry.AllNodes()
-                .Where(node => node.Meta?.GetValueOrDefault("moduleId")?.ToString() == moduleId)
+            var moduleNodes = _registry.AllNodes()
+                .Where(node => node.Meta?.GetValueOrDefault("moduleId")?.ToString() == id)
                 .ToList();
 
             // Get all edges related to this module
-            var moduleEdges = registry.AllEdges()
+            var moduleEdges = _registry.AllEdges()
                 .Where(edge => moduleNodes.Any(n => n.Id == edge.FromId || n.Id == edge.ToId))
                 .ToList();
 
@@ -355,37 +231,38 @@ public sealed class BreathModule : IModule
                 ? $"Validation successful: {moduleNodes.Count} nodes, {moduleEdges.Count} edges"
                 : $"Validation failed: {string.Join("; ", validationErrors)}";
 
-            return Task.FromResult(new ValidateResponse(moduleId, isValid, message));
+            return new ValidateResponse(id, isValid, message);
         }
         catch (Exception ex)
         {
-            return Task.FromResult(new ValidateResponse(moduleId, false, $"Validate failed: {ex.Message}"));
+            return new ValidateResponse(id, false, $"Validate failed: {ex.Message}");
         }
     }
 
-    private Task<ContractResponse> ContractModule(string moduleId, NodeRegistry registry)
+    [ApiRoute("POST", "/breath/contract/{id}", "breath-contract", "Contract a module specification", "codex.breath")]
+    public async Task<object> ContractModule([ApiParameter("id", "Module ID to contract", Required = true, Location = "path")] string id)
     {
         try
         {
             // Get the module node
-            if (!registry.TryGet(moduleId, out var moduleNode))
+            if (!_registry.TryGet(id, out var moduleNode))
             {
-                throw new InvalidOperationException($"Module '{moduleId}' not found");
+                return new ErrorResponse($"Module '{id}' not found");
             }
 
             // Check if module is in Gas state (ready to contract)
             if (moduleNode.State != ContentState.Gas)
             {
-                return Task.FromResult(new ContractResponse(moduleId, moduleNode.State.ToString(), false, $"Module is in {moduleNode.State} state, cannot contract from Gas"));
+                return new ContractResponse(id, moduleNode.State.ToString(), false, $"Module is in {moduleNode.State} state, cannot contract from Gas");
             }
 
             // Get all nodes related to this module
-            var moduleNodes = registry.AllNodes()
-                .Where(node => node.Meta?.GetValueOrDefault("moduleId")?.ToString() == moduleId)
+            var moduleNodes = _registry.AllNodes()
+                .Where(node => node.Meta?.GetValueOrDefault("moduleId")?.ToString() == id)
                 .ToList();
 
             // Get all edges related to this module
-            var moduleEdges = registry.AllEdges()
+            var moduleEdges = _registry.AllEdges()
                 .Where(edge => moduleNodes.Any(n => n.Id == edge.FromId || n.Id == edge.ToId))
                 .ToList();
 
@@ -408,7 +285,7 @@ public sealed class BreathModule : IModule
                         }
                     };
                     contractedNodes.Add(contractedNode);
-                    registry.Upsert(contractedNode);
+                    _registry.Upsert(contractedNode);
                 }
             }
 
@@ -423,26 +300,96 @@ public sealed class BreathModule : IModule
                     }
                 };
                 contractedEdges.Add(contractedEdge);
-                registry.Upsert(contractedEdge);
+                _registry.Upsert(contractedEdge);
             }
 
-            return Task.FromResult(new ContractResponse(
-                moduleId, 
+            return new ContractResponse(
+                id, 
                 "contracted", 
                 true, 
                 $"Contracted {contractedNodes.Count} nodes and {contractedEdges.Count} edges from Gas to Water state"
-            ));
+            );
         }
         catch (Exception ex)
         {
-            return Task.FromResult(new ContractResponse(moduleId, "error", false, $"Contract failed: {ex.Message}"));
+            return new ContractResponse(id, "error", false, $"Contract failed: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("POST", "/breath/loop/{id}", "breath-loop", "Execute full breath loop", "codex.breath")]
+    public async Task<object> BreathLoop([ApiParameter("id", "Module ID for breath loop", Required = true, Location = "path")] string id, 
+                                       [ApiParameter("request", "Breath loop request", Required = true, Location = "body")] BreathLoopRequest request)
+    {
+        try
+        {
+            if (request?.Id == null) return new ErrorResponse("Missing or invalid id");
+
+            var results = new List<BreathLoopResult>();
+            var success = true;
+
+            foreach (var operation in request.Operations ?? new[] { "expand", "validate", "contract" })
+            {
+                try
+                {
+                    object result = operation.ToLowerInvariant() switch
+                    {
+                        "expand" => new ExpandResponse(request.Id, "expanded", true),
+                        "validate" => new ValidateResponse(request.Id, true, "Validation successful"),
+                        "contract" => new ContractResponse(request.Id, "contracted", true),
+                        _ => new ErrorResponse($"Unknown operation: {operation}")
+                    };
+                    results.Add(new BreathLoopResult(operation, result));
+                }
+                catch (Exception ex)
+                {
+                    results.Add(new BreathLoopResult(operation, new ErrorResponse(ex.Message)));
+                    success = false;
+                }
+            }
+
+            return new BreathLoopResponse(request.Id, results, success);
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Breath loop failed: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("POST", "/breath/oneshot/{id}", "breath-oneshot", "One-shot breath loop execution", "codex.breath")]
+    public async Task<object> Oneshot([ApiParameter("id", "Module ID for oneshot", Required = true, Location = "path")] string id,
+                                     [ApiParameter("request", "Oneshot request", Required = true, Location = "body")] BreathRequest request)
+    {
+        try
+        {
+            if (request?.Id == null) return new ErrorResponse("Missing or invalid id");
+
+            // Execute the breath loop: expand, validate, contract
+            var expandResult = new ExpandResponse(request.Id, "expanded", true);
+            var validateResult = new ValidateResponse(request.Id, true, "Validation successful");
+            var contractResult = new ContractResponse(request.Id, "contracted", true);
+
+            var result = new OneshotResult(expandResult, validateResult, contractResult);
+            return new OneshotResponse(request.Id, "oneshot", result, true, "Oneshot completed");
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Oneshot failed: {ex.Message}");
         }
     }
 }
 
 // Request/Response types for the breath module
+[RequestType("codex.breath.expand-request", "ExpandRequest", "Expand request")]
 public sealed record ExpandRequest(string Id);
+
+[RequestType("codex.breath.validate-request", "ValidateRequest", "Validate request")]
 public sealed record ValidateRequest(string Id);
+
+[RequestType("codex.breath.contract-request", "ContractRequest", "Contract request")]
 public sealed record ContractRequest(string Id);
+
+[RequestType("codex.breath.breath-request", "BreathRequest", "Breath request")]
 public sealed record BreathRequest(string Id, string? Operation = null);
+
+[RequestType("codex.breath.breath-loop-request", "BreathLoopRequest", "Breath loop request")]
 public sealed record BreathLoopRequest(string Id, string[]? Operations = null);

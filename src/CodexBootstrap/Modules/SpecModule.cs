@@ -5,17 +5,26 @@ using CodexBootstrap.Runtime;
 namespace CodexBootstrap.Modules;
 
 // Spec module specific response types
+[ResponseType("codex.spec.atoms-response", "SpecAtomsResponse", "Spec atoms response")]
 public record SpecAtomsResponse(string ModuleId, bool Success, string Message = "Atoms processed successfully");
+
+[ResponseType("codex.spec.compose-response", "SpecComposeResponse", "Spec compose response")]
 public record SpecComposeResponse(object Spec, bool Success, string Message = "Spec composed successfully");
+
+[ResponseType("codex.spec.export-response", "SpecExportResponse", "Spec export response")]
 public record SpecExportResponse(string ModuleId, object Atoms, bool Success, string Message = "Atoms exported successfully");
+
+[ResponseType("codex.spec.import-response", "SpecImportResponse", "Spec import response")]
 public record SpecImportResponse(string ModuleId, bool Success, string Message = "Atoms imported successfully");
 
 public sealed class SpecModule : IModule
 {
+    private readonly IApiRouter _apiRouter;
     private readonly NodeRegistry _registry;
 
-    public SpecModule(NodeRegistry registry)
+    public SpecModule(IApiRouter apiRouter, NodeRegistry registry)
     {
+        _apiRouter = apiRouter;
         _registry = registry;
     }
 
@@ -57,259 +66,143 @@ public sealed class SpecModule : IModule
 
     public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
     {
-        router.Register("codex.spec", "atoms", async args =>
-        {
-            try
-            {
-                if (args == null || !args.HasValue)
-                {
-                    return new ErrorResponse("Missing request parameters");
-                }
-
-                var moduleId = args.Value.TryGetProperty("moduleId", out var idElement) ? idElement.GetString() : null;
-                var atoms = args.Value.TryGetProperty("atoms", out var atomsElement) ? atomsElement : (JsonElement?)null;
-
-                if (string.IsNullOrEmpty(moduleId))
-                {
-                    return new ErrorResponse("Module ID is required");
-                }
-
-                // Store atoms as nodes
-                if (atoms.HasValue)
-                {
-                    await StoreAtomsAsNodes(moduleId, atoms.Value, registry);
-                    return new SpecAtomsResponse(moduleId, true, "Atoms stored successfully");
-                }
-
-                return new SpecAtomsResponse(moduleId, true);
-            }
-            catch (Exception ex)
-            {
-                return new ErrorResponse($"Failed to process atoms: {ex.Message}");
-            }
-        });
-
-        router.Register("codex.spec", "compose", async args =>
-        {
-            try
-            {
-                if (args == null || !args.HasValue)
-                {
-                    return new ErrorResponse("Missing request parameters");
-                }
-
-                var moduleId = args.Value.TryGetProperty("moduleId", out var idElement) ? idElement.GetString() : null;
-
-                if (string.IsNullOrEmpty(moduleId))
-                {
-                    return new ErrorResponse("Module ID is required");
-                }
-
-                // Compose spec from stored atoms
-                var spec = await ComposeSpecFromAtoms(moduleId, registry);
-                return new SpecComposeResponse(spec, true);
-            }
-            catch (Exception ex)
-            {
-                return new ErrorResponse($"Failed to compose spec: {ex.Message}");
-            }
-        });
-
-        router.Register("codex.spec", "export", async args =>
-        {
-            try
-            {
-                if (args == null || !args.HasValue)
-                {
-                    return new ErrorResponse("Missing request parameters");
-                }
-
-                var moduleId = args.Value.TryGetProperty("moduleId", out var idElement) ? idElement.GetString() : null;
-
-                if (string.IsNullOrEmpty(moduleId))
-                {
-                    return new ErrorResponse("Module ID is required");
-                }
-
-                // Export atoms for the module
-                var atoms = await ExportModuleAtoms(moduleId, registry);
-                return new SpecExportResponse(moduleId, atoms, true);
-            }
-            catch (Exception ex)
-            {
-                return new ErrorResponse($"Failed to export atoms: {ex.Message}");
-            }
-        });
-
-        router.Register("codex.spec", "import", async args =>
-        {
-            try
-            {
-                if (args == null || !args.HasValue)
-                {
-                    return new ErrorResponse("Missing request parameters");
-                }
-
-                var moduleId = args.Value.TryGetProperty("moduleId", out var idElement) ? idElement.GetString() : null;
-                var atoms = args.Value.TryGetProperty("atoms", out var atomsElement) ? atomsElement : (JsonElement?)null;
-
-                if (string.IsNullOrEmpty(moduleId))
-                {
-                    return new ErrorResponse("Module ID is required");
-                }
-
-                // Import atoms for the module
-                if (atoms.HasValue)
-                {
-                    await StoreAtomsAsNodes(moduleId, atoms.Value, registry);
-                }
-                return new SpecImportResponse(moduleId, true);
-            }
-            catch (Exception ex)
-            {
-                return new ErrorResponse($"Failed to import atoms: {ex.Message}");
-            }
-        });
-
-        router.Register("codex.spec", "get-atoms", async args =>
-        {
-            try
-            {
-                if (args == null || !args.HasValue)
-                {
-                    return new ErrorResponse("Missing request parameters");
-                }
-
-                var moduleId = args.Value.TryGetProperty("moduleId", out var idElement) ? idElement.GetString() : null;
-
-                if (string.IsNullOrEmpty(moduleId))
-                {
-                    return new ErrorResponse("Module ID is required");
-                }
-
-                // Get atoms for the module
-                var atoms = await ExportModuleAtoms(moduleId, registry);
-                return atoms;
-            }
-            catch (Exception ex)
-            {
-                return new ErrorResponse($"Failed to get atoms: {ex.Message}");
-            }
-        });
-
-        router.Register("codex.spec", "get-spec", async args =>
-        {
-            try
-            {
-                if (args == null || !args.HasValue)
-                {
-                    return new ErrorResponse("Missing request parameters");
-                }
-
-                var moduleId = args.Value.TryGetProperty("moduleId", out var idElement) ? idElement.GetString() : null;
-
-                if (string.IsNullOrEmpty(moduleId))
-                {
-                    return new ErrorResponse("Module ID is required");
-                }
-
-                // Get spec for the module
-                var spec = await ComposeSpecFromAtoms(moduleId, registry);
-                return spec;
-            }
-            catch (Exception ex)
-            {
-                return new ErrorResponse($"Failed to get spec: {ex.Message}");
-            }
-        });
+        // This method is now handled by attribute-based discovery
     }
 
     public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
-        // Spec management endpoints
-        app.MapPost("/spec/atoms", (JsonElement request) =>
-        {
-            try
-            {
-                var result = coreApi.ExecuteDynamicCall(new DynamicCall("codex.spec", "atoms", request));
-                return Results.Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return Results.Problem($"Failed to process atoms: {ex.Message}");
-            }
-        });
-
-        app.MapPost("/spec/compose", (JsonElement request) =>
-        {
-            try
-            {
-                var result = coreApi.ExecuteDynamicCall(new DynamicCall("codex.spec", "compose", request));
-                return Results.Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return Results.Problem($"Failed to compose spec: {ex.Message}");
-            }
-        });
-
-        app.MapGet("/spec/export/{id}", (string id) =>
-        {
-            try
-            {
-                var request = JsonSerializer.SerializeToElement(new { moduleId = id });
-                var result = coreApi.ExecuteDynamicCall(new DynamicCall("codex.spec", "export", request));
-                return Results.Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return Results.Problem($"Failed to export atoms: {ex.Message}");
-            }
-        });
-
-        app.MapPost("/spec/import", (JsonElement request) =>
-        {
-            try
-            {
-                var result = coreApi.ExecuteDynamicCall(new DynamicCall("codex.spec", "import", request));
-                return Results.Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return Results.Problem($"Failed to import atoms: {ex.Message}");
-            }
-        });
-
-        app.MapGet("/spec/atoms/{id}", (string id) =>
-        {
-            try
-            {
-                var request = JsonSerializer.SerializeToElement(new { moduleId = id });
-                var result = coreApi.ExecuteDynamicCall(new DynamicCall("codex.spec", "get-atoms", request));
-                return Results.Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return Results.Problem($"Failed to get atoms: {ex.Message}");
-            }
-        });
-
-        app.MapGet("/spec/{id}", (string id) =>
-        {
-            try
-            {
-                var request = JsonSerializer.SerializeToElement(new { moduleId = id });
-                var result = coreApi.ExecuteDynamicCall(new DynamicCall("codex.spec", "get-spec", request));
-                return Results.Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return Results.Problem($"Failed to get spec: {ex.Message}");
-            }
-        });
+        // This method is now handled by attribute-based discovery
     }
 
-    private Task StoreAtomsAsNodes(string moduleId, JsonElement atoms, NodeRegistry registry)
+    [ApiRoute("POST", "/spec/atoms", "spec-atoms", "Submit module atoms", "codex.spec")]
+    public async Task<object> SubmitAtoms([ApiParameter("request", "Atoms submission request", Required = true, Location = "body")] SpecAtomsRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(request.ModuleId))
+            {
+                return new ErrorResponse("Module ID is required");
+            }
+
+            // Store atoms as nodes
+            if (request.Atoms.HasValue)
+            {
+                await StoreAtomsAsNodes(request.ModuleId, request.Atoms.Value);
+                return new SpecAtomsResponse(request.ModuleId, true, "Atoms stored successfully");
+            }
+
+            return new SpecAtomsResponse(request.ModuleId, true);
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to process atoms: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("POST", "/spec/compose", "spec-compose", "Compose spec from atoms", "codex.spec")]
+    public async Task<object> ComposeSpec([ApiParameter("request", "Spec composition request", Required = true, Location = "body")] SpecComposeRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(request.ModuleId))
+            {
+                return new ErrorResponse("Module ID is required");
+            }
+
+            // Compose spec from stored atoms
+            var spec = await ComposeSpecFromAtoms(request.ModuleId);
+            return new SpecComposeResponse(spec, true);
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to compose spec: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("GET", "/spec/export/{id}", "spec-export", "Export module atoms", "codex.spec")]
+    public async Task<object> ExportAtoms([ApiParameter("id", "Module ID to export", Required = true, Location = "path")] string id)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                return new ErrorResponse("Module ID is required");
+            }
+
+            // Export atoms for the module
+            var atoms = await ExportModuleAtoms(id);
+            return new SpecExportResponse(id, atoms, true);
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to export atoms: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("POST", "/spec/import", "spec-import", "Import module atoms", "codex.spec")]
+    public async Task<object> ImportAtoms([ApiParameter("request", "Atoms import request", Required = true, Location = "body")] SpecImportRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(request.ModuleId))
+            {
+                return new ErrorResponse("Module ID is required");
+            }
+
+            // Import atoms for the module
+            if (request.Atoms.HasValue)
+            {
+                await StoreAtomsAsNodes(request.ModuleId, request.Atoms.Value);
+            }
+            return new SpecImportResponse(request.ModuleId, true);
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to import atoms: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("GET", "/spec/atoms/{id}", "spec-get-atoms", "Get module atoms", "codex.spec")]
+    public async Task<object> GetAtoms([ApiParameter("id", "Module ID to get atoms for", Required = true, Location = "path")] string id)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                return new ErrorResponse("Module ID is required");
+            }
+
+            // Get atoms for the module
+            var atoms = await ExportModuleAtoms(id);
+            return atoms;
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to get atoms: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("GET", "/spec/{id}", "spec-get-spec", "Get module spec", "codex.spec")]
+    public async Task<object> GetSpec([ApiParameter("id", "Module ID to get spec for", Required = true, Location = "path")] string id)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                return new ErrorResponse("Module ID is required");
+            }
+
+            // Get spec for the module
+            var spec = await ComposeSpecFromAtoms(id);
+            return spec;
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to get spec: {ex.Message}");
+        }
+    }
+
+    private Task StoreAtomsAsNodes(string moduleId, JsonElement atoms)
     {
         try
         {
@@ -339,7 +232,7 @@ public sealed class SpecModule : IModule
                         ["storedAt"] = DateTime.UtcNow.ToString("O")
                     }
                 );
-                registry.Upsert(node);
+                _registry.Upsert(node);
             }
 
             // Store edges
@@ -352,7 +245,7 @@ public sealed class SpecModule : IModule
                     Weight: null,
                     Meta: null
                 );
-                registry.Upsert(edge);
+                _registry.Upsert(edge);
             }
         }
         catch (Exception ex)
@@ -363,23 +256,23 @@ public sealed class SpecModule : IModule
         return Task.CompletedTask;
     }
 
-    private Task<object> ComposeSpecFromAtoms(string moduleId, NodeRegistry registry)
+    private Task<object> ComposeSpecFromAtoms(string moduleId)
     {
         try
         {
             // Get module node
-            if (!registry.TryGet(moduleId, out var moduleNode))
+            if (!_registry.TryGet(moduleId, out var moduleNode))
             {
                 throw new InvalidOperationException($"Module '{moduleId}' not found");
             }
 
             // Get module's API nodes
-            var apiNodes = registry.GetNodesByType("api")
+            var apiNodes = _registry.GetNodesByType("api")
                 .Where(api => api.Meta?.GetValueOrDefault("moduleId")?.ToString() == moduleId)
                 .ToList();
 
             // Get module's edges
-            var moduleEdges = registry.AllEdges()
+            var moduleEdges = _registry.AllEdges()
                 .Where(edge => edge.FromId == moduleId || edge.ToId == moduleId)
                 .ToList();
 
@@ -416,17 +309,17 @@ public sealed class SpecModule : IModule
         }
     }
 
-    private Task<object> ExportModuleAtoms(string moduleId, NodeRegistry registry)
+    private Task<object> ExportModuleAtoms(string moduleId)
     {
         try
         {
             // Get all nodes related to this module
-            var moduleNodes = registry.AllNodes()
+            var moduleNodes = _registry.AllNodes()
                 .Where(node => node.Meta?.GetValueOrDefault("moduleId")?.ToString() == moduleId)
                 .ToList();
 
             // Get all edges related to this module
-            var moduleEdges = registry.AllEdges()
+            var moduleEdges = _registry.AllEdges()
                 .Where(edge => moduleNodes.Any(n => n.Id == edge.FromId || n.Id == edge.ToId))
                 .ToList();
 
@@ -485,3 +378,13 @@ public sealed class SpecModule : IModule
         public string? Role { get; set; }
     }
 }
+
+// Request types for the spec module
+[RequestType("codex.spec.atoms-request", "SpecAtomsRequest", "Spec atoms request")]
+public sealed record SpecAtomsRequest(string ModuleId, JsonElement? Atoms = null);
+
+[RequestType("codex.spec.compose-request", "SpecComposeRequest", "Spec compose request")]
+public sealed record SpecComposeRequest(string ModuleId);
+
+[RequestType("codex.spec.import-request", "SpecImportRequest", "Spec import request")]
+public sealed record SpecImportRequest(string ModuleId, JsonElement? Atoms = null);

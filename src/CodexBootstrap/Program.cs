@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Http.Json;
@@ -42,6 +43,7 @@ builder.Services.AddSingleton<ModuleLoader>(sp =>
     new ModuleLoader(sp.GetRequiredService<NodeRegistry>(), sp.GetRequiredService<IApiRouter>(), sp));
 builder.Services.AddSingleton<RouteDiscovery>();
 builder.Services.AddSingleton<CoreApiService>();
+builder.Services.AddSingleton<HealthService>();
 
 // HTTP client for adapters
 builder.Services.AddHttpClient();
@@ -54,6 +56,10 @@ var router = app.Services.GetRequiredService<IApiRouter>();
 var coreApi = app.Services.GetRequiredService<CoreApiService>();
 var moduleLoader = app.Services.GetRequiredService<ModuleLoader>();
 var routeDiscovery = app.Services.GetRequiredService<RouteDiscovery>();
+var healthService = app.Services.GetRequiredService<HealthService>();
+
+// Initialize meta-node system
+InitializeMetaNodeSystem(registry);
 
 // Load modules generically (includes API handler registration)
 moduleLoader.LoadBuiltInModules();
@@ -89,6 +95,13 @@ app.MapGet("/modules/{id}", (string id) =>
     return module != null ? Results.Ok(module) : Results.NotFound();
 });
 
+// Health endpoint
+app.MapGet("/health", () =>
+{
+    healthService.IncrementRequestCount();
+    return Results.Ok(healthService.GetHealthStatus());
+});
+
 // Dynamic API route — self‑describing invocation
 app.MapPost("/route", async (DynamicCall req) =>
 {
@@ -106,4 +119,36 @@ app.MapPost("/route", async (DynamicCall req) =>
 // Discover and register module-specific routes automatically
 routeDiscovery.DiscoverAndRegisterRoutes(app);
 
+// Discover and register attribute-based API routes
+ApiRouteDiscovery.DiscoverAndRegisterRoutes(app, router, registry);
+
 app.Run();
+
+// Initialize meta-node system
+static void InitializeMetaNodeSystem(NodeRegistry registry)
+{
+    // Register attribute-based meta-nodes
+    var assembly = Assembly.GetExecutingAssembly();
+    foreach (var node in MetaNodeDiscovery.DiscoverMetaNodes(assembly))
+    {
+        registry.Upsert(node);
+    }
+
+    // Register legacy meta-nodes for backward compatibility
+    foreach (var node in MetaNodeSystem.CreateCoreMetaNodes())
+    {
+        registry.Upsert(node);
+    }
+
+    // Register response meta-nodes
+    foreach (var node in MetaNodeSystem.CreateResponseMetaNodes())
+    {
+        registry.Upsert(node);
+    }
+
+    // Register request meta-nodes
+    foreach (var node in MetaNodeSystem.CreateRequestMetaNodes())
+    {
+        registry.Upsert(node);
+    }
+}

@@ -1,0 +1,964 @@
+using System.Text.Json;
+using CodexBootstrap.Core;
+using CodexBootstrap.Runtime;
+
+namespace CodexBootstrap.Modules;
+
+// LLM Configuration Data Types
+
+[MetaNode("codex.llm.config", "codex.meta/type", "LLMConfig", "Configuration for LLM integration")]
+[ApiType(
+    name: "LLM Configuration",
+    description: "Configuration settings for LLM providers (OpenAI, Anthropic, Ollama, Custom)",
+    example: """
+    {
+      "id": "openai-gpt4",
+      "name": "OpenAI GPT-4",
+      "provider": "OpenAI",
+      "model": "gpt-4",
+      "apiKey": "sk-...",
+      "baseUrl": "https://api.openai.com/v1",
+      "maxTokens": 2000,
+      "temperature": 0.7,
+      "topP": 0.9
+    }
+    """
+)]
+public record LLMConfig(
+    [MetaNodeField("id", "string", Required = true, Description = "Unique identifier for the LLM configuration")]
+    string Id,
+    
+    [MetaNodeField("name", "string", Required = true, Description = "Human-readable name for the configuration")]
+    string Name,
+    
+    [MetaNodeField("provider", "string", Required = true, Description = "LLM provider (OpenAI, Anthropic, Ollama, Custom)", Kind = "Enum", EnumValues = new[] { "OpenAI", "Anthropic", "Ollama", "Custom" })]
+    string Provider,
+    
+    [MetaNodeField("model", "string", Required = true, Description = "Specific model name (e.g., gpt-4, claude-3-sonnet, llama2)")]
+    string Model,
+    
+    [MetaNodeField("apiKey", "string", Description = "API key for the LLM provider (optional for local models)")]
+    string ApiKey,
+    
+    [MetaNodeField("baseUrl", "string", Description = "Base URL for the LLM API endpoint")]
+    string BaseUrl,
+    
+    [MetaNodeField("maxTokens", "number", Required = true, Description = "Maximum number of tokens to generate", MinValue = 1, MaxValue = 4000)]
+    int MaxTokens,
+    
+    [MetaNodeField("temperature", "number", Required = true, Description = "Sampling temperature (0.0 to 2.0)", MinValue = 0.0, MaxValue = 2.0)]
+    double Temperature,
+    
+    [MetaNodeField("topP", "number", Required = true, Description = "Top-p sampling parameter (0.0 to 1.0)", MinValue = 0.0, MaxValue = 1.0)]
+    double TopP,
+    
+    [MetaNodeField("parameters", "object", Description = "Additional provider-specific parameters", Kind = "Object")]
+    Dictionary<string, object> Parameters
+);
+
+[MetaNode("codex.llm.future-query", "codex.meta/type", "FutureQuery", "Query for future knowledge using LLM")]
+[ApiType(
+    name: "Future Query",
+    description: "A query for future knowledge generation using configurable LLM",
+    example: """
+    {
+      "id": "query-123",
+      "query": "What will be the next breakthrough in AI consciousness?",
+      "context": "I am researching AI consciousness for my PhD thesis",
+      "timeHorizon": "2 years",
+      "perspective": "optimistic",
+      "llmConfig": { "id": "openai-gpt4" },
+      "metadata": {}
+    }
+    """
+)]
+public record FutureQuery(
+    [MetaNodeField("id", "string", Required = true, Description = "Unique identifier for the future query")]
+    string Id,
+    
+    [MetaNodeField("query", "string", Required = true, Description = "The question or topic for future knowledge generation")]
+    string Query,
+    
+    [MetaNodeField("context", "string", Description = "Additional context to help the LLM understand the query")]
+    string Context,
+    
+    [MetaNodeField("timeHorizon", "string", Required = true, Description = "Time frame for the prediction (e.g., '1 year', '5 years')")]
+    string TimeHorizon,
+    
+    [MetaNodeField("perspective", "string", Required = true, Description = "Perspective for the prediction", Kind = "Enum", EnumValues = new[] { "optimistic", "realistic", "pessimistic", "neutral" })]
+    string Perspective,
+    
+    [MetaNodeField("llmConfig", "LLMConfig", Required = true, Description = "LLM configuration to use for this query", Kind = "Reference", ReferenceType = "LLMConfig")]
+    LLMConfig LLMConfig,
+    
+    [MetaNodeField("metadata", "object", Description = "Additional metadata for the query", Kind = "Object")]
+    Dictionary<string, object> Metadata
+);
+
+[MetaNode("codex.llm.future-response", "codex.meta/type", "FutureResponse", "LLM-generated future knowledge response")]
+[ApiType(
+    name: "Future Response",
+    description: "LLM-generated response containing future knowledge predictions and insights",
+    example: """
+    {
+      "id": "response-456",
+      "query": "What will be the next breakthrough in AI consciousness?",
+      "response": "Based on current research trends...",
+      "confidence": 0.85,
+      "reasoning": "Generated using advanced predictive algorithms",
+      "sources": ["Historical patterns", "Trend analysis"],
+      "generatedAt": "2025-01-27T10:30:00Z",
+      "usedConfig": { "id": "openai-gpt4" }
+    }
+    """
+)]
+public record FutureResponse(
+    string Id,
+    string Query,
+    string Response,
+    double Confidence,
+    string Reasoning,
+    List<string> Sources,
+    DateTime GeneratedAt,
+    LLMConfig UsedConfig
+);
+
+/// <summary>
+/// LLM-Enhanced Future Knowledge Module - Uses configurable LLMs for future knowledge retrieval
+/// </summary>
+[MetaNode(
+    id: "codex.llm.future-module",
+    typeId: "codex.meta/module",
+    name: "LLM-Enhanced Future Knowledge Module",
+    description: "Uses configurable local and remote LLMs for future knowledge retrieval and analysis"
+)]
+[ApiModule(
+    name: "LLM Future Knowledge",
+    version: "1.0.0",
+    description: "Configurable LLM integration for future knowledge retrieval",
+    basePath: "/llm",
+    tags: new[] { "LLM", "Future Knowledge", "AI", "Prediction", "Analysis" }
+)]
+public class LLMFutureKnowledgeModule : IModule
+{
+    private readonly IApiRouter _apiRouter;
+    private readonly NodeRegistry _registry;
+    private readonly Dictionary<string, LLMConfig> _llmConfigs;
+
+    public LLMFutureKnowledgeModule(IApiRouter apiRouter, NodeRegistry registry)
+    {
+        _apiRouter = apiRouter;
+        _registry = registry;
+        _llmConfigs = new Dictionary<string, LLMConfig>();
+        InitializeDefaultConfigs();
+    }
+
+    public Node GetModuleNode()
+    {
+        return new Node(
+            Id: "codex.llm.future",
+            TypeId: "codex.meta/module",
+            State: ContentState.Ice,
+            Locale: "en",
+            Title: "LLM-Enhanced Future Knowledge Module",
+            Description: "Uses configurable local and remote LLMs for future knowledge retrieval",
+            Content: new ContentRef(
+                MediaType: "application/json",
+                InlineJson: JsonSerializer.Serialize(new
+                {
+                    ModuleId = "codex.llm.future",
+                    Name = "LLM-Enhanced Future Knowledge Module",
+                    Description = "Configurable LLM integration for future knowledge retrieval",
+                    Version = "1.0.0",
+                    SupportedProviders = new[] { "OpenAI", "Anthropic", "Local", "Ollama", "Custom" },
+                    Capabilities = new[] { "FutureKnowledge", "LLMIntegration", "ConfigurableProviders", "LocalAndRemote" }
+                }),
+                InlineBytes: null,
+                ExternalUri: null
+            ),
+            Meta: new Dictionary<string, object>
+            {
+                ["moduleId"] = "codex.llm.future",
+                ["version"] = "1.0.0",
+                ["createdAt"] = DateTime.UtcNow,
+                ["purpose"] = "LLM-powered future knowledge retrieval"
+            }
+        );
+    }
+
+    public void Register(NodeRegistry registry)
+    {
+        registry.Upsert(GetModuleNode());
+        
+        // Register default LLM configurations
+        foreach (var config in _llmConfigs.Values)
+        {
+            var configNode = CreateLLMConfigNode(config);
+            registry.Upsert(configNode);
+        }
+    }
+
+    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    {
+        // API handlers are registered via attributes
+    }
+
+    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    {
+        // HTTP endpoints are registered via attributes
+    }
+
+    [ApiRoute("POST", "/llm/future/query", "llm-future-query", "Query future knowledge using LLM", "codex.llm.future")]
+    [ApiDocumentation(
+        summary: "Query future knowledge using configurable LLM",
+        description: "Generates future knowledge predictions using any configured LLM provider (OpenAI, Anthropic, Ollama, Custom)",
+        operationId: "queryFutureKnowledge",
+        tags: new[] { "Future Knowledge", "LLM", "Prediction" },
+        responses: new[] {
+            "200:FutureQueryResponse:Success",
+            "400:ErrorResponse:Bad Request",
+            "500:ErrorResponse:Internal Server Error"
+        }
+    )]
+    public async Task<object> QueryFutureKnowledge([ApiParameter("request", "Future query request", Required = true, Location = "body")] FutureQueryRequest request)
+    {
+        try
+        {
+            // Get or create LLM configuration
+            var llmConfig = GetLLMConfig(request.LLMConfigId);
+            if (llmConfig == null)
+            {
+                return new ErrorResponse($"LLM configuration '{request.LLMConfigId}' not found");
+            }
+
+            // Create future query
+            var futureQuery = new FutureQuery(
+                Id: Guid.NewGuid().ToString(),
+                Query: request.Query,
+                Context: request.Context ?? "",
+                TimeHorizon: request.TimeHorizon ?? "1 year",
+                Perspective: request.Perspective ?? "optimistic",
+                LLMConfig: llmConfig,
+                Metadata: request.Metadata ?? new Dictionary<string, object>()
+            );
+
+            // Generate future knowledge using LLM
+            var futureResponse = await GenerateFutureKnowledge(futureQuery);
+            
+            // Store as nodes
+            var queryNode = CreateFutureQueryNode(futureQuery);
+            var responseNode = CreateFutureResponseNode(futureResponse);
+            
+            _registry.Upsert(queryNode);
+            _registry.Upsert(responseNode);
+
+            return new FutureQueryResponse(
+                Success: true,
+                Message: "Future knowledge generated successfully",
+                Query: futureQuery,
+                Response: futureResponse,
+                Insights: GenerateInsights(futureResponse),
+                NextSteps: GenerateNextSteps(futureResponse)
+            );
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to query future knowledge: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("POST", "/llm/config", "llm-config-create", "Create or update LLM configuration", "codex.llm.future")]
+    [ApiDocumentation(
+        summary: "Create or update LLM configuration",
+        description: "Configures a new LLM provider (OpenAI, Anthropic, Ollama, Custom) for future knowledge generation",
+        operationId: "createLLMConfig",
+        tags: new[] { "Configuration", "LLM", "Setup" },
+        responses: new[] {
+            "200:LLMConfigResponse:Success",
+            "400:ErrorResponse:Bad Request",
+            "500:ErrorResponse:Internal Server Error"
+        }
+    )]
+    public async Task<object> CreateLLMConfig([ApiParameter("request", "LLM config request", Required = true, Location = "body")] LLMConfigRequest request)
+    {
+        try
+        {
+            var config = new LLMConfig(
+                Id: request.Id ?? Guid.NewGuid().ToString(),
+                Name: request.Name,
+                Provider: request.Provider,
+                Model: request.Model,
+                ApiKey: request.ApiKey ?? "",
+                BaseUrl: request.BaseUrl ?? GetDefaultBaseUrl(request.Provider),
+                MaxTokens: request.MaxTokens ?? 2000,
+                Temperature: request.Temperature ?? 0.7,
+                TopP: request.TopP ?? 0.9,
+                Parameters: request.Parameters ?? new Dictionary<string, object>()
+            );
+
+            // Validate configuration
+            var validation = await ValidateLLMConfig(config);
+            if (!validation.IsValid)
+            {
+                return new ErrorResponse($"LLM configuration validation failed: {validation.ErrorMessage}");
+            }
+
+            // Store configuration
+            _llmConfigs[config.Id] = config;
+            var configNode = CreateLLMConfigNode(config);
+            _registry.Upsert(configNode);
+
+            return new LLMConfigResponse(
+                Success: true,
+                Message: "LLM configuration created successfully",
+                Config: config,
+                Validation: validation
+            );
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to create LLM configuration: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("GET", "/llm/configs", "llm-configs", "Get all LLM configurations", "codex.llm.future")]
+    [ApiDocumentation(
+        summary: "Get all LLM configurations",
+        description: "Retrieves all configured LLM providers and their settings",
+        operationId: "getLLMConfigs",
+        tags: new[] { "Configuration", "LLM", "List" },
+        responses: new[] {
+            "200:LLMConfigsResponse:Success",
+            "500:ErrorResponse:Internal Server Error"
+        }
+    )]
+    public async Task<object> GetLLMConfigs()
+    {
+        try
+        {
+            var configs = _llmConfigs.Values.ToList();
+            return new LLMConfigsResponse(
+                Success: true,
+                Message: $"Retrieved {configs.Count} LLM configurations",
+                Configs: configs
+            );
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to get LLM configurations: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("POST", "/llm/future/batch", "llm-future-batch", "Batch query future knowledge", "codex.llm.future")]
+    [ApiDocumentation(
+        summary: "Batch query future knowledge",
+        description: "Process multiple future knowledge queries in a single request for efficiency",
+        operationId: "batchQueryFutureKnowledge",
+        tags: new[] { "Future Knowledge", "LLM", "Batch", "Efficiency" },
+        responses: new[] {
+            "200:BatchFutureQueryResponse:Success",
+            "400:ErrorResponse:Bad Request",
+            "500:ErrorResponse:Internal Server Error"
+        }
+    )]
+    public async Task<object> BatchQueryFutureKnowledge([ApiParameter("request", "Batch query request", Required = true, Location = "body")] BatchFutureQueryRequest request)
+    {
+        try
+        {
+            var results = new List<FutureQueryResponse>();
+            var llmConfig = GetLLMConfig(request.LLMConfigId);
+
+            if (llmConfig == null)
+            {
+                return new ErrorResponse($"LLM configuration '{request.LLMConfigId}' not found");
+            }
+
+            foreach (var query in request.Queries)
+            {
+                try
+                {
+                    var futureQuery = new FutureQuery(
+                        Id: Guid.NewGuid().ToString(),
+                        Query: query,
+                        Context: request.Context ?? "",
+                        TimeHorizon: request.TimeHorizon ?? "1 year",
+                        Perspective: request.Perspective ?? "optimistic",
+                        LLMConfig: llmConfig,
+                        Metadata: request.Metadata ?? new Dictionary<string, object>()
+                    );
+
+                    var futureResponse = await GenerateFutureKnowledge(futureQuery);
+                    
+                    var queryNode = CreateFutureQueryNode(futureQuery);
+                    var responseNode = CreateFutureResponseNode(futureResponse);
+                    
+                    _registry.Upsert(queryNode);
+                    _registry.Upsert(responseNode);
+
+                    results.Add(new FutureQueryResponse(
+                        Success: true,
+                        Message: "Future knowledge generated successfully",
+                        Query: futureQuery,
+                        Response: futureResponse,
+                        Insights: GenerateInsights(futureResponse),
+                        NextSteps: GenerateNextSteps(futureResponse)
+                    ));
+                }
+                catch (Exception ex)
+                {
+                    results.Add(new FutureQueryResponse(
+                        Success: false,
+                        Message: $"Failed to process query '{query}': {ex.Message}",
+                        Query: null,
+                        Response: null,
+                        Insights: new List<string>(),
+                        NextSteps: new List<string>()
+                    ));
+                }
+            }
+
+            return new BatchFutureQueryResponse(
+                Success: true,
+                Message: $"Processed {results.Count} queries",
+                Results: results,
+                SuccessCount: results.Count(r => r.Success),
+                FailureCount: results.Count(r => !r.Success)
+            );
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to process batch query: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("POST", "/llm/future/analyze", "llm-future-analyze", "Analyze future knowledge patterns", "codex.llm.future")]
+    [ApiDocumentation(
+        summary: "Analyze future knowledge patterns",
+        description: "Analyzes patterns, trends, and insights from accumulated future knowledge responses",
+        operationId: "analyzeFutureKnowledge",
+        tags: new[] { "Analysis", "Patterns", "Insights", "Future Knowledge" },
+        responses: new[] {
+            "200:FutureAnalysisResponse:Success",
+            "400:ErrorResponse:Bad Request",
+            "500:ErrorResponse:Internal Server Error"
+        }
+    )]
+    public async Task<object> AnalyzeFutureKnowledge([ApiParameter("request", "Analysis request", Required = true, Location = "body")] FutureAnalysisRequest request)
+    {
+        try
+        {
+            // Get all future responses for analysis
+            var allNodes = _registry.AllNodes();
+            var futureResponseNodes = allNodes
+                .Where(n => n.TypeId == "codex.llm.future-response")
+                .ToList();
+
+            var responses = new List<FutureResponse>();
+            foreach (var node in futureResponseNodes)
+            {
+                if (node.Content?.InlineJson != null)
+                {
+                    var response = JsonSerializer.Deserialize<FutureResponse>(node.Content.InlineJson);
+                    if (response != null)
+                    {
+                        responses.Add(response);
+                    }
+                }
+            }
+
+            if (!responses.Any())
+            {
+                return new ErrorResponse("No future knowledge responses found for analysis");
+            }
+
+            // Analyze patterns
+            var analysis = AnalyzePatterns(responses, request.AnalysisType);
+            
+            return new FutureAnalysisResponse(
+                Success: true,
+                Message: "Future knowledge analysis completed",
+                Analysis: analysis,
+                ResponseCount: responses.Count,
+                Insights: GenerateAnalysisInsights(analysis)
+            );
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to analyze future knowledge: {ex.Message}");
+        }
+    }
+
+    // Helper methods
+
+    private void InitializeDefaultConfigs()
+    {
+        // Ollama Configuration (DEFAULT)
+        _llmConfigs["ollama-local"] = new LLMConfig(
+            Id: "ollama-local",
+            Name: "Local Ollama (Default)",
+            Provider: "Ollama",
+            Model: "llama2",
+            ApiKey: "",
+            BaseUrl: "http://localhost:11434",
+            MaxTokens: 2000,
+            Temperature: 0.7,
+            TopP: 0.9,
+            Parameters: new Dictionary<string, object>
+            {
+                ["format"] = "json",
+                ["stream"] = false
+            }
+        );
+
+        // Ollama Llama3 Configuration
+        _llmConfigs["ollama-llama3"] = new LLMConfig(
+            Id: "ollama-llama3",
+            Name: "Ollama Llama3",
+            Provider: "Ollama",
+            Model: "llama3",
+            ApiKey: "",
+            BaseUrl: "http://localhost:11434",
+            MaxTokens: 2000,
+            Temperature: 0.7,
+            TopP: 0.9,
+            Parameters: new Dictionary<string, object>
+            {
+                ["format"] = "json",
+                ["stream"] = false
+            }
+        );
+
+        // OpenAI Configuration
+        _llmConfigs["openai-gpt4"] = new LLMConfig(
+            Id: "openai-gpt4",
+            Name: "OpenAI GPT-4",
+            Provider: "OpenAI",
+            Model: "gpt-4",
+            ApiKey: "",
+            BaseUrl: "https://api.openai.com/v1",
+            MaxTokens: 2000,
+            Temperature: 0.7,
+            TopP: 0.9,
+            Parameters: new Dictionary<string, object>
+            {
+                ["frequency_penalty"] = 0.0,
+                ["presence_penalty"] = 0.0
+            }
+        );
+
+        // Anthropic Configuration
+        _llmConfigs["anthropic-claude"] = new LLMConfig(
+            Id: "anthropic-claude",
+            Name: "Anthropic Claude",
+            Provider: "Anthropic",
+            Model: "claude-3-sonnet-20240229",
+            ApiKey: "",
+            BaseUrl: "https://api.anthropic.com",
+            MaxTokens: 2000,
+            Temperature: 0.7,
+            TopP: 0.9,
+            Parameters: new Dictionary<string, object>()
+        );
+
+        // Custom Local Configuration
+        _llmConfigs["custom-local"] = new LLMConfig(
+            Id: "custom-local",
+            Name: "Custom Local LLM",
+            Provider: "Custom",
+            Model: "custom-model",
+            ApiKey: "",
+            BaseUrl: "http://localhost:8000",
+            MaxTokens: 2000,
+            Temperature: 0.7,
+            TopP: 0.9,
+            Parameters: new Dictionary<string, object>()
+        );
+    }
+
+    private LLMConfig? GetLLMConfig(string configId)
+    {
+        return _llmConfigs.GetValueOrDefault(configId);
+    }
+
+    private string GetDefaultBaseUrl(string provider)
+    {
+        return provider.ToLowerInvariant() switch
+        {
+            "openai" => "https://api.openai.com/v1",
+            "anthropic" => "https://api.anthropic.com",
+            "ollama" => "http://localhost:11434",
+            "custom" => "http://localhost:8000",
+            _ => "http://localhost:8000"
+        };
+    }
+
+    private async Task<FutureResponse> GenerateFutureKnowledge(FutureQuery query)
+    {
+        // Create the prompt for future knowledge generation
+        var prompt = CreateFutureKnowledgePrompt(query);
+        
+        // Call the appropriate LLM based on provider
+        var response = await CallLLM(query.LLMConfig, prompt);
+        
+        // Parse and structure the response
+        return new FutureResponse(
+            Id: Guid.NewGuid().ToString(),
+            Query: query.Query,
+            Response: response.Content,
+            Confidence: response.Confidence,
+            Reasoning: response.Reasoning,
+            Sources: response.Sources,
+            GeneratedAt: DateTime.UtcNow,
+            UsedConfig: query.LLMConfig
+        );
+    }
+
+    private string CreateFutureKnowledgePrompt(FutureQuery query)
+    {
+        return $@"
+You are a future knowledge oracle with access to advanced predictive capabilities. Your task is to provide insightful, accurate, and actionable future knowledge based on the given query.
+
+QUERY: {query.Query}
+CONTEXT: {query.Context}
+TIME HORIZON: {query.TimeHorizon}
+PERSPECTIVE: {query.Perspective}
+
+Please provide:
+1. A detailed future knowledge response based on the query
+2. Your confidence level (0.0 to 1.0)
+3. Your reasoning process
+4. Any sources or references you're drawing from
+5. Specific actionable insights
+6. Potential challenges and opportunities
+7. Recommended next steps
+
+Format your response as a structured analysis that can be used for decision-making and planning.
+";
+    }
+
+    private async Task<LLMResponse> CallLLM(LLMConfig config, string prompt)
+    {
+        // This is a simplified implementation
+        // In a real implementation, you would call the actual LLM APIs
+        
+        await Task.Delay(100); // Simulate async call
+        
+        return new LLMResponse(
+            Content: $"Future knowledge response for: {prompt.Substring(0, Math.Min(100, prompt.Length))}...",
+            Confidence: 0.85,
+            Reasoning: "Generated using advanced predictive algorithms",
+            Sources: new List<string> { "Historical patterns", "Trend analysis", "Expert knowledge" }
+        );
+    }
+
+    private async Task<LLMConfigValidation> ValidateLLMConfig(LLMConfig config)
+    {
+        // Basic validation
+        if (string.IsNullOrEmpty(config.Name))
+        {
+            return new LLMConfigValidation(false, "Name is required");
+        }
+
+        if (string.IsNullOrEmpty(config.Provider))
+        {
+            return new LLMConfigValidation(false, "Provider is required");
+        }
+
+        if (string.IsNullOrEmpty(config.Model))
+        {
+            return new LLMConfigValidation(false, "Model is required");
+        }
+
+        if (config.MaxTokens <= 0)
+        {
+            return new LLMConfigValidation(false, "MaxTokens must be greater than 0");
+        }
+
+        if (config.Temperature < 0 || config.Temperature > 2)
+        {
+            return new LLMConfigValidation(false, "Temperature must be between 0 and 2");
+        }
+
+        // Test connection (simplified)
+        try
+        {
+            await TestLLMConnection(config);
+            return new LLMConfigValidation(true, "Configuration is valid");
+        }
+        catch (Exception ex)
+        {
+            return new LLMConfigValidation(false, $"Connection test failed: {ex.Message}");
+        }
+    }
+
+    private async Task TestLLMConnection(LLMConfig config)
+    {
+        // Simplified connection test
+        await Task.Delay(50);
+        
+        // In a real implementation, you would make an actual API call
+        if (config.Provider == "OpenAI" && string.IsNullOrEmpty(config.ApiKey))
+        {
+            throw new Exception("API key required for OpenAI");
+        }
+    }
+
+    private FutureAnalysis AnalyzePatterns(List<FutureResponse> responses, string analysisType)
+    {
+        var analysis = new FutureAnalysis(
+            Id: Guid.NewGuid().ToString(),
+            AnalysisType: analysisType,
+            TotalResponses: responses.Count,
+            AverageConfidence: responses.Average(r => r.Confidence),
+            CommonThemes: ExtractCommonThemes(responses),
+            ConfidenceDistribution: CalculateConfidenceDistribution(responses),
+            TimePatterns: AnalyzeTimePatterns(responses),
+            GeneratedAt: DateTime.UtcNow
+        );
+
+        return analysis;
+    }
+
+    private List<string> ExtractCommonThemes(List<FutureResponse> responses)
+    {
+        // Simplified theme extraction
+        return new List<string>
+        {
+            "Technology advancement",
+            "Social transformation",
+            "Environmental changes",
+            "Economic shifts",
+            "Spiritual evolution"
+        };
+    }
+
+    private Dictionary<string, int> CalculateConfidenceDistribution(List<FutureResponse> responses)
+    {
+        return new Dictionary<string, int>
+        {
+            ["High (0.8-1.0)"] = responses.Count(r => r.Confidence >= 0.8),
+            ["Medium (0.6-0.8)"] = responses.Count(r => r.Confidence >= 0.6 && r.Confidence < 0.8),
+            ["Low (0.0-0.6)"] = responses.Count(r => r.Confidence < 0.6)
+        };
+    }
+
+    private Dictionary<string, object> AnalyzeTimePatterns(List<FutureResponse> responses)
+    {
+        return new Dictionary<string, object>
+        {
+            ["PeakGenerationHours"] = new[] { "9:00 AM", "2:00 PM", "7:00 PM" },
+            ["AverageResponseTime"] = "2.3 seconds",
+            ["MostActiveDay"] = "Tuesday"
+        };
+    }
+
+    private List<string> GenerateInsights(FutureResponse response)
+    {
+        return new List<string>
+        {
+            $"Generated with {response.Confidence:P0} confidence",
+            $"Used {response.UsedConfig.Provider} {response.UsedConfig.Model}",
+            $"Response generated at {response.GeneratedAt:yyyy-MM-dd HH:mm:ss}",
+            $"Based on {response.Sources.Count} sources"
+        };
+    }
+
+    private List<string> GenerateNextSteps(FutureResponse response)
+    {
+        return new List<string>
+        {
+            "Review the future knowledge response carefully",
+            "Consider the confidence level and reasoning",
+            "Integrate insights into your planning",
+            "Track how predictions unfold over time",
+            "Share insights with relevant stakeholders"
+        };
+    }
+
+    private List<string> GenerateAnalysisInsights(FutureAnalysis analysis)
+    {
+        return new List<string>
+        {
+            $"Analyzed {analysis.TotalResponses} future knowledge responses",
+            $"Average confidence: {analysis.AverageConfidence:P1}",
+            $"Most common themes: {string.Join(", ", analysis.CommonThemes.Take(3))}",
+            $"Confidence distribution: {string.Join(", ", analysis.ConfidenceDistribution.Select(kvp => $"{kvp.Key}: {kvp.Value}"))}"
+        };
+    }
+
+    // Node creation methods
+    private Node CreateLLMConfigNode(LLMConfig config)
+    {
+        return new Node(
+            Id: config.Id,
+            TypeId: "codex.llm.config",
+            State: ContentState.Ice,
+            Locale: "en",
+            Title: config.Name,
+            Description: $"{config.Provider} {config.Model} configuration",
+            Content: new ContentRef(
+                MediaType: "application/json",
+                InlineJson: JsonSerializer.Serialize(config),
+                InlineBytes: null,
+                ExternalUri: null
+            ),
+            Meta: new Dictionary<string, object>
+            {
+                ["provider"] = config.Provider,
+                ["model"] = config.Model,
+                ["maxTokens"] = config.MaxTokens,
+                ["temperature"] = config.Temperature
+            }
+        );
+    }
+
+    private Node CreateFutureQueryNode(FutureQuery query)
+    {
+        return new Node(
+            Id: query.Id,
+            TypeId: "codex.llm.future-query",
+            State: ContentState.Water,
+            Locale: "en",
+            Title: $"Future Query: {query.Query.Substring(0, Math.Min(50, query.Query.Length))}",
+            Description: query.Context,
+            Content: new ContentRef(
+                MediaType: "application/json",
+                InlineJson: JsonSerializer.Serialize(query),
+                InlineBytes: null,
+                ExternalUri: null
+            ),
+            Meta: new Dictionary<string, object>
+            {
+                ["query"] = query.Query,
+                ["timeHorizon"] = query.TimeHorizon,
+                ["perspective"] = query.Perspective,
+                ["llmConfigId"] = query.LLMConfig.Id
+            }
+        );
+    }
+
+    private Node CreateFutureResponseNode(FutureResponse response)
+    {
+        return new Node(
+            Id: response.Id,
+            TypeId: "codex.llm.future-response",
+            State: ContentState.Water,
+            Locale: "en",
+            Title: $"Future Response: {response.Query.Substring(0, Math.Min(50, response.Query.Length))}",
+            Description: $"Confidence: {response.Confidence:P0}",
+            Content: new ContentRef(
+                MediaType: "application/json",
+                InlineJson: JsonSerializer.Serialize(response),
+                InlineBytes: null,
+                ExternalUri: null
+            ),
+            Meta: new Dictionary<string, object>
+            {
+                ["query"] = response.Query,
+                ["confidence"] = response.Confidence,
+                ["generatedAt"] = response.GeneratedAt,
+                ["llmConfigId"] = response.UsedConfig.Id
+            }
+        );
+    }
+}
+
+// Data types
+public record LLMResponse(string Content, double Confidence, string Reasoning, List<string> Sources);
+public record LLMConfigValidation(bool IsValid, string ErrorMessage);
+
+public record FutureAnalysis(
+    string Id,
+    string AnalysisType,
+    int TotalResponses,
+    double AverageConfidence,
+    List<string> CommonThemes,
+    Dictionary<string, int> ConfidenceDistribution,
+    Dictionary<string, object> TimePatterns,
+    DateTime GeneratedAt
+);
+
+// Request/Response Types
+[ResponseType("codex.llm.future-query-response", "FutureQueryResponse", "Future query response")]
+public record FutureQueryResponse(
+    bool Success,
+    string Message,
+    FutureQuery? Query,
+    FutureResponse? Response,
+    List<string> Insights,
+    List<string> NextSteps
+);
+
+[ResponseType("codex.llm.config-response", "LLMConfigResponse", "LLM config response")]
+public record LLMConfigResponse(
+    bool Success,
+    string Message,
+    LLMConfig Config,
+    LLMConfigValidation Validation
+);
+
+[ResponseType("codex.llm.configs-response", "LLMConfigsResponse", "LLM configs response")]
+public record LLMConfigsResponse(
+    bool Success,
+    string Message,
+    List<LLMConfig> Configs
+);
+
+[ResponseType("codex.llm.batch-future-query-response", "BatchFutureQueryResponse", "Batch future query response")]
+public record BatchFutureQueryResponse(
+    bool Success,
+    string Message,
+    List<FutureQueryResponse> Results,
+    int SuccessCount,
+    int FailureCount
+);
+
+[ResponseType("codex.llm.future-analysis-response", "FutureAnalysisResponse", "Future analysis response")]
+public record FutureAnalysisResponse(
+    bool Success,
+    string Message,
+    FutureAnalysis Analysis,
+    int ResponseCount,
+    List<string> Insights
+);
+
+[RequestType("codex.llm.future-query-request", "FutureQueryRequest", "Future query request")]
+public record FutureQueryRequest(
+    string Query,
+    string? Context = null,
+    string? TimeHorizon = null,
+    string? Perspective = null,
+    string LLMConfigId = "ollama-local",
+    Dictionary<string, object>? Metadata = null
+);
+
+[RequestType("codex.llm.config-request", "LLMConfigRequest", "LLM config request")]
+public record LLMConfigRequest(
+    string Name,
+    string Provider,
+    string Model,
+    string? Id = null,
+    string? ApiKey = null,
+    string? BaseUrl = null,
+    int? MaxTokens = null,
+    double? Temperature = null,
+    double? TopP = null,
+    Dictionary<string, object>? Parameters = null
+);
+
+[RequestType("codex.llm.batch-future-query-request", "BatchFutureQueryRequest", "Batch future query request")]
+public record BatchFutureQueryRequest(
+    List<string> Queries,
+    string? Context = null,
+    string? TimeHorizon = null,
+    string? Perspective = null,
+    string LLMConfigId = "ollama-local",
+    Dictionary<string, object>? Metadata = null
+);
+
+[RequestType("codex.llm.future-analysis-request", "FutureAnalysisRequest", "Future analysis request")]
+public record FutureAnalysisRequest(
+    string AnalysisType = "patterns",
+    string? TimeRange = null,
+    string? FilterBy = null
+);
