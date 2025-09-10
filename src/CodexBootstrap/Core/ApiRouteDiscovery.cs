@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text.Json;
 using CodexBootstrap.Runtime;
 
 namespace CodexBootstrap.Core;
@@ -215,9 +216,9 @@ public static class ApiRouteDiscovery
     /// <summary>
     /// Creates a handler delegate from the method
     /// </summary>
-    private static Func<object?, Task<object>> CreateHandlerDelegate(MethodInfo method, IApiRouter router, NodeRegistry registry)
+    private static Func<JsonElement?, Task<object>> CreateHandlerDelegate(MethodInfo method, IApiRouter router, NodeRegistry registry)
     {
-        return async (request) =>
+        return async (JsonElement? request) =>
         {
             try
             {
@@ -236,7 +237,7 @@ public static class ApiRouteDiscovery
                 else if (parameters.Length == 1 && request != null)
                 {
                     // Single parameter - use the request
-                    args = new[] { request };
+                    args = new[] { (object)request };
                 }
                 else
                 {
@@ -341,7 +342,7 @@ public static class ApiRouteDiscovery
             case "GET":
             case "DELETE":
                 // GET and DELETE methods don't support request bodies
-                MapHttpEndpointWithoutBody(app, attribute, handler);
+                MapHttpEndpointWithoutBody(app, attribute, WrapHandler(handler));
                 break;
             case "POST":
             case "PUT":
@@ -349,18 +350,30 @@ public static class ApiRouteDiscovery
                 // POST, PUT, and PATCH methods can have request bodies
                 if (requestType != null)
                 {
-                    MapHttpEndpointWithBody(app, attribute, handler, requestType);
+                    MapHttpEndpointWithBody(app, attribute, WrapHandler(handler), requestType);
                 }
                 else
                 {
-                    MapHttpEndpointWithoutBody(app, attribute, handler);
+                    MapHttpEndpointWithoutBody(app, attribute, WrapHandler(handler));
                 }
                 break;
             default:
                 // Fallback to no body for unknown verbs
-                MapHttpEndpointWithoutBody(app, attribute, handler);
+                MapHttpEndpointWithoutBody(app, attribute, WrapHandler(handler));
                 break;
         }
+    }
+
+    /// <summary>
+    /// Wraps a JsonElement handler to work with object handlers
+    /// </summary>
+    private static Func<object?, Task<object>> WrapHandler(Func<JsonElement?, Task<object>> handler)
+    {
+        return async (object? request) =>
+        {
+            JsonElement? jsonRequest = request as JsonElement?;
+            return await handler(jsonRequest);
+        };
     }
 
     /// <summary>

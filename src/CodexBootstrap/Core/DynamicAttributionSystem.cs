@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Text.Json;
 using CodexBootstrap.Core;
@@ -10,19 +13,18 @@ namespace CodexBootstrap.Core;
 /// </summary>
 [MetaNode("codex.dynamic.attribution", "codex.meta/type", "DynamicAttributionSystem", "Dynamic LLM-powered attribution system")]
 [ApiType(
-    name: "Dynamic Attribution System",
-    description: "System for replacing static descriptions with real-time LLM responses using joyful future engine",
-    example: """
-    {
-      "id": "dynamic-attribution-v1",
-      "version": "1.0.0",
-      "llmProvider": "ollama-local",
-      "joyfulEngine": "ucore-joy",
-      "reflectionEnabled": true,
-      "cacheEnabled": true,
-      "cacheTimeout": 300
-    }
-    """
+    Name = "Dynamic Attribution System",
+    Type = "object",
+    Description = "System for replacing static descriptions with real-time LLM responses using joyful future engine",
+    Example = @"{
+      ""id"": ""dynamic-attribution-v1"",
+      ""version"": ""1.0.0"",
+      ""llmProvider"": ""ollama-local"",
+      ""joyfulEngine"": ""ucore-joy"",
+      ""reflectionEnabled"": true,
+      ""cacheEnabled"": true,
+      ""cacheTimeout"": 300
+    }"
 )]
 public class DynamicAttributionSystem
 {
@@ -514,7 +516,7 @@ public static class DynamicContentGenerator
     public static async Task<string> GenerateDescription(object target, Dictionary<string, object> context = null)
     {
         var type = target.GetType();
-        var attribute = type.GetCustomAttribute<DynamicContentAttribute>();
+        var attribute = type.GetCustomAttribute<DynamicAttributionSystem.DynamicContentAttribute>();
         
         if (attribute == null)
         {

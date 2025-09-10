@@ -3,6 +3,46 @@ using System;
 namespace CodexBootstrap.Core;
 
 /// <summary>
+/// API Type Attribute for documenting API types
+/// </summary>
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Property)]
+public class ApiTypeAttribute : Attribute
+{
+    public string Name { get; set; } = string.Empty;
+    public string Type { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string Example { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// API Module Attribute for documenting API modules
+/// </summary>
+[AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
+public class ApiModuleAttribute : Attribute
+{
+    public string ModuleId { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Version { get; set; } = "1.0.0";
+    public string Description { get; set; } = string.Empty;
+    public string[] Tags { get; set; } = Array.Empty<string>();
+}
+
+/// <summary>
+/// Generate Endpoint Attribute for dynamic endpoint generation
+/// </summary>
+[AttributeUsage(AttributeTargets.Method | AttributeTargets.Class)]
+public class GenerateEndpointAttribute : Attribute
+{
+    public string HttpMethod { get; set; } = "GET";
+    public string Route { get; set; } = string.Empty;
+    public string OperationId { get; set; } = string.Empty;
+    public string[] Tags { get; set; } = Array.Empty<string>();
+    public string Description { get; set; } = string.Empty;
+    public bool UseBreathFramework { get; set; } = true;
+    public string[] RequiredPhases { get; set; } = new[] { "compose", "expand", "validate", "contract" };
+}
+
+/// <summary>
 /// Success response type
 /// </summary>
 [ResponseType(

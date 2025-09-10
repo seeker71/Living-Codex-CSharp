@@ -1,5 +1,9 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using CodexBootstrap.Core;
+using CodexBootstrap.Runtime;
 
 namespace CodexBootstrap.Modules;
 
@@ -13,11 +17,10 @@ namespace CodexBootstrap.Modules;
     description: "Converts LLM responses into structured nodes and edges for bootstrap integration"
 )]
 [ApiModule(
-    name: "LLM Response Handler",
-    version: "1.0.0",
-    description: "Handles conversion of LLM responses to node-based diff patches",
-    basePath: "/llm/handler",
-    tags: new[] { "LLM", "Response Handler", "Nodes", "Edges", "Diff Patch", "Bootstrap" }
+    Name = "LLM Response Handler",
+    Version = "1.0.0",
+    Description = "Handles conversion of LLM responses to node-based diff patches",
+    Tags = new[] { "LLM", "Response Handler", "Nodes", "Edges", "Diff Patch", "Bootstrap" }
 )]
 public class LLMResponseHandlerModule : IModule
 {
@@ -78,17 +81,6 @@ public class LLMResponseHandlerModule : IModule
     }
 
     [ApiRoute("POST", "/llm/handler/convert", "llm-convert-response", "Convert LLM response to nodes and edges", "codex.llm.response-handler")]
-    [ApiDocumentation(
-        summary: "Convert LLM response to nodes and edges",
-        description: "Parses LLM response and creates structured nodes and edges as diff patches for bootstrap integration",
-        operationId: "convertLLMResponse",
-        tags: new[] { "LLM", "Conversion", "Nodes", "Edges", "Bootstrap" },
-        responses: new[] {
-            "200:LLMConversionResponse:Success",
-            "400:ErrorResponse:Bad Request",
-            "500:ErrorResponse:Internal Server Error"
-        }
-    )]
     public async Task<object> ConvertLLMResponse([ApiParameter("request", "LLM conversion request", Required = true, Location = "body")] LLMConversionRequest request)
     {
         try
@@ -132,17 +124,6 @@ public class LLMResponseHandlerModule : IModule
     }
 
     [ApiRoute("POST", "/llm/handler/parse", "llm-parse-response", "Parse LLM response structure", "codex.llm.response-handler")]
-    [ApiDocumentation(
-        summary: "Parse LLM response structure",
-        description: "Analyzes LLM response and extracts structured information without creating nodes",
-        operationId: "parseLLMResponse",
-        tags: new[] { "LLM", "Parsing", "Analysis" },
-        responses: new[] {
-            "200:LLMParseResponse:Success",
-            "400:ErrorResponse:Bad Request",
-            "500:ErrorResponse:Internal Server Error"
-        }
-    )]
     public async Task<object> ParseLLMResponse([ApiParameter("request", "LLM parse request", Required = true, Location = "body")] LLMParseRequest request)
     {
         try
@@ -165,17 +146,6 @@ public class LLMResponseHandlerModule : IModule
     }
 
     [ApiRoute("POST", "/llm/handler/bootstrap", "llm-bootstrap-integration", "Integrate LLM response into bootstrap process", "codex.llm.response-handler")]
-    [ApiDocumentation(
-        summary: "Integrate LLM response into bootstrap process",
-        description: "Converts LLM response and integrates it into the bootstrap process with full logging",
-        operationId: "integrateLLMResponse",
-        tags: new[] { "LLM", "Bootstrap", "Integration", "Logging" },
-        responses: new[] {
-            "200:BootstrapIntegrationResponse:Success",
-            "400:ErrorResponse:Bad Request",
-            "500:ErrorResponse:Internal Server Error"
-        }
-    )]
     public async Task<object> IntegrateLLMResponse([ApiParameter("request", "Bootstrap integration request", Required = true, Location = "body")] BootstrapIntegrationRequest request)
     {
         try

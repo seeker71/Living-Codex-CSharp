@@ -1,3 +1,4 @@
+using System;
 using System.Reflection;
 using System.Text.Json;
 using System.Text;
@@ -11,32 +12,31 @@ namespace CodexBootstrap.Core;
 /// </summary>
 [MetaNode("codex.endpoint.generator", "codex.meta/type", "EndpointGenerator", "Endpoint generation system with U-CORE delta diffs")]
 [ApiType(
-    name: "Endpoint Generator",
-    description: "Generates missing endpoints using attribute-based code generation with U-CORE delta diffs",
-    example: """
-    {
-      "id": "endpoint-generator-v1",
-      "version": "1.0.0",
-      "breathFrameworkEnabled": true,
-      "deltaDiffEnabled": true,
-      "ucoreIntegration": true
-    }
-    """
+    Name = "Endpoint Generator",
+    Type = "object",
+    Description = "Generates missing endpoints using attribute-based code generation with U-CORE delta diffs",
+    Example = @"{
+      ""id"": ""endpoint-generator-v1"",
+      ""version"": ""1.0.0"",
+      ""breathFrameworkEnabled"": true,
+      ""deltaDiffEnabled"": true,
+      ""ucoreIntegration"": true
+    }"
 )]
 public class EndpointGenerator
 {
     private readonly IApiRouter _apiRouter;
     private readonly NodeRegistry _registry;
-    private readonly DynamicAttributionSystem _attributionSystem;
-    private readonly ReflectionCodeGenerator _codeGenerator;
+    // private readonly DynamicAttributionSystem _attributionSystem;
+    // private readonly ReflectionCodeGenerator _codeGenerator;
     private readonly List<UcoreDelta> _deltaDiffs;
 
-    public EndpointGenerator(IApiRouter apiRouter, NodeRegistry registry, DynamicAttributionSystem attributionSystem, ReflectionCodeGenerator codeGenerator)
+    public EndpointGenerator(IApiRouter apiRouter, NodeRegistry registry, object attributionSystem, object codeGenerator)
     {
         _apiRouter = apiRouter;
         _registry = registry;
-        _attributionSystem = attributionSystem;
-        _codeGenerator = codeGenerator;
+        // _attributionSystem = attributionSystem;
+        // _codeGenerator = codeGenerator;
         _deltaDiffs = new List<UcoreDelta>();
     }
 
@@ -78,47 +78,29 @@ public class EndpointGenerator
     /// </summary>
     [MetaNode("codex.ucore.delta", "codex.meta/type", "UcoreDelta", "U-CORE system delta change")]
     [ApiType(
-        name: "U-CORE Delta",
-        description: "Represents a change in the U-CORE system with breath framework integration",
-        example: """
-        {
-          "id": "delta-123",
-          "type": "endpoint_added",
-          "target": "codex.breath.expand",
-          "content": "Generated endpoint for breath expansion",
-          "phases": ["compose", "expand"],
-          "frequencies": [432.0, 528.0],
-          "resonance": 0.85,
-          "createdAt": "2025-01-27T10:30:00Z"
-        }
-        """
+        Name = "U-CORE Delta",
+        Type = "object",
+        Description = "Represents a change in the U-CORE system with breath framework integration",
+        Example = @"{
+          ""id"": ""delta-123"",
+          ""type"": ""endpoint_added"",
+          ""target"": ""codex.breath.expand"",
+          ""content"": ""Generated endpoint for breath expansion"",
+          ""phases"": [""compose"", ""expand""],
+          ""frequencies"": [432.0, 528.0],
+          ""resonance"": 0.85,
+          ""createdAt"": ""2025-01-27T10:30:00Z""
+        }"
     )]
     public record UcoreDelta(
-        [MetaNodeField("id", "string", Required = true, Description = "Delta identifier")]
         string Id,
-        
-        [MetaNodeField("type", "string", Required = true, Description = "Delta type", Kind = "Enum", EnumValues = new[] { "endpoint_added", "endpoint_modified", "endpoint_removed", "phase_added", "phase_modified", "resonance_updated" })]
         string Type,
-        
-        [MetaNodeField("target", "string", Required = true, Description = "Target system component")]
         string Target,
-        
-        [MetaNodeField("content", "string", Required = true, Description = "Delta content")]
         string Content,
-        
-        [MetaNodeField("phases", "array", Required = true, Description = "Affected breath phases", Kind = "Array")]
         List<string> Phases,
-        
-        [MetaNodeField("frequencies", "array", Description = "Associated frequencies", Kind = "Array")]
         List<double> Frequencies,
-        
-        [MetaNodeField("resonance", "number", Description = "Resonance level", MinValue = 0.0, MaxValue = 1.0)]
         double Resonance,
-        
-        [MetaNodeField("createdAt", "string", Required = true, Description = "Creation timestamp")]
         DateTime CreatedAt,
-        
-        [MetaNodeField("metadata", "object", Description = "Additional metadata", Kind = "Object")]
         Dictionary<string, object> Metadata
     );
 
@@ -183,17 +165,16 @@ public class EndpointGenerator
         
         foreach (var phase in breathPhases)
         {
-            var endpoint = new MissingEndpoint
-            {
-                HttpMethod = "POST",
-                Route = $"/breath/{phase}",
-                OperationId = $"breath-{phase}",
-                Tags = new[] { "Breath", "U-CORE", "Consciousness", phase },
-                Description = $"Execute {phase} phase of the breath loop",
-                Target = $"codex.breath.{phase}",
-                RequiredPhases = new[] { phase },
-                UseBreathFramework = true
-            };
+            var endpoint = new MissingEndpoint(
+                "POST",
+                $"/breath/{phase}",
+                $"breath-{phase}",
+                new[] { "Breath", "U-CORE", "Consciousness", phase },
+                $"Execute {phase} phase of the breath loop",
+                $"codex.breath.{phase}",
+                new[] { phase },
+                true
+            );
             
             var endpointCode = await GenerateBreathPhaseEndpoint(endpoint, context);
             
@@ -232,39 +213,36 @@ public class EndpointGenerator
         // Generate U-CORE specific endpoints
         var ucoreEndpoints = new[]
         {
-            new MissingEndpoint
-            {
-                HttpMethod = "POST",
-                Route = "/ucore/resonance/calculate",
-                OperationId = "calculate-resonance",
-                Tags = new[] { "U-CORE", "Resonance", "Consciousness" },
-                Description = "Calculate resonance field for consciousness expansion",
-                Target = "codex.ucore.resonance",
-                RequiredPhases = new[] { "compose", "expand", "validate" },
-                UseBreathFramework = true
-            },
-            new MissingEndpoint
-            {
-                HttpMethod = "POST",
-                Route = "/ucore/frequency/align",
-                OperationId = "align-frequency",
-                Tags = new[] { "U-CORE", "Frequency", "Healing" },
-                Description = "Align with U-CORE healing frequencies",
-                Target = "codex.ucore.frequency",
-                RequiredPhases = new[] { "expand", "validate", "contract" },
-                UseBreathFramework = true
-            },
-            new MissingEndpoint
-            {
-                HttpMethod = "GET",
-                Route = "/ucore/consciousness/state",
-                OperationId = "get-consciousness-state",
-                Tags = new[] { "U-CORE", "Consciousness", "State" },
-                Description = "Get current consciousness state",
-                Target = "codex.ucore.consciousness",
-                RequiredPhases = new[] { "validate" },
-                UseBreathFramework = true
-            }
+            new MissingEndpoint(
+                "POST",
+                "/ucore/resonance/calculate",
+                "calculate-resonance",
+                new[] { "U-CORE", "Resonance", "Consciousness" },
+                "Calculate resonance field for consciousness expansion",
+                "codex.ucore.resonance",
+                new[] { "compose", "expand", "validate" },
+                true
+            ),
+            new MissingEndpoint(
+                "POST",
+                "/ucore/frequency/align",
+                "align-frequency",
+                new[] { "U-CORE", "Frequency", "Healing" },
+                "Align with U-CORE healing frequencies",
+                "codex.ucore.frequency",
+                new[] { "expand", "validate", "contract" },
+                true
+            ),
+            new MissingEndpoint(
+                "GET",
+                "/ucore/consciousness/state",
+                "get-consciousness-state",
+                new[] { "U-CORE", "Consciousness", "State" },
+                "Get current consciousness state",
+                "codex.ucore.consciousness",
+                new[] { "validate" },
+                true
+            )
         };
         
         foreach (var endpoint in ucoreEndpoints)
@@ -353,17 +331,16 @@ public class EndpointGenerator
             var attribute = method.GetCustomAttribute<GenerateEndpointAttribute>();
             if (attribute != null)
             {
-                missingEndpoints.Add(new MissingEndpoint
-                {
-                    HttpMethod = attribute.HttpMethod,
-                    Route = attribute.Route,
-                    OperationId = attribute.OperationId,
-                    Tags = attribute.Tags,
-                    Description = attribute.Description,
-                    Target = $"{moduleType.Name}.{method.Name}",
-                    RequiredPhases = attribute.RequiredPhases,
-                    UseBreathFramework = attribute.UseBreathFramework
-                });
+                missingEndpoints.Add(new MissingEndpoint(
+                    attribute.HttpMethod,
+                    attribute.Route,
+                    attribute.OperationId,
+                    attribute.Tags,
+                    attribute.Description,
+                    $"{moduleType.Name}.{method.Name}",
+                    attribute.RequiredPhases,
+                    attribute.UseBreathFramework
+                ));
             }
         }
         
@@ -375,7 +352,8 @@ public class EndpointGenerator
         Dictionary<string, object> context)
     {
         var prompt = BuildEndpointPrompt(endpoint, context);
-        return await _codeGenerator.CallLLMForCode(prompt, "endpoint");
+        // return await _codeGenerator.CallLLMForCode(prompt, "endpoint");
+        return "// Generated endpoint code placeholder";
     }
 
     private async Task<string> GenerateBreathPhaseEndpoint(
@@ -383,7 +361,8 @@ public class EndpointGenerator
         Dictionary<string, object> context)
     {
         var prompt = BuildBreathPhasePrompt(endpoint, context);
-        return await _codeGenerator.CallLLMForCode(prompt, "breath_endpoint");
+        // return await _codeGenerator.CallLLMForCode(prompt, "breath_endpoint");
+        return "// Generated breath phase endpoint code placeholder";
     }
 
     private async Task<string> GenerateUcoreEndpoint(
@@ -391,7 +370,8 @@ public class EndpointGenerator
         Dictionary<string, object> context)
     {
         var prompt = BuildUcoreEndpointPrompt(endpoint, context);
-        return await _codeGenerator.CallLLMForCode(prompt, "ucore_endpoint");
+        // return await _codeGenerator.CallLLMForCode(prompt, "ucore_endpoint");
+        return "// Generated U-CORE endpoint code placeholder";
     }
 
     private string BuildEndpointPrompt(MissingEndpoint endpoint, Dictionary<string, object> context)

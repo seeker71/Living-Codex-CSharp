@@ -1,3 +1,4 @@
+using System;
 using System.Text.Json;
 using CodexBootstrap.Core;
 
@@ -9,18 +10,17 @@ namespace CodexBootstrap.Core;
 /// </summary>
 [MetaNode("codex.llm.configuration-system", "codex.meta/type", "LLMConfigurationSystem", "Generic LLM configuration system with Ollama optimization")]
 [ApiType(
-    name: "LLM Configuration System",
-    description: "Generic provider, model, and mode attributes for optimal LLM integration across all modules",
-    example: """
-    {
-      "provider": "Ollama",
-      "model": "llama3",
-      "mode": "consciousness-expansion",
-      "frequency": 528,
-      "temperature": 0.7,
-      "maxTokens": 2000
-    }
-    """
+    Name = "LLM Configuration System",
+    Type = "object",
+    Description = "Generic provider, model, and mode attributes for optimal LLM integration across all modules",
+    Example = @"{
+      ""provider"": ""Ollama"",
+      ""model"": ""llama3"",
+      ""mode"": ""consciousness-expansion"",
+      ""frequency"": 528,
+      ""temperature"": 0.7,
+      ""maxTokens"": 2000
+    }"
 )]
 public static class LLMConfigurationSystem
 {
@@ -116,58 +116,34 @@ public static class LLMConfigurationSystem
     /// </summary>
     [MetaNode("codex.llm.configuration", "codex.meta/type", "LLMConfiguration", "Complete LLM configuration for specific use case")]
     [ApiType(
-        name: "LLM Configuration",
-        description: "Complete LLM configuration with provider, model, and mode optimization",
-        example: """
-        {
-          "id": "consciousness-expansion-llama3",
-          "provider": "Ollama",
-          "model": "llama3",
-          "mode": "consciousness-expansion",
-          "temperature": 0.7,
-          "maxTokens": 2000,
-          "topP": 0.9,
-          "frequencies": ["432", "528", "741"],
-          "useJoyfulEngine": true,
-          "breathPhase": "expand"
-        }
-        """
+        Name = "LLM Configuration",
+        Type = "object",
+        Description = "Complete LLM configuration with provider, model, and mode optimization",
+        Example = @"{
+          ""id"": ""consciousness-expansion-llama3"",
+          ""provider"": ""Ollama"",
+          ""model"": ""llama3"",
+          ""mode"": ""consciousness-expansion"",
+          ""temperature"": 0.7,
+          ""maxTokens"": 2000,
+          ""topP"": 0.9,
+          ""frequencies"": [""432"", ""528"", ""741""],
+          ""useJoyfulEngine"": true,
+          ""breathPhase"": ""expand""
+        }"
     )]
     public record LLMConfiguration(
-        [MetaNodeField("id", "string", Required = true, Description = "Unique configuration identifier")]
         string Id,
-        
-        [MetaNodeField("provider", "string", Required = true, Description = "LLM provider", Kind = "Enum", EnumValues = new[] { "Ollama", "OpenAI", "Anthropic", "Custom" })]
         string Provider,
-        
-        [MetaNodeField("model", "string", Required = true, Description = "Specific model name")]
         string Model,
-        
-        [MetaNodeField("mode", "string", Required = true, Description = "Operational mode", Kind = "Enum", EnumValues = new[] { "consciousness-expansion", "code-generation", "analysis", "creative", "future-knowledge", "image-generation", "resonance-calculation" })]
         string Mode,
-        
-        [MetaNodeField("temperature", "number", Required = true, Description = "Sampling temperature", MinValue = 0.0, MaxValue = 2.0)]
         double Temperature,
-        
-        [MetaNodeField("maxTokens", "number", Required = true, Description = "Maximum tokens to generate", MinValue = 1, MaxValue = 4000)]
         int MaxTokens,
-        
-        [MetaNodeField("topP", "number", Required = true, Description = "Top-p sampling parameter", MinValue = 0.0, MaxValue = 1.0)]
         double TopP,
-        
-        [MetaNodeField("frequencies", "array", Description = "Sacred frequencies for consciousness expansion", Kind = "Array")]
         string[] Frequencies,
-        
-        [MetaNodeField("useJoyfulEngine", "boolean", Description = "Use joyful engine for consciousness expansion")]
         bool UseJoyfulEngine,
-        
-        [MetaNodeField("breathPhase", "string", Description = "Associated breath phase", Kind = "Enum", EnumValues = new[] { "compose", "expand", "validate", "melt", "patch", "refreeze", "contract" })]
         string BreathPhase,
-        
-        [MetaNodeField("description", "string", Description = "Configuration description")]
         string Description,
-        
-        [MetaNodeField("parameters", "object", Description = "Additional provider-specific parameters", Kind = "Object")]
         Dictionary<string, object> Parameters
     );
 

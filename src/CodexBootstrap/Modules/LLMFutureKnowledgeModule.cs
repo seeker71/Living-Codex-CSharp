@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using CodexBootstrap.Core;
 using CodexBootstrap.Runtime;
@@ -8,109 +11,74 @@ namespace CodexBootstrap.Modules;
 
 [MetaNode("codex.llm.config", "codex.meta/type", "LLMConfig", "Configuration for LLM integration")]
 [ApiType(
-    name: "LLM Configuration",
-    description: "Configuration settings for LLM providers (OpenAI, Anthropic, Ollama, Custom)",
-    example: """
-    {
-      "id": "openai-gpt4",
-      "name": "OpenAI GPT-4",
-      "provider": "OpenAI",
-      "model": "gpt-4",
-      "apiKey": "sk-...",
-      "baseUrl": "https://api.openai.com/v1",
-      "maxTokens": 2000,
-      "temperature": 0.7,
-      "topP": 0.9
-    }
-    """
+    Name = "LLM Configuration",
+    Type = "object",
+    Description = "Configuration settings for LLM providers (OpenAI, Anthropic, Ollama, Custom)",
+    Example = @"{
+      ""id"": ""openai-gpt4"",
+      ""name"": ""OpenAI GPT-4"",
+      ""provider"": ""OpenAI"",
+      ""model"": ""gpt-4"",
+      ""apiKey"": ""sk-..."",
+      ""baseUrl"": ""https://api.openai.com/v1"",
+      ""maxTokens"": 2000,
+      ""temperature"": 0.7,
+      ""topP"": 0.9
+    }"
 )]
 public record LLMConfig(
-    [MetaNodeField("id", "string", Required = true, Description = "Unique identifier for the LLM configuration")]
     string Id,
-    
-    [MetaNodeField("name", "string", Required = true, Description = "Human-readable name for the configuration")]
     string Name,
-    
-    [MetaNodeField("provider", "string", Required = true, Description = "LLM provider (OpenAI, Anthropic, Ollama, Custom)", Kind = "Enum", EnumValues = new[] { "OpenAI", "Anthropic", "Ollama", "Custom" })]
     string Provider,
-    
-    [MetaNodeField("model", "string", Required = true, Description = "Specific model name (e.g., gpt-4, claude-3-sonnet, llama2)")]
     string Model,
-    
-    [MetaNodeField("apiKey", "string", Description = "API key for the LLM provider (optional for local models)")]
     string ApiKey,
-    
-    [MetaNodeField("baseUrl", "string", Description = "Base URL for the LLM API endpoint")]
     string BaseUrl,
-    
-    [MetaNodeField("maxTokens", "number", Required = true, Description = "Maximum number of tokens to generate", MinValue = 1, MaxValue = 4000)]
     int MaxTokens,
-    
-    [MetaNodeField("temperature", "number", Required = true, Description = "Sampling temperature (0.0 to 2.0)", MinValue = 0.0, MaxValue = 2.0)]
     double Temperature,
-    
-    [MetaNodeField("topP", "number", Required = true, Description = "Top-p sampling parameter (0.0 to 1.0)", MinValue = 0.0, MaxValue = 1.0)]
     double TopP,
-    
-    [MetaNodeField("parameters", "object", Description = "Additional provider-specific parameters", Kind = "Object")]
     Dictionary<string, object> Parameters
 );
 
 [MetaNode("codex.llm.future-query", "codex.meta/type", "FutureQuery", "Query for future knowledge using LLM")]
 [ApiType(
-    name: "Future Query",
-    description: "A query for future knowledge generation using configurable LLM",
-    example: """
-    {
-      "id": "query-123",
-      "query": "What will be the next breakthrough in AI consciousness?",
-      "context": "I am researching AI consciousness for my PhD thesis",
-      "timeHorizon": "2 years",
-      "perspective": "optimistic",
-      "llmConfig": { "id": "openai-gpt4" },
-      "metadata": {}
-    }
-    """
+    Name = "Future Query",
+    Type = "object",
+    Description = "A query for future knowledge generation using configurable LLM",
+    Example = @"{
+      ""id"": ""query-123"",
+      ""query"": ""What will be the next breakthrough in AI consciousness?"",
+      ""context"": ""I am researching AI consciousness for my PhD thesis"",
+      ""timeHorizon"": ""2 years"",
+      ""perspective"": ""optimistic"",
+      ""llmConfig"": { ""id"": ""openai-gpt4"" },
+      ""metadata"": {}
+    }"
 )]
 public record FutureQuery(
-    [MetaNodeField("id", "string", Required = true, Description = "Unique identifier for the future query")]
     string Id,
-    
-    [MetaNodeField("query", "string", Required = true, Description = "The question or topic for future knowledge generation")]
     string Query,
-    
-    [MetaNodeField("context", "string", Description = "Additional context to help the LLM understand the query")]
     string Context,
-    
-    [MetaNodeField("timeHorizon", "string", Required = true, Description = "Time frame for the prediction (e.g., '1 year', '5 years')")]
     string TimeHorizon,
-    
-    [MetaNodeField("perspective", "string", Required = true, Description = "Perspective for the prediction", Kind = "Enum", EnumValues = new[] { "optimistic", "realistic", "pessimistic", "neutral" })]
     string Perspective,
-    
-    [MetaNodeField("llmConfig", "LLMConfig", Required = true, Description = "LLM configuration to use for this query", Kind = "Reference", ReferenceType = "LLMConfig")]
     LLMConfig LLMConfig,
-    
-    [MetaNodeField("metadata", "object", Description = "Additional metadata for the query", Kind = "Object")]
     Dictionary<string, object> Metadata
 );
 
 [MetaNode("codex.llm.future-response", "codex.meta/type", "FutureResponse", "LLM-generated future knowledge response")]
 [ApiType(
-    name: "Future Response",
-    description: "LLM-generated response containing future knowledge predictions and insights",
-    example: """
-    {
-      "id": "response-456",
-      "query": "What will be the next breakthrough in AI consciousness?",
-      "response": "Based on current research trends...",
-      "confidence": 0.85,
-      "reasoning": "Generated using advanced predictive algorithms",
-      "sources": ["Historical patterns", "Trend analysis"],
-      "generatedAt": "2025-01-27T10:30:00Z",
-      "usedConfig": { "id": "openai-gpt4" }
-    }
-    """
+    Name = "Future Response",
+    Type = "object",
+    Description = "LLM-generated response containing future knowledge predictions and insights",
+    Example = @"{
+      ""id"": ""response-456"",
+      ""query"": ""What will be the next breakthrough in AI consciousness?"",
+      ""response"": ""Based on current research trends..."",
+      ""confidence"": 0.85,
+      ""reasoning"": ""Generated using advanced predictive algorithms"",
+      ""sources"": [""Historical patterns"", ""Trend analysis""],
+      ""generatedAt"": ""2025-01-27T10:30:00Z"",
+      ""usedConfig"": { ""id"": ""openai-gpt4"" }
+    }"
 )]
 public record FutureResponse(
     string Id,
@@ -133,11 +101,10 @@ public record FutureResponse(
     description: "Uses configurable local and remote LLMs for future knowledge retrieval and analysis"
 )]
 [ApiModule(
-    name: "LLM Future Knowledge",
-    version: "1.0.0",
-    description: "Configurable LLM integration for future knowledge retrieval",
-    basePath: "/llm",
-    tags: new[] { "LLM", "Future Knowledge", "AI", "Prediction", "Analysis" }
+    Name = "LLM Future Knowledge",
+    Version = "1.0.0",
+    Description = "Configurable LLM integration for future knowledge retrieval",
+    Tags = new[] { "LLM", "Future Knowledge", "AI", "Prediction", "Analysis" }
 )]
 public class LLMFutureKnowledgeModule : IModule
 {
@@ -209,17 +176,6 @@ public class LLMFutureKnowledgeModule : IModule
     }
 
     [ApiRoute("POST", "/llm/future/query", "llm-future-query", "Query future knowledge using LLM", "codex.llm.future")]
-    [ApiDocumentation(
-        summary: "Query future knowledge using configurable LLM",
-        description: "Generates future knowledge predictions using any configured LLM provider (OpenAI, Anthropic, Ollama, Custom)",
-        operationId: "queryFutureKnowledge",
-        tags: new[] { "Future Knowledge", "LLM", "Prediction" },
-        responses: new[] {
-            "200:FutureQueryResponse:Success",
-            "400:ErrorResponse:Bad Request",
-            "500:ErrorResponse:Internal Server Error"
-        }
-    )]
     public async Task<object> QueryFutureKnowledge([ApiParameter("request", "Future query request", Required = true, Location = "body")] FutureQueryRequest request)
     {
         try
@@ -268,17 +224,6 @@ public class LLMFutureKnowledgeModule : IModule
     }
 
     [ApiRoute("POST", "/llm/config", "llm-config-create", "Create or update LLM configuration", "codex.llm.future")]
-    [ApiDocumentation(
-        summary: "Create or update LLM configuration",
-        description: "Configures a new LLM provider (OpenAI, Anthropic, Ollama, Custom) for future knowledge generation",
-        operationId: "createLLMConfig",
-        tags: new[] { "Configuration", "LLM", "Setup" },
-        responses: new[] {
-            "200:LLMConfigResponse:Success",
-            "400:ErrorResponse:Bad Request",
-            "500:ErrorResponse:Internal Server Error"
-        }
-    )]
     public async Task<object> CreateLLMConfig([ApiParameter("request", "LLM config request", Required = true, Location = "body")] LLMConfigRequest request)
     {
         try
@@ -322,16 +267,6 @@ public class LLMFutureKnowledgeModule : IModule
     }
 
     [ApiRoute("GET", "/llm/configs", "llm-configs", "Get all LLM configurations", "codex.llm.future")]
-    [ApiDocumentation(
-        summary: "Get all LLM configurations",
-        description: "Retrieves all configured LLM providers and their settings",
-        operationId: "getLLMConfigs",
-        tags: new[] { "Configuration", "LLM", "List" },
-        responses: new[] {
-            "200:LLMConfigsResponse:Success",
-            "500:ErrorResponse:Internal Server Error"
-        }
-    )]
     public async Task<object> GetLLMConfigs()
     {
         try
@@ -350,17 +285,6 @@ public class LLMFutureKnowledgeModule : IModule
     }
 
     [ApiRoute("POST", "/llm/future/batch", "llm-future-batch", "Batch query future knowledge", "codex.llm.future")]
-    [ApiDocumentation(
-        summary: "Batch query future knowledge",
-        description: "Process multiple future knowledge queries in a single request for efficiency",
-        operationId: "batchQueryFutureKnowledge",
-        tags: new[] { "Future Knowledge", "LLM", "Batch", "Efficiency" },
-        responses: new[] {
-            "200:BatchFutureQueryResponse:Success",
-            "400:ErrorResponse:Bad Request",
-            "500:ErrorResponse:Internal Server Error"
-        }
-    )]
     public async Task<object> BatchQueryFutureKnowledge([ApiParameter("request", "Batch query request", Required = true, Location = "body")] BatchFutureQueryRequest request)
     {
         try
@@ -432,17 +356,6 @@ public class LLMFutureKnowledgeModule : IModule
     }
 
     [ApiRoute("POST", "/llm/future/analyze", "llm-future-analyze", "Analyze future knowledge patterns", "codex.llm.future")]
-    [ApiDocumentation(
-        summary: "Analyze future knowledge patterns",
-        description: "Analyzes patterns, trends, and insights from accumulated future knowledge responses",
-        operationId: "analyzeFutureKnowledge",
-        tags: new[] { "Analysis", "Patterns", "Insights", "Future Knowledge" },
-        responses: new[] {
-            "200:FutureAnalysisResponse:Success",
-            "400:ErrorResponse:Bad Request",
-            "500:ErrorResponse:Internal Server Error"
-        }
-    )]
     public async Task<object> AnalyzeFutureKnowledge([ApiParameter("request", "Analysis request", Required = true, Location = "body")] FutureAnalysisRequest request)
     {
         try

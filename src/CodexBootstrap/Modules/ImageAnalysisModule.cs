@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using CodexBootstrap.Core;
 using CodexBootstrap.Runtime;
@@ -8,234 +11,156 @@ namespace CodexBootstrap.Modules;
 
 [MetaNode("codex.analysis.config", "codex.meta/type", "AnalysisConfig", "Configuration for image analysis models")]
 [ApiType(
-    name: "Analysis Configuration",
-    description: "Configuration settings for image analysis models (GPT-4V, Claude Vision, Custom Vision APIs)",
-    example: """
-    {
-      "id": "gpt4v",
-      "name": "OpenAI GPT-4 Vision",
-      "provider": "OpenAI",
-      "model": "gpt-4-vision-preview",
-      "apiKey": "sk-...",
-      "baseUrl": "https://api.openai.com/v1",
-      "maxTokens": 2000,
-      "temperature": 0.3,
-      "analysisType": "comprehensive"
-    }
-    """
+    Name = "Analysis Configuration",
+    Type = "object",
+    Description = "Configuration settings for image analysis models (GPT-4V, Claude Vision, Custom Vision APIs)",
+    Example = @"{
+      ""id"": ""gpt4v"",
+      ""name"": ""OpenAI GPT-4 Vision"",
+      ""provider"": ""OpenAI"",
+      ""model"": ""gpt-4-vision-preview"",
+      ""apiKey"": ""sk-..."",
+      ""baseUrl"": ""https://api.openai.com/v1"",
+      ""maxTokens"": 2000,
+      ""temperature"": 0.3,
+      ""analysisType"": ""comprehensive""
+    }"
 )]
 public record AnalysisConfig(
-    [MetaNodeField("id", "string", Required = true, Description = "Unique identifier for the analysis configuration")]
     string Id,
-    
-    [MetaNodeField("name", "string", Required = true, Description = "Human-readable name for the configuration")]
     string Name,
-    
-    [MetaNodeField("provider", "string", Required = true, Description = "Analysis provider", Kind = "Enum", EnumValues = new[] { "OpenAI", "Anthropic", "Google", "Azure", "Custom", "Local" })]
     string Provider,
-    
-    [MetaNodeField("model", "string", Required = true, Description = "Specific model name (e.g., gpt-4-vision-preview, claude-3-vision, gemini-pro-vision)")]
     string Model,
-    
-    [MetaNodeField("apiKey", "string", Description = "API key for the analysis provider (optional for local models)")]
     string ApiKey,
-    
-    [MetaNodeField("baseUrl", "string", Description = "Base URL for the analysis API endpoint")]
     string BaseUrl,
-    
-    [MetaNodeField("maxTokens", "number", Required = true, Description = "Maximum number of tokens to generate", MinValue = 100, MaxValue = 4000)]
     int MaxTokens,
-    
-    [MetaNodeField("temperature", "number", Required = true, Description = "Sampling temperature (0.0 to 2.0)", MinValue = 0.0, MaxValue = 2.0)]
     double Temperature,
-    
-    [MetaNodeField("analysisType", "string", Required = true, Description = "Type of analysis to perform", Kind = "Enum", EnumValues = new[] { "comprehensive", "objects", "relationships", "concepts", "emotions", "text" })]
     string AnalysisType,
-    
-    [MetaNodeField("parameters", "object", Description = "Additional provider-specific parameters", Kind = "Object")]
     Dictionary<string, object> Parameters
 );
 
 [MetaNode("codex.analysis.image", "codex.meta/type", "ImageAnalysis", "Image to be analyzed for node/edge extraction")]
 [ApiType(
-    name: "Image Analysis",
-    description: "An image that will be analyzed to extract nodes and edges",
-    example: """
-    {
-      "id": "analysis-123",
-      "imageUrl": "https://example.com/image.png",
-      "imageData": "base64-encoded-image-data",
-      "analysisType": "comprehensive",
-      "context": "Analyzing a concept visualization for U-CORE Joy system",
-      "metadata": {}
-    }
-    """
+    Name = "Image Analysis",
+    Type = "object",
+    Description = "An image that will be analyzed to extract nodes and edges",
+    Example = @"{
+      ""id"": ""analysis-123"",
+      ""imageUrl"": ""https://example.com/image.png"",
+      ""imageData"": ""base64-encoded-image-data"",
+      ""analysisType"": ""comprehensive"",
+      ""context"": ""Analyzing a concept visualization for U-CORE Joy system"",
+      ""metadata"": {}
+    }"
 )]
 public record ImageAnalysis(
-    [MetaNodeField("id", "string", Required = true, Description = "Unique identifier for the image analysis")]
     string Id,
-    
-    [MetaNodeField("imageUrl", "string", Description = "URL of the image to analyze")]
     string? ImageUrl,
-    
-    [MetaNodeField("imageData", "string", Description = "Base64-encoded image data")]
     string? ImageData,
-    
-    [MetaNodeField("analysisType", "string", Required = true, Description = "Type of analysis to perform", Kind = "Enum", EnumValues = new[] { "comprehensive", "objects", "relationships", "concepts", "emotions", "text" })]
     string AnalysisType,
-    
-    [MetaNodeField("context", "string", Description = "Context for the analysis to help with interpretation")]
     string? Context,
-    
-    [MetaNodeField("metadata", "object", Description = "Additional metadata for the analysis", Kind = "Object")]
     Dictionary<string, object> Metadata
 );
 
 [MetaNode("codex.analysis.result", "codex.meta/type", "AnalysisResult", "Result of image analysis with extracted nodes and edges")]
 [ApiType(
-    name: "Analysis Result",
-    description: "Result of image analysis containing extracted nodes and edges",
-    example: """
-    {
-      "id": "result-456",
-      "imageAnalysis": { "id": "analysis-123" },
-      "analysisConfig": { "id": "gpt4v" },
-      "nodes": [
+    Name = "Analysis Result",
+    Type = "object",
+    Description = "Result of image analysis containing extracted nodes and edges",
+    Example = @"{
+      ""id"": ""result-456"",
+      ""imageAnalysis"": { ""id"": ""analysis-123"" },
+      ""analysisConfig"": { ""id"": ""gpt4v"" },
+      ""nodes"": [
         {
-          "id": "node-1",
-          "typeId": "codex.concept.joy",
-          "title": "Joy Amplification",
-          "description": "Visual representation of joy being amplified",
-          "properties": { "color": "gold", "intensity": "high" }
+          ""id"": ""node-1"",
+          ""typeId"": ""codex.concept.joy"",
+          ""title"": ""Joy Amplification"",
+          ""description"": ""Visual representation of joy being amplified"",
+          ""properties"": { ""color"": ""gold"", ""intensity"": ""high"" }
         }
       ],
-      "edges": [
+      ""edges"": [
         {
-          "id": "edge-1",
-          "fromId": "node-1",
-          "toId": "node-2",
-          "role": "amplifies",
-          "weight": 0.9
+          ""id"": ""edge-1"",
+          ""fromId"": ""node-1"",
+          ""toId"": ""node-2"",
+          ""role"": ""amplifies"",
+          ""weight"": 0.9
         }
       ],
-      "confidence": 0.85,
-      "status": "completed"
-    }
-    """
+      ""confidence"": 0.85,
+      ""status"": ""completed""
+    }"
 )]
 public record AnalysisResult(
-    [MetaNodeField("id", "string", Required = true, Description = "Unique identifier for the analysis result")]
     string Id,
-    
-    [MetaNodeField("imageAnalysis", "ImageAnalysis", Required = true, Description = "The image analysis that was processed", Kind = "Reference", ReferenceType = "ImageAnalysis")]
     ImageAnalysis ImageAnalysis,
-    
-    [MetaNodeField("analysisConfig", "AnalysisConfig", Required = true, Description = "Analysis configuration used", Kind = "Reference", ReferenceType = "AnalysisConfig")]
     AnalysisConfig AnalysisConfig,
-    
-    [MetaNodeField("nodes", "array", Required = true, Description = "Extracted nodes from the image", Kind = "Array", ArrayItemType = "ExtractedNode")]
     List<ExtractedNode> Nodes,
-    
-    [MetaNodeField("edges", "array", Required = true, Description = "Extracted edges from the image", Kind = "Array", ArrayItemType = "ExtractedEdge")]
     List<ExtractedEdge> Edges,
-    
-    [MetaNodeField("confidence", "number", Required = true, Description = "Overall confidence in the analysis (0.0 to 1.0)", MinValue = 0.0, MaxValue = 1.0)]
     double Confidence,
-    
-    [MetaNodeField("status", "string", Required = true, Description = "Analysis status", Kind = "Enum", EnumValues = new[] { "pending", "processing", "completed", "failed" })]
     string Status,
-    
-    [MetaNodeField("error", "string", Description = "Error message if analysis failed")]
     string? Error,
-    
-    [MetaNodeField("analyzedAt", "string", Required = true, Description = "When the analysis was completed")]
     DateTime AnalyzedAt
 );
 
 [MetaNode("codex.analysis.extracted-node", "codex.meta/type", "ExtractedNode", "Node extracted from image analysis")]
 [ApiType(
-    name: "Extracted Node",
-    description: "A node extracted from image analysis with properties and relationships",
-    example: """
-    {
-      "id": "node-1",
-      "typeId": "codex.concept.joy",
-      "title": "Joy Amplification",
-      "description": "Visual representation of joy being amplified through frequency resonance",
-      "properties": {
-        "color": "gold",
-        "intensity": "high",
-        "position": "center",
-        "size": "large"
+    Name = "Extracted Node",
+    Type = "object",
+    Description = "A node extracted from image analysis with properties and relationships",
+    Example = @"{
+      ""id"": ""node-1"",
+      ""typeId"": ""codex.concept.joy"",
+      ""title"": ""Joy Amplification"",
+      ""description"": ""Visual representation of joy being amplified through frequency resonance"",
+      ""properties"": {
+        ""color"": ""gold"",
+        ""intensity"": ""high"",
+        ""position"": ""center"",
+        ""size"": ""large""
       },
-      "confidence": 0.9,
-      "boundingBox": { "x": 100, "y": 100, "width": 200, "height": 200 }
-    }
-    """
+      ""confidence"": 0.9,
+      ""boundingBox"": { ""x"": 100, ""y"": 100, ""width"": 200, ""height"": 200 }
+    }"
 )]
 public record ExtractedNode(
-    [MetaNodeField("id", "string", Required = true, Description = "Unique identifier for the extracted node")]
     string Id,
-    
-    [MetaNodeField("typeId", "string", Required = true, Description = "Type identifier for the node")]
     string TypeId,
-    
-    [MetaNodeField("title", "string", Required = true, Description = "Title of the extracted node")]
     string Title,
-    
-    [MetaNodeField("description", "string", Required = true, Description = "Description of what the node represents")]
     string Description,
-    
-    [MetaNodeField("properties", "object", Description = "Properties extracted from the image", Kind = "Object")]
     Dictionary<string, object> Properties,
-    
-    [MetaNodeField("confidence", "number", Required = true, Description = "Confidence in this node extraction (0.0 to 1.0)", MinValue = 0.0, MaxValue = 1.0)]
     double Confidence,
-    
-    [MetaNodeField("boundingBox", "object", Description = "Bounding box coordinates in the image", Kind = "Object")]
     Dictionary<string, object>? BoundingBox
 );
 
 [MetaNode("codex.analysis.extracted-edge", "codex.meta/type", "ExtractedEdge", "Edge extracted from image analysis")]
 [ApiType(
-    name: "Extracted Edge",
-    description: "An edge extracted from image analysis representing relationships between nodes",
-    example: """
-    {
-      "id": "edge-1",
-      "fromId": "node-1",
-      "toId": "node-2",
-      "role": "amplifies",
-      "weight": 0.9,
-      "properties": {
-        "strength": "strong",
-        "direction": "unidirectional",
-        "color": "gold"
+    Name = "Extracted Edge",
+    Type = "object",
+    Description = "An edge extracted from image analysis representing relationships between nodes",
+    Example = @"{
+      ""id"": ""edge-1"",
+      ""fromId"": ""node-1"",
+      ""toId"": ""node-2"",
+      ""role"": ""amplifies"",
+      ""weight"": 0.9,
+      ""properties"": {
+        ""strength"": ""strong"",
+        ""direction"": ""unidirectional"",
+        ""color"": ""gold""
       },
-      "confidence": 0.8
-    }
-    """
+      ""confidence"": 0.8
+    }"
 )]
 public record ExtractedEdge(
-    [MetaNodeField("id", "string", Required = true, Description = "Unique identifier for the extracted edge")]
     string Id,
-    
-    [MetaNodeField("fromId", "string", Required = true, Description = "Source node identifier")]
     string FromId,
-    
-    [MetaNodeField("toId", "string", Required = true, Description = "Target node identifier")]
     string ToId,
-    
-    [MetaNodeField("role", "string", Required = true, Description = "Role or type of relationship")]
     string Role,
-    
-    [MetaNodeField("weight", "number", Required = true, Description = "Weight or strength of the relationship (0.0 to 1.0)", MinValue = 0.0, MaxValue = 1.0)]
     double Weight,
-    
-    [MetaNodeField("properties", "object", Description = "Properties of the relationship", Kind = "Object")]
     Dictionary<string, object> Properties,
-    
-    [MetaNodeField("confidence", "number", Required = true, Description = "Confidence in this edge extraction (0.0 to 1.0)", MinValue = 0.0, MaxValue = 1.0)]
     double Confidence
 );
 
@@ -249,11 +174,10 @@ public record ExtractedEdge(
     description: "Analyzes images to extract nodes and edges for integration with the node-based system"
 )]
 [ApiModule(
-    name: "Image Analysis",
-    version: "1.0.0",
-    description: "Configurable image analysis for extracting structured data",
-    basePath: "/analysis",
-    tags: new[] { "Image Analysis", "AI", "Computer Vision", "Node Extraction", "Edge Detection" }
+    Name = "Image Analysis",
+    Version = "1.0.0",
+    Description = "Configurable image analysis for extracting structured data",
+    Tags = new[] { "Image Analysis", "AI", "Computer Vision", "Node Extraction", "Edge Detection" }
 )]
 public class ImageAnalysisModule : IModule
 {
@@ -325,17 +249,6 @@ public class ImageAnalysisModule : IModule
     }
 
     [ApiRoute("POST", "/analysis/image", "analysis-image", "Analyze image to extract nodes and edges", "codex.analysis.image")]
-    [ApiDocumentation(
-        summary: "Analyze image to extract nodes and edges",
-        description: "Analyzes an image using AI vision models to extract structured nodes and edges for the node-based system",
-        operationId: "analyzeImage",
-        tags: new[] { "Image Analysis", "Node Extraction", "Computer Vision" },
-        responses: new[] {
-            "200:AnalysisResultResponse:Success",
-            "400:ErrorResponse:Bad Request",
-            "500:ErrorResponse:Internal Server Error"
-        }
-    )]
     public async Task<object> AnalyzeImage([ApiParameter("request", "Image analysis request", Required = true, Location = "body")] ImageAnalysisRequest request)
     {
         try
@@ -387,17 +300,6 @@ public class ImageAnalysisModule : IModule
     }
 
     [ApiRoute("POST", "/analysis/config", "analysis-config-create", "Create or update analysis configuration", "codex.analysis.image")]
-    [ApiDocumentation(
-        summary: "Create or update analysis configuration",
-        description: "Configures a new image analysis provider (OpenAI, Anthropic, Google, Azure, Custom, Local)",
-        operationId: "createAnalysisConfig",
-        tags: new[] { "Configuration", "Image Analysis", "Setup" },
-        responses: new[] {
-            "200:AnalysisConfigResponse:Success",
-            "400:ErrorResponse:Bad Request",
-            "500:ErrorResponse:Internal Server Error"
-        }
-    )]
     public async Task<object> CreateAnalysisConfig([ApiParameter("request", "Analysis config request", Required = true, Location = "body")] AnalysisConfigRequest request)
     {
         try
@@ -441,16 +343,6 @@ public class ImageAnalysisModule : IModule
     }
 
     [ApiRoute("GET", "/analysis/configs", "analysis-configs", "Get all analysis configurations", "codex.analysis.image")]
-    [ApiDocumentation(
-        summary: "Get all analysis configurations",
-        description: "Retrieves all configured image analysis providers and their settings",
-        operationId: "getAnalysisConfigs",
-        tags: new[] { "Configuration", "Image Analysis", "List" },
-        responses: new[] {
-            "200:AnalysisConfigsResponse:Success",
-            "500:ErrorResponse:Internal Server Error"
-        }
-    )]
     public async Task<object> GetAnalysisConfigs()
     {
         try
@@ -469,16 +361,6 @@ public class ImageAnalysisModule : IModule
     }
 
     [ApiRoute("GET", "/analysis/results", "analysis-results", "Get all analysis results", "codex.analysis.image")]
-    [ApiDocumentation(
-        summary: "Get all analysis results",
-        description: "Retrieves all image analysis results and their extracted nodes and edges",
-        operationId: "getAnalysisResults",
-        tags: new[] { "Image Analysis", "Results", "History" },
-        responses: new[] {
-            "200:AnalysisResultsResponse:Success",
-            "500:ErrorResponse:Internal Server Error"
-        }
-    )]
     public async Task<object> GetAnalysisResults()
     {
         try
@@ -515,17 +397,6 @@ public class ImageAnalysisModule : IModule
     }
 
     [ApiRoute("POST", "/analysis/batch", "analysis-batch", "Batch analyze multiple images", "codex.analysis.image")]
-    [ApiDocumentation(
-        summary: "Batch analyze multiple images",
-        description: "Analyzes multiple images in a single request for efficiency",
-        operationId: "batchAnalyzeImages",
-        tags: new[] { "Image Analysis", "Batch", "Efficiency" },
-        responses: new[] {
-            "200:BatchAnalysisResponse:Success",
-            "400:ErrorResponse:Bad Request",
-            "500:ErrorResponse:Internal Server Error"
-        }
-    )]
     public async Task<object> BatchAnalyzeImages([ApiParameter("request", "Batch analysis request", Required = true, Location = "body")] BatchAnalysisRequest request)
     {
         try

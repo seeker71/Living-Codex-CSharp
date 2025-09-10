@@ -1,3 +1,4 @@
+using System;
 using System.Reflection;
 using System.Text.Json;
 using System.Text;
@@ -11,31 +12,30 @@ namespace CodexBootstrap.Core;
 /// </summary>
 [MetaNode("codex.reflection.code-generator", "codex.meta/type", "ReflectionCodeGenerator", "Reflection-based code generation system")]
 [ApiType(
-    name: "Reflection Code Generator",
-    description: "Generates code and structure using reflection and LLM, replacing static data with dynamic content",
-    example: """
-    {
-      "id": "reflection-code-generator-v1",
-      "version": "1.0.0",
-      "llmProvider": "ollama-local",
-      "codeGenerationEnabled": true,
-      "structureGenerationEnabled": true,
-      "reflectionEnabled": true
-    }
-    """
+    Name = "Reflection Code Generator",
+    Type = "object",
+    Description = "Generates code and structure using reflection and LLM, replacing static data with dynamic content",
+    Example = @"{
+      ""id"": ""reflection-code-generator-v1"",
+      ""version"": ""1.0.0"",
+      ""llmProvider"": ""ollama-local"",
+      ""codeGenerationEnabled"": true,
+      ""structureGenerationEnabled"": true,
+      ""reflectionEnabled"": true
+    }"
 )]
 public class ReflectionCodeGenerator
 {
     private readonly IApiRouter _apiRouter;
     private readonly NodeRegistry _registry;
-    private readonly DynamicAttributionSystem _attributionSystem;
+    // private readonly DynamicAttributionSystem _attributionSystem;
     private readonly Dictionary<string, GeneratedCode> _codeCache;
 
-    public ReflectionCodeGenerator(IApiRouter apiRouter, NodeRegistry registry, DynamicAttributionSystem attributionSystem)
+    public ReflectionCodeGenerator(IApiRouter apiRouter, NodeRegistry registry, object attributionSystem)
     {
         _apiRouter = apiRouter;
         _registry = registry;
-        _attributionSystem = attributionSystem;
+        // _attributionSystem = attributionSystem;
         _codeCache = new Dictionary<string, GeneratedCode>();
     }
 
@@ -275,7 +275,7 @@ public class ReflectionCodeGenerator
         {
             if (field.GetCustomAttribute<DynamicDataAttribute>() != null)
             {
-                var data = await GenerateDynamicData(field, context);
+                var data = await GenerateDynamicDataForField(field, context);
                 results[field.Name] = data;
             }
         }
@@ -332,7 +332,8 @@ public class ReflectionCodeGenerator
         var sb = new StringBuilder();
         
         // Generate class documentation
-        var classDoc = await _attributionSystem.GenerateDynamicContent(moduleType, context);
+        // var classDoc = await _attributionSystem.GenerateDynamicContent(moduleType, context);
+        var classDoc = "Generated class documentation";
         sb.AppendLine($"/// <summary>");
         sb.AppendLine($"/// {classDoc}");
         sb.AppendLine($"/// </summary>");
@@ -341,7 +342,8 @@ public class ReflectionCodeGenerator
         // Generate method documentation
         foreach (var method in moduleType.GetMethods(BindingFlags.Public | BindingFlags.Instance))
         {
-            var methodDoc = await _attributionSystem.GenerateDynamicContent(moduleType, method, context);
+            // var methodDoc = await _attributionSystem.GenerateDynamicContent(moduleType, method, context);
+            var methodDoc = "Generated method documentation";
             sb.AppendLine($"/// <summary>");
             sb.AppendLine($"/// {methodDoc}");
             sb.AppendLine($"/// </summary>");
@@ -856,6 +858,15 @@ public class ReflectionCodeGenerator
             ["oldestGeneration"] = _codeCache.Values.Min(v => v.GeneratedAt),
             ["newestGeneration"] = _codeCache.Values.Max(v => v.GeneratedAt)
         };
+    }
+
+    /// <summary>
+    /// Generate dynamic data for a field
+    /// </summary>
+    private async Task<object> GenerateDynamicDataForField(FieldInfo field, Dictionary<string, object> context)
+    {
+        // Placeholder implementation
+        return $"Generated data for field {field.Name}";
     }
 }
 

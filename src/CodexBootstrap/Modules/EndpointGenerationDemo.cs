@@ -1,5 +1,10 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
+using System.Threading.Tasks;
 using CodexBootstrap.Core;
+using CodexBootstrap.Runtime;
 
 namespace CodexBootstrap.Modules;
 
@@ -14,16 +19,10 @@ namespace CodexBootstrap.Modules;
     description: "Demonstrates missing endpoint generation with U-CORE delta diffs"
 )]
 [ApiModule(
-    name: "Endpoint Generation Demo",
-    version: "1.0.0",
-    description: "Demonstrates missing endpoint generation with breath framework integration",
-    basePath: "/endpoint/demo",
-    tags: new[] { "Endpoint", "Generation", "Demo", "U-CORE", "Breath", "Delta" }
-)]
-[DynamicContent(
-    contentType: "description",
-    generationStrategy: "joyful",
-    realTime: true
+    Name = "Endpoint Generation Demo",
+    Version = "1.0.0",
+    Description = "Demonstrates missing endpoint generation with breath framework integration",
+    Tags = new[] { "Endpoint", "Generation", "Demo", "U-CORE", "Breath", "Delta" }
 )]
 public class EndpointGenerationDemo : IModule
 {
@@ -91,27 +90,16 @@ public class EndpointGenerationDemo : IModule
     /// Generate missing endpoints for a module
     /// </summary>
     [ApiRoute("POST", "/endpoint/demo/generate", "endpoint-generate", "Generate missing endpoints", "codex.endpoint.demo")]
-    [ApiDocumentation(
-        summary: "Generate missing endpoints",
-        description: "Generates missing endpoints using attribute-based code generation with U-CORE delta diffs",
-        operationId: "generateMissingEndpoints",
-        tags: new[] { "Endpoint", "Generation", "U-CORE", "Delta" },
-        responses: new[] {
-            "200:EndpointGenerationResponse:Success",
-            "400:ErrorResponse:Bad Request",
-            "500:ErrorResponse:Internal Server Error"
-        }
-    )]
     [GenerateEndpoint(
-        httpMethod: "POST",
-        route: "/endpoint/demo/generate",
-        operationId: "generate-missing-endpoints",
-        tags: new[] { "Endpoint", "Generation", "U-CORE" },
-        description: "Generate missing endpoints with consciousness expansion",
-        useBreathFramework: true,
-        requiredPhases: new[] { "compose", "expand", "validate", "contract" }
+        HttpMethod = "POST",
+        Route = "/endpoint/demo/generate",
+        OperationId = "generate-missing-endpoints",
+        Tags = new[] { "Endpoint", "Generation", "U-CORE" },
+        Description = "Generate missing endpoints with consciousness expansion",
+        UseBreathFramework = true,
+        RequiredPhases = new[] { "compose", "expand", "validate", "contract" }
     )]
-    public async Task<object> GenerateMissingEndpoints([ApiParameter("request", "Endpoint generation request", Required = true, Location = "body")] EndpointGenerationRequest request)
+    public async Task<object> GenerateMissingEndpoints(EndpointGenerationRequest request)
     {
         try
         {
@@ -143,27 +131,16 @@ public class EndpointGenerationDemo : IModule
     /// Generate breath framework endpoints
     /// </summary>
     [ApiRoute("POST", "/endpoint/demo/breath", "endpoint-breath", "Generate breath framework endpoints", "codex.endpoint.demo")]
-    [ApiDocumentation(
-        summary: "Generate breath framework endpoints",
-        description: "Generates breath framework endpoints with U-CORE delta diffs",
-        operationId: "generateBreathEndpoints",
-        tags: new[] { "Endpoint", "Generation", "Breath", "U-CORE" },
-        responses: new[] {
-            "200:BreathEndpointResponse:Success",
-            "400:ErrorResponse:Bad Request",
-            "500:ErrorResponse:Internal Server Error"
-        }
-    )]
     [GenerateEndpoint(
-        httpMethod: "POST",
-        route: "/endpoint/demo/breath",
-        operationId: "generate-breath-endpoints",
-        tags: new[] { "Endpoint", "Breath", "Consciousness" },
-        description: "Generate breath framework endpoints for consciousness expansion",
-        useBreathFramework: true,
-        requiredPhases: new[] { "compose", "expand", "validate", "melt", "patch", "refreeze", "contract" }
+        HttpMethod = "POST",
+        Route = "/endpoint/demo/breath",
+        OperationId = "generate-breath-endpoints",
+        Tags = new[] { "Endpoint", "Breath", "Consciousness" },
+        Description = "Generate breath framework endpoints for consciousness expansion",
+        UseBreathFramework = true,
+        RequiredPhases = new[] { "compose", "expand", "validate", "melt", "patch", "refreeze", "contract" }
     )]
-    public async Task<object> GenerateBreathEndpoints([ApiParameter("request", "Breath endpoint generation request", Required = true, Location = "body")] BreathEndpointRequest request)
+    public async Task<object> GenerateBreathEndpoints(BreathEndpointRequest request)
     {
         try
         {
@@ -193,27 +170,16 @@ public class EndpointGenerationDemo : IModule
     /// Generate U-CORE specific endpoints
     /// </summary>
     [ApiRoute("POST", "/endpoint/demo/ucore", "endpoint-ucore", "Generate U-CORE endpoints", "codex.endpoint.demo")]
-    [ApiDocumentation(
-        summary: "Generate U-CORE endpoints",
-        description: "Generates U-CORE specific endpoints with consciousness expansion",
-        operationId: "generateUcoreEndpoints",
-        tags: new[] { "Endpoint", "Generation", "U-CORE", "Consciousness" },
-        responses: new[] {
-            "200:UcoreEndpointResponse:Success",
-            "400:ErrorResponse:Bad Request",
-            "500:ErrorResponse:Internal Server Error"
-        }
-    )]
     [GenerateEndpoint(
-        httpMethod: "POST",
-        route: "/endpoint/demo/ucore",
-        operationId: "generate-ucore-endpoints",
-        tags: new[] { "Endpoint", "U-CORE", "Consciousness", "Resonance" },
-        description: "Generate U-CORE endpoints for consciousness expansion and healing",
-        useBreathFramework: true,
-        requiredPhases: new[] { "compose", "expand", "validate", "contract" }
+        HttpMethod = "POST",
+        Route = "/endpoint/demo/ucore",
+        OperationId = "generate-ucore-endpoints",
+        Tags = new[] { "Endpoint", "U-CORE", "Consciousness", "Resonance" },
+        Description = "Generate U-CORE endpoints for consciousness expansion and healing",
+        UseBreathFramework = true,
+        RequiredPhases = new[] { "compose", "expand", "validate", "contract" }
     )]
-    public async Task<object> GenerateUcoreEndpoints([ApiParameter("request", "U-CORE endpoint generation request", Required = true, Location = "body")] UcoreEndpointRequest request)
+    public async Task<object> GenerateUcoreEndpoints(UcoreEndpointRequest request)
     {
         try
         {
@@ -243,24 +209,14 @@ public class EndpointGenerationDemo : IModule
     /// Get all U-CORE delta diffs
     /// </summary>
     [ApiRoute("GET", "/endpoint/demo/deltas", "endpoint-deltas", "Get U-CORE delta diffs", "codex.endpoint.demo")]
-    [ApiDocumentation(
-        summary: "Get U-CORE delta diffs",
-        description: "Retrieves all U-CORE delta diffs generated by the endpoint system",
-        operationId: "getDeltaDiffs",
-        tags: new[] { "Endpoint", "Delta", "U-CORE", "History" },
-        responses: new[] {
-            "200:DeltaDiffsResponse:Success",
-            "500:ErrorResponse:Internal Server Error"
-        }
-    )]
     [GenerateEndpoint(
-        httpMethod: "GET",
-        route: "/endpoint/demo/deltas",
-        operationId: "get-delta-diffs",
-        tags: new[] { "Endpoint", "Delta", "U-CORE" },
-        description: "Get all U-CORE delta diffs with consciousness expansion",
-        useBreathFramework: true,
-        requiredPhases: new[] { "validate" }
+        HttpMethod = "GET",
+        Route = "/endpoint/demo/deltas",
+        OperationId = "get-delta-diffs",
+        Tags = new[] { "Endpoint", "Delta", "U-CORE" },
+        Description = "Get all U-CORE delta diffs with consciousness expansion",
+        UseBreathFramework = true,
+        RequiredPhases = new[] { "validate" }
     )]
     public async Task<object> GetDeltaDiffs()
     {
@@ -287,27 +243,16 @@ public class EndpointGenerationDemo : IModule
     /// Apply delta diffs to the system
     /// </summary>
     [ApiRoute("POST", "/endpoint/demo/apply", "endpoint-apply", "Apply delta diffs", "codex.endpoint.demo")]
-    [ApiDocumentation(
-        summary: "Apply delta diffs",
-        description: "Applies U-CORE delta diffs to the system with consciousness expansion",
-        operationId: "applyDeltaDiffs",
-        tags: new[] { "Endpoint", "Delta", "U-CORE", "Apply" },
-        responses: new[] {
-            "200:DeltaApplyResponse:Success",
-            "400:ErrorResponse:Bad Request",
-            "500:ErrorResponse:Internal Server Error"
-        }
-    )]
     [GenerateEndpoint(
-        httpMethod: "POST",
-        route: "/endpoint/demo/apply",
-        operationId: "apply-delta-diffs",
-        tags: new[] { "Endpoint", "Delta", "U-CORE", "Apply" },
-        description: "Apply delta diffs with consciousness expansion and healing",
-        useBreathFramework: true,
-        requiredPhases: new[] { "compose", "expand", "validate", "contract" }
+        HttpMethod = "POST",
+        Route = "/endpoint/demo/apply",
+        OperationId = "apply-delta-diffs",
+        Tags = new[] { "Endpoint", "Delta", "U-CORE", "Apply" },
+        Description = "Apply delta diffs with consciousness expansion and healing",
+        UseBreathFramework = true,
+        RequiredPhases = new[] { "compose", "expand", "validate", "contract" }
     )]
-    public async Task<object> ApplyDeltaDiffs([ApiParameter("request", "Delta apply request", Required = true, Location = "body")] DeltaApplyRequest request)
+    public async Task<object> ApplyDeltaDiffs(DeltaApplyRequest request)
     {
         try
         {
@@ -331,7 +276,7 @@ public class EndpointGenerationDemo : IModule
 
     // Helper methods
 
-    private Dictionary<string, object> GenerateStatistics(List<UcoreDelta> deltas)
+    private Dictionary<string, object> GenerateStatistics(List<EndpointGenerator.UcoreDelta> deltas)
     {
         return new Dictionary<string, object>
         {
@@ -345,7 +290,7 @@ public class EndpointGenerationDemo : IModule
         };
     }
 
-    private Dictionary<string, object> GenerateBreathStatistics(List<UcoreDelta> deltas)
+    private Dictionary<string, object> GenerateBreathStatistics(List<EndpointGenerator.UcoreDelta> deltas)
     {
         return new Dictionary<string, object>
         {
@@ -358,7 +303,7 @@ public class EndpointGenerationDemo : IModule
         };
     }
 
-    private Dictionary<string, object> GenerateUcoreStatistics(List<UcoreDelta> deltas)
+    private Dictionary<string, object> GenerateUcoreStatistics(List<EndpointGenerator.UcoreDelta> deltas)
     {
         return new Dictionary<string, object>
         {
@@ -372,7 +317,7 @@ public class EndpointGenerationDemo : IModule
         };
     }
 
-    private Dictionary<string, object> GenerateDeltaStatistics(List<UcoreDelta> deltas)
+    private Dictionary<string, object> GenerateDeltaStatistics(List<EndpointGenerator.UcoreDelta> deltas)
     {
         return new Dictionary<string, object>
         {
@@ -409,7 +354,7 @@ public record EndpointGenerationRequest(
 public record EndpointGenerationResponse(
     bool Success,
     string Message,
-    List<UcoreDelta> Deltas,
+    List<EndpointGenerator.UcoreDelta> Deltas,
     Dictionary<string, object> Results,
     DateTime GeneratedAt,
     Dictionary<string, object> Statistics
@@ -424,7 +369,7 @@ public record BreathEndpointRequest(
 public record BreathEndpointResponse(
     bool Success,
     string Message,
-    List<UcoreDelta> Deltas,
+    List<EndpointGenerator.UcoreDelta> Deltas,
     Dictionary<string, object> Results,
     string[] Phases,
     DateTime GeneratedAt,
@@ -440,7 +385,7 @@ public record UcoreEndpointRequest(
 public record UcoreEndpointResponse(
     bool Success,
     string Message,
-    List<UcoreDelta> Deltas,
+    List<EndpointGenerator.UcoreDelta> Deltas,
     Dictionary<string, object> Results,
     double[] Frequencies,
     DateTime GeneratedAt,
@@ -451,7 +396,7 @@ public record UcoreEndpointResponse(
 public record DeltaDiffsResponse(
     bool Success,
     string Message,
-    List<UcoreDelta> Deltas,
+    List<EndpointGenerator.UcoreDelta> Deltas,
     int Count,
     DateTime RetrievedAt,
     Dictionary<string, object> Statistics
@@ -459,7 +404,7 @@ public record DeltaDiffsResponse(
 
 [RequestType("codex.endpoint.delta-apply-request", "DeltaApplyRequest", "Delta apply request")]
 public record DeltaApplyRequest(
-    List<UcoreDelta> Deltas,
+    List<EndpointGenerator.UcoreDelta> Deltas,
     Dictionary<string, object>? Context = null
 );
 
@@ -472,3 +417,4 @@ public record DeltaApplyResponse(
     DateTime AppliedAt,
     Dictionary<string, object> Statistics
 );
+

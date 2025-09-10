@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using CodexBootstrap.Core;
 using CodexBootstrap.Runtime;
@@ -8,143 +11,87 @@ namespace CodexBootstrap.Modules;
 
 [MetaNode("codex.image.config", "codex.meta/type", "ImageConfig", "Configuration for image generation models")]
 [ApiType(
-    name: "Image Configuration",
-    description: "Configuration settings for image generation models (DALL-E, Stable Diffusion, Midjourney, Custom)",
-    example: """
-    {
-      "id": "dalle-3",
-      "name": "OpenAI DALL-E 3",
-      "provider": "OpenAI",
-      "model": "dall-e-3",
-      "apiKey": "sk-...",
-      "baseUrl": "https://api.openai.com/v1",
-      "maxImages": 4,
-      "imageSize": "1024x1024",
-      "quality": "standard",
-      "style": "vivid"
-    }
-    """
+    Name = "Image Configuration",
+    Type = "object",
+    Description = "Configuration settings for image generation models (DALL-E, Stable Diffusion, Midjourney, Custom)",
+    Example = @"{
+      ""id"": ""dalle-3"",
+      ""name"": ""OpenAI DALL-E 3"",
+      ""provider"": ""OpenAI"",
+      ""model"": ""dall-e-3"",
+      ""apiKey"": ""sk-..."",
+      ""baseUrl"": ""https://api.openai.com/v1"",
+      ""maxImages"": 4,
+      ""imageSize"": ""1024x1024"",
+      ""quality"": ""standard"",
+      ""style"": ""vivid""
+    }"
 )]
 public record ImageConfig(
-    [MetaNodeField("id", "string", Required = true, Description = "Unique identifier for the image configuration")]
     string Id,
-    
-    [MetaNodeField("name", "string", Required = true, Description = "Human-readable name for the configuration")]
     string Name,
-    
-    [MetaNodeField("provider", "string", Required = true, Description = "Image generation provider", Kind = "Enum", EnumValues = new[] { "OpenAI", "StabilityAI", "Midjourney", "Custom", "Local" })]
     string Provider,
-    
-    [MetaNodeField("model", "string", Required = true, Description = "Specific model name (e.g., dall-e-3, stable-diffusion-xl, midjourney-v6)")]
     string Model,
-    
-    [MetaNodeField("apiKey", "string", Description = "API key for the image provider (optional for local models)")]
     string ApiKey,
-    
-    [MetaNodeField("baseUrl", "string", Description = "Base URL for the image generation API endpoint")]
     string BaseUrl,
-    
-    [MetaNodeField("maxImages", "number", Required = true, Description = "Maximum number of images to generate per request", MinValue = 1, MaxValue = 10)]
     int MaxImages,
-    
-    [MetaNodeField("imageSize", "string", Required = true, Description = "Image dimensions", Kind = "Enum", EnumValues = new[] { "256x256", "512x512", "1024x1024", "1792x1024", "1024x1792" })]
     string ImageSize,
-    
-    [MetaNodeField("quality", "string", Description = "Image quality setting", Kind = "Enum", EnumValues = new[] { "standard", "hd" })]
     string Quality,
-    
-    [MetaNodeField("style", "string", Description = "Image style setting", Kind = "Enum", EnumValues = new[] { "vivid", "natural" })]
     string Style,
-    
-    [MetaNodeField("parameters", "object", Description = "Additional provider-specific parameters", Kind = "Object")]
     Dictionary<string, object> Parameters
 );
 
 [MetaNode("codex.image.concept", "codex.meta/type", "ConceptImage", "Concept to be rendered as an image")]
 [ApiType(
-    name: "Concept Image",
-    description: "A concept that can be rendered into an image using AI image generation",
-    example: """
-    {
-      "id": "concept-123",
-      "title": "Joy Amplification",
-      "description": "A visualization of joy being amplified through frequency resonance",
-      "conceptType": "spiritual",
-      "style": "abstract",
-      "mood": "uplifting",
-      "colors": ["gold", "white", "rainbow"],
-      "elements": ["light", "energy", "frequency", "heart"]
-    }
-    """
+    Name = "Concept Image",
+    Type = "object",
+    Description = "A concept that can be rendered into an image using AI image generation",
+    Example = @"{
+      ""id"": ""concept-123"",
+      ""title"": ""Joy Amplification"",
+      ""description"": ""A visualization of joy being amplified through frequency resonance"",
+      ""conceptType"": ""spiritual"",
+      ""style"": ""abstract"",
+      ""mood"": ""uplifting"",
+      ""colors"": [""gold"", ""white"", ""rainbow""],
+      ""elements"": [""light"", ""energy"", ""frequency"", ""heart""]
+    }"
 )]
 public record ConceptImage(
-    [MetaNodeField("id", "string", Required = true, Description = "Unique identifier for the concept")]
     string Id,
-    
-    [MetaNodeField("title", "string", Required = true, Description = "Title of the concept")]
     string Title,
-    
-    [MetaNodeField("description", "string", Required = true, Description = "Detailed description of the concept to visualize")]
     string Description,
-    
-    [MetaNodeField("conceptType", "string", Required = true, Description = "Type of concept", Kind = "Enum", EnumValues = new[] { "spiritual", "scientific", "abstract", "concrete", "emotional", "technical" })]
     string ConceptType,
-    
-    [MetaNodeField("style", "string", Required = true, Description = "Visual style for the image", Kind = "Enum", EnumValues = new[] { "realistic", "abstract", "minimalist", "detailed", "artistic", "scientific" })]
     string Style,
-    
-    [MetaNodeField("mood", "string", Required = true, Description = "Emotional mood of the image", Kind = "Enum", EnumValues = new[] { "uplifting", "calm", "energetic", "mysterious", "peaceful", "powerful" })]
     string Mood,
-    
-    [MetaNodeField("colors", "array", Description = "Preferred color palette", Kind = "Array", ArrayItemType = "string")]
     List<string> Colors,
-    
-    [MetaNodeField("elements", "array", Description = "Key visual elements to include", Kind = "Array", ArrayItemType = "string")]
     List<string> Elements,
-    
-    [MetaNodeField("metadata", "object", Description = "Additional metadata for the concept", Kind = "Object")]
     Dictionary<string, object> Metadata
 );
 
 [MetaNode("codex.image.generation", "codex.meta/type", "ImageGeneration", "Image generation request and result")]
 [ApiType(
-    name: "Image Generation",
-    description: "Request and result for generating images from concepts",
-    example: """
-    {
-      "id": "gen-456",
-      "concept": { "id": "concept-123" },
-      "prompt": "A beautiful visualization of joy amplification...",
-      "imageConfig": { "id": "dalle-3" },
-      "status": "completed",
-      "images": ["https://example.com/image1.png"],
-      "generatedAt": "2025-01-27T10:30:00Z"
-    }
-    """
+    Name = "Image Generation",
+    Type = "object",
+    Description = "Request and result for generating images from concepts",
+    Example = @"{
+      ""id"": ""gen-456"",
+      ""concept"": { ""id"": ""concept-123"" },
+      ""prompt"": ""A beautiful visualization of joy amplification..."",
+      ""imageConfig"": { ""id"": ""dalle-3"" },
+      ""status"": ""completed"",
+      ""images"": [""https://example.com/image1.png""],
+      ""generatedAt"": ""2025-01-27T10:30:00Z""
+    }"
 )]
 public record ImageGeneration(
-    [MetaNodeField("id", "string", Required = true, Description = "Unique identifier for the generation")]
     string Id,
-    
-    [MetaNodeField("concept", "ConceptImage", Required = true, Description = "The concept being visualized", Kind = "Reference", ReferenceType = "ConceptImage")]
     ConceptImage Concept,
-    
-    [MetaNodeField("prompt", "string", Required = true, Description = "The final prompt sent to the image generation model")]
     string Prompt,
-    
-    [MetaNodeField("imageConfig", "ImageConfig", Required = true, Description = "Image generation configuration used", Kind = "Reference", ReferenceType = "ImageConfig")]
     ImageConfig ImageConfig,
-    
-    [MetaNodeField("status", "string", Required = true, Description = "Generation status", Kind = "Enum", EnumValues = new[] { "pending", "processing", "completed", "failed" })]
     string Status,
-    
-    [MetaNodeField("images", "array", Description = "Generated image URLs or base64 data", Kind = "Array", ArrayItemType = "string")]
     List<string> Images,
-    
-    [MetaNodeField("error", "string", Description = "Error message if generation failed")]
     string? Error,
-    
-    [MetaNodeField("generatedAt", "string", Required = true, Description = "When the generation was completed")]
     DateTime GeneratedAt
 );
 
@@ -158,11 +105,10 @@ public record ImageGeneration(
     description: "Renders concepts into images using configurable local and remote image generation models"
 )]
 [ApiModule(
-    name: "Concept Image Generation",
-    version: "1.0.0",
-    description: "Configurable image generation for visualizing concepts",
-    basePath: "/image",
-    tags: new[] { "Image Generation", "AI", "Visualization", "Concepts", "Art" }
+    Name = "Concept Image Generation",
+    Version = "1.0.0",
+    Description = "Configurable image generation for visualizing concepts",
+    Tags = new[] { "Image Generation", "AI", "Visualization", "Concepts", "Art" }
 )]
 public class ConceptImageModule : IModule
 {
@@ -234,17 +180,6 @@ public class ConceptImageModule : IModule
     }
 
     [ApiRoute("POST", "/image/concept/create", "image-concept-create", "Create a concept for image generation", "codex.image.concept")]
-    [ApiDocumentation(
-        summary: "Create a concept for image generation",
-        description: "Creates a new concept that can be rendered into an image using AI image generation",
-        operationId: "createConcept",
-        tags: new[] { "Concepts", "Image Generation", "Creation" },
-        responses: new[] {
-            "200:ConceptImageResponse:Success",
-            "400:ErrorResponse:Bad Request",
-            "500:ErrorResponse:Internal Server Error"
-        }
-    )]
     public async Task<object> CreateConcept([ApiParameter("request", "Concept creation request", Required = true, Location = "body")] ConceptCreationRequest request)
     {
         try
@@ -279,17 +214,6 @@ public class ConceptImageModule : IModule
     }
 
     [ApiRoute("POST", "/image/generate", "image-generate", "Generate images from a concept", "codex.image.concept")]
-    [ApiDocumentation(
-        summary: "Generate images from a concept",
-        description: "Generates images from a concept using configurable image generation models",
-        operationId: "generateImages",
-        tags: new[] { "Image Generation", "AI", "Visualization" },
-        responses: new[] {
-            "200:ImageGenerationResponse:Success",
-            "400:ErrorResponse:Bad Request",
-            "500:ErrorResponse:Internal Server Error"
-        }
-    )]
     public async Task<object> GenerateImages([ApiParameter("request", "Image generation request", Required = true, Location = "body")] ImageGenerationRequest request)
     {
         try
@@ -362,17 +286,6 @@ public class ConceptImageModule : IModule
     }
 
     [ApiRoute("POST", "/image/config", "image-config-create", "Create or update image configuration", "codex.image.concept")]
-    [ApiDocumentation(
-        summary: "Create or update image configuration",
-        description: "Configures a new image generation provider (OpenAI, StabilityAI, Midjourney, Custom, Local)",
-        operationId: "createImageConfig",
-        tags: new[] { "Configuration", "Image Generation", "Setup" },
-        responses: new[] {
-            "200:ImageConfigResponse:Success",
-            "400:ErrorResponse:Bad Request",
-            "500:ErrorResponse:Internal Server Error"
-        }
-    )]
     public async Task<object> CreateImageConfig([ApiParameter("request", "Image config request", Required = true, Location = "body")] ImageConfigRequest request)
     {
         try
@@ -417,16 +330,6 @@ public class ConceptImageModule : IModule
     }
 
     [ApiRoute("GET", "/image/configs", "image-configs", "Get all image configurations", "codex.image.concept")]
-    [ApiDocumentation(
-        summary: "Get all image configurations",
-        description: "Retrieves all configured image generation providers and their settings",
-        operationId: "getImageConfigs",
-        tags: new[] { "Configuration", "Image Generation", "List" },
-        responses: new[] {
-            "200:ImageConfigsResponse:Success",
-            "500:ErrorResponse:Internal Server Error"
-        }
-    )]
     public async Task<object> GetImageConfigs()
     {
         try
@@ -445,16 +348,6 @@ public class ConceptImageModule : IModule
     }
 
     [ApiRoute("GET", "/image/concepts", "image-concepts", "Get all concepts", "codex.image.concept")]
-    [ApiDocumentation(
-        summary: "Get all concepts",
-        description: "Retrieves all created concepts available for image generation",
-        operationId: "getConcepts",
-        tags: new[] { "Concepts", "List" },
-        responses: new[] {
-            "200:ConceptsResponse:Success",
-            "500:ErrorResponse:Internal Server Error"
-        }
-    )]
     public async Task<object> GetConcepts()
     {
         try
@@ -490,16 +383,6 @@ public class ConceptImageModule : IModule
     }
 
     [ApiRoute("GET", "/image/generations", "image-generations", "Get all image generations", "codex.image.concept")]
-    [ApiDocumentation(
-        summary: "Get all image generations",
-        description: "Retrieves all image generation requests and their results",
-        operationId: "getImageGenerations",
-        tags: new[] { "Image Generation", "History", "List" },
-        responses: new[] {
-            "200:ImageGenerationsResponse:Success",
-            "500:ErrorResponse:Internal Server Error"
-        }
-    )]
     public async Task<object> GetImageGenerations()
     {
         try
