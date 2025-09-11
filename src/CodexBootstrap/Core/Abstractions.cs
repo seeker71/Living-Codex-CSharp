@@ -15,7 +15,22 @@ public sealed record Node(
     string? Description,
     ContentRef? Content,
     Dictionary<string, object>? Meta
-);
+)
+{
+    public Node DeepClone()
+    {
+        return new Node(
+            Id: Id,
+            TypeId: TypeId,
+            State: State,
+            Locale: Locale,
+            Title: Title,
+            Description: Description,
+            Content: Content,
+            Meta: Meta != null ? new Dictionary<string, object>(Meta) : null
+        );
+    }
+}
 
 public sealed record ContentRef(
     string? MediaType,
@@ -35,7 +50,19 @@ public sealed record Edge(
     string Role,
     double? Weight,
     Dictionary<string, object>? Meta
-);
+)
+{
+    public Edge DeepClone()
+    {
+        return new Edge(
+            FromId: FromId,
+            ToId: ToId,
+            Role: Role,
+            Weight: Weight,
+            Meta: Meta != null ? new Dictionary<string, object>(Meta) : null
+        );
+    }
+}
 
 // Enhanced type system to self‑describe payloads and APIs
 public sealed record TypeSpec(
