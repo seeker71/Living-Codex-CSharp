@@ -109,7 +109,7 @@ public class EndpointGenerator
     /// </summary>
     public async Task<List<UcoreDelta>> GenerateMissingEndpoints(
         Type moduleType, 
-        Dictionary<string, object> context = null)
+        Dictionary<string, object>? context = null)
     {
         var deltas = new List<UcoreDelta>();
         var module = Activator.CreateInstance(moduleType);
@@ -153,7 +153,7 @@ public class EndpointGenerator
     /// Generate breath framework endpoints
     /// </summary>
     public async Task<List<UcoreDelta>> GenerateBreathFrameworkEndpoints(
-        Dictionary<string, object> context = null)
+        Dictionary<string, object>? context = null)
     {
         var deltas = new List<UcoreDelta>();
         
@@ -206,7 +206,7 @@ public class EndpointGenerator
     /// Generate U-CORE specific endpoints
     /// </summary>
     public async Task<List<UcoreDelta>> GenerateUcoreEndpoints(
-        Dictionary<string, object> context = null)
+        Dictionary<string, object>? context = null)
     {
         var deltas = new List<UcoreDelta>();
         
@@ -286,7 +286,7 @@ public class EndpointGenerator
     /// </summary>
     public async Task<Dictionary<string, object>> ApplyDeltaDiffs(
         List<UcoreDelta> deltas, 
-        Dictionary<string, object> context = null)
+        Dictionary<string, object>? context = null)
     {
         var results = new Dictionary<string, object>();
         
@@ -321,7 +321,7 @@ public class EndpointGenerator
 
     private async Task<List<MissingEndpoint>> AnalyzeMissingEndpoints(
         Type moduleType, 
-        Dictionary<string, object> context)
+        Dictionary<string, object>? context)
     {
         var missingEndpoints = new List<MissingEndpoint>();
         
@@ -349,7 +349,7 @@ public class EndpointGenerator
 
     private async Task<string> GenerateEndpointImplementation(
         MissingEndpoint endpoint, 
-        Dictionary<string, object> context)
+        Dictionary<string, object>? context)
     {
         var prompt = BuildEndpointPrompt(endpoint, context);
         // return await _codeGenerator.CallLLMForCode(prompt, "endpoint");
@@ -358,7 +358,7 @@ public class EndpointGenerator
 
     private async Task<string> GenerateBreathPhaseEndpoint(
         MissingEndpoint endpoint, 
-        Dictionary<string, object> context)
+        Dictionary<string, object>? context)
     {
         var prompt = BuildBreathPhasePrompt(endpoint, context);
         // return await _codeGenerator.CallLLMForCode(prompt, "breath_endpoint");
@@ -367,7 +367,7 @@ public class EndpointGenerator
 
     private async Task<string> GenerateUcoreEndpoint(
         MissingEndpoint endpoint, 
-        Dictionary<string, object> context)
+        Dictionary<string, object>? context)
     {
         var prompt = BuildUcoreEndpointPrompt(endpoint, context);
         // return await _codeGenerator.CallLLMForCode(prompt, "ucore_endpoint");

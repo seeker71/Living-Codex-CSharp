@@ -4,8 +4,10 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <NoWarn>$(NoWarn);CS1998;CS8625;CS8603;CS8604;CS8601;CS8602;CS0114</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="log4net" Version="3.2.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="7.0.0" />
   </ItemGroup>
 </Project>

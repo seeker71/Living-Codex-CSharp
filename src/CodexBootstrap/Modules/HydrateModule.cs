@@ -10,10 +10,12 @@ public record HydrateNodeResponse(string NodeId, object Content, bool Success, s
 public sealed class HydrateModule : IModule
 {
     private readonly NodeRegistry _registry;
+    private readonly Core.ILogger _logger;
 
     public HydrateModule(NodeRegistry registry)
     {
         _registry = registry;
+        _logger = new Log4NetLogger(typeof(HydrateModule));
     }
 
     public Node GetModuleNode()
@@ -175,7 +177,7 @@ public sealed class HydrateModule : IModule
                 catch (Exception ex)
                 {
                     // Log adapter failure and try next one
-                    Console.WriteLine($"Adapter {adapter.Id} failed: {ex.Message}");
+                    _logger.Warn($"Adapter {adapter.Id} failed: {ex.Message}", ex);
                 }
             }
 

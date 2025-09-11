@@ -15,6 +15,7 @@ namespace CodexBootstrap.Core;
 /// </summary>
 public static class ApiRouteDiscovery
 {
+    private static readonly ILogger _logger = new Log4NetLogger(typeof(ApiRouteDiscovery));
     /// <summary>
     /// Discovers and registers all API routes from attributes in the current assembly
     /// </summary>
@@ -75,7 +76,7 @@ public static class ApiRouteDiscovery
     {
         try
         {
-            Console.WriteLine($"Registering route: {attribute.Verb} {attribute.Route} from {method.DeclaringType?.Name}.{method.Name}");
+            _logger.Info($"Registering route: {attribute.Verb} {attribute.Route} from {method.DeclaringType?.Name}.{method.Name}");
             
             // Create API node
             var apiNode = CreateApiNode(attribute, method);
@@ -91,13 +92,13 @@ public static class ApiRouteDiscovery
             // Map HTTP endpoint
             MapHttpEndpoint(app, attribute, method, router, registry);
             
-            Console.WriteLine($"Successfully registered route: {attribute.Verb} {attribute.Route}");
+            _logger.Info($"Successfully registered route: {attribute.Verb} {attribute.Route}");
         }
         catch (Exception ex)
         {
             // Log error with detailed information
             var errorMessage = $"Error registering route {attribute.Verb} {attribute.Route} from {method.DeclaringType?.Name}.{method.Name}: {ex.Message}";
-            Console.WriteLine(errorMessage);
+            _logger.Error(errorMessage, ex);
             throw new InvalidOperationException(errorMessage, ex);
         }
     }

@@ -21,11 +21,13 @@ public sealed class SpecModule : IModule
 {
     private readonly IApiRouter _apiRouter;
     private readonly NodeRegistry _registry;
+    private readonly Core.ILogger _logger;
 
     public SpecModule(IApiRouter apiRouter, NodeRegistry registry)
     {
         _apiRouter = apiRouter;
         _registry = registry;
+        _logger = new Log4NetLogger(typeof(SpecModule));
     }
 
     public Node GetModuleNode()
@@ -210,18 +212,18 @@ public sealed class SpecModule : IModule
     {
         try
         {
-            Console.WriteLine($"StoreAtomsAsNodes called for moduleId: {moduleId}");
-            Console.WriteLine($"Atoms JSON: {atoms.GetRawText()}");
+            _logger.Info($"StoreAtomsAsNodes called for moduleId: {moduleId}");
+            _logger.Debug($"Atoms JSON: {atoms.GetRawText()}");
             
             // Parse atoms JSON
             var atomsData = JsonSerializer.Deserialize<AtomsData>(atoms.GetRawText());
             if (atomsData == null) 
             {
-                Console.WriteLine("AtomsData is null after deserialization");
+                _logger.Warn("AtomsData is null after deserialization");
                 return Task.CompletedTask;
             }
             
-            Console.WriteLine($"Parsed {atomsData.Nodes?.Count ?? 0} nodes and {atomsData.Edges?.Count ?? 0} edges");
+            _logger.Info($"Parsed {atomsData.Nodes?.Count ?? 0} nodes and {atomsData.Edges?.Count ?? 0} edges");
 
             // Store nodes
             foreach (var nodeData in atomsData.Nodes ?? new List<NodeData>())

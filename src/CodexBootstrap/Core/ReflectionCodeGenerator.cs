@@ -119,7 +119,7 @@ public class ReflectionCodeGenerator
     /// </summary>
     public async Task<string> GenerateMethodImplementation(
         MethodInfo method, 
-        Dictionary<string, object> context = null)
+        Dictionary<string, object>? context = null)
     {
         var attribute = method.GetCustomAttribute<GenerateCodeAttribute>();
         if (attribute == null)
@@ -153,7 +153,7 @@ public class ReflectionCodeGenerator
     /// </summary>
     public async Task<string> GeneratePropertyImplementation(
         PropertyInfo property, 
-        Dictionary<string, object> context = null)
+        Dictionary<string, object>? context = null)
     {
         var attribute = property.GetCustomAttribute<GenerateCodeAttribute>();
         if (attribute == null)
@@ -187,7 +187,7 @@ public class ReflectionCodeGenerator
     /// </summary>
     public async Task<string> GenerateClassStructure(
         Type type, 
-        Dictionary<string, object> context = null)
+        Dictionary<string, object>? context = null)
     {
         var attribute = type.GetCustomAttribute<GenerateStructureAttribute>();
         if (attribute == null)
@@ -221,7 +221,7 @@ public class ReflectionCodeGenerator
     /// </summary>
     public async Task<object> GenerateDynamicData(
         PropertyInfo property, 
-        Dictionary<string, object> context = null)
+        Dictionary<string, object>? context = null)
     {
         var attribute = property.GetCustomAttribute<DynamicDataAttribute>();
         if (attribute == null)
@@ -255,7 +255,7 @@ public class ReflectionCodeGenerator
     /// </summary>
     public async Task<Dictionary<string, object>> ReplaceStaticData(
         object module, 
-        Dictionary<string, object> context = null)
+        Dictionary<string, object>? context = null)
     {
         var results = new Dictionary<string, object>();
         var type = module.GetType();
@@ -288,7 +288,7 @@ public class ReflectionCodeGenerator
     /// </summary>
     public async Task<string> GenerateModuleImplementation(
         Type moduleType, 
-        Dictionary<string, object> context = null)
+        Dictionary<string, object>? context = null)
     {
         var sb = new StringBuilder();
         
@@ -327,7 +327,7 @@ public class ReflectionCodeGenerator
     /// </summary>
     public async Task<string> GenerateApiDocumentation(
         Type moduleType, 
-        Dictionary<string, object> context = null)
+        Dictionary<string, object>? context = null)
     {
         var sb = new StringBuilder();
         
@@ -382,7 +382,7 @@ public class ReflectionCodeGenerator
     private async Task<string> GenerateLLMCode(
         MethodInfo method, 
         GenerateCodeAttribute attribute, 
-        Dictionary<string, object> context)
+        Dictionary<string, object>? context)
     {
         var prompt = BuildMethodPrompt(method, attribute, context);
         return await CallLLMForCode(prompt, attribute.CodeType);
@@ -391,7 +391,7 @@ public class ReflectionCodeGenerator
     private async Task<string> GenerateLLMPropertyCode(
         PropertyInfo property, 
         GenerateCodeAttribute attribute, 
-        Dictionary<string, object> context)
+        Dictionary<string, object>? context)
     {
         var prompt = BuildPropertyPrompt(property, attribute, context);
         return await CallLLMForCode(prompt, attribute.CodeType);
@@ -400,7 +400,7 @@ public class ReflectionCodeGenerator
     private async Task<string> GenerateLLMClassStructure(
         Type type, 
         GenerateStructureAttribute attribute, 
-        Dictionary<string, object> context)
+        Dictionary<string, object>? context)
     {
         var prompt = BuildClassPrompt(type, attribute, context);
         return await CallLLMForCode(prompt, attribute.StructureType);
@@ -409,7 +409,7 @@ public class ReflectionCodeGenerator
     private async Task<object> GenerateLLMData(
         PropertyInfo property, 
         DynamicDataAttribute attribute, 
-        Dictionary<string, object> context)
+        Dictionary<string, object>? context)
     {
         var prompt = BuildDataPrompt(property, attribute, context);
         var response = await CallLLMForData(prompt, attribute.DataType);
@@ -419,7 +419,7 @@ public class ReflectionCodeGenerator
     private string BuildMethodPrompt(
         MethodInfo method, 
         GenerateCodeAttribute attribute, 
-        Dictionary<string, object> context)
+        Dictionary<string, object>? context)
     {
         var prompt = new StringBuilder();
         
@@ -456,7 +456,7 @@ public class ReflectionCodeGenerator
     private string BuildPropertyPrompt(
         PropertyInfo property, 
         GenerateCodeAttribute attribute, 
-        Dictionary<string, object> context)
+        Dictionary<string, object>? context)
     {
         var prompt = new StringBuilder();
         
@@ -492,7 +492,7 @@ public class ReflectionCodeGenerator
     private string BuildClassPrompt(
         Type type, 
         GenerateStructureAttribute attribute, 
-        Dictionary<string, object> context)
+        Dictionary<string, object>? context)
     {
         var prompt = new StringBuilder();
         
@@ -517,7 +517,7 @@ public class ReflectionCodeGenerator
     private string BuildDataPrompt(
         PropertyInfo property, 
         DynamicDataAttribute attribute, 
-        Dictionary<string, object> context)
+        Dictionary<string, object>? context)
     {
         var prompt = new StringBuilder();
         
@@ -762,7 +762,7 @@ public class ReflectionCodeGenerator
         {
             return Activator.CreateInstance(type);
         }
-        return null;
+        return null!;
     }
 
     private object ConvertToType(string value, Type targetType)

@@ -3,24 +3,24 @@ using System.Text.Json;
 namespace CodexBootstrap.Core;
 
 // Core - only nodes and edges
-public sealed class NodeRegistry
+public class NodeRegistry
 {
     private readonly Dictionary<string, Node> _nodes = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<Edge> _edges = new();
 
-    public void Upsert(Node node) => _nodes[node.Id] = node;
-    public void Upsert(Edge edge) => _edges.Add(edge);
-    public bool TryGet(string id, out Node node) => _nodes.TryGetValue(id, out node!);
-    public IEnumerable<Edge> AllEdges() => _edges;
-    public IEnumerable<Node> AllNodes() => _nodes.Values;
+    public virtual void Upsert(Node node) => _nodes[node.Id] = node;
+    public virtual void Upsert(Edge edge) => _edges.Add(edge);
+    public virtual bool TryGet(string id, out Node node) => _nodes.TryGetValue(id, out node!);
+    public virtual IEnumerable<Edge> AllEdges() => _edges;
+    public virtual IEnumerable<Node> AllNodes() => _nodes.Values;
     
-    public IEnumerable<Node> GetNodesByType(string typeId) => 
+    public virtual IEnumerable<Node> GetNodesByType(string typeId) => 
         _nodes.Values.Where(n => n.TypeId == typeId);
     
-    public IEnumerable<Edge> GetEdgesFrom(string fromId) => 
+    public virtual IEnumerable<Edge> GetEdgesFrom(string fromId) => 
         _edges.Where(e => e.FromId == fromId);
     
-    public IEnumerable<Edge> GetEdgesTo(string toId) => 
+    public virtual IEnumerable<Edge> GetEdgesTo(string toId) => 
         _edges.Where(e => e.ToId == toId);
 }
 

@@ -46,14 +46,28 @@ public sealed class ModuleLoader
             .Where(t => typeof(IModule).IsAssignableFrom(t) && !t.IsAbstract && t.IsClass)
             .Where(t => t.Namespace?.StartsWith("CodexBootstrap.Modules") == true);
 
+        _logger.Info($"Found {moduleTypes.Count()} module types to load");
+
+        // Debug: List all found module types
+        foreach (var moduleType in moduleTypes)
+        {
+            _logger.Info($"  - {moduleType.Name} (Namespace: {moduleType.Namespace})");
+        }
+
         foreach (var moduleType in moduleTypes)
         {
             try
             {
+                _logger.Info($"Attempting to load module: {moduleType.Name}");
                 var module = ActivatorUtilities.CreateInstance(_serviceProvider, moduleType) as IModule;
                 if (module != null)
                 {
+                    _logger.Info($"Successfully created module: {moduleType.Name}");
                     LoadModule(module);
+                }
+                else
+                {
+                    _logger.Warn($"Failed to create module: {moduleType.Name} - returned null");
                 }
             }
             catch (Exception ex)
@@ -93,18 +107,28 @@ public sealed class ModuleLoader
         }
     }
 
-    private void LoadModule(IModule module)
+    public void LoadModule(IModule module)
     {
-        var moduleNode = module.GetModuleNode();
-        _registry.Upsert(moduleNode);
-        module.Register(_registry);
-        module.RegisterApiHandlers(_router, _registry);
-        
-        // Track loaded modules
-        _loadedModules.Add(module);
-        
-        var name = moduleNode.Meta?.GetValueOrDefault("name")?.ToString() ?? moduleNode.Title;
-        var version = moduleNode.Meta?.GetValueOrDefault("version")?.ToString() ?? "0.1.0";
-        _logger.Info($"Loaded module: {name} v{version}");
+        try
+        {
+            _logger.Info($"Loading module: {module.GetType().Name}");
+            var moduleNode = module.GetModuleNode();
+            _logger.Info($"Module node ID: {moduleNode.Id}");
+            _registry.Upsert(moduleNode);
+            module.Register(_registry);
+            module.RegisterApiHandlers(_router, _registry);
+            
+            // Track loaded modules
+            _loadedModules.Add(module);
+            
+            var name = moduleNode.Meta?.GetValueOrDefault("name")?.ToString() ?? moduleNode.Title;
+            var version = moduleNode.Meta?.GetValueOrDefault("version")?.ToString() ?? "0.1.0";
+            _logger.Info($"Successfully loaded module: {name} v{version}");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error loading module {module.GetType().Name}: {ex.Message}", ex);
+            throw;
+        }
     }
 }

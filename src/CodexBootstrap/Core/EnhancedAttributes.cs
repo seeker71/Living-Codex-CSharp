@@ -10,7 +10,7 @@ namespace CodexBootstrap.Core
     public class MetaNodeAttribute : Attribute
     {
         public string Id { get; set; } = "";
-        public string TypeId { get; set; } = "meta-node";
+        public new string TypeId { get; set; } = "meta-node";
         public string Name { get; set; } = "";
         public string Description { get; set; } = "";
         public string Version { get; set; } = "1.0.0";

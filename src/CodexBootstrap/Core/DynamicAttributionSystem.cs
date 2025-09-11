@@ -97,7 +97,7 @@ public class DynamicAttributionSystem
     public async Task<string> GenerateDynamicContent(
         object target, 
         PropertyInfo property, 
-        Dictionary<string, object> context = null)
+        Dictionary<string, object>? context = null)
     {
         var attribute = property.GetCustomAttribute<DynamicDescriptionAttribute>();
         if (attribute == null)
@@ -133,7 +133,7 @@ public class DynamicAttributionSystem
     public async Task<string> GenerateDynamicContent(
         object target, 
         MethodInfo method, 
-        Dictionary<string, object> context = null)
+        Dictionary<string, object>? context = null)
     {
         var attribute = method.GetCustomAttribute<DynamicDescriptionAttribute>();
         if (attribute == null)
@@ -168,7 +168,7 @@ public class DynamicAttributionSystem
     /// </summary>
     public async Task<string> GenerateDynamicContent(
         Type type, 
-        Dictionary<string, object> context = null)
+        Dictionary<string, object>? context = null)
     {
         var attribute = type.GetCustomAttribute<DynamicContentAttribute>();
         if (attribute == null)
@@ -203,7 +203,7 @@ public class DynamicAttributionSystem
     /// </summary>
     public async Task<Dictionary<string, string>> ReplaceStaticDescriptions(
         object module, 
-        Dictionary<string, object> context = null)
+        Dictionary<string, object>? context = null)
     {
         var results = new Dictionary<string, string>();
         var type = module.GetType();
@@ -244,14 +244,14 @@ public class DynamicAttributionSystem
     public async Task<object> GetDynamicPropertyValue(
         object target, 
         string propertyName, 
-        Dictionary<string, object> context = null)
+        Dictionary<string, object>? context = null)
     {
         var type = target.GetType();
         var property = type.GetProperty(propertyName);
         
         if (property == null)
         {
-            return null;
+            return null!;
         }
 
         var attribute = property.GetCustomAttribute<DynamicDescriptionAttribute>();
@@ -271,14 +271,14 @@ public class DynamicAttributionSystem
         object target, 
         string methodName, 
         object[] parameters = null, 
-        Dictionary<string, object> context = null)
+        Dictionary<string, object>? context = null)
     {
         var type = target.GetType();
         var method = type.GetMethod(methodName);
         
         if (method == null)
         {
-            return null;
+            return null!;
         }
 
         var attribute = method.GetCustomAttribute<DynamicDescriptionAttribute>();
@@ -299,13 +299,13 @@ public class DynamicAttributionSystem
 
     // Helper methods
 
-    private string GenerateCacheKey(object target, MemberInfo member, Dictionary<string, object> context)
+    private string GenerateCacheKey(object target, MemberInfo member, Dictionary<string, object>? context)
     {
         var contextHash = context?.GetHashCode().ToString() ?? "default";
         return $"{target.GetType().Name}.{member.Name}.{contextHash}";
     }
 
-    private string GenerateCacheKey(Type type, Dictionary<string, object> context)
+    private string GenerateCacheKey(Type type, Dictionary<string, object>? context)
     {
         var contextHash = context?.GetHashCode().ToString() ?? "default";
         return $"{type.Name}.Class.{contextHash}";
@@ -319,7 +319,7 @@ public class DynamicAttributionSystem
         }
         catch
         {
-            return null;
+            return null!;
         }
     }
 
@@ -327,7 +327,7 @@ public class DynamicAttributionSystem
         DynamicDescriptionAttribute attribute, 
         object target, 
         MemberInfo member, 
-        Dictionary<string, object> context)
+        Dictionary<string, object>? context)
     {
         var basePrompt = attribute.PromptTemplate;
         if (string.IsNullOrEmpty(basePrompt))
@@ -363,7 +363,7 @@ public class DynamicAttributionSystem
     private string BuildClassPrompt(
         Type type, 
         DynamicContentAttribute attribute, 
-        Dictionary<string, object> context)
+        Dictionary<string, object>? context)
     {
         var prompt = $"Generate a dynamic, joyful description for the {type.Name} class. ";
         
@@ -513,7 +513,7 @@ public static class DynamicContentGenerator
     /// <summary>
     /// Generate dynamic description for any object
     /// </summary>
-    public static async Task<string> GenerateDescription(object target, Dictionary<string, object> context = null)
+    public static async Task<string> GenerateDescription(object target, Dictionary<string, object>? context = null)
     {
         var type = target.GetType();
         var attribute = type.GetCustomAttribute<DynamicAttributionSystem.DynamicContentAttribute>();
@@ -532,7 +532,7 @@ public static class DynamicContentGenerator
     public static async Task<string> GeneratePropertyDescription(
         object target, 
         string propertyName, 
-        Dictionary<string, object> context = null)
+        Dictionary<string, object>? context = null)
     {
         var type = target.GetType();
         var property = type.GetProperty(propertyName);
@@ -550,7 +550,7 @@ public static class DynamicContentGenerator
     /// </summary>
     public static async Task<Dictionary<string, string>> ReplaceAllStaticContent(
         object module, 
-        Dictionary<string, object> context = null)
+        Dictionary<string, object>? context = null)
     {
         return await _attributionSystem.ReplaceStaticDescriptions(module, context);
     }

@@ -11,193 +11,285 @@ namespace CodexBootstrap.Modules;
 /// </summary>
 public class UserModule : IModule
 {
-    private readonly IApiRouter _apiRouter;
-    private readonly NodeRegistry _registry;
-
-    public UserModule(IApiRouter apiRouter, NodeRegistry registry)
-    {
-        _apiRouter = apiRouter;
-        _registry = registry;
-    }
-
+    
     public string ModuleId => "codex.user";
-    public string Name => "User Management Module";
     public string Version => "1.0.0";
     public string Description => "User Management Module - Self-contained fractal APIs";
 
     public Node GetModuleNode()
     {
-        return ModuleHelpers.CreateModuleNode(ModuleId, Name, Version, Description);
+        return new Node(
+            Id: ModuleId,
+            TypeId: "codex.meta/module",
+            State: ContentState.Ice,
+            Locale: "en",
+            Title: "User Management Module",
+            Description: Description,
+            Content: new ContentRef(
+                MediaType: "application/json",
+                InlineJson: JsonSerializer.Serialize(new
+                {
+                    moduleId = ModuleId,
+                    version = Version,
+                    description = Description,
+                    apis = new[]
+                    {
+                        new { name = "create", spec = "/user/create/spec" },
+                        new { name = "authenticate", spec = "/user/authenticate/spec" },
+                        new { name = "profile", spec = "/user/profile/spec" },
+                        new { name = "permissions", spec = "/user/permissions/spec" },
+                        new { name = "sessions", spec = "/user/sessions/spec" }
+                    }
+                }),
+                InlineBytes: null,
+                ExternalUri: null
+            ),
+            Meta: new Dictionary<string, object>
+            {
+                ["moduleId"] = ModuleId,
+                ["version"] = Version,
+                ["type"] = "user-management"
+            }
+        );
     }
 
     public void Register(NodeRegistry registry)
     {
-        // Module registration is now handled automatically by the attribute discovery system
-        // This method can be used for additional module-specific setup if needed
+        // Register module node
+        registry.Upsert(GetModuleNode());
+
+        // Register API nodes for RouteDiscovery
+        var createApi = NodeStorage.CreateApiNode("codex.user", "create", "/user/create", "Create a new user account");
+        var authenticateApi = NodeStorage.CreateApiNode("codex.user", "authenticate", "/user/authenticate", "Authenticate user credentials");
+        var profileApi = NodeStorage.CreateApiNode("codex.user", "profile", "/user/profile/{id}", "Get or update user profile");
+        var permissionsApi = NodeStorage.CreateApiNode("codex.user", "permissions", "/user/permissions/{id}", "Manage user permissions");
+        var sessionsApi = NodeStorage.CreateApiNode("codex.user", "sessions", "/user/sessions/{id}", "Manage user sessions");
+
+        registry.Upsert(createApi);
+        registry.Upsert(authenticateApi);
+        registry.Upsert(profileApi);
+        registry.Upsert(permissionsApi);
+        registry.Upsert(sessionsApi);
+
+        // Register edges
+        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.user", "create"));
+        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.user", "authenticate"));
+        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.user", "profile"));
+        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.user", "permissions"));
+        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.user", "sessions"));
     }
 
     public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
     {
-        // API handlers are now registered automatically by the attribute discovery system
-        // This method can be used for additional manual registrations if needed
+        // User Creation API
+        router.Register("codex.user", "create", (args) =>
+        {
+            var logger = new Log4NetLogger(typeof(UserModule));
+            logger.Debug($"DEBUG: args is null = {args == null}");
+            if (args != null)
+            {
+                var jsonString = JsonSerializer.Serialize(args);
+                logger.Debug($"DEBUG: JSON string = {jsonString}");
+                
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    WriteIndented = true,
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                };
+                
+                var request = JsonSerializer.Deserialize<UserCreateRequest>(jsonString, options);
+                logger.Debug($"DEBUG: Deserialized request = {request?.Username}");
+                return CreateUser(request ?? new UserCreateRequest("", "", "", ""), router.GetRegistry());
+            }
+            else
+            {
+                logger.Debug("DEBUG: args is null, using default request");
+                return CreateUser(new UserCreateRequest("", "", "", ""), router.GetRegistry());
+            }
+        });
+
+        // User Authentication API
+        router.Register("codex.user", "authenticate", (args) =>
+        {
+            var request = JsonSerializer.Deserialize<UserAuthRequest>(JsonSerializer.Serialize(args));
+            return AuthenticateUser(request ?? new UserAuthRequest("", ""));
+        });
+
+        // User Profile API
+        router.Register("codex.user", "profile", (args) =>
+        {
+            var options = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = true,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            };
+            
+            var request = JsonSerializer.Deserialize<UserProfileRequest>(JsonSerializer.Serialize(args), options);
+            return GetUserProfile(request ?? new UserProfileRequest(""), router.GetRegistry());
+        });
+
+        // User Permissions API
+        router.Register("codex.user", "permissions", (args) =>
+        {
+            var request = JsonSerializer.Deserialize<UserPermissionsRequest>(JsonSerializer.Serialize(args));
+            return GetUserPermissions(request ?? new UserPermissionsRequest(""));
+        });
+
+        // User Sessions API
+        router.Register("codex.user", "sessions", (args) =>
+        {
+            var request = JsonSerializer.Deserialize<UserSessionsRequest>(JsonSerializer.Serialize(args));
+            return GetUserSessions(request ?? new UserSessionsRequest(""));
+        });
     }
 
     public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
-        // HTTP endpoints are now registered automatically by the attribute discovery system
-        // This method can be used for additional manual registrations if needed
+        // Each API endpoint is self-contained with its own OpenAPI spec
+        app.MapPost("/user/create", (UserCreateRequest request) =>
+        {
+            var result = CreateUser(request, registry);
+            return Results.Ok(result);
+        })
+        .WithName("CreateUser");
+
+        app.MapPost("/user/authenticate", (UserAuthRequest request) =>
+        {
+            var result = AuthenticateUser(request);
+            return Results.Ok(result);
+        })
+        .WithName("AuthenticateUser");
+
+        app.MapGet("/user/profile/{id}", (string id) =>
+        {
+            var request = new UserProfileRequest(id);
+            var result = GetUserProfile(request, registry);
+            return Results.Ok(result);
+        })
+        .WithName("GetUserProfile");
+
+        app.MapGet("/user/permissions/{id}", (string id) =>
+        {
+            var request = new UserPermissionsRequest(id);
+            var result = GetUserPermissions(request);
+            return Results.Ok(result);
+        })
+        .WithName("GetUserPermissions");
+
+        app.MapGet("/user/sessions/{id}", (string id) =>
+        {
+            var request = new UserSessionsRequest(id);
+            var result = GetUserSessions(request);
+            return Results.Ok(result);
+        })
+        .WithName("GetUserSessions");
     }
 
-    /// <summary>
-    /// Create a new user account
-    /// </summary>
-    [Post("/user/create", "user-create", "Create a new user account", "codex.user")]
-    [ApiResponse(200, "Success")]
-    [ApiResponse(400, "Bad request")]
-    public async Task<object> CreateUser([ApiParameter("request", "User creation request", Required = true, Location = "body")] UserCreateRequest request)
+    // API Implementation Methods
+    private Task<object> CreateUser(UserCreateRequest request, NodeRegistry registry)
     {
-        try
-        {
-            // Create user node
-            var userNode = new Node(
-                Id: $"user.{request.Username}",
-                TypeId: "codex.user",
-                State: ContentState.Ice,
-                Locale: "en",
-                Title: request.Username,
-                Description: $"User account for {request.Username}",
-                Content: new ContentRef(
-                    MediaType: "application/json",
-                    InlineJson: JsonSerializer.Serialize(new
-                    {
-                        username = request.Username,
-                        email = request.Email,
-                        displayName = request.DisplayName,
-                        createdAt = DateTime.UtcNow
-                    }),
-                    InlineBytes: null,
-                    ExternalUri: null
-                ),
-                Meta: new Dictionary<string, object>
+        // Create user node
+        var userNode = new Node(
+            Id: $"user.{request.Username}",
+            TypeId: "codex.user",
+            State: ContentState.Ice,
+            Locale: "en",
+            Title: request.Username,
+            Description: $"User account for {request.Username}",
+            Content: new ContentRef(
+                MediaType: "application/json",
+                InlineJson: JsonSerializer.Serialize(new
                 {
-                    ["username"] = request.Username,
-                    ["email"] = request.Email,
-                    ["displayName"] = request.DisplayName,
-                    ["createdAt"] = DateTime.UtcNow,
-                    ["status"] = "active"
-                }
-            );
+                    username = request.Username,
+                    email = request.Email,
+                    displayName = request.DisplayName,
+                    createdAt = DateTime.UtcNow
+                }),
+                InlineBytes: null,
+                ExternalUri: null
+            ),
+            Meta: new Dictionary<string, object>
+            {
+                ["username"] = request.Username,
+                ["email"] = request.Email,
+                ["displayName"] = request.DisplayName,
+                ["createdAt"] = DateTime.UtcNow,
+                ["status"] = "active"
+            }
+        );
 
-            // Store the user in the registry
-            _registry.Upsert(userNode);
+        // Store the user node in the registry
+        registry.Upsert(userNode);
 
-            return new UserCreateResponse(
-                Success: true,
-                UserId: userNode.Id,
-                Message: "User created successfully"
-            );
-        }
-        catch (Exception ex)
-        {
-            return ResponseHelpers.CreateErrorResponse($"Failed to create user: {ex.Message}", "CREATE_ERROR");
-        }
+        return Task.FromResult<object>(new UserCreateResponse(
+            Success: true,
+            UserId: userNode.Id,
+            Message: "User created successfully"
+        ));
     }
 
-    /// <summary>
-    /// Authenticate user credentials
-    /// </summary>
-    [Post("/user/authenticate", "user-authenticate", "Authenticate user credentials", "codex.user")]
-    [ApiResponse(200, "Success")]
-    [ApiResponse(401, "Unauthorized")]
-    public async Task<object> AuthenticateUser([ApiParameter("request", "User authentication request", Required = true, Location = "body")] UserAuthRequest request)
+    private Task<object> AuthenticateUser(UserAuthRequest request)
     {
-        try
-        {
-            // Simple authentication logic (in real implementation, use proper auth)
-            var isValid = !string.IsNullOrEmpty(request.Username) && !string.IsNullOrEmpty(request.Password);
-            
-            return new UserAuthResponse(
-                Success: isValid,
-                Token: isValid ? Guid.NewGuid().ToString() : null,
-                Message: isValid ? "Authentication successful" : "Invalid credentials"
-            );
-        }
-        catch (Exception ex)
-        {
-            return ResponseHelpers.CreateErrorResponse($"Failed to authenticate user: {ex.Message}", "AUTH_ERROR");
-        }
+        // Simple authentication logic (in real implementation, use proper auth)
+        var isValid = !string.IsNullOrEmpty(request.Username) && !string.IsNullOrEmpty(request.Password);
+        
+        return Task.FromResult<object>(new UserAuthResponse(
+            Success: isValid,
+            Token: isValid ? Guid.NewGuid().ToString() : null,
+            Message: isValid ? "Authentication successful" : "Invalid credentials"
+        ));
     }
 
-    /// <summary>
-    /// Get user profile
-    /// </summary>
-    [Get("/user/profile/{id}", "user-profile", "Get user profile", "codex.user")]
-    [ApiResponse(200, "Success")]
-    [ApiResponse(404, "Not found")]
-    public async Task<object> GetUserProfile([ApiParameter("id", "User ID", Required = true, Location = "path")] string id)
+    private Task<object> GetUserProfile(UserProfileRequest request, NodeRegistry registry)
     {
-        try
+        // Query the registry for the user node
+        if (!registry.TryGet(request.UserId, out var userNode))
         {
-            // In a real implementation, you would query the registry
-            return new UserProfileResponse(
-                UserId: id,
-                Username: "sample_user",
-                Email: "user@example.com",
-                DisplayName: "Sample User",
-                CreatedAt: DateTime.UtcNow
-            );
+            return Task.FromResult<object>(new UserProfileResponse(
+                UserId: request.UserId,
+                Username: "not_found",
+                Email: "not_found",
+                DisplayName: "User Not Found",
+                CreatedAt: DateTime.MinValue
+            ));
         }
-        catch (Exception ex)
-        {
-            return ResponseHelpers.CreateErrorResponse($"Failed to get user profile: {ex.Message}", "PROFILE_ERROR");
-        }
+
+        // Extract data from the user node
+        var username = userNode.Meta?.TryGetValue("username", out var usernameValue) == true ? usernameValue.ToString() ?? "unknown" : "unknown";
+        var email = userNode.Meta?.TryGetValue("email", out var emailValue) == true ? emailValue.ToString() ?? "unknown" : "unknown";
+        var displayName = userNode.Meta?.TryGetValue("displayName", out var displayNameValue) == true ? displayNameValue.ToString() ?? "unknown" : "unknown";
+        var createdAt = userNode.Meta?.TryGetValue("createdAt", out var createdAtValue) == true && createdAtValue is DateTime dateTime ? dateTime : DateTime.UtcNow;
+
+        return Task.FromResult<object>(new UserProfileResponse(
+            UserId: userNode.Id,
+            Username: username,
+            Email: email,
+            DisplayName: displayName,
+            CreatedAt: createdAt
+        ));
     }
 
-    /// <summary>
-    /// Get user permissions
-    /// </summary>
-    [Get("/user/permissions/{id}", "user-permissions", "Get user permissions", "codex.user")]
-    [ApiResponse(200, "Success")]
-    [ApiResponse(404, "Not found")]
-    public async Task<object> GetUserPermissions([ApiParameter("id", "User ID", Required = true, Location = "path")] string id)
+    private Task<object> GetUserPermissions(UserPermissionsRequest request)
     {
-        try
-        {
-            return new UserPermissionsResponse(
-                UserId: id,
-                Permissions: new[] { "read", "write", "admin" },
-                Roles: new[] { "user", "editor" }
-            );
-        }
-        catch (Exception ex)
-        {
-            return ResponseHelpers.CreateErrorResponse($"Failed to get user permissions: {ex.Message}", "PERMISSIONS_ERROR");
-        }
+        return Task.FromResult<object>(new UserPermissionsResponse(
+            UserId: request.UserId,
+            Permissions: new[] { "read", "write", "admin" },
+            Roles: new[] { "user", "editor" }
+        ));
     }
 
-    /// <summary>
-    /// Get user sessions
-    /// </summary>
-    [Get("/user/sessions/{id}", "user-sessions", "Get user sessions", "codex.user")]
-    [ApiResponse(200, "Success")]
-    [ApiResponse(404, "Not found")]
-    public async Task<object> GetUserSessions([ApiParameter("id", "User ID", Required = true, Location = "path")] string id)
+    private Task<object> GetUserSessions(UserSessionsRequest request)
     {
-        try
-        {
-            return new UserSessionsResponse(
-                UserId: id,
-                Sessions: new[]
-                {
-                    new { id = "session1", createdAt = DateTime.UtcNow.AddHours(-1), isActive = true },
-                    new { id = "session2", createdAt = DateTime.UtcNow.AddDays(-1), isActive = false }
-                }
-            );
-        }
-        catch (Exception ex)
-        {
-            return ResponseHelpers.CreateErrorResponse($"Failed to get user sessions: {ex.Message}", "SESSIONS_ERROR");
-        }
+        return Task.FromResult<object>(new UserSessionsResponse(
+            UserId: request.UserId,
+            Sessions: new[]
+            {
+                new { id = "session1", createdAt = DateTime.UtcNow.AddHours(-1), isActive = true },
+                new { id = "session2", createdAt = DateTime.UtcNow.AddDays(-1), isActive = false }
+            }
+        ));
     }
 }
 

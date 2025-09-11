@@ -38,8 +38,8 @@ public static class LLMConfigurationSystem
         public LLMProviderAttribute(
             string provider = "Ollama",
             string description = "LLM provider configuration",
-            string[] supportedModels = null,
-            string[] supportedModes = null)
+            string[]? supportedModels = null,
+            string[]? supportedModes = null)
         {
             Provider = provider;
             Description = description;
@@ -69,7 +69,7 @@ public static class LLMConfigurationSystem
             double temperature = 0.7,
             int maxTokens = 2000,
             double topP = 0.9,
-            string[] frequencies = null)
+            string[]? frequencies = null)
         {
             Model = model;
             UseCase = useCase;
@@ -97,8 +97,8 @@ public static class LLMConfigurationSystem
         public LLMModeAttribute(
             string mode = "consciousness-expansion",
             string description = "LLM operational mode",
-            string[] requiredCapabilities = null,
-            string[] sacredFrequencies = null,
+            string[]? requiredCapabilities = null,
+            string[]? sacredFrequencies = null,
             string breathPhase = "expand",
             bool useJoyfulEngine = true)
         {
@@ -359,7 +359,7 @@ public static class LLMConfigurationSystem
     /// <summary>
     /// Get optimal configuration for a specific use case
     /// </summary>
-    public static LLMConfiguration GetOptimalConfiguration(string useCase, string preferredModel = null)
+    public static LLMConfiguration GetOptimalConfiguration(string useCase, string? preferredModel = null)
     {
         return useCase.ToLowerInvariant() switch
         {

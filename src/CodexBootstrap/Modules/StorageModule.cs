@@ -1,0 +1,193 @@
+using System.Text.Json;
+using CodexBootstrap.Core;
+using CodexBootstrap.Runtime;
+
+namespace CodexBootstrap.Modules;
+
+/// <summary>
+/// Storage management module that configures its own storage backend
+/// </summary>
+public sealed class StorageModule : IModule
+{
+    private readonly NodeRegistry _registry;
+    private readonly IStorageBackend? _storage;
+    private readonly Core.ILogger _logger;
+
+    public StorageModule(NodeRegistry registry, IStorageBackend? storage = null)
+    {
+        _registry = registry;
+        _logger = new Log4NetLogger(typeof(StorageModule));
+        _storage = storage ?? ConfigureDefaultStorageBackend();
+    }
+
+    /// <summary>
+    /// Get the configured storage backend
+    /// </summary>
+    public IStorageBackend? GetStorageBackend() => _storage;
+
+    /// <summary>
+    /// Configure the default storage backend based on environment or configuration
+    /// </summary>
+    private IStorageBackend ConfigureDefaultStorageBackend()
+    {
+        try
+        {
+            // Check for environment variables or configuration
+            var storageType = Environment.GetEnvironmentVariable("STORAGE_TYPE")?.ToLower() ?? "jsonfile";
+            var storagePath = Environment.GetEnvironmentVariable("STORAGE_PATH") ?? "data";
+            
+            _logger.Info($"Configuring storage backend: {storageType} at {storagePath}");
+
+            return storageType switch
+            {
+                "sqlite" => new SqliteStorageBackend(storagePath),
+                "jsonfile" => new JsonFileStorageBackend(storagePath),
+                _ => new JsonFileStorageBackend(storagePath)
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Failed to configure storage backend: {ex.Message}", ex);
+            // Return a null storage backend - the module will handle this gracefully
+            return null!;
+        }
+    }
+
+    public Node GetModuleNode()
+    {
+        return NodeStorage.CreateModuleNode(
+            id: "codex.storage",
+            name: "Storage Management Module",
+            version: "0.1.0",
+            description: "Self-contained module for storage management operations using node-based storage"
+        );
+    }
+
+    public void Register(NodeRegistry registry)
+    {
+        // Register API nodes
+        var statsApi = NodeStorage.CreateApiNode("codex.storage", "storage-stats", "/storage/stats", "Get storage statistics");
+        var syncApi = NodeStorage.CreateApiNode("codex.storage", "storage-sync", "/storage/sync", "Sync cache with storage");
+        var healthApi = NodeStorage.CreateApiNode("codex.storage", "storage-health", "/storage/health", "Check storage health");
+        
+        registry.Upsert(statsApi);
+        registry.Upsert(syncApi);
+        registry.Upsert(healthApi);
+        
+        // Register edges
+        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.storage", "storage-stats"));
+        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.storage", "storage-sync"));
+        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.storage", "storage-health"));
+    }
+
+    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    {
+        // Removed manual registrations; now using attributes
+    }
+
+    [ApiRoute("GET", "/storage/stats", "storage-stats", "Get storage statistics", "codex.storage")]
+    public async Task<object> GetStatsAsync()
+    {
+        try
+        {
+            if (_storage == null)
+            {
+                return new ErrorResponse("No storage backend configured");
+            }
+
+            var stats = await _storage.GetStatsAsync();
+            return new
+            {
+                success = true,
+                stats = new
+                {
+                    nodeCount = stats.NodeCount,
+                    edgeCount = stats.EdgeCount,
+                    totalSizeBytes = stats.TotalSizeBytes,
+                    lastUpdated = stats.LastUpdated
+                }
+            };
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to get storage stats: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("POST", "/storage/sync", "storage-sync", "Sync cache with storage", "codex.storage")]
+    public async Task<object> SyncAsync()
+    {
+        try
+        {
+            if (_storage == null)
+            {
+                return new ErrorResponse("No storage backend configured");
+            }
+
+            if (_registry is PersistentNodeRegistry persistentRegistry)
+            {
+                await persistentRegistry.SyncWithStorageAsync();
+                return new
+                {
+                    success = true,
+                    message = "Cache synchronized with storage"
+                };
+            }
+            else
+            {
+                return new ErrorResponse("Registry is not persistent");
+            }
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to sync storage: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("GET", "/storage/health", "storage-health", "Check storage health", "codex.storage")]
+    public async Task<object> GetHealthAsync()
+    {
+        try
+        {
+            if (_storage == null)
+            {
+                return new
+                {
+                    success = false,
+                    message = "No storage backend configured",
+                    available = false
+                };
+            }
+
+            var isAvailable = await _storage.IsAvailableAsync();
+            var stats = isAvailable ? await _storage.GetStatsAsync() : null;
+
+            return new
+            {
+                success = true,
+                available = isAvailable,
+                stats = stats != null ? new
+                {
+                    nodeCount = stats.NodeCount,
+                    edgeCount = stats.EdgeCount,
+                    totalSizeBytes = stats.TotalSizeBytes,
+                    lastUpdated = stats.LastUpdated
+                } : null
+            };
+        }
+        catch (Exception ex)
+        {
+            return new
+            {
+                success = false,
+                message = $"Storage health check failed: {ex.Message}",
+                available = false
+            };
+        }
+    }
+
+    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    {
+        // Discovery is handled globally
+    }
+}

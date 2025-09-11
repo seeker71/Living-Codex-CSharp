@@ -24,11 +24,13 @@ namespace CodexBootstrap.Core
         protected readonly NodeRegistry _nodeRegistry;
         protected readonly AttributeProcessor _attributeProcessor;
         protected readonly Dictionary<string, Node> _moduleNodes = new();
+        protected readonly ILogger _logger;
 
         public EnhancedModuleBase(NodeRegistry nodeRegistry)
         {
             _nodeRegistry = nodeRegistry ?? throw new ArgumentNullException(nameof(nodeRegistry));
             _attributeProcessor = new AttributeProcessor(nodeRegistry);
+            _logger = new Log4NetLogger(GetType());
             
             // Auto-process this module's attributes
             ProcessModuleAttributes();
@@ -205,7 +207,7 @@ namespace CodexBootstrap.Core
             catch (Exception ex)
             {
                 // Log error but don't fail the entire registration
-                Console.WriteLine($"Error registering legacy endpoint {method.Name}: {ex.Message}");
+                _logger.Error($"Error registering legacy endpoint {method.Name}: {ex.Message}", ex);
             }
         }
 
@@ -251,7 +253,7 @@ namespace CodexBootstrap.Core
             catch (Exception ex)
             {
                 // Log error but don't fail the entire registration
-                Console.WriteLine($"Error registering endpoint {method.Name}: {ex.Message}");
+                _logger.Error($"Error registering endpoint {method.Name}: {ex.Message}", ex);
             }
         }
 

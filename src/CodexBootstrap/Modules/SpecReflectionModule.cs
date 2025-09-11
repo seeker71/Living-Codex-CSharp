@@ -13,10 +13,12 @@ public record IngestResponse(ModuleSpec Spec, bool Success, string Message);
 public sealed class SpecReflectionModule : IModule
 {
     private readonly NodeRegistry _registry;
+    private readonly Core.ILogger _logger;
 
     public SpecReflectionModule(NodeRegistry registry)
     {
         _registry = registry;
+        _logger = new Log4NetLogger(typeof(SpecReflectionModule));
     }
 
     public Node GetModuleNode()
@@ -337,7 +339,8 @@ public sealed class SpecReflectionModule : IModule
         catch (Exception ex)
         {
             // Log error but return partial results
-            Console.WriteLine($"Error reflecting spec to meta-nodes: {ex.Message}");
+            var logger = new Log4NetLogger(typeof(SpecReflectionModule));
+            logger.Error($"Error reflecting spec to meta-nodes: {ex.Message}", ex);
         }
 
         return metaNodes;
