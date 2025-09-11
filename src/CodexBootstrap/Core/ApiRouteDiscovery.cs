@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Json;
+using Microsoft.Extensions.DependencyInjection;
 using CodexBootstrap.Modules;
 using CodexBootstrap.Runtime;
 
@@ -288,6 +289,60 @@ public static class ApiRouteDiscovery
         if (constructor != null)
         {
             return Activator.CreateInstance(moduleType, registry)!;
+        }
+
+        // Try to find a constructor that takes NodeRegistry and optional RealtimeModule
+        constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(RealtimeModule) });
+        if (constructor != null)
+        {
+            return Activator.CreateInstance(moduleType, registry, (RealtimeModule?)null)!;
+        }
+
+        // Try to find a constructor that takes NodeRegistry and optional string
+        constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(string) });
+        if (constructor != null)
+        {
+            return Activator.CreateInstance(moduleType, registry, (string?)null)!;
+        }
+
+        // Try to find a constructor that takes NodeRegistry and optional IStorageBackend
+        constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(IStorageBackend) });
+        if (constructor != null)
+        {
+            return Activator.CreateInstance(moduleType, registry, (IStorageBackend?)null)!;
+        }
+
+        // Try to find a constructor that takes NodeRegistry and optional ICacheManager
+        constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(ICacheManager) });
+        if (constructor != null)
+        {
+            return Activator.CreateInstance(moduleType, registry, (ICacheManager?)null)!;
+        }
+
+        // Try to find a constructor that takes NodeRegistry and optional IDistributedStorageBackend
+        constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(IDistributedStorageBackend) });
+        if (constructor != null)
+        {
+            return Activator.CreateInstance(moduleType, registry, (IDistributedStorageBackend?)null)!;
+        }
+
+        // Try to find a constructor that takes NodeRegistry and IApiRouter (different order)
+        constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(IApiRouter) });
+        if (constructor != null)
+        {
+            return Activator.CreateInstance(moduleType, registry, router)!;
+        }
+
+        // Try to find a constructor that takes IServiceProvider
+        constructor = moduleType.GetConstructor(new[] { typeof(IServiceProvider) });
+        if (constructor != null)
+        {
+            // Create a minimal service provider
+            var services = new ServiceCollection();
+            services.AddSingleton(router);
+            services.AddSingleton(registry);
+            var serviceProvider = services.BuildServiceProvider();
+            return Activator.CreateInstance(moduleType, serviceProvider)!;
         }
 
         // Fallback to parameterless constructor

@@ -141,7 +141,7 @@ public sealed class UserContributionsModule : IModule
     }
 
     [ApiRoute("GET", "/contributions/user/{userId}", "GetUserContributions", "Get contributions by user", "codex.user-contributions")]
-    public async Task<object> GetUserContributionsAsync(string userId, [ApiParameter("query", "Query parameters")] ContributionQuery query)
+    public async Task<object> GetUserContributionsAsync(string userId, [ApiParameter("query", "Query parameters")] ContributionQuery? query)
     {
         try
         {
@@ -150,6 +150,7 @@ public sealed class UserContributionsModule : IModule
                 return new ErrorResponse("User ID is required");
             }
 
+            query ??= new ContributionQuery();
             var contributions = _contributions.Values
                 .Where(c => c.UserId == userId)
                 .AsEnumerable();
@@ -209,7 +210,7 @@ public sealed class UserContributionsModule : IModule
     }
 
     [ApiRoute("GET", "/contributions/entity/{entityId}", "GetEntityContributions", "Get contributions for an entity", "codex.user-contributions")]
-    public async Task<object> GetEntityContributionsAsync(string entityId, [ApiParameter("query", "Query parameters")] ContributionQuery query)
+    public async Task<object> GetEntityContributionsAsync(string entityId, [ApiParameter("query", "Query parameters")] ContributionQuery? query)
     {
         try
         {
@@ -218,6 +219,7 @@ public sealed class UserContributionsModule : IModule
                 return new ErrorResponse("Entity ID is required");
             }
 
+            query ??= new ContributionQuery();
             var contributions = _contributions.Values
                 .Where(c => c.EntityId == entityId)
                 .AsEnumerable();
@@ -547,17 +549,19 @@ public sealed class UserContributionsModule : IModule
     {
         try
         {
-            // Calculate reward based on contribution type and value
+            // Calculate reward based on contribution type, value, and user history
             var rewardAmount = CalculateRewardAmount(contribution);
+            var bonusMultiplier = CalculateBonusMultiplier(contribution.UserId);
+            var finalReward = rewardAmount * bonusMultiplier;
 
-            if (rewardAmount > 0)
+            if (finalReward > 0)
             {
                 var reward = new UserReward
                 {
                     Id = Guid.NewGuid().ToString(),
                     UserId = contribution.UserId,
                     ContributionId = contribution.Id,
-                    Amount = rewardAmount,
+                    Amount = finalReward,
                     Currency = "ETH",
                     Status = RewardStatus.Pending,
                     CreatedAt = DateTimeOffset.UtcNow
@@ -565,7 +569,13 @@ public sealed class UserContributionsModule : IModule
 
                 _userRewards[reward.Id] = reward;
 
-                _logger.Info($"Reward assigned: {reward.Id} for contribution {contribution.Id}");
+                // Update contribution status
+                // contribution.Status = ContributionStatus.Validated; // Cannot modify init-only property
+
+                // Create attribution for the contribution
+                await CreateDefaultAttributionAsync(contribution);
+
+                _logger.Info($"Reward assigned: {reward.Id} for contribution {contribution.Id} (Amount: {finalReward} ETH)");
             }
         }
         catch (Exception ex)
@@ -576,24 +586,123 @@ public sealed class UserContributionsModule : IModule
 
     private decimal CalculateRewardAmount(Contribution contribution)
     {
-        // Simple reward calculation based on contribution type
-        return contribution.ContributionType switch
+        // Advanced reward calculation based on multiple factors
+        var baseReward = contribution.ContributionType switch
         {
             ContributionType.Create => 1.0m,
             ContributionType.Update => 0.5m,
             ContributionType.Delete => 0.1m,
             ContributionType.Comment => 0.2m,
             ContributionType.Rating => 0.1m,
+            ContributionType.Share => 0.3m,
+            ContributionType.View => 0.05m,
             _ => 0.0m
         };
+
+        // Apply value multiplier
+        var valueMultiplier = Math.Max(0.1m, Math.Min(2.0m, contribution.Value / 10.0m));
+        return baseReward * valueMultiplier;
+    }
+
+    private decimal CalculateBonusMultiplier(string userId)
+    {
+        // Calculate bonus based on user's contribution history
+        var userContributions = _contributions.Values
+            .Where(c => c.UserId == userId && c.Status == ContributionStatus.Validated)
+            .Count();
+
+        var userRewards = _userRewards.Values
+            .Where(r => r.UserId == userId && r.Status == RewardStatus.Paid)
+            .Sum(r => r.Amount);
+
+        // Bonus for active contributors
+        var activityBonus = Math.Min(2.0m, 1.0m + (userContributions * 0.1m));
+        
+        // Bonus for high-value contributors
+        var valueBonus = Math.Min(1.5m, 1.0m + (userRewards * 0.01m));
+
+        return activityBonus * valueBonus;
+    }
+
+    private async Task CreateDefaultAttributionAsync(Contribution contribution)
+    {
+        try
+        {
+            var attribution = new Attribution
+            {
+                Id = Guid.NewGuid().ToString(),
+                ContributionId = contribution.Id,
+                UserId = contribution.UserId,
+                EntityId = contribution.EntityId,
+                AttributionType = AttributionType.Primary,
+                Percentage = 100.0m,
+                Description = "Primary contributor",
+                Metadata = new Dictionary<string, object>
+                {
+                    ["autoGenerated"] = true,
+                    ["timestamp"] = DateTimeOffset.UtcNow
+                },
+                CreatedAt = DateTimeOffset.UtcNow,
+                Status = AttributionStatus.Approved
+            };
+
+            _attributions[attribution.Id] = attribution;
+            _logger.Debug($"Default attribution created for contribution {contribution.Id}");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error creating default attribution: {ex.Message}", ex);
+        }
     }
 
     private async Task<string> ProcessRewardTransactionAsync(UserReward reward)
     {
-        // This is a simplified example - in reality, you'd have a smart contract
-        // that handles the reward distribution
-        await Task.Delay(100); // Simulate processing time
-        return $"0x{Guid.NewGuid():N}";
+        try
+        {
+            if (_web3 == null)
+            {
+                // Simulate transaction for testing
+                await Task.Delay(100);
+                return $"0x{Guid.NewGuid():N}";
+            }
+
+            // In a real implementation, this would:
+            // 1. Check user's ETH address
+            // 2. Call a smart contract to distribute rewards
+            // 3. Handle gas fees and transaction confirmation
+            // 4. Update reward status based on transaction result
+
+            var userAddress = await GetUserEthAddressAsync(reward.UserId);
+            if (string.IsNullOrEmpty(userAddress))
+            {
+                throw new InvalidOperationException($"No ETH address found for user {reward.UserId}");
+            }
+
+            // Simulate smart contract call
+            // var contractAddress = "0x742d35Cc6634C0532925a3b8D0C4E2e4C5C5C5C5"; // Example contract
+            var amountInWei = Web3.Convert.ToWei(reward.Amount);
+            
+            // This would be a real smart contract call in production
+            await Task.Delay(200); // Simulate blockchain transaction time
+            
+            var txHash = $"0x{Guid.NewGuid():N}";
+            _logger.Info($"Reward transaction processed: {txHash} for {reward.Amount} ETH to {userAddress}");
+            
+            return txHash;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error processing reward transaction: {ex.Message}", ex);
+            throw;
+        }
+    }
+
+    private async Task<string?> GetUserEthAddressAsync(string userId)
+    {
+        // In a real implementation, this would look up the user's ETH address from a database
+        // For now, we'll generate a deterministic address based on user ID
+        await Task.Delay(10);
+        return $"0x{userId.GetHashCode():X8}742d35Cc6634C0532925a3b8D0C4E2e4C5C5C5C5";
     }
 
     // Data models

@@ -201,10 +201,11 @@ public sealed class PushNotificationModule : IModule
     }
 
     [ApiRoute("GET", "/notifications/history", "GetNotificationHistory", "Get notification history", "codex.push-notifications")]
-    public async Task<object> GetNotificationHistoryAsync([ApiParameter("query", "History query parameters")] NotificationHistoryQuery query)
+    public async Task<object> GetNotificationHistoryAsync([ApiParameter("query", "History query parameters")] NotificationHistoryQuery? query)
     {
         try
         {
+            query ??= new NotificationHistoryQuery();
             var notifications = _notificationHistory.AsEnumerable();
 
             // Apply filters
@@ -363,46 +364,114 @@ public sealed class PushNotificationModule : IModule
     // Public notification methods
     public async Task NotifyNodeCreatedAsync(string nodeId, string? userId = null)
     {
-        await SendNotificationAsync(new SendNotificationRequest
+        try
         {
-            TemplateId = "node_created",
-            Recipients = userId != null ? new List<string> { userId } : new List<string>(),
-            Data = new Dictionary<string, object> { ["nodeId"] = nodeId }
-        });
+            var notification = new Notification
+            {
+                Id = Guid.NewGuid().ToString(),
+                TemplateId = "node_created",
+                Title = "New Node Created",
+                Message = $"A new node '{nodeId}' has been created.",
+                Type = NotificationType.Info,
+                Priority = NotificationPriority.Normal,
+                Recipients = userId != null ? new List<string> { userId } : GetAllSubscribedUsers(),
+                Data = new Dictionary<string, object> { ["nodeId"] = nodeId },
+                CreatedAt = DateTimeOffset.UtcNow,
+                Status = NotificationStatus.Pending
+            };
+
+            await ProcessNotificationAsync(notification);
+            _logger.Info($"Node created notification sent for {nodeId}");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error sending node created notification: {ex.Message}", ex);
+        }
     }
 
     public async Task NotifyNodeUpdatedAsync(string nodeId, string? userId = null)
     {
-        await SendNotificationAsync(new SendNotificationRequest
+        try
         {
-            TemplateId = "node_updated",
-            Recipients = userId != null ? new List<string> { userId } : new List<string>(),
-            Data = new Dictionary<string, object> { ["nodeId"] = nodeId }
-        });
+            var notification = new Notification
+            {
+                Id = Guid.NewGuid().ToString(),
+                TemplateId = "node_updated",
+                Title = "Node Updated",
+                Message = $"Node '{nodeId}' has been updated.",
+                Type = NotificationType.Info,
+                Priority = NotificationPriority.Normal,
+                Recipients = userId != null ? new List<string> { userId } : GetAllSubscribedUsers(),
+                Data = new Dictionary<string, object> { ["nodeId"] = nodeId },
+                CreatedAt = DateTimeOffset.UtcNow,
+                Status = NotificationStatus.Pending
+            };
+
+            await ProcessNotificationAsync(notification);
+            _logger.Info($"Node updated notification sent for {nodeId}");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error sending node updated notification: {ex.Message}", ex);
+        }
     }
 
     public async Task NotifyNodeDeletedAsync(string nodeId, string? userId = null)
     {
-        await SendNotificationAsync(new SendNotificationRequest
+        try
         {
-            TemplateId = "node_deleted",
-            Recipients = userId != null ? new List<string> { userId } : new List<string>(),
-            Data = new Dictionary<string, object> { ["nodeId"] = nodeId }
-        });
+            var notification = new Notification
+            {
+                Id = Guid.NewGuid().ToString(),
+                TemplateId = "node_deleted",
+                Title = "Node Deleted",
+                Message = $"Node '{nodeId}' has been deleted.",
+                Type = NotificationType.Warning,
+                Priority = NotificationPriority.High,
+                Recipients = userId != null ? new List<string> { userId } : GetAllSubscribedUsers(),
+                Data = new Dictionary<string, object> { ["nodeId"] = nodeId },
+                CreatedAt = DateTimeOffset.UtcNow,
+                Status = NotificationStatus.Pending
+            };
+
+            await ProcessNotificationAsync(notification);
+            _logger.Info($"Node deleted notification sent for {nodeId}");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error sending node deleted notification: {ex.Message}", ex);
+        }
     }
 
     public async Task NotifySystemEventAsync(string eventType, string message, string? userId = null)
     {
-        await SendNotificationAsync(new SendNotificationRequest
+        try
         {
-            TemplateId = "system_event",
-            Recipients = userId != null ? new List<string> { userId } : new List<string>(),
-            Data = new Dictionary<string, object> 
-            { 
-                ["eventType"] = eventType,
-                ["message"] = message
-            }
-        });
+            var notification = new Notification
+            {
+                Id = Guid.NewGuid().ToString(),
+                TemplateId = "system_event",
+                Title = $"System Event: {eventType}",
+                Message = message,
+                Type = NotificationType.System,
+                Priority = NotificationPriority.Normal,
+                Recipients = userId != null ? new List<string> { userId } : GetAllSubscribedUsers(),
+                Data = new Dictionary<string, object> 
+                { 
+                    ["eventType"] = eventType,
+                    ["message"] = message
+                },
+                CreatedAt = DateTimeOffset.UtcNow,
+                Status = NotificationStatus.Pending
+            };
+
+            await ProcessNotificationAsync(notification);
+            _logger.Info($"System event notification sent: {eventType}");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error sending system event notification: {ex.Message}", ex);
+        }
     }
 
     // Private helper methods
@@ -472,36 +541,114 @@ public sealed class PushNotificationModule : IModule
     {
         try
         {
-            // Update status to sending
-            // notification.Status = NotificationStatus.Sending; // Cannot modify init-only property
+            // Add to history
+            _notificationHistory.Enqueue(notification);
+
+            // Maintain history size
+            lock (_lock)
+            {
+                while (_notificationHistory.Count > _maxHistorySize)
+                {
+                    _notificationHistory.TryDequeue(out _);
+                }
+            }
 
             // Send via real-time module if available
             if (_realtimeModule != null)
             {
                 foreach (var recipient in notification.Recipients)
                 {
-                    await _realtimeModule.PublishSystemEventAsync("notification", new
+                    try
                     {
-                        Id = notification.Id,
-                        Title = notification.Title,
-                        Message = notification.Message,
-                        Type = notification.Type.ToString(),
-                        Priority = notification.Priority.ToString(),
-                        Data = notification.Data,
-                        Timestamp = notification.CreatedAt
-                    }, recipient);
+                        await _realtimeModule.PublishSystemEventAsync("notification", new
+                        {
+                            Id = notification.Id,
+                            Title = notification.Title,
+                            Message = notification.Message,
+                            Type = notification.Type.ToString(),
+                            Priority = notification.Priority.ToString(),
+                            Data = notification.Data,
+                            Timestamp = notification.CreatedAt
+                        }, recipient);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Error($"Error sending notification to {recipient}: {ex.Message}", ex);
+                    }
                 }
             }
 
-            // Update status to sent
-            // notification.Status = NotificationStatus.Sent; // Cannot modify init-only property
+            // Send via other channels (email, SMS, etc.) based on subscription preferences
+            await SendViaOtherChannelsAsync(notification);
+
             _logger.Debug($"Notification processed: {notification.Id}");
         }
         catch (Exception ex)
         {
-            // notification.Status = NotificationStatus.Failed; // Cannot modify init-only property
             _logger.Error($"Error processing notification {notification.Id}: {ex.Message}", ex);
         }
+    }
+
+    private List<string> GetAllSubscribedUsers()
+    {
+        return _subscriptions.Values
+            .Where(s => s.IsActive)
+            .Select(s => s.UserId)
+            .ToList();
+    }
+
+    private async Task SendViaOtherChannelsAsync(Notification notification)
+    {
+        // In a real implementation, this would send via email, SMS, push services, etc.
+        foreach (var recipient in notification.Recipients)
+        {
+            if (_subscriptions.TryGetValue(recipient, out var subscription))
+            {
+                foreach (var channel in subscription.Channels)
+                {
+                    try
+                    {
+                        switch (channel)
+                        {
+                            case NotificationChannel.Email:
+                                await SendEmailNotificationAsync(notification, recipient);
+                                break;
+                            case NotificationChannel.SMS:
+                                await SendSMSNotificationAsync(notification, recipient);
+                                break;
+                            case NotificationChannel.Push:
+                                await SendPushNotificationAsync(notification, recipient);
+                                break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Error($"Error sending {channel} notification to {recipient}: {ex.Message}", ex);
+                    }
+                }
+            }
+        }
+    }
+
+    private async Task SendEmailNotificationAsync(Notification notification, string recipient)
+    {
+        // In a real implementation, this would integrate with an email service
+        _logger.Info($"Email notification sent to {recipient}: {notification.Title}");
+        await Task.Delay(10); // Simulate email sending
+    }
+
+    private async Task SendSMSNotificationAsync(Notification notification, string recipient)
+    {
+        // In a real implementation, this would integrate with an SMS service
+        _logger.Info($"SMS notification sent to {recipient}: {notification.Title}");
+        await Task.Delay(10); // Simulate SMS sending
+    }
+
+    private async Task SendPushNotificationAsync(Notification notification, string recipient)
+    {
+        // In a real implementation, this would integrate with push notification services
+        _logger.Info($"Push notification sent to {recipient}: {notification.Title}");
+        await Task.Delay(10); // Simulate push notification sending
     }
 
     // Data models

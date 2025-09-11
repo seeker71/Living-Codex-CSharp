@@ -170,7 +170,7 @@ public sealed class RealtimeModule : IModule
         }
     }
 
-    [ApiRoute("POST", "/realtime/subscribe", "SubscribeToEvents", "Subscribe to specific event types", "codex.realtime")]
+    [ApiRoute("POST", "/realtime/subscribe", "SubscribeToRealtimeEvents", "Subscribe to realtime event types", "codex.realtime")]
     public async Task<object> SubscribeToEventsAsync([ApiParameter("body", "Subscription request")] SubscriptionRequest request)
     {
         try
@@ -207,7 +207,7 @@ public sealed class RealtimeModule : IModule
         }
     }
 
-    [ApiRoute("POST", "/realtime/unsubscribe", "UnsubscribeFromEvents", "Unsubscribe from specific event types", "codex.realtime")]
+    [ApiRoute("POST", "/realtime/unsubscribe", "UnsubscribeFromRealtimeEvents", "Unsubscribe from specific event types", "codex.realtime")]
     public async Task<object> UnsubscribeFromEventsAsync([ApiParameter("body", "Unsubscription request")] UnsubscriptionRequest request)
     {
         try
@@ -269,7 +269,7 @@ public sealed class RealtimeModule : IModule
         }
     }
 
-    [ApiRoute("POST", "/realtime/notify", "SendNotification", "Send notification to specific session", "codex.realtime")]
+    [ApiRoute("POST", "/realtime/notify", "SendRealtimeNotification", "Send notification to specific session", "codex.realtime")]
     public async Task<object> SendNotificationAsync([ApiParameter("body", "Notification request")] NotificationRequest request)
     {
         try

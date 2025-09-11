@@ -136,7 +136,7 @@ public sealed class EventStreamingModule : IModule
         }
     }
 
-    [ApiRoute("POST", "/events/subscribe", "SubscribeToEvents", "Subscribe to specific event types", "codex.event-streaming")]
+    [ApiRoute("POST", "/events/subscribe", "SubscribeToEventStream", "Subscribe to specific event types", "codex.event-streaming")]
     public async Task<object> SubscribeToEventsAsync([ApiParameter("body", "Subscription request")] EventSubscriptionRequest request)
     {
         try
