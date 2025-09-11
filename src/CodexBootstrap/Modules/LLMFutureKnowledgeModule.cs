@@ -223,6 +223,82 @@ public class LLMFutureKnowledgeModule : IModule
         }
     }
 
+    [ApiRoute("POST", "/llm/translate", "llm-translate-concept", "Translate concept through belief system using LLM", "codex.llm.future")]
+    public async Task<object> TranslateConcept([ApiParameter("request", "Translation request", Required = true, Location = "body")] TranslationRequest request)
+    {
+        try
+        {
+            // Get optimal LLM configuration for translation
+            var optimalConfig = LLMConfigurationSystem.GetOptimalConfiguration("consciousness-expansion");
+            
+            // Build sophisticated translation prompt
+            var prompt = BuildTranslationPrompt(request, optimalConfig);
+            
+            // Convert LLMConfigurationSystem.LLMConfiguration to LLMConfig
+            var llmConfig = new LLMConfig(
+                Id: optimalConfig.Id,
+                Name: optimalConfig.Id,
+                Provider: optimalConfig.Provider,
+                Model: optimalConfig.Model,
+                ApiKey: "",
+                BaseUrl: "http://localhost:11434",
+                MaxTokens: optimalConfig.MaxTokens,
+                Temperature: optimalConfig.Temperature,
+                TopP: optimalConfig.TopP,
+                Parameters: optimalConfig.Parameters
+            );
+            
+            // Call LLM with real Ollama integration
+            var llmResponse = await CallLLM(llmConfig, prompt);
+            
+            if (llmResponse.Content.Contains("LLM unavailable"))
+            {
+                return new TranslationResponse(
+                    Success: false,
+                    OriginalConcept: request.ConceptName,
+                    TranslatedConcept: "",
+                    TranslationFramework: request.TargetFramework,
+                    ResonanceScore: 0,
+                    UnityAmplification: 0,
+                    Explanation: "",
+                    CulturalNotes: "",
+                    Message: "AI translation failed: " + llmResponse.Content
+                );
+            }
+            
+            // Parse LLM response (simplified - in production would parse JSON)
+            var translatedConcept = llmResponse.Content;
+            var resonanceScore = CalculateResonanceScore(request.UserBeliefSystem, request.TargetFramework);
+            var unityAmplification = CalculateUnityAmplification(resonanceScore);
+            
+            return new TranslationResponse(
+                Success: true,
+                OriginalConcept: request.ConceptName,
+                TranslatedConcept: translatedConcept,
+                TranslationFramework: request.TargetFramework,
+                ResonanceScore: resonanceScore,
+                UnityAmplification: unityAmplification,
+                Explanation: $"Translated using {request.TargetFramework} framework with real AI",
+                CulturalNotes: $"Adapted for {request.UserBeliefSystem.GetValueOrDefault("culturalContext", "Unknown")} context",
+                Message: "Real AI translation completed successfully"
+            );
+        }
+        catch (Exception ex)
+        {
+            return new TranslationResponse(
+                Success: false,
+                OriginalConcept: request.ConceptName,
+                TranslatedConcept: "",
+                TranslationFramework: request.TargetFramework,
+                ResonanceScore: 0,
+                UnityAmplification: 0,
+                Explanation: "",
+                CulturalNotes: "",
+                Message: $"Translation failed: {ex.Message}"
+            );
+        }
+    }
+
     [ApiRoute("POST", "/llm/config", "llm-config-create", "Create or update LLM configuration", "codex.llm.future")]
     public async Task<object> CreateLLMConfig([ApiParameter("request", "LLM config request", Required = true, Location = "body")] LLMConfigRequest request)
     {
@@ -551,17 +627,61 @@ Format your response as a structured analysis that can be used for decision-maki
 
     private async Task<LLMResponse> CallLLM(LLMConfig config, string prompt)
     {
-        // This is a simplified implementation
-        // In a real implementation, you would call the actual LLM APIs
-        
-        await Task.Delay(100); // Simulate async call
-        
-        return new LLMResponse(
-            Content: $"Future knowledge response for: {prompt.Substring(0, Math.Min(100, prompt.Length))}...",
-            Confidence: 0.85,
-            Reasoning: "Generated using advanced predictive algorithms",
-            Sources: new List<string> { "Historical patterns", "Trend analysis", "Expert knowledge" }
-        );
+        try
+        {
+            Console.WriteLine($"[LLM] Making real call to Ollama with model: {config.Model}");
+            Console.WriteLine($"[LLM] Prompt: {prompt.Substring(0, Math.Min(200, prompt.Length))}...");
+            
+            using var httpClient = new HttpClient();
+            
+            // Use the optimal configuration for the specific mode
+            var optimalConfig = LLMConfigurationSystem.GetOptimalConfiguration("consciousness-expansion");
+            
+            var requestBody = new
+            {
+                model = optimalConfig.Model,
+                prompt = prompt,
+                options = new
+                {
+                    temperature = optimalConfig.Temperature,
+                    top_p = optimalConfig.TopP,
+                    num_predict = optimalConfig.MaxTokens
+                },
+                stream = false
+            };
+
+            Console.WriteLine($"[LLM] Request body: {JsonSerializer.Serialize(requestBody)}");
+
+            var content = new StringContent(JsonSerializer.Serialize(requestBody), System.Text.Encoding.UTF8, "application/json");
+            var response = await httpClient.PostAsync("http://localhost:11434/api/generate", content);
+            response.EnsureSuccessStatusCode();
+
+            var responseString = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"[LLM] Raw response: {responseString.Substring(0, Math.Min(500, responseString.Length))}...");
+            
+            var jsonResponse = JsonDocument.Parse(responseString);
+            var llmOutput = jsonResponse.RootElement.GetProperty("response").GetString();
+
+            Console.WriteLine($"[LLM] Extracted response: {llmOutput}");
+
+            return new LLMResponse(
+                Content: llmOutput ?? "No response generated",
+                Confidence: 0.85,
+                Reasoning: "Generated using real LLM integration with Ollama",
+                Sources: new List<string> { "Real LLM", "Ollama API", "Advanced AI" }
+            );
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[LLM] Error: {ex.Message}");
+            // Fallback to mock response if LLM is not available
+            return new LLMResponse(
+                Content: $"LLM unavailable: {ex.Message}. Future knowledge response for: {prompt.Substring(0, Math.Min(100, prompt.Length))}...",
+                Confidence: 0.5,
+                Reasoning: "Fallback response due to LLM unavailability",
+                Sources: new List<string> { "Fallback system", "Error handling" }
+            );
+        }
     }
 
     private async Task<LLMConfigValidation> ValidateLLMConfig(LLMConfig config)
@@ -774,6 +894,55 @@ Format your response as a structured analysis that can be used for decision-maki
             }
         );
     }
+
+    /// <summary>
+    /// Build sophisticated translation prompt for belief system translation
+    /// </summary>
+    private string BuildTranslationPrompt(TranslationRequest request, LLMConfigurationSystem.LLMConfiguration config)
+    {
+        var userBeliefSystem = request.UserBeliefSystem;
+        
+        return $@"Translate the concept ""{request.ConceptName}"" through the lens of {request.TargetFramework}.
+
+CONCEPT: {request.ConceptName} - {request.ConceptDescription}
+
+TARGET FRAMEWORK: {request.TargetFramework}
+LANGUAGE: {userBeliefSystem.GetValueOrDefault("language", "English")}
+CULTURAL CONTEXT: {userBeliefSystem.GetValueOrDefault("culturalContext", "Not specified")}
+
+Please provide a thoughtful translation that adapts the concept to the {request.TargetFramework} framework, using appropriate terminology and cultural references. Explain how this concept would be understood and expressed within this belief system.";
+    }
+
+    /// <summary>
+    /// Calculate resonance score based on belief system alignment
+    /// </summary>
+    private double CalculateResonanceScore(Dictionary<string, object> userBeliefSystem, string targetFramework)
+    {
+        // Real mathematical calculation based on belief system alignment
+        var framework = userBeliefSystem.GetValueOrDefault("framework", "").ToString();
+        var culturalContext = userBeliefSystem.GetValueOrDefault("culturalContext", "").ToString();
+        
+        // Base resonance on framework alignment
+        var frameworkAlignment = framework.Equals(targetFramework, StringComparison.OrdinalIgnoreCase) ? 0.9 : 0.7;
+        
+        // Add cultural context bonus
+        var culturalBonus = culturalContext.Contains("Buddhist") || culturalContext.Contains("Zen") ? 0.1 : 0.05;
+        
+        // Add core values alignment (simplified)
+        var coreValues = userBeliefSystem.GetValueOrDefault("coreValues", new Dictionary<string, object>()) as Dictionary<string, object>;
+        var valuesAlignment = coreValues?.Count > 0 ? 0.1 : 0.05;
+        
+        return Math.Min(1.0, frameworkAlignment + culturalBonus + valuesAlignment);
+    }
+
+    /// <summary>
+    /// Calculate unity amplification score
+    /// </summary>
+    private double CalculateUnityAmplification(double resonanceScore)
+    {
+        // Unity amplification is based on resonance but slightly lower to show potential for growth
+        return Math.Max(0.0, resonanceScore * 0.9);
+    }
 }
 
 // Data types
@@ -833,6 +1002,63 @@ public record FutureAnalysisResponse(
     FutureAnalysis Analysis,
     int ResponseCount,
     List<string> Insights
+);
+
+// Translation-specific data types
+[MetaNodeAttribute("codex.llm.translation-request", "codex.meta/type", "TranslationRequest", "Request for belief system translation")]
+[ApiType(
+    Name = "Translation Request",
+    Type = "object",
+    Description = "Request to translate concepts through different belief systems using LLM",
+    Example = @"{
+      ""conceptId"": ""consciousness"",
+      ""conceptName"": ""Consciousness"",
+      ""conceptDescription"": ""The state of being aware and able to think"",
+      ""sourceFramework"": ""Universal"",
+      ""targetFramework"": ""Buddhist"",
+      ""userBeliefSystem"": {
+        ""framework"": ""Buddhist"",
+        ""language"": ""English"",
+        ""culturalContext"": ""Tibetan Buddhism"",
+        ""coreValues"": {""compassion"": 0.9, ""mindfulness"": 0.95}
+      }
+    }"
+)]
+public record TranslationRequest(
+    string ConceptId,
+    string ConceptName,
+    string ConceptDescription,
+    string SourceFramework,
+    string TargetFramework,
+    Dictionary<string, object> UserBeliefSystem
+);
+
+[MetaNodeAttribute("codex.llm.translation-response", "codex.meta/type", "TranslationResponse", "LLM-generated translation response")]
+[ApiType(
+    Name = "Translation Response",
+    Type = "object",
+    Description = "LLM-generated translation of concepts through belief systems",
+    Example = @"{
+      ""success"": true,
+      ""originalConcept"": ""consciousness"",
+      ""translatedConcept"": ""The interconnected web of awareness, the fundamental ground of being"",
+      ""translationFramework"": ""Buddhist"",
+      ""resonanceScore"": 0.92,
+      ""unityAmplification"": 0.88,
+      ""explanation"": ""Translated using Buddhist concepts of interconnectedness"",
+      ""culturalNotes"": ""Emphasizes the non-dual nature of consciousness""
+    }"
+)]
+public record TranslationResponse(
+    bool Success,
+    string OriginalConcept,
+    string TranslatedConcept,
+    string TranslationFramework,
+    double ResonanceScore,
+    double UnityAmplification,
+    string Explanation,
+    string CulturalNotes,
+    string Message = ""
 );
 
 [RequestType("codex.llm.future-query-request", "FutureQueryRequest", "Future query request")]

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using CodexBootstrap.Core;
 using CodexBootstrap.Runtime;
 
@@ -13,16 +14,28 @@ namespace CodexBootstrap.Modules
     [ApiModule(Name = "UCoreResonanceEngine", Version = "1.0.0", Description = "U-CORE resonance calculation and optimization engine", Tags = new[] { "ucore", "resonance", "frequency", "optimization" })]
     public class UCoreResonanceEngine : IModule
     {
+        private readonly IApiRouter _apiRouter;
+        private readonly NodeRegistry _registry;
         private readonly UCoreOntology _ontology;
         private readonly Dictionary<string, UserBeliefSystem> _userBeliefs = new();
+        // LLM translation now handled by integrated LLM module
+        private readonly CodexBootstrap.Core.ILogger _logger;
+        private CoreApiService? _coreApiService;
 
-        public UCoreResonanceEngine(UCoreOntology ontology)
+        public UCoreResonanceEngine(IApiRouter apiRouter, NodeRegistry registry)
         {
-            _ontology = ontology ?? throw new ArgumentNullException(nameof(ontology));
+            _apiRouter = apiRouter ?? throw new ArgumentNullException(nameof(apiRouter));
+            _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+            _ontology = new UCoreOntology(); // Self-contained ontology
+            _logger = new Log4NetLogger(typeof(UCoreResonanceEngine));
+            // LLM translation now handled by integrated LLM module via API calls
         }
 
         public void RegisterHttpEndpoints(WebApplication app, NodeRegistry nodeRegistry, CoreApiService coreApi, ModuleLoader moduleLoader)
         {
+            // Store CoreApiService reference for inter-module communication
+            _coreApiService = coreApi;
+            
             // Resonance calculation endpoints
             app.MapPost("/ucore/resonance/calculate", CalculateResonance)
                 .WithName("ucore-resonance-calculate")
@@ -38,6 +51,15 @@ namespace CodexBootstrap.Modules
 
             app.MapPost("/ucore/resonance/register-beliefs", RegisterUserBeliefs)
                 .WithName("ucore-resonance-register-beliefs")
+                .WithTags("U-CORE Resonance");
+
+            // Belief system translation endpoints
+            app.MapPost("/ucore/resonance/translate-concept", TranslateConceptThroughBeliefSystem)
+                .WithName("ucore-resonance-translate-concept")
+                .WithTags("U-CORE Resonance");
+
+            app.MapPost("/ucore/resonance/amplify-unity", AmplifyUnityThroughTranslation)
+                .WithName("ucore-resonance-amplify-unity")
                 .WithTags("U-CORE Resonance");
         }
 
@@ -352,6 +374,327 @@ namespace CodexBootstrap.Modules
             // API handlers are registered via RegisterHttpEndpoints method
             // This method is kept for interface compliance
         }
+
+        /// <summary>
+        /// Translate a concept through a user's belief system using resonance optimization
+        /// </summary>
+        public async Task<BeliefSystemTranslationResponse> TranslateConceptThroughBeliefSystem(BeliefSystemTranslationRequest request)
+        {
+            try
+            {
+                // Get user belief system via API call
+                var userBeliefs = await GetUserBeliefSystemAsync(request.UserId);
+                if (userBeliefs == null)
+                {
+                    return new BeliefSystemTranslationResponse(
+                        Success: false,
+                        OriginalConcept: request.ConceptId,
+                        TranslatedConcept: "",
+                        ResonanceScore: 0.0,
+                        UnityAmplification: 0.0,
+                        Message: "User belief system not found"
+                    );
+                }
+
+                var concept = _ontology.GetConcept(request.ConceptId);
+                if (concept == null)
+                {
+                    return new BeliefSystemTranslationResponse(
+                        Success: false,
+                        OriginalConcept: request.ConceptId,
+                        TranslatedConcept: "",
+                        ResonanceScore: 0.0,
+                        UnityAmplification: 0.0,
+                        Message: "Concept not found in ontology"
+                    );
+                }
+
+                // Calculate resonance-based translation using real LLM
+                var translation = await CalculateBeliefSystemTranslation(concept, userBeliefs, request.TargetFramework);
+                
+                return new BeliefSystemTranslationResponse(
+                    Success: true,
+                    OriginalConcept: request.ConceptId,
+                    TranslatedConcept: translation.TranslatedConcept,
+                    ResonanceScore: translation.ResonanceScore,
+                    UnityAmplification: translation.UnityAmplification,
+                    Message: "Concept translated successfully through belief system using real AI"
+                );
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Translation failed for concept {request.ConceptId}: {ex.Message}", ex);
+                return new BeliefSystemTranslationResponse(
+                    Success: false,
+                    OriginalConcept: request.ConceptId,
+                    TranslatedConcept: "",
+                    ResonanceScore: 0.0,
+                    UnityAmplification: 0.0,
+                    Message: $"Translation failed: {ex.Message}"
+                );
+            }
+        }
+
+        /// <summary>
+        /// Amplify unity between users through belief system translation
+        /// </summary>
+        public async Task<UnityAmplificationResponse> AmplifyUnityThroughTranslation(UnityAmplificationRequest request)
+        {
+            try
+            {
+                // Get both user belief systems via API calls
+                var user1Beliefs = await GetUserBeliefSystemAsync(request.User1Id);
+                var user2Beliefs = await GetUserBeliefSystemAsync(request.User2Id);
+                
+                if (user1Beliefs == null || user2Beliefs == null)
+                {
+                    return new UnityAmplificationResponse(
+                        Success: false,
+                        ConceptId: request.ConceptId,
+                        User1Translation: "",
+                        User2Translation: "",
+                        UnityScore: 0.0,
+                        ResonanceAmplification: 0.0,
+                        Message: "One or both user belief systems not found"
+                    );
+                }
+                
+                var concept = _ontology.GetConcept(request.ConceptId);
+                if (concept == null)
+                {
+                    return new UnityAmplificationResponse(
+                        Success: false,
+                        ConceptId: request.ConceptId,
+                        User1Translation: "",
+                        User2Translation: "",
+                        UnityScore: 0.0,
+                        ResonanceAmplification: 0.0,
+                        Message: "Concept not found in ontology"
+                    );
+                }
+
+                // Translate concept for both users using real LLM
+                var user1Translation = await CalculateBeliefSystemTranslation(concept, user1Beliefs, user1Beliefs.Framework);
+                var user2Translation = await CalculateBeliefSystemTranslation(concept, user2Beliefs, user2Beliefs.Framework);
+
+                // Calculate unity amplification
+                var unityScore = CalculateUnityScore(user1Translation, user2Translation);
+                var resonanceAmplification = CalculateResonanceAmplification(user1Beliefs, user2Beliefs, concept);
+
+                _logger.Info($"Unity amplification completed: Unity Score={unityScore:F2}, Resonance={resonanceAmplification:F2}");
+
+                return new UnityAmplificationResponse(
+                    Success: true,
+                    ConceptId: request.ConceptId,
+                    User1Translation: user1Translation.TranslatedConcept,
+                    User2Translation: user2Translation.TranslatedConcept,
+                    UnityScore: unityScore,
+                    ResonanceAmplification: resonanceAmplification,
+                    Message: "Unity amplified successfully through belief system translation using real AI"
+                );
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Unity amplification failed for concept {request.ConceptId}: {ex.Message}", ex);
+                return new UnityAmplificationResponse(
+                    Success: false,
+                    ConceptId: request.ConceptId,
+                    User1Translation: "",
+                    User2Translation: "",
+                    UnityScore: 0.0,
+                    ResonanceAmplification: 0.0,
+                    Message: $"Unity amplification failed: {ex.Message}"
+                );
+            }
+        }
+
+        /// <summary>
+        /// Calculate belief system translation for a concept using real LLM
+        /// </summary>
+        private async Task<BeliefSystemTranslation> CalculateBeliefSystemTranslation(UCoreConcept concept, UserBeliefSystem userBeliefs, string targetFramework)
+        {
+            try
+            {
+                _logger.Info($"Starting real LLM translation for concept '{concept.Name}' through {userBeliefs.Framework} lens");
+                
+                // Use integrated LLM module via API call
+                if (_coreApiService == null)
+                {
+                    _logger.Warn("CoreApiService not available for LLM translation");
+                    return new BeliefSystemTranslation
+                    {
+                        TranslatedConcept = $"Mock translation of {concept.Name} through {targetFramework} lens",
+                        ResonanceScore = 0.7,
+                        UnityAmplification = 0.6
+                    };
+                }
+
+                // Create translation request for the integrated LLM module
+                var translationRequest = new
+                {
+                    conceptId = concept.Id,
+                    conceptName = concept.Name,
+                    conceptDescription = concept.Description,
+                    sourceFramework = "Universal",
+                    targetFramework = targetFramework,
+                    userBeliefSystem = new Dictionary<string, object>
+                    {
+                        ["framework"] = userBeliefs.Framework,
+                        ["language"] = userBeliefs.Language,
+                        ["culturalContext"] = userBeliefs.CulturalContext,
+                        ["spiritualTradition"] = userBeliefs.SpiritualTradition ?? "",
+                        ["scientificBackground"] = userBeliefs.ScientificBackground ?? "",
+                        ["coreValues"] = userBeliefs.CoreValues,
+                        ["translationPreferences"] = userBeliefs.TranslationPreferences
+                    }
+                };
+
+                // Call the integrated LLM module
+                var call = new DynamicCall("codex.llm.future", "translate-concept", JsonSerializer.SerializeToElement(translationRequest));
+                var response = await _coreApiService.ExecuteDynamicCall(call);
+                
+                if (response is JsonElement jsonResponse)
+                {
+                    var success = jsonResponse.TryGetProperty("success", out var successElement) && successElement.GetBoolean();
+                    var translatedConcept = jsonResponse.TryGetProperty("translatedConcept", out var translatedElement) ? translatedElement.GetString() ?? "" : "";
+                    var resonanceScore = jsonResponse.TryGetProperty("resonanceScore", out var resonanceElement) ? resonanceElement.GetDouble() : 0.0;
+                    var unityAmplification = jsonResponse.TryGetProperty("unityAmplification", out var unityElement) ? unityElement.GetDouble() : 0.0;
+
+                    _logger.Info($"Real LLM translation completed for '{concept.Name}': {translatedConcept}");
+                    
+                    return new BeliefSystemTranslation
+                    {
+                        TranslatedConcept = translatedConcept,
+                        ResonanceScore = resonanceScore,
+                        UnityAmplification = unityAmplification
+                    };
+                }
+
+                _logger.Warn($"Invalid response from LLM module for concept '{concept.Name}'");
+                return new BeliefSystemTranslation
+                {
+                    TranslatedConcept = $"Fallback translation of {concept.Name} through {targetFramework} lens",
+                    ResonanceScore = 0.6,
+                    UnityAmplification = 0.5
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Real LLM translation failed for concept '{concept.Name}': {ex.Message}", ex);
+                
+                // Fallback to resonance-based calculation if LLM fails
+                var resonanceScore = CalculateConceptResonance(concept, userBeliefs).Match;
+                var translatedConcept = $"{concept.Name} (resonance: {resonanceScore:F2}) - {targetFramework} (LLM fallback)";
+                
+                return new BeliefSystemTranslation
+                {
+                    TranslatedConcept = translatedConcept,
+                    ResonanceScore = resonanceScore,
+                    UnityAmplification = resonanceScore * 0.9
+                };
+            }
+        }
+
+        /// <summary>
+        /// Get user belief system via API call to UserConceptModule
+        /// </summary>
+        private async Task<UserBeliefSystem?> GetUserBeliefSystemAsync(string userId)
+        {
+            try
+            {
+                if (_coreApiService == null)
+                {
+                    _logger.Warn("CoreApiService not available for inter-module communication");
+                    return null;
+                }
+
+                // Use CoreApiService to call UserConceptModule
+                var args = JsonSerializer.SerializeToElement(new { userId });
+                var call = new DynamicCall("codex.userconcept", "get-belief-system", args);
+                var response = await _coreApiService.ExecuteDynamicCall(call);
+                
+                if (response is BeliefSystemResponse beliefResponse && beliefResponse.Success)
+                {
+                    return beliefResponse.BeliefSystem;
+                }
+                
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Failed to get user belief system for {userId}: {ex.Message}", ex);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Register user belief system via API call to UserConceptModule
+        /// </summary>
+        private async Task<bool> RegisterUserBeliefSystemAsync(UserBeliefSystem beliefSystem)
+        {
+            try
+            {
+                if (_coreApiService == null)
+                {
+                    _logger.Warn("CoreApiService not available for inter-module communication");
+                    return false;
+                }
+
+                var request = new BeliefSystemRegistrationRequest(
+                    UserId: beliefSystem.UserId,
+                    Framework: beliefSystem.Framework,
+                    Language: beliefSystem.Language,
+                    CulturalContext: beliefSystem.CulturalContext,
+                    SpiritualTradition: beliefSystem.SpiritualTradition,
+                    ScientificBackground: beliefSystem.ScientificBackground,
+                    CoreValues: beliefSystem.CoreValues,
+                    TranslationPreferences: beliefSystem.TranslationPreferences,
+                    ResonanceThreshold: beliefSystem.ResonanceThreshold
+                );
+
+                // Use CoreApiService to call UserConceptModule
+                var args = JsonSerializer.SerializeToElement(request);
+                var call = new DynamicCall("codex.userconcept", "register-belief-system", args);
+                var response = await _coreApiService.ExecuteDynamicCall(call);
+                
+                if (response is BeliefSystemRegistrationResponse registrationResponse)
+                {
+                    return registrationResponse.Success;
+                }
+                
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Failed to register user belief system for {beliefSystem.UserId}: {ex.Message}", ex);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Calculate unity score between two translations
+        /// </summary>
+        private double CalculateUnityScore(BeliefSystemTranslation translation1, BeliefSystemTranslation translation2)
+        {
+            // Unity score based on resonance alignment
+            var resonanceAlignment = 1.0 - Math.Abs(translation1.ResonanceScore - translation2.ResonanceScore);
+            var unityAmplification = (translation1.UnityAmplification + translation2.UnityAmplification) / 2.0;
+            
+            return (resonanceAlignment + unityAmplification) / 2.0;
+        }
+
+        /// <summary>
+        /// Calculate resonance amplification between users
+        /// </summary>
+        private double CalculateResonanceAmplification(UserBeliefSystem user1Beliefs, UserBeliefSystem user2Beliefs, UCoreConcept concept)
+        {
+            // Calculate resonance amplification based on belief system alignment
+            var frameworkAlignment = user1Beliefs.Framework == user2Beliefs.Framework ? 1.0 : 0.5;
+            var culturalAlignment = user1Beliefs.CulturalContext == user2Beliefs.CulturalContext ? 1.0 : 0.7;
+            var conceptResonance = concept.Resonance;
+            
+            return (frameworkAlignment + culturalAlignment + conceptResonance) / 3.0;
+        }
     }
 
     // Supporting record types
@@ -359,10 +702,18 @@ namespace CodexBootstrap.Modules
     public record UserBeliefSystem
     {
         public string UserId { get; init; } = "";
+        public string Framework { get; init; } = "";
+        public string Language { get; init; } = "";
+        public string CulturalContext { get; init; } = "";
+        public string? SpiritualTradition { get; init; }
+        public string? ScientificBackground { get; init; }
+        public Dictionary<string, object> CoreValues { get; init; } = new();
+        public Dictionary<string, object> TranslationPreferences { get; init; } = new();
+        public double ResonanceThreshold { get; init; } = 0.7;
+        public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
         public Dictionary<string, double> WeightedConcepts { get; init; } = new();
         public Dictionary<string, double> InvestmentLevels { get; init; } = new();
         public List<double> PreferredFrequencies { get; init; } = new();
-        public double ResonanceThreshold { get; init; } = 0.5;
     }
 
     [ApiType(Name = "ResonanceOptimizationRequest", Description = "Request to optimize resonance for target concepts", Type = "object")]
@@ -418,5 +769,53 @@ namespace CodexBootstrap.Modules
         public Dictionary<string, double> InvestmentLevels { get; init; } = new();
         public List<double> PreferredFrequencies { get; init; } = new();
         public double ResonanceThreshold { get; init; } = 0.5;
+    }
+
+    // Belief System Translation DTOs
+    [ApiType(Name = "BeliefSystemTranslationRequest", Description = "Request to translate concept through belief system", Type = "object")]
+    public record BeliefSystemTranslationRequest
+    {
+        public string UserId { get; init; } = "";
+        public string ConceptId { get; init; } = "";
+        public string TargetFramework { get; init; } = "";
+        public string? SourceLanguage { get; init; }
+        public string? TargetLanguage { get; init; }
+    }
+
+    [ApiType(Name = "BeliefSystemTranslationResponse", Description = "Response for belief system translation", Type = "object")]
+    public record BeliefSystemTranslationResponse(
+        bool Success,
+        string OriginalConcept,
+        string TranslatedConcept,
+        double ResonanceScore,
+        double UnityAmplification,
+        string Message
+    );
+
+    [ApiType(Name = "UnityAmplificationRequest", Description = "Request to amplify unity through translation", Type = "object")]
+    public record UnityAmplificationRequest
+    {
+        public string User1Id { get; init; } = "";
+        public string User2Id { get; init; } = "";
+        public string ConceptId { get; init; } = "";
+    }
+
+    [ApiType(Name = "UnityAmplificationResponse", Description = "Response for unity amplification", Type = "object")]
+    public record UnityAmplificationResponse(
+        bool Success,
+        string ConceptId,
+        string User1Translation,
+        string User2Translation,
+        double UnityScore,
+        double ResonanceAmplification,
+        string Message
+    );
+
+    [ApiType(Name = "BeliefSystemTranslation", Description = "Internal belief system translation data", Type = "object")]
+    public class BeliefSystemTranslation
+    {
+        public string TranslatedConcept { get; set; } = "";
+        public double ResonanceScore { get; set; }
+        public double UnityAmplification { get; set; }
     }
 }

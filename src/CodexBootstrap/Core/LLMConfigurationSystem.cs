@@ -154,21 +154,28 @@ public static class LLMConfigurationSystem
     {
         // Consciousness Expansion Configurations
         public static readonly LLMConfiguration ConsciousnessExpansionLlama3 = new(
-            Id: "consciousness-expansion-llama3",
+            Id: "consciousness-expansion-gpt-oss-20b",
             Provider: "Ollama",
-            Model: "llama3",
+            Model: "gpt-oss:20b", // Using the better 20B model for Mac M1
             Mode: "consciousness-expansion",
-            Temperature: 0.8,
+            Temperature: 0.7, // Slightly lower for more focused responses
             MaxTokens: 2000,
             TopP: 0.9,
             Frequencies: new[] { "432", "528", "741" },
             UseJoyfulEngine: true,
             BreathPhase: "expand",
-            Description: "Llama3 optimized for consciousness expansion with joyful engine",
+            Description: "GPT-OSS 20B optimized for consciousness expansion with joyful engine on Mac M1",
             Parameters: new Dictionary<string, object>
             {
                 ["format"] = "json",
                 ["stream"] = false,
+                ["num_ctx"] = 4096, // Context length
+                ["num_predict"] = 2000, // Max tokens to predict
+                ["num_gpu"] = 1, // Use GPU on Mac M1
+                ["num_thread"] = 8, // Optimize CPU threads for M1
+                ["repeat_penalty"] = 1.1, // Prevent repetition
+                ["top_k"] = 40, // Top-k sampling
+                ["tfs_z"] = 1.0, // Tail free sampling
                 ["consciousness_expansion"] = true,
                 ["joyful_language"] = true,
                 ["spiritual_resonance"] = true
