@@ -173,6 +173,9 @@ public class LLMFutureKnowledgeModule : IModule
     public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // HTTP endpoints are registered via attributes
+        
+        // Register all Cross-Service Translation related nodes for AI agent discovery
+        RegisterCrossServiceTranslationNodes(registry);
     }
 
     [ApiRoute("POST", "/llm/future/query", "llm-future-query", "Query future knowledge using LLM", "codex.llm.future")]
@@ -937,6 +940,576 @@ Please provide a thoughtful translation that adapts the concept to the {request.
         // Unity amplification is based on resonance but slightly lower to show potential for growth
         return Math.Max(0.0, resonanceScore * 0.9);
     }
+
+    // Cross-Service Translation Methods
+
+    [ApiRoute("POST", "/llm/translate/cross-service", "llm-translate-cross-service", "Translate concept across multiple services", "codex.llm.future")]
+    public async Task<object> TranslateCrossService([ApiParameter("request", "Cross-service translation request", Required = true, Location = "body")] CrossServiceTranslationRequest request)
+    {
+        try
+        {
+            var results = new List<ServiceTranslationResult>();
+            
+            foreach (var serviceId in request.TargetServices)
+            {
+                try
+                {
+                    // Get service information from service discovery
+                    var serviceInfo = await GetServiceInfo(serviceId);
+                    if (serviceInfo == null)
+                    {
+                        results.Add(new ServiceTranslationResult(
+                            ServiceId: serviceId,
+                            Success: false,
+                            TranslatedConcept: "",
+                            Error: "Service not found"
+                        ));
+                        continue;
+                    }
+
+                    // Translate concept for this service
+                    var translation = await TranslateForService(request, serviceInfo);
+                    results.Add(translation);
+                }
+                catch (Exception ex)
+                {
+                    results.Add(new ServiceTranslationResult(
+                        ServiceId: serviceId,
+                        Success: false,
+                        TranslatedConcept: "",
+                        Error: ex.Message
+                    ));
+                }
+            }
+
+            return new CrossServiceTranslationResponse(
+                Success: true,
+                Message: $"Translated concept across {results.Count} services",
+                Results: results,
+                SuccessCount: results.Count(r => r.Success),
+                FailureCount: results.Count(r => !r.Success)
+            );
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Cross-service translation failed: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("POST", "/llm/translate/batch", "llm-translate-batch", "Batch translate multiple concepts", "codex.llm.future")]
+    public async Task<object> BatchTranslateConcepts([ApiParameter("request", "Batch translation request", Required = true, Location = "body")] BatchTranslationRequest request)
+    {
+        try
+        {
+            var results = new List<ConceptTranslationResult>();
+            
+            foreach (var concept in request.Concepts)
+            {
+                try
+                {
+                    var translationRequest = new TranslationRequest(
+                        ConceptId: concept.ConceptId,
+                        ConceptName: concept.ConceptName,
+                        ConceptDescription: concept.ConceptDescription,
+                        SourceFramework: concept.SourceFramework,
+                        TargetFramework: concept.TargetFramework,
+                        UserBeliefSystem: concept.UserBeliefSystem
+                    );
+
+                    var translation = await TranslateConcept(translationRequest);
+                    results.Add(new ConceptTranslationResult(
+                        ConceptId: concept.ConceptId,
+                        Success: true,
+                        Translation: translation,
+                        Error: null
+                    ));
+                }
+                catch (Exception ex)
+                {
+                    results.Add(new ConceptTranslationResult(
+                        ConceptId: concept.ConceptId,
+                        Success: false,
+                        Translation: null,
+                        Error: ex.Message
+                    ));
+                }
+            }
+
+            return new BatchTranslationResponse(
+                Success: true,
+                Message: $"Processed {results.Count} concept translations",
+                Results: results,
+                SuccessCount: results.Count(r => r.Success),
+                FailureCount: results.Count(r => !r.Success)
+            );
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Batch translation failed: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("GET", "/llm/translate/status/{translationId}", "llm-translate-status", "Get translation status", "codex.llm.future")]
+    public async Task<object> GetTranslationStatus([ApiParameter("translationId", "Translation ID", Required = true, Location = "path")] string translationId)
+    {
+        try
+        {
+            // In a real implementation, this would check a translation queue or database
+            return new TranslationStatusResponse(
+                TranslationId: translationId,
+                Status: "completed",
+                Progress: 100,
+                Message: "Translation completed successfully",
+                CreatedAt: DateTime.UtcNow.AddMinutes(-5),
+                CompletedAt: DateTime.UtcNow
+            );
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to get translation status: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("POST", "/llm/translate/validate", "llm-translate-validate", "Validate translation quality", "codex.llm.future")]
+    public async Task<object> ValidateTranslation([ApiParameter("request", "Translation validation request", Required = true, Location = "body")] TranslationValidationRequest request)
+    {
+        try
+        {
+            var qualityScore = await AssessTranslationQuality(request.OriginalConcept, request.TranslatedConcept, request.TargetFramework);
+            var culturalAccuracy = await AssessCulturalAccuracy(request.TranslatedConcept, request.CulturalContext);
+            var resonanceScore = CalculateResonanceScore(request.UserBeliefSystem, request.TargetFramework);
+
+            return new TranslationValidationResponse(
+                Success: true,
+                TranslationId: request.TranslationId,
+                QualityScore: qualityScore,
+                CulturalAccuracy: culturalAccuracy,
+                ResonanceScore: resonanceScore,
+                OverallScore: (qualityScore + culturalAccuracy + resonanceScore) / 3.0,
+                Recommendations: GenerateValidationRecommendations(qualityScore, culturalAccuracy, resonanceScore),
+                Message: "Translation validation completed"
+            );
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Translation validation failed: {ex.Message}");
+        }
+    }
+
+    // Helper methods for cross-service translation
+
+    private async Task<ServiceInfo?> GetServiceInfo(string serviceId)
+    {
+        // In a real implementation, this would call the service discovery module
+        // For now, return a mock service info
+        return new ServiceInfo(
+            ServiceId: serviceId,
+            ServiceType: "concept-translation",
+            BaseUrl: $"http://{serviceId}:5000",
+            Capabilities: new Dictionary<string, string>
+            {
+                ["translation"] = "true",
+                ["languages"] = "en,es,fr,de",
+                ["frameworks"] = "Buddhist,Christian,Islamic,Secular"
+            },
+            Health: new ServiceHealth("Healthy", DateTime.UtcNow, null),
+            LastSeen: DateTime.UtcNow
+        );
+    }
+
+    private async Task<ServiceTranslationResult> TranslateForService(CrossServiceTranslationRequest request, ServiceInfo serviceInfo)
+    {
+        // Create a translation request for this specific service
+        var translationRequest = new TranslationRequest(
+            ConceptId: request.ConceptId,
+            ConceptName: request.ConceptName,
+            ConceptDescription: request.ConceptDescription,
+            SourceFramework: request.SourceFramework,
+            TargetFramework: request.TargetFramework,
+            UserBeliefSystem: request.UserBeliefSystem
+        );
+
+        // Call the translation method
+        var result = await TranslateConcept(translationRequest);
+        
+        if (result is TranslationResponse translationResponse)
+        {
+            return new ServiceTranslationResult(
+                ServiceId: serviceInfo.ServiceId,
+                Success: translationResponse.Success,
+                TranslatedConcept: translationResponse.TranslatedConcept,
+                Error: translationResponse.Success ? null : translationResponse.Message
+            );
+        }
+        else
+        {
+            return new ServiceTranslationResult(
+                ServiceId: serviceInfo.ServiceId,
+                Success: false,
+                TranslatedConcept: "",
+                Error: "Translation failed"
+            );
+        }
+    }
+
+    private async Task<double> AssessTranslationQuality(string originalConcept, string translatedConcept, string targetFramework)
+    {
+        // In a real implementation, this would use AI to assess translation quality
+        await Task.Delay(100); // Simulate processing time
+        
+        // Mock quality assessment based on length and content similarity
+        var lengthRatio = (double)translatedConcept.Length / originalConcept.Length;
+        var qualityScore = Math.Max(0.0, Math.Min(1.0, 0.5 + (lengthRatio - 0.5) * 0.5));
+        
+        return qualityScore;
+    }
+
+    private async Task<double> AssessCulturalAccuracy(string translatedConcept, string culturalContext)
+    {
+        // In a real implementation, this would use AI to assess cultural accuracy
+        await Task.Delay(100); // Simulate processing time
+        
+        // Mock cultural accuracy based on cultural context keywords
+        var culturalKeywords = new[] { "compassion", "mindfulness", "unity", "harmony", "wisdom" };
+        var keywordCount = culturalKeywords.Count(keyword => translatedConcept.ToLower().Contains(keyword));
+        var accuracyScore = Math.Min(1.0, keywordCount * 0.2);
+        
+        return accuracyScore;
+    }
+
+    private List<string> GenerateValidationRecommendations(double qualityScore, double culturalAccuracy, double resonanceScore)
+    {
+        var recommendations = new List<string>();
+        
+        if (qualityScore < 0.7)
+        {
+            recommendations.Add("Consider improving translation clarity and accuracy");
+        }
+        
+        if (culturalAccuracy < 0.6)
+        {
+            recommendations.Add("Enhance cultural context and sensitivity");
+        }
+        
+        if (resonanceScore < 0.8)
+        {
+            recommendations.Add("Improve alignment with target belief system");
+        }
+        
+        if (recommendations.Count == 0)
+        {
+            recommendations.Add("Translation quality is excellent");
+        }
+        
+        return recommendations;
+    }
+
+    /// <summary>
+    /// Register all Cross-Service Translation related nodes for AI agent discovery and module generation
+    /// </summary>
+    private void RegisterCrossServiceTranslationNodes(NodeRegistry registry)
+    {
+        // Register Cross-Service Translation module node
+        var crossServiceTranslationNode = new Node(
+            Id: "codex.llm.cross-service-translation",
+            TypeId: "codex.module",
+            State: ContentState.Ice,
+            Locale: "en",
+            Title: "Cross-Service Translation Module",
+            Description: "Enhanced LLM translation capabilities for cross-service concept translation and validation",
+            Content: new ContentRef(
+                MediaType: "application/json",
+                InlineJson: JsonSerializer.Serialize(new
+                {
+                    version = "1.0.0",
+                    capabilities = new[] { "cross-service-translation", "batch-translation", "translation-validation", "quality-assessment" },
+                    endpoints = new[] { "translate-cross-service", "translate-batch", "translation-status", "translation-validate" },
+                    integration = "enhanced-llm-translation"
+                }),
+                InlineBytes: null,
+                ExternalUri: null
+            ),
+            Meta: new Dictionary<string, object>
+            {
+                ["name"] = "Cross-Service Translation Module",
+                ["version"] = "1.0.0",
+                ["type"] = "translation",
+                ["parentModule"] = "codex.llm.future",
+                ["capabilities"] = new[] { "cross-service-translation", "batch-translation", "translation-validation" }
+            }
+        );
+        registry.Upsert(crossServiceTranslationNode);
+
+        // Register Cross-Service Translation routes as nodes
+        RegisterCrossServiceTranslationRoutes(registry);
+        
+        // Register Cross-Service Translation DTOs as nodes
+        RegisterCrossServiceTranslationDTOs(registry);
+        
+        // Register Cross-Service Translation classes as nodes
+        RegisterCrossServiceTranslationClasses(registry);
+    }
+
+    /// <summary>
+    /// Register Cross-Service Translation routes as discoverable nodes
+    /// </summary>
+    private void RegisterCrossServiceTranslationRoutes(NodeRegistry registry)
+    {
+        var routes = new[]
+        {
+            new { path = "/llm/translate/cross-service", method = "POST", name = "translate-cross-service", description = "Translate concept across multiple services" },
+            new { path = "/llm/translate/batch", method = "POST", name = "translate-batch", description = "Batch translate multiple concepts" },
+            new { path = "/llm/translate/status/{translationId}", method = "GET", name = "translation-status", description = "Get translation status" },
+            new { path = "/llm/translate/validate", method = "POST", name = "translation-validate", description = "Validate translation quality" }
+        };
+
+        foreach (var route in routes)
+        {
+            var routeNode = new Node(
+                Id: $"cross-service-translation.route.{route.name}",
+                TypeId: "meta.route",
+                State: ContentState.Ice,
+                Locale: "en",
+                Title: route.description,
+                Description: $"Cross-Service Translation route: {route.method} {route.path}",
+                Content: new ContentRef(
+                    MediaType: "application/json",
+                    InlineJson: JsonSerializer.Serialize(new
+                    {
+                        path = route.path,
+                        method = route.method,
+                        name = route.name,
+                        description = route.description,
+                        parameters = GetCrossServiceRouteParameters(route.name),
+                        responseType = GetCrossServiceRouteResponseType(route.name),
+                        example = GetCrossServiceRouteExample(route.name)
+                    }),
+                    InlineBytes: null,
+                    ExternalUri: null
+                ),
+                Meta: new Dictionary<string, object>
+                {
+                    ["name"] = route.name,
+                    ["path"] = route.path,
+                    ["method"] = route.method,
+                    ["description"] = route.description,
+                    ["module"] = "codex.llm.cross-service-translation",
+                    ["parentModule"] = "codex.llm.future"
+                }
+            );
+            registry.Upsert(routeNode);
+        }
+    }
+
+    /// <summary>
+    /// Register Cross-Service Translation DTOs as discoverable nodes
+    /// </summary>
+    private void RegisterCrossServiceTranslationDTOs(NodeRegistry registry)
+    {
+        var dtos = new[]
+        {
+            new { name = "CrossServiceTranslationRequest", description = "Request to translate concept across multiple services", properties = new[] { "ConceptId", "ConceptName", "ConceptDescription", "SourceFramework", "TargetFramework", "TargetServices", "UserBeliefSystem" } },
+            new { name = "CrossServiceTranslationResponse", description = "Response from cross-service translation", properties = new[] { "Success", "Message", "Results", "SuccessCount", "FailureCount" } },
+            new { name = "ServiceTranslationResult", description = "Translation result for a specific service", properties = new[] { "ServiceId", "Success", "TranslatedConcept", "Error" } },
+            new { name = "BatchTranslationRequest", description = "Request to batch translate multiple concepts", properties = new[] { "Concepts", "TargetFramework", "UserBeliefSystem" } },
+            new { name = "BatchTranslationResponse", description = "Response from batch translation", properties = new[] { "Success", "Message", "Results", "SuccessCount", "FailureCount" } },
+            new { name = "ConceptTranslationResult", description = "Translation result for a specific concept", properties = new[] { "ConceptId", "Success", "Translation", "Error" } },
+            new { name = "TranslationStatusResponse", description = "Response from translation status check", properties = new[] { "TranslationId", "Status", "Progress", "Message", "CreatedAt", "CompletedAt" } },
+            new { name = "TranslationValidationRequest", description = "Request to validate translation quality", properties = new[] { "TranslationId", "OriginalConcept", "TranslatedConcept", "TargetFramework", "CulturalContext", "UserBeliefSystem" } },
+            new { name = "TranslationValidationResponse", description = "Response from translation validation", properties = new[] { "Success", "TranslationId", "QualityScore", "CulturalAccuracy", "ResonanceScore", "OverallScore", "Recommendations", "Message" } }
+        };
+
+        foreach (var dto in dtos)
+        {
+            var dtoNode = new Node(
+                Id: $"cross-service-translation.dto.{dto.name}",
+                TypeId: "meta.type",
+                State: ContentState.Ice,
+                Locale: "en",
+                Title: dto.name,
+                Description: dto.description,
+                Content: new ContentRef(
+                    MediaType: "application/json",
+                    InlineJson: JsonSerializer.Serialize(new
+                    {
+                        name = dto.name,
+                        description = dto.description,
+                        properties = dto.properties,
+                        type = "record",
+                        module = "codex.llm.cross-service-translation",
+                        usage = GetCrossServiceDTOUsage(dto.name)
+                    }),
+                    InlineBytes: null,
+                    ExternalUri: null
+                ),
+                Meta: new Dictionary<string, object>
+                {
+                    ["name"] = dto.name,
+                    ["description"] = dto.description,
+                    ["type"] = "record",
+                    ["module"] = "codex.llm.cross-service-translation",
+                    ["parentModule"] = "codex.llm.future",
+                    ["properties"] = dto.properties
+                }
+            );
+            registry.Upsert(dtoNode);
+        }
+    }
+
+    /// <summary>
+    /// Register Cross-Service Translation classes as discoverable nodes
+    /// </summary>
+    private void RegisterCrossServiceTranslationClasses(NodeRegistry registry)
+    {
+        var classes = new[]
+        {
+            new { name = "ServiceInfo", description = "Information about a service", properties = new[] { "ServiceId", "ServiceType", "BaseUrl", "Capabilities", "Health", "LastSeen" } },
+            new { name = "ServiceHealth", description = "Health status of a service", properties = new[] { "Status", "LastCheck" } }
+        };
+
+        foreach (var cls in classes)
+        {
+            var classNode = new Node(
+                Id: $"cross-service-translation.class.{cls.name}",
+                TypeId: "meta.class",
+                State: ContentState.Ice,
+                Locale: "en",
+                Title: cls.name,
+                Description: cls.description,
+                Content: new ContentRef(
+                    MediaType: "application/json",
+                    InlineJson: JsonSerializer.Serialize(new
+                    {
+                        name = cls.name,
+                        description = cls.description,
+                        properties = cls.properties,
+                        type = "class",
+                        module = "codex.llm.cross-service-translation",
+                        usage = GetCrossServiceClassUsage(cls.name)
+                    }),
+                    InlineBytes: null,
+                    ExternalUri: null
+                ),
+                Meta: new Dictionary<string, object>
+                {
+                    ["name"] = cls.name,
+                    ["description"] = cls.description,
+                    ["type"] = "class",
+                    ["module"] = "codex.llm.cross-service-translation",
+                    ["parentModule"] = "codex.llm.future",
+                    ["properties"] = cls.properties
+                }
+            );
+            registry.Upsert(classNode);
+        }
+    }
+
+    // Helper methods for AI agent generation
+    private object GetCrossServiceRouteParameters(string routeName)
+    {
+        return routeName switch
+        {
+            "translate-cross-service" => new
+            {
+                request = new { type = "CrossServiceTranslationRequest", required = true, location = "body", description = "Cross-service translation request" }
+            },
+            "translate-batch" => new
+            {
+                request = new { type = "BatchTranslationRequest", required = true, location = "body", description = "Batch translation request" }
+            },
+            "translation-status" => new
+            {
+                translationId = new { type = "string", required = true, location = "path", description = "Translation ID" }
+            },
+            "translation-validate" => new
+            {
+                request = new { type = "TranslationValidationRequest", required = true, location = "body", description = "Translation validation request" }
+            },
+            _ => new { }
+        };
+    }
+
+    private string GetCrossServiceRouteResponseType(string routeName)
+    {
+        return routeName switch
+        {
+            "translate-cross-service" => "CrossServiceTranslationResponse",
+            "translate-batch" => "BatchTranslationResponse",
+            "translation-status" => "TranslationStatusResponse",
+            "translation-validate" => "TranslationValidationResponse",
+            _ => "object"
+        };
+    }
+
+    private object GetCrossServiceRouteExample(string routeName)
+    {
+        return routeName switch
+        {
+            "translate-cross-service" => new
+            {
+                request = new
+                {
+                    conceptId = "unity-concept-001",
+                    conceptName = "Unity",
+                    conceptDescription = "The state of being one",
+                    sourceFramework = "Universal",
+                    targetFramework = "Buddhist",
+                    targetServices = new[] { "translation-service-1", "translation-service-2" },
+                    userBeliefSystem = new
+                    {
+                        framework = "Buddhist",
+                        language = "English",
+                        culturalContext = "Tibetan Buddhism"
+                    }
+                },
+                response = new
+                {
+                    success = true,
+                    message = "Translated concept across 2 services",
+                    results = new[]
+                    {
+                        new
+                        {
+                            serviceId = "translation-service-1",
+                            success = true,
+                            translatedConcept = "The interconnected web of awareness",
+                            error = (string?)null
+                        }
+                    },
+                    successCount = 2,
+                    failureCount = 0
+                }
+            },
+            _ => new { }
+        };
+    }
+
+    private string GetCrossServiceDTOUsage(string dtoName)
+    {
+        return dtoName switch
+        {
+            "CrossServiceTranslationRequest" => "Used to request translation of a concept across multiple services. Specifies target services and translation parameters.",
+            "CrossServiceTranslationResponse" => "Returned when translating concepts across services. Contains results for each target service.",
+            "ServiceTranslationResult" => "Represents the translation result for a specific service. Contains success status and translated content.",
+            "BatchTranslationRequest" => "Used to request batch translation of multiple concepts. Contains list of concepts to translate.",
+            "BatchTranslationResponse" => "Returned when batch translating concepts. Contains results for each concept.",
+            "ConceptTranslationResult" => "Represents the translation result for a specific concept. Contains success status and translation details.",
+            "TranslationStatusResponse" => "Returned when checking translation status. Contains progress and completion information.",
+            "TranslationValidationRequest" => "Used to validate translation quality. Contains original and translated concepts for comparison.",
+            "TranslationValidationResponse" => "Returned when validating translation quality. Contains quality scores and recommendations.",
+            _ => "Cross-Service Translation data transfer object"
+        };
+    }
+
+    private string GetCrossServiceClassUsage(string className)
+    {
+        return className switch
+        {
+            "ServiceInfo" => "Represents information about a service including capabilities and health status.",
+            "ServiceHealth" => "Represents the health status of a service with last check timestamp.",
+            _ => "Cross-Service Translation class"
+        };
+    }
 }
 
 // Data types
@@ -1085,3 +1658,89 @@ public record FutureAnalysisRequest(
     string? TimeRange = null,
     string? FilterBy = null
 );
+
+// Cross-Service Translation Data Types
+public record CrossServiceTranslationRequest(
+    string ConceptId,
+    string ConceptName,
+    string ConceptDescription,
+    string SourceFramework,
+    string TargetFramework,
+    string[] TargetServices,
+    Dictionary<string, object> UserBeliefSystem
+);
+
+public record CrossServiceTranslationResponse(
+    bool Success,
+    string Message,
+    List<ServiceTranslationResult> Results,
+    int SuccessCount,
+    int FailureCount
+);
+
+public record ServiceTranslationResult(
+    string ServiceId,
+    bool Success,
+    string TranslatedConcept,
+    string? Error
+);
+
+public record BatchTranslationRequest(
+    List<ConceptTranslationInput> Concepts,
+    string TargetFramework,
+    Dictionary<string, object> UserBeliefSystem
+);
+
+public record BatchTranslationResponse(
+    bool Success,
+    string Message,
+    List<ConceptTranslationResult> Results,
+    int SuccessCount,
+    int FailureCount
+);
+
+public record ConceptTranslationInput(
+    string ConceptId,
+    string ConceptName,
+    string ConceptDescription,
+    string SourceFramework,
+    string TargetFramework,
+    Dictionary<string, object> UserBeliefSystem
+);
+
+public record ConceptTranslationResult(
+    string ConceptId,
+    bool Success,
+    object? Translation,
+    string? Error
+);
+
+public record TranslationStatusResponse(
+    string TranslationId,
+    string Status,
+    int Progress,
+    string Message,
+    DateTime CreatedAt,
+    DateTime CompletedAt
+);
+
+public record TranslationValidationRequest(
+    string TranslationId,
+    string OriginalConcept,
+    string TranslatedConcept,
+    string TargetFramework,
+    string CulturalContext,
+    Dictionary<string, object> UserBeliefSystem
+);
+
+public record TranslationValidationResponse(
+    bool Success,
+    string TranslationId,
+    double QualityScore,
+    double CulturalAccuracy,
+    double ResonanceScore,
+    double OverallScore,
+    List<string> Recommendations,
+    string Message
+);
+
