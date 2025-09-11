@@ -24,6 +24,13 @@ public sealed record PatchDoc(
 
 public sealed class DeltaModule : IModule
 {
+    private readonly NodeRegistry _registry;
+
+    public DeltaModule(NodeRegistry registry)
+    {
+        _registry = registry;
+    }
+
     public Node GetModuleNode()
     {
         return NodeStorage.CreateModuleNode(
@@ -119,92 +126,75 @@ public sealed class DeltaModule : IModule
         registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.delta", "patch"));
     }
 
+    [ApiRoute("GET", "/diff/{id}", "diff", "Generate diff between two nodes", "codex.delta")]
+    public async Task<object> DiffNodes([ApiParameter("id", "Source node ID", Required = true, Location = "path")] string id, [ApiParameter("against", "Base node ID to compare against", Required = true, Location = "query")] string against)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(against))
+            {
+                return new ErrorResponse("Both 'id' and 'against' parameters are required");
+            }
+
+            if (!_registry.TryGet(id, out var sourceNode))
+            {
+                return new ErrorResponse($"Source node '{id}' not found");
+            }
+
+            if (!_registry.TryGet(against, out var againstNode))
+            {
+                return new ErrorResponse($"Base node '{against}' not found");
+            }
+
+            // Generate patch operations by comparing the two nodes
+            var ops = await Task.Run(() => GeneratePatchOps(againstNode, sourceNode));
+
+            var patch = new PatchDoc(TargetId: against, Ops: ops);
+
+            return new DiffResponse(SourceId: id, TargetId: against, Patch: patch);
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to generate diff: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("POST", "/patch/{targetId}", "patch", "Apply patch to target node", "codex.delta")]
+    public async Task<object> PatchNode([ApiParameter("targetId", "Target node ID", Required = true, Location = "path")] string targetId, [ApiParameter("patch", "Patch document to apply", Required = true, Location = "body")] PatchDoc patch)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(targetId))
+            {
+                return new ErrorResponse("Target ID is required");
+            }
+
+            if (patch == null)
+            {
+                return new ErrorResponse("Patch document is required");
+            }
+
+            if (!_registry.TryGet(targetId, out var targetNode))
+            {
+                return new ErrorResponse($"Target node '{targetId}' not found");
+            }
+
+            // Apply the patch operations
+            var patchedNode = await Task.Run(() => ApplyPatch(targetNode, patch));
+            _registry.Upsert(patchedNode);
+
+            return new PatchResponse(TargetId: targetId, Success: true, Message: "Patch applied successfully");
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to apply patch: {ex.Message}");
+        }
+    }
+
     public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
     {
-        router.Register("codex.delta", "diff", async args =>
-        {
-            try
-            {
-                if (args == null || !args.HasValue)
-                {
-                    return new ErrorResponse("Missing request parameters");
-                }
-
-                var sourceId = args.Value.TryGetProperty("id", out var idElement) ? idElement.GetString() : null;
-                var againstId = args.Value.TryGetProperty("against", out var againstElement) ? againstElement.GetString() : null;
-
-                if (string.IsNullOrEmpty(sourceId) || string.IsNullOrEmpty(againstId))
-                {
-                    return new ErrorResponse("Both 'id' and 'against' parameters are required");
-                }
-
-                if (!registry.TryGet(sourceId, out var sourceNode))
-                {
-                    return new ErrorResponse($"Source node '{sourceId}' not found");
-                }
-
-                if (!registry.TryGet(againstId, out var againstNode))
-                {
-                    return new ErrorResponse($"Base node '{againstId}' not found");
-                }
-
-                // Generate patch operations by comparing the two nodes
-                var ops = await Task.Run(() => GeneratePatchOps(againstNode, sourceNode));
-
-                var patch = new PatchDoc(TargetId: againstId, Ops: ops);
-
-                return new DiffResponse(SourceId: sourceId, TargetId: againstId, Patch: patch);
-            }
-            catch (Exception ex)
-            {
-                return new ErrorResponse($"Failed to generate diff: {ex.Message}");
-            }
-        });
-
-        router.Register("codex.delta", "patch", async args =>
-        {
-            try
-            {
-                if (args == null || !args.HasValue)
-                {
-                    return new ErrorResponse("Missing request body");
-                }
-
-                var targetId = args.Value.TryGetProperty("targetId", out var targetElement) ? targetElement.GetString() : null;
-                var patchJson = args.Value.TryGetProperty("patch", out var patchElement) ? patchElement.GetRawText() : null;
-
-                if (string.IsNullOrEmpty(targetId) || string.IsNullOrEmpty(patchJson))
-                {
-                    return new ErrorResponse("Both 'targetId' and 'patch' are required");
-                }
-
-                var patch = JsonSerializer.Deserialize<PatchDoc>(patchJson, new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                    Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
-                });
-
-                if (patch == null)
-                {
-                    return new ErrorResponse("Invalid patch document");
-                }
-
-                if (!registry.TryGet(targetId, out var targetNode))
-                {
-                    return new ErrorResponse($"Target node '{targetId}' not found");
-                }
-
-                // Apply the patch operations
-                var patchedNode = await Task.Run(() => ApplyPatch(targetNode, patch));
-                registry.Upsert(patchedNode);
-
-                return new PatchResponse(TargetId: targetId, Success: true);
-            }
-            catch (Exception ex)
-            {
-                return new ErrorResponse($"Failed to apply patch: {ex.Message}");
-            }
-        });
+        // Delta module uses ApiRoute attributes for endpoint registration
+        // No additional API handlers needed
     }
 
     private static IReadOnlyList<PatchOp> GeneratePatchOps(Node fromNode, Node toNode)

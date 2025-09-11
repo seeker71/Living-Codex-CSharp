@@ -12,6 +12,13 @@ public record IngestResponse(ModuleSpec Spec, bool Success, string Message);
 
 public sealed class SpecReflectionModule : IModule
 {
+    private readonly NodeRegistry _registry;
+
+    public SpecReflectionModule(NodeRegistry registry)
+    {
+        _registry = registry;
+    }
+
     public Node GetModuleNode()
     {
         return NodeStorage.CreateModuleNode(
@@ -95,74 +102,61 @@ public sealed class SpecReflectionModule : IModule
         registry.Upsert(ingestApiNode);
     }
 
+    [ApiRoute("GET", "/reflect/spec/{id}", "reflect-spec", "Reflect a module spec to meta-nodes", "codex.reflect")]
+    public async Task<object> ReflectSpec([ApiParameter("id", "Spec ID to reflect", Required = true, Location = "path")] string id)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                return new ErrorResponse("Spec ID is required");
+            }
+
+            // Find the spec node
+            var specNode = _registry.GetNodesByType("codex.meta/spec")
+                .FirstOrDefault(n => n.Id == id || n.Meta?.GetValueOrDefault("specId")?.ToString() == id);
+
+            if (specNode == null)
+            {
+                return new ErrorResponse($"Spec with ID '{id}' not found");
+            }
+
+            // Convert spec to meta-nodes
+            var metaNodes = await Task.Run(() => ReflectSpecToMetaNodes(specNode, _registry));
+            
+            return new ReflectResponse(metaNodes, id);
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to reflect spec: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("POST", "/ingest/spec", "ingest-spec", "Ingest meta-nodes to build a module spec", "codex.reflect")]
+    public async Task<object> IngestSpec([ApiParameter("metaNodes", "Meta nodes to ingest", Required = true, Location = "body")] List<Node> metaNodes)
+    {
+        try
+        {
+            if (metaNodes == null || !metaNodes.Any())
+            {
+                return new ErrorResponse("No meta nodes provided");
+            }
+
+            // Convert meta-nodes back to spec
+            var spec = await Task.Run(() => IngestMetaNodesToSpec(metaNodes));
+            
+            return new IngestResponse(spec, true, "Successfully ingested meta-nodes to spec");
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to ingest meta-nodes: {ex.Message}");
+        }
+    }
+
     public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
     {
-        router.Register("codex.reflect", "reflect", async args =>
-        {
-            try
-            {
-                var specId = args?.GetProperty("id").GetString();
-                if (string.IsNullOrEmpty(specId))
-                {
-                    return new ErrorResponse("Spec ID is required");
-                }
-
-                // Find the spec node
-                var specNode = registry.GetNodesByType("codex.meta/spec")
-                    .FirstOrDefault(n => n.Id == specId || n.Meta?.GetValueOrDefault("specId")?.ToString() == specId);
-
-                if (specNode == null)
-                {
-                    return new ErrorResponse($"Spec with ID '{specId}' not found");
-                }
-
-                // Convert spec to meta-nodes
-                var metaNodes = await Task.Run(() => ReflectSpecToMetaNodes(specNode, registry));
-                
-                return new ReflectResponse(metaNodes, specId);
-            }
-            catch (Exception ex)
-            {
-                return new ErrorResponse($"Failed to reflect spec: {ex.Message}");
-            }
-        });
-
-        router.Register("codex.reflect", "ingest", async args =>
-        {
-            try
-            {
-                if (args == null)
-                {
-                    return new ErrorResponse("Meta nodes are required");
-                }
-
-                var metaNodesJson = args?.GetProperty("metaNodes").GetRawText();
-                if (string.IsNullOrEmpty(metaNodesJson))
-                {
-                    return new ErrorResponse("Meta nodes JSON is required");
-                }
-                
-                var metaNodes = JsonSerializer.Deserialize<List<Node>>(metaNodesJson, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true,
-                    Converters = { new JsonStringEnumConverter() }
-                });
-
-                if (metaNodes == null || !metaNodes.Any())
-                {
-                    return new ErrorResponse("No meta nodes provided");
-                }
-
-                // Convert meta-nodes back to spec
-                var spec = await Task.Run(() => IngestMetaNodesToSpec(metaNodes));
-                
-                return new IngestResponse(spec, true, "Successfully ingested meta-nodes to spec");
-            }
-            catch (Exception ex)
-            {
-                return new ErrorResponse($"Failed to ingest meta-nodes: {ex.Message}");
-            }
-        });
+        // Spec Reflection module uses ApiRoute attributes for endpoint registration
+        // No additional API handlers needed
     }
 
     private static List<Node> ReflectSpecToMetaNodes(Node specNode, NodeRegistry registry)
