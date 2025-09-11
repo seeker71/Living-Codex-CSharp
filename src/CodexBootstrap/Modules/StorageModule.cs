@@ -35,15 +35,34 @@ public sealed class StorageModule : IModule
             // Check for environment variables or configuration
             var storageType = Environment.GetEnvironmentVariable("STORAGE_TYPE")?.ToLower() ?? "jsonfile";
             var storagePath = Environment.GetEnvironmentVariable("STORAGE_PATH") ?? "data";
+            var clusterId = Environment.GetEnvironmentVariable("CLUSTER_ID");
+            var seedNodes = Environment.GetEnvironmentVariable("SEED_NODES")?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
             
             _logger.Info($"Configuring storage backend: {storageType} at {storagePath}");
 
-            return storageType switch
+            IStorageBackend baseBackend = storageType switch
             {
                 "sqlite" => new SqliteStorageBackend(storagePath),
                 "jsonfile" => new JsonFileStorageBackend(storagePath),
                 _ => new JsonFileStorageBackend(storagePath)
             };
+
+            // If cluster configuration is provided, wrap with distributed storage
+            if (!string.IsNullOrEmpty(clusterId) && seedNodes.Length > 0)
+            {
+                var clusterConfig = new ClusterConfig(
+                    ClusterId: clusterId,
+                    SeedNodes: seedNodes,
+                    ReplicationFactor: int.Parse(Environment.GetEnvironmentVariable("REPLICATION_FACTOR") ?? "3"),
+                    ReadConsistencyLevel: int.Parse(Environment.GetEnvironmentVariable("READ_CONSISTENCY") ?? "1"),
+                    WriteConsistencyLevel: int.Parse(Environment.GetEnvironmentVariable("WRITE_CONSISTENCY") ?? "1")
+                );
+                
+                _logger.Info($"Configuring distributed storage with cluster ID: {clusterId}, seed nodes: {string.Join(", ", seedNodes)}");
+                return new DistributedStorageBackend(baseBackend, clusterConfig);
+            }
+
+            return baseBackend;
         }
         catch (Exception ex)
         {
