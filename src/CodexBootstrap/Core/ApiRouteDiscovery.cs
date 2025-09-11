@@ -17,6 +17,7 @@ namespace CodexBootstrap.Core;
 public static class ApiRouteDiscovery
 {
     private static readonly ILogger _logger = new Log4NetLogger(typeof(ApiRouteDiscovery));
+    private static readonly Dictionary<Type, object> _moduleInstances = new();
     /// <summary>
     /// Discovers and registers all API routes from attributes in the current assembly
     /// </summary>
@@ -270,83 +271,79 @@ public static class ApiRouteDiscovery
     /// </summary>
     private static object CreateModuleInstance(Type moduleType, IApiRouter router, NodeRegistry registry)
     {
+        // Check if we already have an instance of this module type
+        if (_moduleInstances.TryGetValue(moduleType, out var existingInstance))
+        {
+            return existingInstance;
+        }
+
+        object instance;
+
         // Try to find a constructor that takes IApiRouter and NodeRegistry
         var constructor = moduleType.GetConstructor(new[] { typeof(IApiRouter), typeof(NodeRegistry) });
         if (constructor != null)
         {
-            return Activator.CreateInstance(moduleType, router, registry)!;
+            instance = Activator.CreateInstance(moduleType, router, registry)!;
         }
-
         // Try to find a constructor that takes just IApiRouter
-        constructor = moduleType.GetConstructor(new[] { typeof(IApiRouter) });
-        if (constructor != null)
+        else if ((constructor = moduleType.GetConstructor(new[] { typeof(IApiRouter) })) != null)
         {
-            return Activator.CreateInstance(moduleType, router)!;
+            instance = Activator.CreateInstance(moduleType, router)!;
         }
-
         // Try to find a constructor that takes just NodeRegistry
-        constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry) });
-        if (constructor != null)
+        else if ((constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry) })) != null)
         {
-            return Activator.CreateInstance(moduleType, registry)!;
+            instance = Activator.CreateInstance(moduleType, registry)!;
         }
-
         // Try to find a constructor that takes NodeRegistry and optional RealtimeModule
-        constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(RealtimeModule) });
-        if (constructor != null)
+        else if ((constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(RealtimeModule) })) != null)
         {
-            return Activator.CreateInstance(moduleType, registry, (RealtimeModule?)null)!;
+            instance = Activator.CreateInstance(moduleType, registry, (RealtimeModule?)null)!;
         }
-
         // Try to find a constructor that takes NodeRegistry and optional string
-        constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(string) });
-        if (constructor != null)
+        else if ((constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(string) })) != null)
         {
-            return Activator.CreateInstance(moduleType, registry, (string?)null)!;
+            instance = Activator.CreateInstance(moduleType, registry, (string?)null)!;
         }
-
         // Try to find a constructor that takes NodeRegistry and optional IStorageBackend
-        constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(IStorageBackend) });
-        if (constructor != null)
+        else if ((constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(IStorageBackend) })) != null)
         {
-            return Activator.CreateInstance(moduleType, registry, (IStorageBackend?)null)!;
+            instance = Activator.CreateInstance(moduleType, registry, (IStorageBackend?)null)!;
         }
-
         // Try to find a constructor that takes NodeRegistry and optional ICacheManager
-        constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(ICacheManager) });
-        if (constructor != null)
+        else if ((constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(ICacheManager) })) != null)
         {
-            return Activator.CreateInstance(moduleType, registry, (ICacheManager?)null)!;
+            instance = Activator.CreateInstance(moduleType, registry, (ICacheManager?)null)!;
         }
-
         // Try to find a constructor that takes NodeRegistry and optional IDistributedStorageBackend
-        constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(IDistributedStorageBackend) });
-        if (constructor != null)
+        else if ((constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(IDistributedStorageBackend) })) != null)
         {
-            return Activator.CreateInstance(moduleType, registry, (IDistributedStorageBackend?)null)!;
+            instance = Activator.CreateInstance(moduleType, registry, (IDistributedStorageBackend?)null)!;
         }
-
         // Try to find a constructor that takes NodeRegistry and IApiRouter (different order)
-        constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(IApiRouter) });
-        if (constructor != null)
+        else if ((constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(IApiRouter) })) != null)
         {
-            return Activator.CreateInstance(moduleType, registry, router)!;
+            instance = Activator.CreateInstance(moduleType, registry, router)!;
         }
-
         // Try to find a constructor that takes IServiceProvider
-        constructor = moduleType.GetConstructor(new[] { typeof(IServiceProvider) });
-        if (constructor != null)
+        else if ((constructor = moduleType.GetConstructor(new[] { typeof(IServiceProvider) })) != null)
         {
             // Create a minimal service provider
             var services = new ServiceCollection();
             services.AddSingleton(router);
             services.AddSingleton(registry);
             var serviceProvider = services.BuildServiceProvider();
-            return Activator.CreateInstance(moduleType, serviceProvider)!;
+            instance = Activator.CreateInstance(moduleType, serviceProvider)!;
+        }
+        // Fallback to parameterless constructor
+        else
+        {
+            instance = Activator.CreateInstance(moduleType)!;
         }
 
-        // Fallback to parameterless constructor
-        return Activator.CreateInstance(moduleType)!;
+        // Cache the instance for reuse
+        _moduleInstances[moduleType] = instance;
+        return instance;
     }
 
     /// <summary>
