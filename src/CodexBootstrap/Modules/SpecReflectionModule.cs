@@ -112,9 +112,17 @@ public sealed class SpecReflectionModule : IModule
                 return new ErrorResponse("Spec ID is required");
             }
 
-            // Find the spec node
-            var specNode = _registry.GetNodesByType("codex.meta/spec")
-                .FirstOrDefault(n => n.Id == id || n.Meta?.GetValueOrDefault("specId")?.ToString() == id);
+            // Find the spec node - look for module nodes with matching ID
+            var specNode = _registry.GetNodesByType("codex.meta/module")
+                .FirstOrDefault(n => n.Id == id || n.Meta?.GetValueOrDefault("moduleId")?.ToString() == id);
+
+            if (specNode == null)
+            {
+                // Also try to find by looking for nodes with the spec ID in meta
+                specNode = _registry.AllNodes()
+                    .FirstOrDefault(n => n.Meta?.GetValueOrDefault("specId")?.ToString() == id ||
+                                       n.Meta?.GetValueOrDefault("moduleId")?.ToString() == id);
+            }
 
             if (specNode == null)
             {

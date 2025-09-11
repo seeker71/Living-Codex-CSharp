@@ -45,6 +45,8 @@ public sealed class HydrateModule : IModule
             {
                 // Extract nodeId from route parameters (passed by RouteDiscovery)
                 string? nodeId = null;
+                string? description = null;
+                string? typeId = null;
                 
                 if (args != null && args.HasValue)
                 {
@@ -56,6 +58,10 @@ public sealed class HydrateModule : IModule
                     {
                         nodeId = args.Value.TryGetProperty("nodeId", out var nodeIdElement) ? nodeIdElement.GetString() : null;
                     }
+                    
+                    // Get description and typeId for new node creation
+                    description = args.Value.TryGetProperty("description", out var descElement) ? descElement.GetString() : null;
+                    typeId = args.Value.TryGetProperty("typeId", out var typeElement) ? typeElement.GetString() : "codex.meta/content";
                 }
 
                 if (string.IsNullOrEmpty(nodeId))
@@ -63,10 +69,41 @@ public sealed class HydrateModule : IModule
                     return new ErrorResponse("Node ID is required");
                 }
 
-                // Get the node from registry
-                if (!registry.TryGet(nodeId, out var node))
+                Node node;
+                
+                // Check if node exists in registry
+                if (!registry.TryGet(nodeId, out node))
                 {
-                    return new ErrorResponse($"Node '{nodeId}' not found");
+                    // Create new node if it doesn't exist
+                    if (string.IsNullOrEmpty(description))
+                    {
+                        return new ErrorResponse($"Node '{nodeId}' not found and no description provided for creation");
+                    }
+                    
+                    // Create a new node in Ice state
+                    node = new Node(
+                        Id: nodeId,
+                        TypeId: typeId ?? "codex.meta/content",
+                        State: ContentState.Ice,
+                        Locale: "en",
+                        Title: nodeId,
+                        Description: description,
+                        Content: new ContentRef(
+                            MediaType: "application/json",
+                            InlineJson: JsonSerializer.Serialize(new { description, typeId, state = "ice" }),
+                            InlineBytes: null,
+                            ExternalUri: null
+                        ),
+                        Meta: new Dictionary<string, object>
+                        {
+                            ["createdAt"] = DateTime.UtcNow.ToString("O"),
+                            ["state"] = "ice",
+                            ["isNew"] = true
+                        }
+                    );
+                    
+                    // Register the new node
+                    registry.Upsert(node);
                 }
 
                 // Real hydration: promote Gas/Ice → Water via adapters/synthesizer

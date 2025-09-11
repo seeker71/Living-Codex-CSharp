@@ -150,9 +150,13 @@ public sealed class SpecModule : IModule
             }
 
             // Import atoms for the module
-            if (request.Atoms.HasValue)
+            if (request.Atoms != null && request.Atoms.Value.ValueKind != JsonValueKind.Null)
             {
                 await StoreAtomsAsNodes(request.ModuleId, request.Atoms.Value);
+            }
+            else
+            {
+                return new ErrorResponse("Atoms data is required for import");
             }
             return new SpecImportResponse(request.ModuleId, true);
         }
@@ -206,9 +210,18 @@ public sealed class SpecModule : IModule
     {
         try
         {
+            Console.WriteLine($"StoreAtomsAsNodes called for moduleId: {moduleId}");
+            Console.WriteLine($"Atoms JSON: {atoms.GetRawText()}");
+            
             // Parse atoms JSON
             var atomsData = JsonSerializer.Deserialize<AtomsData>(atoms.GetRawText());
-            if (atomsData == null) return Task.CompletedTask;
+            if (atomsData == null) 
+            {
+                Console.WriteLine("AtomsData is null after deserialization");
+                return Task.CompletedTask;
+            }
+            
+            Console.WriteLine($"Parsed {atomsData.Nodes?.Count ?? 0} nodes and {atomsData.Edges?.Count ?? 0} edges");
 
             // Store nodes
             foreach (var nodeData in atomsData.Nodes ?? new List<NodeData>())

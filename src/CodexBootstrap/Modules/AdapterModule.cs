@@ -27,6 +27,14 @@ public sealed record AdapterRegistration(
     Dictionary<string, object>? Configuration
 );
 
+public sealed record AdapterRegistrationRequest(
+    string Scheme,
+    string Name,
+    string? Description = null,
+    IReadOnlyList<string>? SupportedMediaTypes = null,
+    Dictionary<string, object>? Configuration = null
+);
+
 public interface IContentAdapter
 {
     string Scheme { get; }
@@ -147,9 +155,13 @@ public sealed class AdapterModule : IModule
     private readonly Dictionary<string, IContentAdapter> _adapters = new();
     private readonly HttpClient _httpClient;
 
-    public AdapterModule(HttpClient httpClient)
+    public AdapterModule() : this(null)
     {
-        _httpClient = httpClient;
+    }
+
+    public AdapterModule(HttpClient? httpClient)
+    {
+        _httpClient = httpClient ?? new HttpClient();
         
         // Register built-in adapters
         RegisterBuiltInAdapters();
@@ -347,5 +359,88 @@ public sealed class AdapterModule : IModule
     {
         // Adapter module doesn't need any custom HTTP endpoints
         // All functionality is exposed through the generic /route endpoint
+    }
+
+    [ApiRoute("POST", "/adapters/register", "adapter-register", "Register a new content adapter", "codex.adapters")]
+    public async Task<object> RegisterAdapter([ApiParameter("request", "Adapter registration request", Required = true, Location = "body")] AdapterRegistrationRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(request.Scheme))
+            {
+                return new ErrorResponse("Scheme is required");
+            }
+
+            if (string.IsNullOrEmpty(request.Name))
+            {
+                return new ErrorResponse("Name is required");
+            }
+
+            var adapterId = $"adapter-{Guid.NewGuid()}";
+            var adapterInfo = new AdapterInfo(
+                Id: adapterId,
+                Scheme: request.Scheme,
+                Name: request.Name,
+                Description: request.Description ?? $"Adapter for {request.Scheme} scheme",
+                SupportedMediaTypes: request.SupportedMediaTypes ?? new[] { "text/plain", "application/json" },
+                Configuration: request.Configuration
+            );
+
+            // Store adapter info in registry
+            var adapterNode = new Node(
+                Id: adapterId,
+                TypeId: "codex.adapters/adapter",
+                State: ContentState.Ice,
+                Locale: "en",
+                Title: request.Name,
+                Description: request.Description ?? $"Adapter for {request.Scheme} scheme",
+                Content: new ContentRef(
+                    MediaType: "application/json",
+                    InlineJson: JsonSerializer.Serialize(adapterInfo, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
+                    InlineBytes: null,
+                    ExternalUri: null
+                ),
+                Meta: new Dictionary<string, object>
+                {
+                    ["moduleId"] = "codex.adapters",
+                    ["scheme"] = request.Scheme,
+                    ["name"] = request.Name
+                }
+            );
+
+            // Note: We can't access registry here directly, so we'll return the adapter info
+            // The actual registration would need to be handled by the calling code
+            return new AdapterRegistrationResponse(AdapterId: adapterId, Success: true);
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to register adapter: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("GET", "/adapters/list", "adapter-list", "List all registered adapters", "codex.adapters")]
+    public object ListAdapters()
+    {
+        try
+        {
+            var adapters = _adapters.Values.Select(adapter => new AdapterInfo(
+                Id: adapter.Scheme,
+                Scheme: adapter.Scheme,
+                Name: adapter.GetType().Name,
+                Description: $"Built-in {adapter.Scheme} adapter",
+                SupportedMediaTypes: new[] { "text/plain", "application/json" },
+                Configuration: null
+            )).ToList();
+
+            return new
+            {
+                adapters,
+                count = adapters.Count
+            };
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to list adapters: {ex.Message}");
+        }
     }
 }

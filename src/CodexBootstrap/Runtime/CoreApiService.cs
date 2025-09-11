@@ -62,8 +62,14 @@ public sealed class CoreApiService
     
     private IEnumerable<string> GetAvailableApisForModule(string moduleId)
     {
-        // This is a simplified version - in a real implementation, you'd want to track this more efficiently
-        return new[] { "No APIs available" };
+        // Get all API nodes for this module
+        var apiNodes = _registry.GetNodesByType("api")
+            .Where(node => node.Meta?.GetValueOrDefault("moduleId")?.ToString() == moduleId)
+            .Select(node => node.Meta?.GetValueOrDefault("apiName")?.ToString())
+            .Where(name => !string.IsNullOrEmpty(name))
+            .Cast<string>();
+        
+        return apiNodes.Any() ? apiNodes : new[] { "No APIs available" };
     }
 
     public List<Node> GetNodes() => _registry.AllNodes().ToList();

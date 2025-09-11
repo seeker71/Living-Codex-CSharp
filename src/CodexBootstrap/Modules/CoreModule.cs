@@ -35,15 +35,15 @@ public sealed class CoreModule : IModule
     public void Register(NodeRegistry registry)
     {
         // Register API nodes
-        var atomsApi = NodeStorage.CreateApiNode("codex.core", "atoms", "/core/atoms", "Get core atoms");
-        var specApi = NodeStorage.CreateApiNode("codex.core", "spec", "/core/spec", "Get core spec");
+        var atomsApi = NodeStorage.CreateApiNode("codex.core", "core-atoms", "/core/atoms", "Get core atoms");
+        var specApi = NodeStorage.CreateApiNode("codex.core", "core-spec", "/core/spec", "Get core spec");
         
         registry.Upsert(atomsApi);
         registry.Upsert(specApi);
         
         // Register edges
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.core", "atoms"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.core", "spec"));
+        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.core", "core-atoms"));
+        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.core", "core-spec"));
     }
 
     public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)

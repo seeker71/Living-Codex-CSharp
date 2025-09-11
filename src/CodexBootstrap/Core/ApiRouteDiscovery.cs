@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Json;
+using CodexBootstrap.Modules;
 using CodexBootstrap.Runtime;
 
 namespace CodexBootstrap.Core;
@@ -247,70 +250,11 @@ public static class ApiRouteDiscovery
         {
             try
             {
-                // Create instance with proper dependency injection
                 var instance = CreateModuleInstance(method.DeclaringType!, router, registry);
-                
-                // Get method parameters
                 var parameters = method.GetParameters();
-                object[] args;
-                
-                if (parameters.Length == 0)
-                {
-                    // No parameters
-                    args = Array.Empty<object>();
-                }
-                else if (parameters.Length == 1 && parameters[0].ParameterType == typeof(string))
-                {
-                    // Single string parameter - this is likely a path parameter
-                    args = new[] { request ?? "test-node-123" };
-                }
-                else if (parameters.Length == 1 && request != null)
-                {
-                    // Single parameter - use the request
-                    args = new[] { request };
-                }
-                else
-                {
-                    // Multiple parameters - try to match by type or use defaults
-                    args = new object[parameters.Length];
-                    for (int i = 0; i < parameters.Length; i++)
-                    {
-                        var param = parameters[i];
-                        if (i == 0 && param.ParameterType == typeof(string))
-                        {
-                            // First parameter is string - likely a path parameter
-                            args[i] = request ?? "test-node-123";
-                        }
-                        else if (i == 0 && request != null && param.ParameterType.IsAssignableFrom(request.GetType()))
-                        {
-                            args[i] = request;
-                        }
-                        else if (param.HasDefaultValue)
-                        {
-                            args[i] = param.DefaultValue!;
-                        }
-                        else
-                        {
-                            args[i] = GetDefaultValue(param.ParameterType);
-                        }
-                    }
-                }
-                
+                var args = await BindParametersFromObjectAsync(parameters, request);
                 var result = method.Invoke(instance, args);
-                
-                if (result is Task<object> task)
-                {
-                    return await task;
-                }
-                else if (result is Task taskResult)
-                {
-                    await taskResult;
-                    return new { success = true };
-                }
-                else
-                {
-                    return result ?? new { success = true };
-                }
+                return await UnwrapResultAsync(result);
             }
             catch (Exception ex)
             {
@@ -366,37 +310,29 @@ public static class ApiRouteDiscovery
     /// </summary>
     private static void MapHttpEndpoint(WebApplication app, ApiRouteAttribute attribute, MethodInfo method, IApiRouter router, NodeRegistry registry)
     {
-        var handler = CreateHandlerDelegate(method, router, registry);
-        
-        // Auto-detect request type from method parameters
-        var requestType = attribute.RequestType ?? GetRequestTypeFromMethod(method);
-        
-        // Handle different HTTP verbs appropriately
-        switch (attribute.Verb.ToUpperInvariant())
+        var httpVerb = attribute.Verb.ToUpperInvariant();
+        app.MapMethods(attribute.Route, new[] { httpVerb }, async (HttpContext context) =>
         {
-            case "GET":
-            case "DELETE":
-                // GET and DELETE methods don't support request bodies
-                MapHttpEndpointWithoutBody(app, attribute, WrapHandler(handler));
-                break;
-            case "POST":
-            case "PUT":
-            case "PATCH":
-                // POST, PUT, and PATCH methods can have request bodies
-                if (requestType != null)
-                {
-                    MapHttpEndpointWithBody(app, attribute, WrapHandler(handler), requestType);
-                }
-                else
-                {
-                    MapHttpEndpointWithoutBody(app, attribute, WrapHandler(handler));
-                }
-                break;
-            default:
-                // Fallback to no body for unknown verbs
-                MapHttpEndpointWithoutBody(app, attribute, WrapHandler(handler));
-                break;
-        }
+            try
+            {
+                var instance = CreateModuleInstance(method.DeclaringType!, router, registry);
+                var args = await BindParametersFromHttpContextAsync(method, context);
+                var result = method.Invoke(instance, args);
+                return Results.Ok(await UnwrapResultAsync(result));
+            }
+            catch (ApiBindingException bex)
+            {
+                return Results.Ok(new ErrorResponse(bex.Message));
+            }
+            catch (JsonException jex)
+            {
+                return Results.Ok(new ErrorResponse($"Invalid JSON: {jex.Message}"));
+            }
+            catch (Exception ex)
+            {
+                return Results.Ok(new ErrorResponse($"Error executing {method.Name}: {ex.Message}"));
+            }
+        }).WithName(attribute.Name);
     }
 
     /// <summary>
@@ -405,6 +341,248 @@ public static class ApiRouteDiscovery
     private static Func<object?, Task<object>> WrapHandler(Func<object?, Task<object>> handler)
     {
         return handler;
+    }
+
+    private static async Task<object[]> BindParametersFromObjectAsync(ParameterInfo[] parameters, object? source)
+    {
+        if (parameters.Length == 0)
+        {
+            return Array.Empty<object>();
+        }
+
+        if (parameters.Length == 1)
+        {
+            var p = parameters[0];
+            var value = await DeserializeToTypeAsync(source, p.ParameterType);
+            if (value == null)
+            {
+                if (p.HasDefaultValue) return new[] { p.DefaultValue! };
+                if (IsNullable(p.ParameterType)) return new object?[] { null! } as object[];
+                throw new InvalidOperationException($"Missing value for parameter '{p.Name}'");
+            }
+            return new[] { value };
+        }
+
+        // Multiple parameters require object-like source; try JSON object mapping
+        var args = new object?[parameters.Length];
+        JsonElement? json = source as JsonElement?;
+        for (int i = 0; i < parameters.Length; i++)
+        {
+            var p = parameters[i];
+            var targetName = p.GetCustomAttribute<ApiParameterAttribute>()?.Name ?? p.Name ?? $"arg{i}";
+            object? value = null;
+
+            if (json.HasValue && json.Value.ValueKind == JsonValueKind.Object)
+            {
+                if (json.Value.TryGetProperty(targetName, out var prop))
+                {
+                    value = JsonSerializer.Deserialize(prop.GetRawText(), p.ParameterType);
+                }
+                else
+                {
+                    foreach (var propEnum in json.Value.EnumerateObject())
+                    {
+                        if (string.Equals(propEnum.Name, targetName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            value = JsonSerializer.Deserialize(propEnum.Value.GetRawText(), p.ParameterType);
+                            break;
+                        }
+                    }
+                }
+            }
+            else if (source != null && p.ParameterType.IsInstanceOfType(source))
+            {
+                value = source;
+            }
+
+            if (value == null)
+            {
+                if (p.HasDefaultValue)
+                {
+                    value = p.DefaultValue;
+                }
+                else if (IsNullable(p.ParameterType))
+                {
+                    value = null;
+                }
+                else
+                {
+                    throw new InvalidOperationException($"Missing value for parameter '{targetName}'");
+                }
+            }
+            args[i] = value;
+        }
+        return args!;
+    }
+
+    private static async Task<object?> DeserializeToTypeAsync(object? source, Type targetType)
+    {
+        if (source == null) return null;
+        var nonNullType = Nullable.GetUnderlyingType(targetType) ?? targetType;
+        if (nonNullType.IsInstanceOfType(source)) return source;
+        if (source is JsonElement je)
+        {
+            return JsonSerializer.Deserialize(je.GetRawText(), nonNullType);
+        }
+        if (source is string s)
+        {
+            try { return JsonSerializer.Deserialize(s, nonNullType); } catch { /* ignore */ }
+        }
+        return source;
+    }
+
+    private static async Task<object[]> BindParametersFromHttpContextAsync(MethodInfo method, HttpContext context)
+    {
+        var parameters = method.GetParameters();
+        if (parameters.Length == 0) return Array.Empty<object>();
+
+        // Identify body parameter
+        ParameterInfo? bodyParam = null;
+        foreach (var p in parameters)
+        {
+            var attr = p.GetCustomAttribute<ApiParameterAttribute>();
+            var loc = attr?.Location?.ToLowerInvariant();
+            if (loc == "body") { bodyParam = p; break; }
+        }
+        if (bodyParam == null)
+        {
+            foreach (var p in parameters)
+            {
+                if (!IsSimpleType(p.ParameterType)) { bodyParam = p; break; }
+            }
+        }
+
+        object? bodyValue = null;
+        var methodName = context.Request.Method;
+        if (bodyParam != null && BodyAllowedForVerb(methodName))
+        {
+            bodyValue = await context.Request.ReadFromJsonAsync(bodyParam.ParameterType);
+        }
+
+        var args = new object?[parameters.Length];
+        for (int i = 0; i < parameters.Length; i++)
+        {
+            var p = parameters[i];
+            if (p == bodyParam)
+            {
+                args[i] = bodyValue;
+                continue;
+            }
+
+            var paramAttr = p.GetCustomAttribute<ApiParameterAttribute>();
+            var name = paramAttr?.Name ?? p.Name ?? $"arg{i}";
+            var location = (paramAttr?.Location ?? GuessLocationForParameter(p, methodName)).ToLowerInvariant();
+
+            object? raw = null;
+            switch (location)
+            {
+                case "path":
+                    if (context.Request.RouteValues.TryGetValue(name, out var rv)) raw = rv?.ToString();
+                    break;
+                case "query":
+                    if (context.Request.Query.TryGetValue(name, out var qv)) raw = qv.FirstOrDefault();
+                    break;
+                case "header":
+                    if (context.Request.Headers.TryGetValue(name, out var hv)) raw = hv.FirstOrDefault();
+                    break;
+                case "body":
+                    throw new ApiBindingException($"Multiple body parameters are not supported (parameter '{name}')");
+                default:
+                    if (context.Request.RouteValues.TryGetValue(name, out var rv2)) raw = rv2?.ToString();
+                    if (raw == null && context.Request.Query.TryGetValue(name, out var qv2)) raw = qv2.FirstOrDefault();
+                    break;
+            }
+
+            if (raw == null)
+            {
+                if (p.HasDefaultValue) { args[i] = p.DefaultValue; continue; }
+                if (IsNullable(p.ParameterType)) { args[i] = null; continue; }
+                throw new ApiBindingException($"Missing required parameter '{name}'");
+            }
+
+            args[i] = ConvertToType(raw, p.ParameterType);
+        }
+
+        return args!;
+    }
+
+    private static bool BodyAllowedForVerb(string httpMethod)
+    {
+        var m = httpMethod.ToUpperInvariant();
+        return m == "POST" || m == "PUT" || m == "PATCH";
+    }
+
+    private static string GuessLocationForParameter(ParameterInfo p, string httpMethod)
+    {
+        var m = httpMethod.ToUpperInvariant();
+        var paramName = p.Name ?? string.Empty;
+        var declaring = p.Member as MethodInfo;
+        var route = declaring?.GetCustomAttribute<ApiRouteAttribute>()?.Route ?? string.Empty;
+        var inPath = !string.IsNullOrEmpty(paramName) && route.Contains("{" + paramName + "}", StringComparison.OrdinalIgnoreCase);
+
+        if (IsSimpleType(p.ParameterType))
+        {
+            if (inPath) return "path";
+            // Default simple types to query for safe GET/DELETE; query first for others as well
+            return "query";
+        }
+
+        // Complex types prefer body on write verbs
+        return BodyAllowedForVerb(m) ? "body" : (inPath ? "path" : "query");
+    }
+
+    private static bool IsSimpleType(Type type)
+    {
+        type = Nullable.GetUnderlyingType(type) ?? type;
+        return type.IsPrimitive || type.IsEnum || type == typeof(string) || type == typeof(decimal) || type == typeof(DateTime) || type == typeof(Guid);
+    }
+
+    private static object? ConvertToType(object? value, Type targetType)
+    {
+        if (value == null) return null;
+        var nonNullType = Nullable.GetUnderlyingType(targetType) ?? targetType;
+        if (nonNullType == typeof(string)) return value.ToString();
+        if (nonNullType.IsEnum) return Enum.Parse(nonNullType, value.ToString()!, true);
+        try
+        {
+            if (nonNullType == typeof(int)) return int.Parse(value.ToString()!);
+            if (nonNullType == typeof(long)) return long.Parse(value.ToString()!);
+            if (nonNullType == typeof(bool)) return bool.Parse(value.ToString()!);
+            if (nonNullType == typeof(double)) return double.Parse(value.ToString()!);
+            if (nonNullType == typeof(float)) return float.Parse(value.ToString()!);
+            if (nonNullType == typeof(decimal)) return decimal.Parse(value.ToString()!);
+            if (nonNullType == typeof(DateTime)) return DateTime.Parse(value.ToString()!);
+            if (nonNullType == typeof(Guid)) return Guid.Parse(value.ToString()!);
+        }
+        catch (Exception ex)
+        {
+            throw new ApiBindingException($"Invalid value '{value}' for type {nonNullType.Name}: {ex.Message}");
+        }
+        // Fallback: try JSON deserialize when value looks like JSON
+        var s = value as string;
+        if (!string.IsNullOrWhiteSpace(s))
+        {
+            try { return JsonSerializer.Deserialize(s, nonNullType); } catch { }
+        }
+        return value;
+    }
+
+    private static bool IsNullable(Type t) => !t.IsValueType || Nullable.GetUnderlyingType(t) != null;
+
+    private static async Task<object> UnwrapResultAsync(object? result)
+    {
+        if (result is Task<object> to) return await to;
+        if (result is Task t)
+        {
+            await t;
+            return new { success = true };
+        }
+        return result ?? new { success = true };
+    }
+
+    private sealed class ApiBindingException : Exception
+    {
+        public ApiBindingException(string message) : base(message) { }
     }
 
     /// <summary>
@@ -443,131 +621,4 @@ public static class ApiRouteDiscovery
         return null;
     }
 
-    /// <summary>
-    /// Maps HTTP endpoint without request body
-    /// </summary>
-    private static void MapHttpEndpointWithoutBody(WebApplication app, ApiRouteAttribute attribute, Func<object?, Task<object>> handler)
-    {
-        // Check if the route has path parameters
-        var hasPathParams = attribute.Route.Contains("{");
-        
-        if (hasPathParams)
-        {
-            // Handle routes with path parameters
-            switch (attribute.Verb.ToUpperInvariant())
-            {
-                case "GET":
-                    app.MapGet(attribute.Route, async (string id) =>
-                    {
-                        var result = await handler(id);
-                        return Results.Ok(result);
-                    }).WithName(attribute.Name);
-                    break;
-                case "POST":
-                    app.MapPost(attribute.Route, async (string id) =>
-                    {
-                        var result = await handler(id);
-                        return Results.Ok(result);
-                    }).WithName(attribute.Name);
-                    break;
-                case "PUT":
-                    app.MapPut(attribute.Route, async (string id) =>
-                    {
-                        var result = await handler(id);
-                        return Results.Ok(result);
-                    }).WithName(attribute.Name);
-                    break;
-                case "DELETE":
-                    app.MapDelete(attribute.Route, async (string id) =>
-                    {
-                        var result = await handler(id);
-                        return Results.Ok(result);
-                    }).WithName(attribute.Name);
-                    break;
-                case "PATCH":
-                    app.MapMethods(attribute.Route, new[] { "PATCH" }, async (string id) =>
-                    {
-                        var result = await handler(id);
-                        return Results.Ok(result);
-                    }).WithName(attribute.Name);
-                    break;
-            }
-        }
-        else
-        {
-            // Handle routes without path parameters
-            switch (attribute.Verb.ToUpperInvariant())
-            {
-                case "GET":
-                    app.MapGet(attribute.Route, async () =>
-                    {
-                        var result = await handler(null);
-                        return Results.Ok(result);
-                    }).WithName(attribute.Name);
-                    break;
-                case "POST":
-                    app.MapPost(attribute.Route, async () =>
-                    {
-                        var result = await handler(null);
-                        return Results.Ok(result);
-                    }).WithName(attribute.Name);
-                    break;
-                case "PUT":
-                    app.MapPut(attribute.Route, async () =>
-                    {
-                        var result = await handler(null);
-                        return Results.Ok(result);
-                    }).WithName(attribute.Name);
-                    break;
-                case "DELETE":
-                    app.MapDelete(attribute.Route, async () =>
-                    {
-                        var result = await handler(null);
-                        return Results.Ok(result);
-                    }).WithName(attribute.Name);
-                    break;
-                case "PATCH":
-                    app.MapMethods(attribute.Route, new[] { "PATCH" }, async () =>
-                    {
-                        var result = await handler(null);
-                        return Results.Ok(result);
-                    }).WithName(attribute.Name);
-                    break;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Maps HTTP endpoint with request body
-    /// </summary>
-    private static void MapHttpEndpointWithBody(WebApplication app, ApiRouteAttribute attribute, Func<object?, Task<object>> handler, Type requestType)
-    {
-        switch (attribute.Verb.ToUpperInvariant())
-        {
-            case "POST":
-                app.MapPost(attribute.Route, async (HttpContext context) =>
-                {
-                    var request = await context.Request.ReadFromJsonAsync(requestType);
-                    var result = await handler(request);
-                    return Results.Ok(result);
-                }).WithName(attribute.Name);
-                break;
-            case "PUT":
-                app.MapPut(attribute.Route, async (HttpContext context) =>
-                {
-                    var request = await context.Request.ReadFromJsonAsync(requestType);
-                    var result = await handler(request);
-                    return Results.Ok(result);
-                }).WithName(attribute.Name);
-                break;
-            case "PATCH":
-                app.MapMethods(attribute.Route, new[] { "PATCH" }, async (HttpContext context) =>
-                {
-                    var request = await context.Request.ReadFromJsonAsync(requestType);
-                    var result = await handler(request);
-                    return Results.Ok(result);
-                }).WithName(attribute.Name);
-                break;
-        }
-    }
 }

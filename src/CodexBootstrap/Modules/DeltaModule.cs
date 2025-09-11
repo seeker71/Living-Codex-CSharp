@@ -126,7 +126,7 @@ public sealed class DeltaModule : IModule
         registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.delta", "patch"));
     }
 
-    [ApiRoute("GET", "/diff/{id}", "diff", "Generate diff between two nodes", "codex.delta")]
+    [ApiRoute("GET", "/diff/{id}", "delta-diff", "Generate diff between two nodes", "codex.delta")]
     public async Task<object> DiffNodes([ApiParameter("id", "Source node ID", Required = true, Location = "path")] string id, [ApiParameter("against", "Base node ID to compare against", Required = true, Location = "query")] string against)
     {
         try
@@ -159,7 +159,7 @@ public sealed class DeltaModule : IModule
         }
     }
 
-    [ApiRoute("POST", "/patch/{targetId}", "patch", "Apply patch to target node", "codex.delta")]
+    [ApiRoute("POST", "/patch/{targetId}", "delta-patch", "Apply patch to target node", "codex.delta")]
     public async Task<object> PatchNode([ApiParameter("targetId", "Target node ID", Required = true, Location = "path")] string targetId, [ApiParameter("patch", "Patch document to apply", Required = true, Location = "body")] PatchDoc patch)
     {
         try
