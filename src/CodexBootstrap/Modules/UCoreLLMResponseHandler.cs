@@ -903,7 +903,10 @@ public record ConceptMatch(
     string Concept,
     double Match,
     double Weight,
-    string Description
+    string Description,
+    double ResonanceScore = 0.0,
+    string Phase = "unknown",
+    double InvestmentLevel = 0.0
 );
 
 public record ResonanceCalculationRequest(

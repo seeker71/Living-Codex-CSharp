@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text.Json;
 using CodexBootstrap.Runtime;
 
 namespace CodexBootstrap.Core
@@ -178,203 +179,283 @@ namespace CodexBootstrap.Core
         {
             var nodeId = !string.IsNullOrEmpty(attr.ModuleId) ? attr.ModuleId : $"module.{moduleType.Name.ToLower()}";
             
-            return new Node
-            {
-                Id = nodeId,
-                TypeId = "module",
-                State = ContentState.Active,
-                Locale = "en",
-                Title = !string.IsNullOrEmpty(attr.Name) ? attr.Name : moduleType.Name,
-                Description = attr.Description,
-                Content = new Dictionary<string, object>
-                {
-                    ["version"] = attr.Version,
-                    ["category"] = attr.Category,
-                    ["tags"] = attr.Tags,
-                    ["basePath"] = attr.BasePath,
-                    ["autoGenerateNodes"] = attr.AutoGenerateNodes,
-                    ["autoGenerateRoutes"] = attr.AutoGenerateRoutes,
-                    ["moduleType"] = moduleType.FullName ?? "",
-                    ["properties"] = attr.ModuleProperties
-                }
-            };
+            return new Node(
+                nodeId,
+                "module",
+                ContentState.Ice,
+                "en",
+                !string.IsNullOrEmpty(attr.Name) ? attr.Name : moduleType.Name,
+                attr.Description,
+                new ContentRef(
+                    "application/json",
+                    JsonSerializer.Serialize(new Dictionary<string, object>
+                    {
+                        ["version"] = attr.Version,
+                        ["category"] = attr.Category,
+                        ["tags"] = attr.Tags,
+                        ["basePath"] = attr.BasePath,
+                        ["autoGenerateNodes"] = attr.AutoGenerateNodes,
+                        ["autoGenerateRoutes"] = attr.AutoGenerateRoutes,
+                        ["moduleType"] = moduleType.FullName ?? "",
+                        ["properties"] = attr.ModuleProperties
+                    }),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
+                ),
+                null
+            );
         }
 
         private Node GenerateConceptNode(MemberInfo member, UCoreConceptAttribute attr)
         {
             var nodeId = !string.IsNullOrEmpty(attr.ConceptId) ? attr.ConceptId : $"concept.{member.Name.ToLower()}";
             
-            return new Node
-            {
-                Id = nodeId,
-                TypeId = "ucore-concept",
-                State = ContentState.Active,
-                Locale = "en",
-                Title = !string.IsNullOrEmpty(attr.Name) ? attr.Name : member.Name,
-                Description = attr.Description,
-                Content = new Dictionary<string, object>
-                {
-                    ["frequency"] = attr.Frequency,
-                    ["resonance"] = attr.Resonance,
-                    ["category"] = attr.Category,
-                    ["relatedConcepts"] = attr.RelatedConcepts,
-                    ["memberType"] = member.MemberType.ToString(),
-                    ["memberName"] = member.Name
-                }
-            };
+            return new Node(
+                nodeId,
+                "ucore-concept",
+                ContentState.Ice,
+                "en",
+                !string.IsNullOrEmpty(attr.Name) ? attr.Name : member.Name,
+                attr.Description,
+                new ContentRef(
+                    "application/json",
+                    JsonSerializer.Serialize(new Dictionary<string, object>
+                    {
+                        ["frequency"] = attr.Frequency,
+                        ["resonance"] = attr.Resonance,
+                        ["category"] = attr.Category,
+                        ["relatedConcepts"] = attr.RelatedConcepts,
+                        ["memberType"] = member.MemberType.ToString(),
+                        ["memberName"] = member.Name
+                    }),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
+                ),
+                null
+            );
         }
 
         private Node GenerateFrequencyNode(MemberInfo member, UCoreFrequencyAttribute attr)
         {
             var nodeId = $"frequency.{attr.Value}hz";
             
-            return new Node
-            {
-                Id = nodeId,
-                TypeId = "ucore-frequency",
-                State = ContentState.Active,
-                Locale = "en",
-                Title = !string.IsNullOrEmpty(attr.Name) ? attr.Name : $"{attr.Value} Hz",
-                Description = attr.Description,
-                Content = new Dictionary<string, object>
-                {
-                    ["value"] = attr.Value,
-                    ["resonance"] = attr.Resonance,
-                    ["category"] = attr.Category,
-                    ["effects"] = attr.Effects,
-                    ["memberType"] = member.MemberType.ToString(),
-                    ["memberName"] = member.Name
-                }
-            };
+            return new Node(
+                nodeId,
+                "ucore-frequency",
+                ContentState.Ice,
+                "en",
+                !string.IsNullOrEmpty(attr.Name) ? attr.Name : $"{attr.Value} Hz",
+                attr.Description,
+                new ContentRef(
+                    "application/json",
+                    JsonSerializer.Serialize(new Dictionary<string, object>
+                    {
+                        ["value"] = attr.Value,
+                        ["resonance"] = attr.Resonance,
+                        ["category"] = attr.Category,
+                        ["effects"] = attr.Effects,
+                        ["memberType"] = member.MemberType.ToString(),
+                        ["memberName"] = member.Name
+                    }),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
+                ),
+                null
+            );
         }
 
         private Node GenerateResonanceNode(Type moduleType, UCoreResonanceAttribute attr)
         {
             var nodeId = !string.IsNullOrEmpty(attr.ResonanceId) ? attr.ResonanceId : $"resonance.{moduleType.Name.ToLower()}";
             
-            return new Node
-            {
-                Id = nodeId,
-                TypeId = "ucore-resonance",
-                State = ContentState.Active,
-                Locale = "en",
-                Title = !string.IsNullOrEmpty(attr.Name) ? attr.Name : moduleType.Name,
-                Description = attr.Description,
-                Content = new Dictionary<string, object>
-                {
-                    ["amplitude"] = attr.Amplitude,
-                    ["phase"] = attr.Phase,
-                    ["frequencies"] = attr.Frequencies,
-                    ["moduleType"] = moduleType.FullName ?? ""
-                }
-            };
+            return new Node(
+                nodeId,
+                "ucore-resonance",
+                ContentState.Ice,
+                "en",
+                !string.IsNullOrEmpty(attr.Name) ? attr.Name : moduleType.Name,
+                attr.Description,
+                new ContentRef(
+                    "application/json",
+                    JsonSerializer.Serialize(new Dictionary<string, object>
+                    {
+                        ["amplitude"] = attr.Amplitude,
+                        ["phase"] = attr.Phase,
+                        ["frequencies"] = attr.Frequencies,
+                        ["moduleType"] = moduleType.FullName ?? ""
+                    }),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
+                ),
+                null
+            );
         }
 
         private Node GenerateRouteNode(Type moduleType, MethodInfo method, EnhancedApiRouteAttribute attr)
         {
             var nodeId = !string.IsNullOrEmpty(attr.Name) ? attr.Name : $"route.{moduleType.Name.ToLower()}.{method.Name.ToLower()}";
             
-            return new Node
-            {
-                Id = nodeId,
-                TypeId = "api-route",
-                State = ContentState.Active,
-                Locale = "en",
-                Title = !string.IsNullOrEmpty(attr.Name) ? attr.Name : method.Name,
-                Description = attr.Description,
-                Content = new Dictionary<string, object>
-                {
-                    ["httpMethod"] = attr.HttpMethod,
-                    ["route"] = attr.Route,
-                    ["moduleId"] = attr.ModuleId,
-                    ["tags"] = attr.Tags,
-                    ["requiresAuth"] = attr.RequiresAuth,
-                    ["requiredPermissions"] = attr.RequiredPermissions,
-                    ["requestType"] = attr.RequestType?.FullName ?? "",
-                    ["responseType"] = attr.ResponseType?.FullName ?? "",
-                    ["methodName"] = method.Name,
-                    ["moduleType"] = moduleType.FullName ?? ""
-                }
-            };
+            return new Node(
+                nodeId,
+                "api-route",
+                ContentState.Ice,
+                "en",
+                !string.IsNullOrEmpty(attr.Name) ? attr.Name : method.Name,
+                attr.Description,
+                new ContentRef(
+                    "application/json",
+                    JsonSerializer.Serialize(new Dictionary<string, object>
+                    {
+                        ["httpMethod"] = attr.HttpMethod,
+                        ["route"] = attr.Route,
+                        ["moduleId"] = attr.ModuleId,
+                        ["tags"] = attr.Tags,
+                        ["requiresAuth"] = attr.RequiresAuth,
+                        ["requiredPermissions"] = attr.RequiredPermissions,
+                        ["requestType"] = attr.RequestType?.FullName ?? "",
+                        ["responseType"] = attr.ResponseType?.FullName ?? "",
+                        ["methodName"] = method.Name,
+                        ["moduleType"] = moduleType.FullName ?? ""
+                    }),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
+                ),
+                null
+            );
         }
 
         private Node GenerateMetaNode(PropertyInfo property, EnhancedApiTypeAttribute attr)
         {
             var nodeId = !string.IsNullOrEmpty(attr.Id) ? attr.Id : $"meta.{property.DeclaringType?.Name.ToLower()}.{property.Name.ToLower()}";
             
-            return new Node
-            {
-                Id = nodeId,
-                TypeId = "meta-node",
-                State = ContentState.Active,
-                Locale = "en",
-                Title = !string.IsNullOrEmpty(attr.Name) ? attr.Name : property.Name,
-                Description = attr.Description,
-                Content = new Dictionary<string, object>
-                {
-                    ["type"] = attr.Type,
-                    ["version"] = attr.Version,
-                    ["tags"] = attr.Tags,
-                    ["example"] = attr.Example,
-                    ["propertyType"] = property.PropertyType.FullName ?? "",
-                    ["propertyName"] = property.Name,
-                    ["declaringType"] = property.DeclaringType?.FullName ?? "",
-                    ["properties"] = attr.TypeProperties
-                }
-            };
+            return new Node(
+                nodeId,
+                "meta-node",
+                ContentState.Ice,
+                "en",
+                !string.IsNullOrEmpty(attr.Name) ? attr.Name : property.Name,
+                attr.Description,
+                new ContentRef(
+                    "application/json",
+                    JsonSerializer.Serialize(new Dictionary<string, object>
+                    {
+                        ["type"] = attr.Type,
+                        ["version"] = attr.Version,
+                        ["tags"] = attr.Tags,
+                        ["example"] = attr.Example,
+                        ["propertyType"] = property.PropertyType.FullName ?? "",
+                        ["propertyName"] = property.Name,
+                        ["declaringType"] = property.DeclaringType?.FullName ?? "",
+                        ["properties"] = attr.TypeProperties
+                    }),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
+                ),
+                null
+            );
         }
 
         private Node GenerateFieldNode(MemberInfo member, NodeFieldAttribute attr)
         {
             var nodeId = !string.IsNullOrEmpty(attr.FieldId) ? attr.FieldId : $"field.{member.DeclaringType?.Name.ToLower()}.{member.Name.ToLower()}";
             
-            return new Node
-            {
-                Id = nodeId,
-                TypeId = "node-field",
-                State = ContentState.Active,
-                Locale = "en",
-                Title = !string.IsNullOrEmpty(attr.FieldId) ? attr.FieldId : member.Name,
-                Description = attr.Description,
-                Content = new Dictionary<string, object>
-                {
-                    ["fieldType"] = attr.FieldType,
-                    ["required"] = attr.Required,
-                    ["defaultValue"] = attr.DefaultValue,
-                    ["validationRules"] = attr.ValidationRules,
-                    ["memberType"] = member.MemberType.ToString(),
-                    ["memberName"] = member.Name,
-                    ["declaringType"] = member.DeclaringType?.FullName ?? "",
-                    ["properties"] = attr.FieldProperties
-                }
-            };
+            return new Node(
+                nodeId,
+                "node-field",
+                ContentState.Ice,
+                "en",
+                !string.IsNullOrEmpty(attr.FieldId) ? attr.FieldId : member.Name,
+                attr.Description,
+                new ContentRef(
+                    "application/json",
+                    JsonSerializer.Serialize(new Dictionary<string, object>
+                    {
+                        ["fieldType"] = attr.FieldType,
+                        ["required"] = attr.Required,
+                        ["defaultValue"] = attr.DefaultValue,
+                        ["validationRules"] = attr.ValidationRules,
+                        ["memberType"] = member.MemberType.ToString(),
+                        ["memberName"] = member.Name,
+                        ["declaringType"] = member.DeclaringType?.FullName ?? "",
+                        ["properties"] = attr.FieldProperties
+                    }),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
+                ),
+                null
+            );
         }
 
         private Node GenerateContentNode(PropertyInfo property, DynamicContentAttribute attr)
         {
             var nodeId = $"content.{property.DeclaringType?.Name.ToLower()}.{property.Name.ToLower()}";
             
-            return new Node
-            {
-                Id = nodeId,
-                TypeId = "dynamic-content",
-                State = ContentState.Active,
-                Locale = "en",
-                Title = property.Name,
-                Description = $"Dynamic content for {property.Name}",
-                Content = new Dictionary<string, object>
-                {
-                    ["contentType"] = attr.ContentType,
-                    ["generator"] = attr.Generator,
-                    ["template"] = attr.Template,
-                    ["autoRefresh"] = attr.AutoRefresh,
-                    ["refreshInterval"] = attr.RefreshInterval,
-                    ["propertyType"] = property.PropertyType.FullName ?? "",
-                    ["propertyName"] = property.Name,
-                    ["declaringType"] = property.DeclaringType?.FullName ?? "",
-                    ["properties"] = attr.ContentProperties
-                }
-            };
+            return new Node(
+                nodeId,
+                "dynamic-content",
+                ContentState.Ice,
+                "en",
+                property.Name,
+                $"Dynamic content for {property.Name}",
+                new ContentRef(
+                    "application/json",
+                    JsonSerializer.Serialize(new Dictionary<string, object>
+                    {
+                        ["contentType"] = attr.ContentType,
+                        ["generator"] = attr.Generator,
+                        ["template"] = attr.Template,
+                        ["autoRefresh"] = attr.AutoRefresh,
+                        ["refreshInterval"] = attr.RefreshInterval,
+                        ["propertyType"] = property.PropertyType.FullName ?? "",
+                        ["propertyName"] = property.Name,
+                        ["declaringType"] = property.DeclaringType?.FullName ?? "",
+                        ["properties"] = attr.ContentProperties
+                    }),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
+                ),
+                new Dictionary<string, object>()
+            );
         }
 
         /// <summary>

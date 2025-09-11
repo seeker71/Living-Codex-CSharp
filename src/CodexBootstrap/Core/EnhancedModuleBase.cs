@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text.Json;
 using CodexBootstrap.Runtime;
 
 namespace CodexBootstrap.Core
@@ -58,42 +59,62 @@ namespace CodexBootstrap.Core
             {
                 var nodeId = !string.IsNullOrEmpty(moduleAttr.ModuleId) ? moduleAttr.ModuleId : $"module.{GetType().Name.ToLower()}";
                 
-                return new Node
-                {
-                    Id = nodeId,
-                    TypeId = "module",
-                    State = ContentState.Active,
-                    Locale = "en",
-                    Title = !string.IsNullOrEmpty(moduleAttr.Name) ? moduleAttr.Name : GetType().Name,
-                    Description = moduleAttr.Description,
-                    Content = new Dictionary<string, object>
-                    {
-                        ["version"] = moduleAttr.Version,
-                        ["category"] = moduleAttr.Category,
-                        ["tags"] = moduleAttr.Tags,
-                        ["autoGenerateNodes"] = moduleAttr.AutoGenerateNodes,
-                        ["autoGenerateRoutes"] = moduleAttr.AutoGenerateRoutes,
-                        ["moduleType"] = GetType().FullName ?? "",
-                        ["properties"] = moduleAttr.ModuleProperties
-                    }
-                };
+                return new Node(
+                    nodeId,
+                    "module",
+                    ContentState.Ice,
+                    "en",
+                    !string.IsNullOrEmpty(moduleAttr.Name) ? moduleAttr.Name : GetType().Name,
+                    moduleAttr.Description,
+                    new ContentRef(
+                        "application/json",
+                        JsonSerializer.Serialize(new Dictionary<string, object>
+                        {
+                            ["version"] = moduleAttr.Version,
+                            ["category"] = moduleAttr.Category,
+                            ["tags"] = moduleAttr.Tags,
+                            ["autoGenerateNodes"] = moduleAttr.AutoGenerateNodes,
+                            ["autoGenerateRoutes"] = moduleAttr.AutoGenerateRoutes,
+                            ["moduleType"] = GetType().FullName ?? "",
+                            ["properties"] = moduleAttr.ModuleProperties
+                        }),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                    ),
+                    null
+                );
             }
 
             // Fallback to basic module node
-            return new Node
-            {
-                Id = $"module.{GetType().Name.ToLower()}",
-                TypeId = "module",
-                State = ContentState.Active,
-                Locale = "en",
-                Title = GetType().Name,
-                Description = $"Module: {GetType().Name}",
-                Content = new Dictionary<string, object>
-                {
-                    ["version"] = "1.0.0",
-                    ["moduleType"] = GetType().FullName ?? ""
-                }
-            };
+            return new Node(
+                $"module.{GetType().Name.ToLower()}",
+                "module",
+                ContentState.Ice,
+                "en",
+                GetType().Name,
+                $"Module: {GetType().Name}",
+                    new ContentRef(
+                        "application/json",
+                        JsonSerializer.Serialize(new Dictionary<string, object>
+                        {
+                            ["version"] = "1.0.0",
+                            ["moduleType"] = GetType().FullName ?? ""
+                        }),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                    ),
+                null
+            );
         }
 
         /// <summary>
@@ -126,11 +147,65 @@ namespace CodexBootstrap.Core
             
             foreach (var method in methods)
             {
-                var routeAttr = method.GetCustomAttribute<EnhancedApiRouteAttribute>();
-                if (routeAttr?.AutoGenerate == true)
+                // Check for EnhancedApiRouteAttribute first
+                var enhancedRouteAttr = method.GetCustomAttribute<EnhancedApiRouteAttribute>();
+                if (enhancedRouteAttr?.AutoGenerate == true)
                 {
-                    RegisterEndpoint(app, method, routeAttr);
+                    RegisterEndpoint(app, method, enhancedRouteAttr);
                 }
+                
+                // Also check for ApiRouteAttribute
+                var routeAttr = method.GetCustomAttribute<ApiRouteAttribute>();
+                if (routeAttr != null)
+                {
+                    RegisterLegacyEndpoint(app, method, routeAttr);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Register a legacy endpoint using ApiRouteAttribute
+        /// </summary>
+        protected virtual void RegisterLegacyEndpoint(WebApplication app, MethodInfo method, ApiRouteAttribute routeAttr)
+        {
+            try
+            {
+                var endpointName = !string.IsNullOrEmpty(routeAttr.Name) ? routeAttr.Name : $"{GetType().Name.ToLower()}-{method.Name.ToLower()}";
+                
+                switch (routeAttr.Verb.ToUpper())
+                {
+                    case "GET":
+                        app.MapGet(routeAttr.Route, CreateHandlerDelegate(method))
+                            .WithName(endpointName)
+                            .WithTags(routeAttr.Tags ?? new[] { "default" });
+                        break;
+                    case "POST":
+                        app.MapPost(routeAttr.Route, CreateHandlerDelegate(method))
+                            .WithName(endpointName)
+                            .WithTags(routeAttr.Tags ?? new[] { "default" });
+                        break;
+                    case "PUT":
+                        app.MapPut(routeAttr.Route, CreateHandlerDelegate(method))
+                            .WithName(endpointName)
+                            .WithTags(routeAttr.Tags ?? new[] { "default" });
+                        break;
+                    case "DELETE":
+                        app.MapDelete(routeAttr.Route, CreateHandlerDelegate(method))
+                            .WithName(endpointName)
+                            .WithTags(routeAttr.Tags ?? new[] { "default" });
+                        break;
+                    case "PATCH":
+                        // PATCH is not directly supported, use PUT instead
+                        app.MapPut(routeAttr.Route, CreateHandlerDelegate(method))
+                            .WithName(endpointName)
+                            .WithTags(routeAttr.Tags ?? new[] { "default" });
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log error but don't fail the entire registration
+                Console.WriteLine($"Error registering legacy endpoint {method.Name}: {ex.Message}");
             }
         }
 
@@ -166,7 +241,8 @@ namespace CodexBootstrap.Core
                             .WithTags(routeAttr.Tags);
                         break;
                     case "PATCH":
-                        app.MapPatch(routeAttr.Route, CreateHandlerDelegate(method))
+                        // PATCH is not directly supported, use PUT instead
+                        app.MapPut(routeAttr.Route, CreateHandlerDelegate(method))
                             .WithName(endpointName)
                             .WithTags(routeAttr.Tags);
                         break;

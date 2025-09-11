@@ -12,19 +12,19 @@ namespace CodexBootstrap.Core;
 )]
 public class ConceptCreateRequest
 {
-    [MetaNodeField("name", "string", Required = true, Description = "Concept name")]
+    [MetaNodeFieldAttribute("name", "string", Required = true, Description = "Concept name")]
     public string Name { get; set; } = string.Empty;
 
-    [MetaNodeField("description", "string", Required = true, Description = "Concept description")]
+    [MetaNodeFieldAttribute("description", "string", Required = true, Description = "Concept description")]
     public string Description { get; set; } = string.Empty;
 
-    [MetaNodeField("domain", "string", Required = true, Description = "Concept domain")]
+    [MetaNodeFieldAttribute("domain", "string", Required = true, Description = "Concept domain")]
     public string Domain { get; set; } = string.Empty;
 
-    [MetaNodeField("complexity", "string", Required = true, Description = "Concept complexity")]
+    [MetaNodeFieldAttribute("complexity", "string", Required = true, Description = "Concept complexity")]
     public string Complexity { get; set; } = string.Empty;
 
-    [MetaNodeField("tags", "array", Required = true, Description = "Concept tags", Kind = "Array", ArrayItemType = "string")]
+    [MetaNodeFieldAttribute("tags", "array", Required = true, Description = "Concept tags", Kind = "Array", ArrayItemType = "string")]
     public string[] Tags { get; set; } = Array.Empty<string>();
 }
 
@@ -38,16 +38,16 @@ public class ConceptCreateRequest
 )]
 public class ConceptDefineRequest
 {
-    [MetaNodeField("conceptId", "string", Required = true, Description = "Concept identifier")]
+    [MetaNodeFieldAttribute("conceptId", "string", Required = true, Description = "Concept identifier")]
     public string ConceptId { get; set; } = string.Empty;
 
-    [MetaNodeField("definition", "string", Required = true, Description = "Concept definition")]
+    [MetaNodeFieldAttribute("definition", "string", Required = true, Description = "Concept definition")]
     public string Definition { get; set; } = string.Empty;
 
-    [MetaNodeField("examples", "array", Description = "Concept examples", Kind = "Array", ArrayItemType = "string")]
+    [MetaNodeFieldAttribute("examples", "array", Description = "Concept examples", Kind = "Array", ArrayItemType = "string")]
     public string[]? Examples { get; set; }
 
-    [MetaNodeField("relationships", "array", Description = "Concept relationships", Kind = "Array", ArrayItemType = "string")]
+    [MetaNodeFieldAttribute("relationships", "array", Description = "Concept relationships", Kind = "Array", ArrayItemType = "string")]
     public string[]? Relationships { get; set; }
 }
 
@@ -61,16 +61,16 @@ public class ConceptDefineRequest
 )]
 public class ConceptRelateRequest
 {
-    [MetaNodeField("sourceConceptId", "string", Required = true, Description = "Source concept identifier")]
+    [MetaNodeFieldAttribute("sourceConceptId", "string", Required = true, Description = "Source concept identifier")]
     public string SourceConceptId { get; set; } = string.Empty;
 
-    [MetaNodeField("targetConceptId", "string", Required = true, Description = "Target concept identifier")]
+    [MetaNodeFieldAttribute("targetConceptId", "string", Required = true, Description = "Target concept identifier")]
     public string TargetConceptId { get; set; } = string.Empty;
 
-    [MetaNodeField("relationshipType", "string", Required = true, Description = "Type of relationship")]
+    [MetaNodeFieldAttribute("relationshipType", "string", Required = true, Description = "Type of relationship")]
     public string RelationshipType { get; set; } = string.Empty;
 
-    [MetaNodeField("weight", "number", Required = true, Description = "Relationship weight")]
+    [MetaNodeFieldAttribute("weight", "number", Required = true, Description = "Relationship weight")]
     public double Weight { get; set; }
 }
 
@@ -84,13 +84,13 @@ public class ConceptRelateRequest
 )]
 public class ConceptSearchRequest
 {
-    [MetaNodeField("query", "string", Description = "Search query")]
+    [MetaNodeFieldAttribute("query", "string", Description = "Search query")]
     public string? Query { get; set; }
 
-    [MetaNodeField("domain", "string", Description = "Domain filter")]
+    [MetaNodeFieldAttribute("domain", "string", Description = "Domain filter")]
     public string? Domain { get; set; }
 
-    [MetaNodeField("tags", "array", Description = "Tag filters", Kind = "Array", ArrayItemType = "string")]
+    [MetaNodeFieldAttribute("tags", "array", Description = "Tag filters", Kind = "Array", ArrayItemType = "string")]
     public string[]? Tags { get; set; }
 }
 
@@ -104,16 +104,16 @@ public class ConceptSearchRequest
 )]
 public class UserConceptLinkRequest
 {
-    [MetaNodeField("userId", "string", Required = true, Description = "User identifier")]
+    [MetaNodeFieldAttribute("userId", "string", Required = true, Description = "User identifier")]
     public string UserId { get; set; } = string.Empty;
 
-    [MetaNodeField("conceptId", "string", Required = true, Description = "Concept identifier")]
+    [MetaNodeFieldAttribute("conceptId", "string", Required = true, Description = "Concept identifier")]
     public string ConceptId { get; set; } = string.Empty;
 
-    [MetaNodeField("relationshipType", "string", Required = true, Description = "Type of relationship")]
+    [MetaNodeFieldAttribute("relationshipType", "string", Required = true, Description = "Type of relationship")]
     public string RelationshipType { get; set; } = string.Empty;
 
-    [MetaNodeField("weight", "number", Required = true, Description = "Relationship weight")]
+    [MetaNodeFieldAttribute("weight", "number", Required = true, Description = "Relationship weight")]
     public double Weight { get; set; }
 }
 
@@ -127,10 +127,10 @@ public class UserConceptLinkRequest
 )]
 public class UserConceptUnlinkRequest
 {
-    [MetaNodeField("userId", "string", Required = true, Description = "User identifier")]
+    [MetaNodeFieldAttribute("userId", "string", Required = true, Description = "User identifier")]
     public string UserId { get; set; } = string.Empty;
 
-    [MetaNodeField("conceptId", "string", Required = true, Description = "Concept identifier")]
+    [MetaNodeFieldAttribute("conceptId", "string", Required = true, Description = "Concept identifier")]
     public string ConceptId { get; set; } = string.Empty;
 }
 
@@ -144,10 +144,10 @@ public class UserConceptUnlinkRequest
 )]
 public class BreathLoopRequest
 {
-    [MetaNodeField("id", "string", Required = true, Description = "Node identifier")]
+    [MetaNodeFieldAttribute("id", "string", Required = true, Description = "Node identifier")]
     public string Id { get; set; } = string.Empty;
 
-    [MetaNodeField("operations", "array", Description = "List of operations to perform", Kind = "Array", ArrayItemType = "string")]
+    [MetaNodeFieldAttribute("operations", "array", Description = "List of operations to perform", Kind = "Array", ArrayItemType = "string")]
     public string[]? Operations { get; set; }
 }
 
@@ -161,9 +161,9 @@ public class BreathLoopRequest
 )]
 public class SpecComposeRequest
 {
-    [MetaNodeField("moduleId", "string", Description = "Module identifier")]
+    [MetaNodeFieldAttribute("moduleId", "string", Description = "Module identifier")]
     public string? ModuleId { get; set; }
 
-    [MetaNodeField("atoms", "array", Required = true, Description = "Atoms to compose", Kind = "Array", ArrayItemType = "object")]
+    [MetaNodeFieldAttribute("atoms", "array", Required = true, Description = "Atoms to compose", Kind = "Array", ArrayItemType = "object")]
     public object[] Atoms { get; set; } = Array.Empty<object>();
 }

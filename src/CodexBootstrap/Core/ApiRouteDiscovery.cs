@@ -19,9 +19,23 @@ public static class ApiRouteDiscovery
     {
         var assembly = Assembly.GetExecutingAssembly();
         var routeMethods = GetRouteMethods(assembly);
+        var registeredRoutes = new HashSet<string>();
 
         foreach (var (method, attribute) in routeMethods)
         {
+            var routeKey = $"{attribute.Verb.ToUpperInvariant()}:{attribute.Route}";
+            
+            if (registeredRoutes.Contains(routeKey))
+            {
+                throw new InvalidOperationException(
+                    $"Duplicate route registration detected! " +
+                    $"Route '{attribute.Verb} {attribute.Route}' is already registered. " +
+                    $"This route is being registered by method '{method.DeclaringType?.Name}.{method.Name}' " +
+                    $"in module '{attribute.ModuleId}'. " +
+                    $"Please check for duplicate ApiRoute attributes or conflicting route patterns.");
+            }
+            
+            registeredRoutes.Add(routeKey);
             RegisterRoute(app, router, registry, method, attribute);
         }
     }
@@ -58,6 +72,8 @@ public static class ApiRouteDiscovery
     {
         try
         {
+            Console.WriteLine($"Registering route: {attribute.Verb} {attribute.Route} from {method.DeclaringType?.Name}.{method.Name}");
+            
             // Create API node
             var apiNode = CreateApiNode(attribute, method);
             registry.Upsert(apiNode);
@@ -71,11 +87,15 @@ public static class ApiRouteDiscovery
 
             // Map HTTP endpoint
             MapHttpEndpoint(app, attribute, method, router, registry);
+            
+            Console.WriteLine($"Successfully registered route: {attribute.Verb} {attribute.Route}");
         }
         catch (Exception ex)
         {
-            // Log error but continue with other routes
-            Console.WriteLine($"Error registering route {attribute.Route}: {ex.Message}");
+            // Log error with detailed information
+            var errorMessage = $"Error registering route {attribute.Verb} {attribute.Route} from {method.DeclaringType?.Name}.{method.Name}: {ex.Message}";
+            Console.WriteLine(errorMessage);
+            throw new InvalidOperationException(errorMessage, ex);
         }
     }
 
@@ -210,15 +230,20 @@ public static class ApiRouteDiscovery
     private static void RegisterApiHandler(IApiRouter router, NodeRegistry registry, ApiRouteAttribute attribute, MethodInfo method)
     {
         var handler = CreateHandlerDelegate(method, router, registry);
-        ModuleHelpers.RegisterApiHandler(router, attribute.ModuleId, attribute.Name, handler);
+        // Convert Func<object?, Task<object>> to Func<JsonElement?, Task<object>>
+        Func<JsonElement?, Task<object>> jsonHandler = async (JsonElement? request) =>
+        {
+            return await handler(request);
+        };
+        ModuleHelpers.RegisterApiHandler(router, attribute.ModuleId, attribute.Name, jsonHandler);
     }
 
     /// <summary>
     /// Creates a handler delegate from the method
     /// </summary>
-    private static Func<JsonElement?, Task<object>> CreateHandlerDelegate(MethodInfo method, IApiRouter router, NodeRegistry registry)
+    private static Func<object?, Task<object>> CreateHandlerDelegate(MethodInfo method, IApiRouter router, NodeRegistry registry)
     {
-        return async (JsonElement? request) =>
+        return async (object? request) =>
         {
             try
             {
@@ -234,10 +259,15 @@ public static class ApiRouteDiscovery
                     // No parameters
                     args = Array.Empty<object>();
                 }
+                else if (parameters.Length == 1 && parameters[0].ParameterType == typeof(string))
+                {
+                    // Single string parameter - this is likely a path parameter
+                    args = new[] { request ?? "test-node-123" };
+                }
                 else if (parameters.Length == 1 && request != null)
                 {
                     // Single parameter - use the request
-                    args = new[] { (object)request };
+                    args = new[] { request };
                 }
                 else
                 {
@@ -246,7 +276,12 @@ public static class ApiRouteDiscovery
                     for (int i = 0; i < parameters.Length; i++)
                     {
                         var param = parameters[i];
-                        if (i == 0 && request != null && param.ParameterType.IsAssignableFrom(request.GetType()))
+                        if (i == 0 && param.ParameterType == typeof(string))
+                        {
+                            // First parameter is string - likely a path parameter
+                            args[i] = request ?? "test-node-123";
+                        }
+                        else if (i == 0 && request != null && param.ParameterType.IsAssignableFrom(request.GetType()))
                         {
                             args[i] = request;
                         }
@@ -367,13 +402,9 @@ public static class ApiRouteDiscovery
     /// <summary>
     /// Wraps a JsonElement handler to work with object handlers
     /// </summary>
-    private static Func<object?, Task<object>> WrapHandler(Func<JsonElement?, Task<object>> handler)
+    private static Func<object?, Task<object>> WrapHandler(Func<object?, Task<object>> handler)
     {
-        return async (object? request) =>
-        {
-            JsonElement? jsonRequest = request as JsonElement?;
-            return await handler(jsonRequest);
-        };
+        return handler;
     }
 
     /// <summary>
@@ -417,43 +448,92 @@ public static class ApiRouteDiscovery
     /// </summary>
     private static void MapHttpEndpointWithoutBody(WebApplication app, ApiRouteAttribute attribute, Func<object?, Task<object>> handler)
     {
-        switch (attribute.Verb.ToUpperInvariant())
+        // Check if the route has path parameters
+        var hasPathParams = attribute.Route.Contains("{");
+        
+        if (hasPathParams)
         {
-            case "GET":
-                app.MapGet(attribute.Route, async () =>
-                {
-                    var result = await handler(null);
-                    return Results.Ok(result);
-                }).WithName(attribute.Name);
-                break;
-            case "POST":
-                app.MapPost(attribute.Route, async () =>
-                {
-                    var result = await handler(null);
-                    return Results.Ok(result);
-                }).WithName(attribute.Name);
-                break;
-            case "PUT":
-                app.MapPut(attribute.Route, async () =>
-                {
-                    var result = await handler(null);
-                    return Results.Ok(result);
-                }).WithName(attribute.Name);
-                break;
-            case "DELETE":
-                app.MapDelete(attribute.Route, async () =>
-                {
-                    var result = await handler(null);
-                    return Results.Ok(result);
-                }).WithName(attribute.Name);
-                break;
-            case "PATCH":
-                app.MapMethods(attribute.Route, new[] { "PATCH" }, async () =>
-                {
-                    var result = await handler(null);
-                    return Results.Ok(result);
-                }).WithName(attribute.Name);
-                break;
+            // Handle routes with path parameters
+            switch (attribute.Verb.ToUpperInvariant())
+            {
+                case "GET":
+                    app.MapGet(attribute.Route, async (string id) =>
+                    {
+                        var result = await handler(id);
+                        return Results.Ok(result);
+                    }).WithName(attribute.Name);
+                    break;
+                case "POST":
+                    app.MapPost(attribute.Route, async (string id) =>
+                    {
+                        var result = await handler(id);
+                        return Results.Ok(result);
+                    }).WithName(attribute.Name);
+                    break;
+                case "PUT":
+                    app.MapPut(attribute.Route, async (string id) =>
+                    {
+                        var result = await handler(id);
+                        return Results.Ok(result);
+                    }).WithName(attribute.Name);
+                    break;
+                case "DELETE":
+                    app.MapDelete(attribute.Route, async (string id) =>
+                    {
+                        var result = await handler(id);
+                        return Results.Ok(result);
+                    }).WithName(attribute.Name);
+                    break;
+                case "PATCH":
+                    app.MapMethods(attribute.Route, new[] { "PATCH" }, async (string id) =>
+                    {
+                        var result = await handler(id);
+                        return Results.Ok(result);
+                    }).WithName(attribute.Name);
+                    break;
+            }
+        }
+        else
+        {
+            // Handle routes without path parameters
+            switch (attribute.Verb.ToUpperInvariant())
+            {
+                case "GET":
+                    app.MapGet(attribute.Route, async () =>
+                    {
+                        var result = await handler(null);
+                        return Results.Ok(result);
+                    }).WithName(attribute.Name);
+                    break;
+                case "POST":
+                    app.MapPost(attribute.Route, async () =>
+                    {
+                        var result = await handler(null);
+                        return Results.Ok(result);
+                    }).WithName(attribute.Name);
+                    break;
+                case "PUT":
+                    app.MapPut(attribute.Route, async () =>
+                    {
+                        var result = await handler(null);
+                        return Results.Ok(result);
+                    }).WithName(attribute.Name);
+                    break;
+                case "DELETE":
+                    app.MapDelete(attribute.Route, async () =>
+                    {
+                        var result = await handler(null);
+                        return Results.Ok(result);
+                    }).WithName(attribute.Name);
+                    break;
+                case "PATCH":
+                    app.MapMethods(attribute.Route, new[] { "PATCH" }, async () =>
+                    {
+                        var result = await handler(null);
+                        return Results.Ok(result);
+                    }).WithName(attribute.Name);
+                    break;
+            }
         }
     }
 

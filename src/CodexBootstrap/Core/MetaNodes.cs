@@ -13,28 +13,28 @@ namespace CodexBootstrap.Core;
 )]
 public class NodeMetaNode
 {
-    [MetaNodeField("id", "string", Required = true, Description = "Unique identifier")]
+    [MetaNodeFieldAttribute("id", "string", Required = true, Description = "Unique identifier")]
     public string Id { get; set; } = string.Empty;
 
-    [MetaNodeField("typeId", "string", Required = true, Description = "Type identifier")]
+    [MetaNodeFieldAttribute("typeId", "string", Required = true, Description = "Type identifier")]
     public string TypeId { get; set; } = string.Empty;
 
-    [MetaNodeField("state", "string", Required = true, Description = "Content state", Kind = "Enum", EnumValues = new[] { "Ice", "Water", "Gas" })]
+    [MetaNodeFieldAttribute("state", "string", Required = true, Description = "Content state", Kind = "Enum", EnumValues = new[] { "Ice", "Water", "Gas" })]
     public string State { get; set; } = string.Empty;
 
-    [MetaNodeField("locale", "string", Description = "Locale information")]
+    [MetaNodeFieldAttribute("locale", "string", Description = "Locale information")]
     public string? Locale { get; set; }
 
-    [MetaNodeField("title", "string", Description = "Display title")]
+    [MetaNodeFieldAttribute("title", "string", Description = "Display title")]
     public string? Title { get; set; }
 
-    [MetaNodeField("description", "string", Description = "Description")]
+    [MetaNodeFieldAttribute("description", "string", Description = "Description")]
     public string? Description { get; set; }
 
-    [MetaNodeField("content", "ContentRef", Description = "Content reference", Kind = "Reference", ReferenceType = "ContentRef")]
+    [MetaNodeFieldAttribute("content", "ContentRef", Description = "Content reference", Kind = "Reference", ReferenceType = "ContentRef")]
     public object? Content { get; set; }
 
-    [MetaNodeField("meta", "object", Description = "Metadata dictionary", Kind = "Object")]
+    [MetaNodeFieldAttribute("meta", "object", Description = "Metadata dictionary", Kind = "Object")]
     public object? Meta { get; set; }
 }
 
@@ -49,19 +49,19 @@ public class NodeMetaNode
 )]
 public class EdgeMetaNode
 {
-    [MetaNodeField("fromId", "string", Required = true, Description = "Source node identifier")]
+    [MetaNodeFieldAttribute("fromId", "string", Required = true, Description = "Source node identifier")]
     public string FromId { get; set; } = string.Empty;
 
-    [MetaNodeField("toId", "string", Required = true, Description = "Target node identifier")]
+    [MetaNodeFieldAttribute("toId", "string", Required = true, Description = "Target node identifier")]
     public string ToId { get; set; } = string.Empty;
 
-    [MetaNodeField("role", "string", Required = true, Description = "Edge role")]
+    [MetaNodeFieldAttribute("role", "string", Required = true, Description = "Edge role")]
     public string Role { get; set; } = string.Empty;
 
-    [MetaNodeField("weight", "number", Description = "Edge weight")]
+    [MetaNodeFieldAttribute("weight", "number", Description = "Edge weight")]
     public double? Weight { get; set; }
 
-    [MetaNodeField("meta", "object", Description = "Edge metadata", Kind = "Object")]
+    [MetaNodeFieldAttribute("meta", "object", Description = "Edge metadata", Kind = "Object")]
     public object? Meta { get; set; }
 }
 
@@ -76,31 +76,31 @@ public class EdgeMetaNode
 )]
 public class ContentRefMetaNode
 {
-    [MetaNodeField("mediaType", "string", Description = "MIME type")]
+    [MetaNodeFieldAttribute("mediaType", "string", Description = "MIME type")]
     public string? MediaType { get; set; }
 
-    [MetaNodeField("inlineJson", "string", Description = "Inline JSON content")]
+    [MetaNodeFieldAttribute("inlineJson", "string", Description = "Inline JSON content")]
     public string? InlineJson { get; set; }
 
-    [MetaNodeField("inlineBytes", "array", Description = "Inline binary content", Kind = "Array", ArrayItemType = "byte")]
+    [MetaNodeFieldAttribute("inlineBytes", "array", Description = "Inline binary content", Kind = "Array", ArrayItemType = "byte")]
     public byte[]? InlineBytes { get; set; }
 
-    [MetaNodeField("externalUri", "string", Description = "External URI")]
+    [MetaNodeFieldAttribute("externalUri", "string", Description = "External URI")]
     public string? ExternalUri { get; set; }
 
-    [MetaNodeField("selector", "string", Description = "Content selector")]
+    [MetaNodeFieldAttribute("selector", "string", Description = "Content selector")]
     public string? Selector { get; set; }
 
-    [MetaNodeField("query", "string", Description = "Content query")]
+    [MetaNodeFieldAttribute("query", "string", Description = "Content query")]
     public string? Query { get; set; }
 
-    [MetaNodeField("headers", "object", Description = "HTTP headers", Kind = "Object")]
+    [MetaNodeFieldAttribute("headers", "object", Description = "HTTP headers", Kind = "Object")]
     public object? Headers { get; set; }
 
-    [MetaNodeField("authRef", "string", Description = "Authentication reference")]
+    [MetaNodeFieldAttribute("authRef", "string", Description = "Authentication reference")]
     public string? AuthRef { get; set; }
 
-    [MetaNodeField("cacheKey", "string", Description = "Cache key")]
+    [MetaNodeFieldAttribute("cacheKey", "string", Description = "Cache key")]
     public string? CacheKey { get; set; }
 }
 
@@ -115,16 +115,16 @@ public class ContentRefMetaNode
 )]
 public class IceStateMetaNode
 {
-    [MetaNodeField("name", "string", Required = true, Description = "State name")]
+    [MetaNodeFieldAttribute("name", "string", Required = true, Description = "State name")]
     public string Name { get; set; } = "Ice";
 
-    [MetaNodeField("description", "string", Required = true, Description = "State description")]
+    [MetaNodeFieldAttribute("description", "string", Required = true, Description = "State description")]
     public string Description { get; set; } = "Frozen, immutable state";
 
-    [MetaNodeField("parentType", "string", Required = true, Description = "Parent type")]
+    [MetaNodeFieldAttribute("parentType", "string", Required = true, Description = "Parent type")]
     public string ParentType { get; set; } = "ContentState";
 
-    [MetaNodeField("value", "string", Required = true, Description = "State value")]
+    [MetaNodeFieldAttribute("value", "string", Required = true, Description = "State value")]
     public string Value { get; set; } = "ice";
 }
 
@@ -139,16 +139,16 @@ public class IceStateMetaNode
 )]
 public class WaterStateMetaNode
 {
-    [MetaNodeField("name", "string", Required = true, Description = "State name")]
+    [MetaNodeFieldAttribute("name", "string", Required = true, Description = "State name")]
     public string Name { get; set; } = "Water";
 
-    [MetaNodeField("description", "string", Required = true, Description = "State description")]
+    [MetaNodeFieldAttribute("description", "string", Required = true, Description = "State description")]
     public string Description { get; set; } = "Liquid, mutable state";
 
-    [MetaNodeField("parentType", "string", Required = true, Description = "Parent type")]
+    [MetaNodeFieldAttribute("parentType", "string", Required = true, Description = "Parent type")]
     public string ParentType { get; set; } = "ContentState";
 
-    [MetaNodeField("value", "string", Required = true, Description = "State value")]
+    [MetaNodeFieldAttribute("value", "string", Required = true, Description = "State value")]
     public string Value { get; set; } = "water";
 }
 
@@ -163,16 +163,16 @@ public class WaterStateMetaNode
 )]
 public class GasStateMetaNode
 {
-    [MetaNodeField("name", "string", Required = true, Description = "State name")]
+    [MetaNodeFieldAttribute("name", "string", Required = true, Description = "State name")]
     public string Name { get; set; } = "Gas";
 
-    [MetaNodeField("description", "string", Required = true, Description = "State description")]
+    [MetaNodeFieldAttribute("description", "string", Required = true, Description = "State description")]
     public string Description { get; set; } = "Transient, derivable state";
 
-    [MetaNodeField("parentType", "string", Required = true, Description = "Parent type")]
+    [MetaNodeFieldAttribute("parentType", "string", Required = true, Description = "Parent type")]
     public string ParentType { get; set; } = "ContentState";
 
-    [MetaNodeField("value", "string", Required = true, Description = "State value")]
+    [MetaNodeFieldAttribute("value", "string", Required = true, Description = "State value")]
     public string Value { get; set; } = "gas";
 }
 
@@ -187,16 +187,16 @@ public class GasStateMetaNode
 )]
 public class ObjectTypeKindMetaNode
 {
-    [MetaNodeField("name", "string", Required = true, Description = "Type kind name")]
+    [MetaNodeFieldAttribute("name", "string", Required = true, Description = "Type kind name")]
     public string Name { get; set; } = "Object";
 
-    [MetaNodeField("description", "string", Required = true, Description = "Type kind description")]
+    [MetaNodeFieldAttribute("description", "string", Required = true, Description = "Type kind description")]
     public string Description { get; set; } = "Object type";
 
-    [MetaNodeField("parentType", "string", Required = true, Description = "Parent type")]
+    [MetaNodeFieldAttribute("parentType", "string", Required = true, Description = "Parent type")]
     public string ParentType { get; set; } = "TypeKind";
 
-    [MetaNodeField("value", "string", Required = true, Description = "Type kind value")]
+    [MetaNodeFieldAttribute("value", "string", Required = true, Description = "Type kind value")]
     public string Value { get; set; } = "object";
 }
 
@@ -211,16 +211,16 @@ public class ObjectTypeKindMetaNode
 )]
 public class ArrayTypeKindMetaNode
 {
-    [MetaNodeField("name", "string", Required = true, Description = "Type kind name")]
+    [MetaNodeFieldAttribute("name", "string", Required = true, Description = "Type kind name")]
     public string Name { get; set; } = "Array";
 
-    [MetaNodeField("description", "string", Required = true, Description = "Type kind description")]
+    [MetaNodeFieldAttribute("description", "string", Required = true, Description = "Type kind description")]
     public string Description { get; set; } = "Array type";
 
-    [MetaNodeField("parentType", "string", Required = true, Description = "Parent type")]
+    [MetaNodeFieldAttribute("parentType", "string", Required = true, Description = "Parent type")]
     public string ParentType { get; set; } = "TypeKind";
 
-    [MetaNodeField("value", "string", Required = true, Description = "Type kind value")]
+    [MetaNodeFieldAttribute("value", "string", Required = true, Description = "Type kind value")]
     public string Value { get; set; } = "array";
 }
 
@@ -235,16 +235,16 @@ public class ArrayTypeKindMetaNode
 )]
 public class ReferenceTypeKindMetaNode
 {
-    [MetaNodeField("name", "string", Required = true, Description = "Type kind name")]
+    [MetaNodeFieldAttribute("name", "string", Required = true, Description = "Type kind name")]
     public string Name { get; set; } = "Reference";
 
-    [MetaNodeField("description", "string", Required = true, Description = "Type kind description")]
+    [MetaNodeFieldAttribute("description", "string", Required = true, Description = "Type kind description")]
     public string Description { get; set; } = "Reference type";
 
-    [MetaNodeField("parentType", "string", Required = true, Description = "Parent type")]
+    [MetaNodeFieldAttribute("parentType", "string", Required = true, Description = "Parent type")]
     public string ParentType { get; set; } = "TypeKind";
 
-    [MetaNodeField("value", "string", Required = true, Description = "Type kind value")]
+    [MetaNodeFieldAttribute("value", "string", Required = true, Description = "Type kind value")]
     public string Value { get; set; } = "reference";
 }
 
@@ -259,16 +259,16 @@ public class ReferenceTypeKindMetaNode
 )]
 public class EnumTypeKindMetaNode
 {
-    [MetaNodeField("name", "string", Required = true, Description = "Type kind name")]
+    [MetaNodeFieldAttribute("name", "string", Required = true, Description = "Type kind name")]
     public string Name { get; set; } = "Enum";
 
-    [MetaNodeField("description", "string", Required = true, Description = "Type kind description")]
+    [MetaNodeFieldAttribute("description", "string", Required = true, Description = "Type kind description")]
     public string Description { get; set; } = "Enumeration type";
 
-    [MetaNodeField("parentType", "string", Required = true, Description = "Parent type")]
+    [MetaNodeFieldAttribute("parentType", "string", Required = true, Description = "Parent type")]
     public string ParentType { get; set; } = "TypeKind";
 
-    [MetaNodeField("value", "string", Required = true, Description = "Type kind value")]
+    [MetaNodeFieldAttribute("value", "string", Required = true, Description = "Type kind value")]
     public string Value { get; set; } = "enum";
 }
 
@@ -283,15 +283,15 @@ public class EnumTypeKindMetaNode
 )]
 public class PrimitiveTypeKindMetaNode
 {
-    [MetaNodeField("name", "string", Required = true, Description = "Type kind name")]
+    [MetaNodeFieldAttribute("name", "string", Required = true, Description = "Type kind name")]
     public string Name { get; set; } = "Primitive";
 
-    [MetaNodeField("description", "string", Required = true, Description = "Type kind description")]
+    [MetaNodeFieldAttribute("description", "string", Required = true, Description = "Type kind description")]
     public string Description { get; set; } = "Primitive type";
 
-    [MetaNodeField("parentType", "string", Required = true, Description = "Parent type")]
+    [MetaNodeFieldAttribute("parentType", "string", Required = true, Description = "Parent type")]
     public string ParentType { get; set; } = "TypeKind";
 
-    [MetaNodeField("value", "string", Required = true, Description = "Type kind value")]
+    [MetaNodeFieldAttribute("value", "string", Required = true, Description = "Type kind value")]
     public string Value { get; set; } = "primitive";
 }

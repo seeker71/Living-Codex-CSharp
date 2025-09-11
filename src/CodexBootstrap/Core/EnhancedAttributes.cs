@@ -18,6 +18,23 @@ namespace CodexBootstrap.Core
         public string Category { get; set; } = "";
         public bool AutoGenerate { get; set; } = true;
         public Dictionary<string, object> Properties { get; set; } = new();
+        
+        // Additional properties needed for MetaNodeDiscovery
+        public string Kind { get; set; } = "";
+        public bool IsCore { get; set; } = false;
+        public bool IsState { get; set; } = false;
+        public bool IsType { get; set; } = false;
+        public bool IsApi { get; set; } = false;
+        public bool IsResponse { get; set; } = false;
+        public bool IsRequest { get; set; } = false;
+        public bool IsModule { get; set; } = false;
+        public string ParentType { get; set; } = "";
+        public string Value { get; set; } = "";
+        public string ModuleId { get; set; } = "";
+        public string ApiName { get; set; } = "";
+        public string Route { get; set; } = "";
+        public string Verb { get; set; } = "";
+        public Dictionary<string, object> AdditionalMeta { get; set; } = new();
 
         public MetaNodeAttribute() { }
         public MetaNodeAttribute(string id, string typeId, string name, string description)
@@ -211,6 +228,8 @@ namespace CodexBootstrap.Core
               public string Description { get; set; } = "";
               public string Example { get; set; } = "";
               public string Id { get; set; } = "";
+              public string ModuleId { get; set; } = "";
+              public string ApiName { get; set; } = "";
 
               public ResponseTypeAttribute() { }
               public ResponseTypeAttribute(string id, string name, string description)
@@ -245,6 +264,8 @@ namespace CodexBootstrap.Core
               public string Description { get; set; } = "";
               public string Example { get; set; } = "";
               public string Id { get; set; } = "";
+              public string ModuleId { get; set; } = "";
+              public string ApiName { get; set; } = "";
 
               public RequestTypeAttribute() { }
               public RequestTypeAttribute(string id, string name, string description)
@@ -273,10 +294,11 @@ namespace CodexBootstrap.Core
 
 
 
-    // Legacy attribute compatibility - MetaNodeField without "Attribute" suffix
+    // MetaNodeFieldAttribute with "Attribute" suffix for compatibility
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
-    public class MetaNodeField : Attribute
+    public class MetaNodeFieldAttribute : Attribute
     {
+        public string Name { get; set; } = "";
         public bool Required { get; set; } = false;
         public string Description { get; set; } = "";
         public string Type { get; set; } = "";
@@ -285,16 +307,17 @@ namespace CodexBootstrap.Core
         public string[] EnumValues { get; set; } = Array.Empty<string>();
         public string ReferenceType { get; set; } = "";
 
-              public MetaNodeField() { }
-              public MetaNodeField(string name, string type, bool required = true, string description = "", string kind = "", string arrayItemType = "", string[] enumValues = null, string referenceType = "")
-              {
-                  Type = type;
-                  Required = required;
-                  Description = description;
-                  Kind = kind;
-                  ArrayItemType = arrayItemType;
-                  EnumValues = enumValues ?? Array.Empty<string>();
-                  ReferenceType = referenceType;
-              }
+        public MetaNodeFieldAttribute() { }
+        public MetaNodeFieldAttribute(string name, string type, bool required = true, string description = "", string kind = "", string arrayItemType = "", string[] enumValues = null, string referenceType = "")
+        {
+            Name = name;
+            Type = type;
+            Required = required;
+            Description = description;
+            Kind = kind;
+            ArrayItemType = arrayItemType;
+            EnumValues = enumValues ?? Array.Empty<string>();
+            ReferenceType = referenceType;
+        }
     }
 }

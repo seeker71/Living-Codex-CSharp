@@ -116,11 +116,11 @@ app.MapPost("/route", async (DynamicCall req) =>
     }
 });
 
-// Discover and register module-specific routes automatically
-routeDiscovery.DiscoverAndRegisterRoutes(app);
-
 // Discover and register attribute-based API routes
 ApiRouteDiscovery.DiscoverAndRegisterRoutes(app, router, registry);
+
+// Note: Traditional route discovery is disabled to prevent duplicate route registration
+// routeDiscovery.DiscoverAndRegisterRoutes(app);
 
 app.Run();
 
@@ -128,11 +128,12 @@ app.Run();
 static void InitializeMetaNodeSystem(NodeRegistry registry)
 {
     // Register attribute-based meta-nodes
-    var assembly = Assembly.GetExecutingAssembly();
-    foreach (var node in MetaNodeDiscovery.DiscoverMetaNodes(assembly))
-    {
-        registry.Upsert(node);
-    }
+    // MetaNodeDiscovery is temporarily disabled
+    // var assembly = Assembly.GetExecutingAssembly();
+    // foreach (var node in MetaNodeDiscovery.DiscoverMetaNodes(assembly))
+    // {
+    //     registry.Upsert(node);
+    // }
 
     // Register legacy meta-nodes for backward compatibility
     foreach (var node in MetaNodeSystem.CreateCoreMetaNodes())

@@ -107,12 +107,9 @@ public static class MetaNodeDiscovery
         // Add additional metadata
         if (attribute.AdditionalMeta != null)
         {
-            for (int i = 0; i < attribute.AdditionalMeta.Length; i += 2)
+            foreach (var kvp in attribute.AdditionalMeta)
             {
-                if (i + 1 < attribute.AdditionalMeta.Length)
-                {
-                    meta[attribute.AdditionalMeta[i]] = attribute.AdditionalMeta[i + 1];
-                }
+                meta[kvp.Key] = kvp.Value;
             }
         }
 
@@ -325,4 +322,5 @@ public static class MetaNodeDiscovery
         return content;
     }
 }
+
 
