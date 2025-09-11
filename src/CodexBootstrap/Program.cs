@@ -33,16 +33,33 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
     o.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
 });
 
-// Core services - only nodes and edges
-// Storage backend will be configured by StorageModule
-builder.Services.AddSingleton<NodeRegistry>(sp => 
-{
-    // Start with a basic NodeRegistry, will be replaced by PersistentNodeRegistry
-    // when StorageModule is loaded
-    return new NodeRegistry();
-});
-builder.Services.AddSingleton<ApiRouter>();
-builder.Services.AddSingleton<IApiRouter>(sp => sp.GetRequiredService<ApiRouter>());
+        // Core services - only nodes and edges
+        // Storage backend will be configured by StorageModule
+        builder.Services.AddSingleton<NodeRegistry>(sp =>
+        {
+            // Start with a basic NodeRegistry, will be replaced by PersistentNodeRegistry
+            // when StorageModule is loaded
+            return new NodeRegistry();
+        });
+        builder.Services.AddSingleton<ApiRouter>();
+        builder.Services.AddSingleton<IApiRouter>(sp => sp.GetRequiredService<ApiRouter>());
+
+        // Authentication and Authorization services
+        builder.Services.AddSingleton<IUserRepository, InMemoryUserRepository>();
+        builder.Services.AddSingleton<IRoleRepository, InMemoryRoleRepository>();
+        builder.Services.AddSingleton<IPermissionRepository, InMemoryPermissionRepository>();
+        
+        // JWT settings - in production, these should come from configuration
+        var jwtSettings = new JwtSettings(
+            SecretKey: Environment.GetEnvironmentVariable("JWT_SECRET") ?? "your-super-secret-key-that-is-at-least-32-characters-long",
+            Issuer: Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "CodexBootstrap",
+            Audience: Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "CodexBootstrap",
+            ExpirationMinutes: int.Parse(Environment.GetEnvironmentVariable("JWT_EXPIRATION_MINUTES") ?? "60")
+        );
+        builder.Services.AddSingleton(jwtSettings);
+        
+        builder.Services.AddSingleton<IAuthenticationService, JwtAuthenticationService>();
+        builder.Services.AddSingleton<IAuthorizationService, RoleBasedAuthorizationService>();
 
 
 // Generic services
