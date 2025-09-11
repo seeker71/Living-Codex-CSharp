@@ -1,5 +1,6 @@
 using CodexBootstrap.Core;
 using CodexBootstrap.Runtime;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CodexBootstrap.Modules;
 
@@ -12,10 +13,22 @@ public sealed class AuthenticationModule : IModule
     private readonly IAuthorizationService _authzService;
     private readonly Core.ILogger _logger;
 
-    public AuthenticationModule(IAuthenticationService authService, IAuthorizationService authzService)
+    public AuthenticationModule(IServiceProvider serviceProvider)
     {
-        _authService = authService;
-        _authzService = authzService;
+        // Create services directly since we can't modify the service collection at this point
+        var userRepository = new InMemoryUserRepository();
+        var roleRepository = new InMemoryRoleRepository();
+        var permissionRepository = new InMemoryPermissionRepository();
+        
+        var jwtSettings = new JwtSettings(
+            SecretKey: Environment.GetEnvironmentVariable("JWT_SECRET") ?? "your-super-secret-key-that-is-at-least-32-characters-long",
+            Issuer: Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "CodexBootstrap",
+            Audience: Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "CodexBootstrap",
+            ExpirationMinutes: int.Parse(Environment.GetEnvironmentVariable("JWT_EXPIRATION_MINUTES") ?? "60")
+        );
+        
+        _authService = new JwtAuthenticationService(userRepository, jwtSettings);
+        _authzService = new RoleBasedAuthorizationService(userRepository, roleRepository, permissionRepository);
         _logger = new Log4NetLogger(typeof(AuthenticationModule));
     }
 

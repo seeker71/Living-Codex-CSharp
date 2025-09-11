@@ -44,22 +44,6 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
         builder.Services.AddSingleton<ApiRouter>();
         builder.Services.AddSingleton<IApiRouter>(sp => sp.GetRequiredService<ApiRouter>());
 
-        // Authentication and Authorization services
-        builder.Services.AddSingleton<IUserRepository, InMemoryUserRepository>();
-        builder.Services.AddSingleton<IRoleRepository, InMemoryRoleRepository>();
-        builder.Services.AddSingleton<IPermissionRepository, InMemoryPermissionRepository>();
-        
-        // JWT settings - in production, these should come from configuration
-        var jwtSettings = new JwtSettings(
-            SecretKey: Environment.GetEnvironmentVariable("JWT_SECRET") ?? "your-super-secret-key-that-is-at-least-32-characters-long",
-            Issuer: Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "CodexBootstrap",
-            Audience: Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "CodexBootstrap",
-            ExpirationMinutes: int.Parse(Environment.GetEnvironmentVariable("JWT_EXPIRATION_MINUTES") ?? "60")
-        );
-        builder.Services.AddSingleton(jwtSettings);
-        
-        builder.Services.AddSingleton<IAuthenticationService, JwtAuthenticationService>();
-        builder.Services.AddSingleton<IAuthorizationService, RoleBasedAuthorizationService>();
 
 
 // Generic services
@@ -188,7 +172,8 @@ static void LoadCoreModules(ModuleLoader moduleLoader, IServiceProvider serviceP
     var coreModuleTypes = new[]
     {
         "CodexBootstrap.Modules.CoreModule",
-        "CodexBootstrap.Modules.StorageModule", 
+        "CodexBootstrap.Modules.StorageModule",
+        "CodexBootstrap.Modules.AuthenticationModule",
         "CodexBootstrap.Modules.PhaseModule",
         "CodexBootstrap.Modules.DeltaModule",
         "CodexBootstrap.Modules.SpecModule",
