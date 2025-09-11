@@ -111,6 +111,13 @@ public sealed class ModuleLoader
     {
         try
         {
+            // Check if module is already loaded to prevent duplicates
+            if (_loadedModules.Any(m => m == module))
+            {
+                _logger.Warn($"Module {module.GetType().Name} is already loaded, skipping duplicate load");
+                return;
+            }
+
             _logger.Info($"Loading module: {module.GetType().Name}");
             var moduleNode = module.GetModuleNode();
             _logger.Info($"Module node ID: {moduleNode.Id}");

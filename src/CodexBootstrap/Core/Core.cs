@@ -39,19 +39,13 @@ public sealed class ApiRouter : IApiRouter
     
     public void Register(string moduleId, string api, Func<JsonElement?, Task<object>> handler)
     {
-        _logger.Debug($"ApiRouter: Registering {moduleId}.{api}");
+        // Registration is logged by ApiRouteDiscovery
         _handlers[(moduleId, api)] = handler;
     }
     
     public bool TryGetHandler(string moduleId, string api, out Func<JsonElement?, Task<object>> handler)
     {
-        var found = _handlers.TryGetValue((moduleId, api), out handler!);
-        _logger.Debug($"ApiRouter: TryGetHandler({moduleId}, {api}) = {found}");
-        if (!found)
-        {
-            _logger.Debug($"ApiRouter: Available handlers: {string.Join(", ", _handlers.Keys.Select(k => $"{k.module}.{k.api}"))}");
-        }
-        return found;
+        return _handlers.TryGetValue((moduleId, api), out handler!);
     }
     
     public NodeRegistry GetRegistry()

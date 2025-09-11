@@ -190,7 +190,7 @@ static void LoadCoreModules(ModuleLoader moduleLoader, IServiceProvider serviceP
             var moduleType = assembly.GetType(moduleTypeName);
             if (moduleType != null && typeof(IModule).IsAssignableFrom(moduleType))
             {
-                logger.Info($"Loading core module: {moduleTypeName}");
+                // Module loading is logged by ModuleLoader.LoadModule()
                 var module = ActivatorUtilities.CreateInstance(serviceProvider, moduleType) as IModule;
                 if (module != null)
                 {
@@ -218,7 +218,7 @@ static void LoadCoreModules(ModuleLoader moduleLoader, IServiceProvider serviceP
                     
                     moduleLoader.LoadModule(module);
                     loadedCount++;
-                    logger.Info($"Successfully loaded core module: {moduleTypeName}");
+                    // Success is logged by ModuleLoader.LoadModule()
                 }
                 else
                 {
