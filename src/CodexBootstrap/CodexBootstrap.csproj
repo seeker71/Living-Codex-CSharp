@@ -7,8 +7,10 @@
     <NoWarn>$(NoWarn);CS1998;CS8625;CS8603;CS8604;CS8601;CS8602;CS0114</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="FluentValidation" Version="11.8.0" />
     <PackageReference Include="log4net" Version="3.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authorization" Version="6.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.2.0" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="7.0.0" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.14.0" />
   </ItemGroup>

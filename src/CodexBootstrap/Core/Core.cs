@@ -22,6 +22,16 @@ public class NodeRegistry
     
     public virtual IEnumerable<Edge> GetEdgesTo(string toId) => 
         _edges.Where(e => e.ToId == toId);
+    
+    public virtual void RemoveNode(string id) => _nodes.Remove(id);
+    
+    public virtual void RemoveEdge(string fromId, string toId) => 
+        _edges.RemoveAll(e => e.FromId == fromId && e.ToId == toId);
+    
+    public virtual Node? GetNode(string id) => _nodes.TryGetValue(id, out var node) ? node : null;
+    
+    public virtual Edge? GetEdge(string fromId, string toId) => 
+        _edges.FirstOrDefault(e => e.FromId == fromId && e.ToId == toId);
 }
 
 
