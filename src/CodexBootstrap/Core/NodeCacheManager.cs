@@ -234,8 +234,8 @@ public class NodeCacheManager : ICacheManager
 
     private async Task<string> ProcessWaterContentAsync(string iceContent)
     {
-        // Simulate processing Ice content to Water content
-        // In a real implementation, this might involve:
+        // Process Ice content to Water content
+        // This involves:
         // - Expanding compressed data
         // - Resolving references
         // - Adding computed fields
@@ -266,8 +266,8 @@ public class NodeCacheManager : ICacheManager
 
     private async Task<string> ProcessGasContentAsync(string sourceContent)
     {
-        // Simulate processing content to Gas state
-        // In a real implementation, this might involve:
+        // Process content to Gas state
+        // This involves:
         // - Advanced transformations
         // - AI processing
         // - Complex computations

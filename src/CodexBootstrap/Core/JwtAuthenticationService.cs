@@ -16,6 +16,8 @@ public class JwtAuthenticationService : IAuthenticationService
     private readonly ILogger _logger;
     private readonly JwtSettings _jwtSettings;
     private readonly Dictionary<string, string> _refreshTokens = new();
+    private readonly HashSet<string> _revokedTokens = new();
+    private readonly Dictionary<string, PasswordResetInfo> _passwordResetTokens = new();
 
     public JwtAuthenticationService(IUserRepository userRepository, JwtSettings jwtSettings)
     {
@@ -163,8 +165,8 @@ public class JwtAuthenticationService : IAuthenticationService
             
             if (jti != null)
             {
-                // In a real implementation, you'd store revoked tokens in a database
-                // For now, we'll just log it
+                // Store revoked token in memory (in production, use a database)
+                _revokedTokens.Add(jti);
                 _logger.Info($"Token revoked: {jti}");
                 return true;
             }
@@ -199,6 +201,13 @@ public class JwtAuthenticationService : IAuthenticationService
 
             var principal = tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
             var jwtToken = (JwtSecurityToken)validatedToken;
+
+            // Check if token is revoked
+            var jti = jwtToken.Claims.FirstOrDefault(x => x.Type == "jti")?.Value;
+            if (jti != null && _revokedTokens.Contains(jti))
+            {
+                return new TokenValidationResult(false, Error: "Token has been revoked");
+            }
 
             var userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userId == null)
@@ -320,9 +329,20 @@ public class JwtAuthenticationService : IAuthenticationService
                 return true;
             }
 
-            // In a real implementation, you'd send a password reset email
-            // For now, we'll just log it
-            _logger.Info($"Password reset requested for user {user.Username}");
+            // Generate a password reset token
+            var resetToken = GeneratePasswordResetToken();
+            
+            // Store the reset token with expiration (in production, use a database)
+            // For now, we'll use a simple in-memory store
+            _passwordResetTokens[resetToken] = new PasswordResetInfo
+            {
+                UserId = user.Id,
+                Email = user.Email,
+                ExpiresAt = DateTime.UtcNow.AddHours(1), // Token expires in 1 hour
+                CreatedAt = DateTime.UtcNow
+            };
+            
+            _logger.Info($"Password reset token generated for user {user.Username}: {resetToken}");
             return true;
         }
         catch (Exception ex)
@@ -379,6 +399,14 @@ public class JwtAuthenticationService : IAuthenticationService
         rng.GetBytes(randomBytes);
         return Convert.ToBase64String(randomBytes);
     }
+
+    private string GeneratePasswordResetToken()
+    {
+        using var rng = RandomNumberGenerator.Create();
+        var randomBytes = new byte[32];
+        rng.GetBytes(randomBytes);
+        return Convert.ToBase64String(randomBytes);
+    }
 }
 
 /// <summary>
@@ -391,3 +419,14 @@ public record JwtSettings(
     int ExpirationMinutes = 60,
     int RefreshTokenExpirationDays = 7
 );
+
+/// <summary>
+/// Password reset information
+/// </summary>
+public record PasswordResetInfo
+{
+    public string UserId { get; init; } = string.Empty;
+    public string Email { get; init; } = string.Empty;
+    public DateTime ExpiresAt { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
