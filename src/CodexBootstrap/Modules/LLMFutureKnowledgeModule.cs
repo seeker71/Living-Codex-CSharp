@@ -739,14 +739,9 @@ Format your response as a structured analysis that can be used for decision-maki
     private FutureAnalysis AnalyzePatterns(List<FutureResponse> responses, string analysisType)
     {
         var analysis = new FutureAnalysis(
-            Id: Guid.NewGuid().ToString(),
-            AnalysisType: analysisType,
-            TotalResponses: responses.Count,
-            AverageConfidence: responses.Average(r => r.Confidence),
-            CommonThemes: ExtractCommonThemes(responses),
-            ConfidenceDistribution: CalculateConfidenceDistribution(responses),
-            TimePatterns: AnalyzeTimePatterns(responses),
-            GeneratedAt: DateTime.UtcNow
+            FuturePotential: responses.Average(r => r.Confidence),
+            Confidence: responses.Average(r => r.Confidence),
+            Recommendations: ExtractCommonThemes(responses)
         );
 
         return analysis;
@@ -812,10 +807,9 @@ Format your response as a structured analysis that can be used for decision-maki
     {
         return new List<string>
         {
-            $"Analyzed {analysis.TotalResponses} future knowledge responses",
-            $"Average confidence: {analysis.AverageConfidence:P1}",
-            $"Most common themes: {string.Join(", ", analysis.CommonThemes.Take(3))}",
-            $"Confidence distribution: {string.Join(", ", analysis.ConfidenceDistribution.Select(kvp => $"{kvp.Key}: {kvp.Value}"))}"
+            $"Future potential: {analysis.FuturePotential:P1}",
+            $"Confidence: {analysis.Confidence:P1}",
+            $"Recommendations: {string.Join(", ", analysis.Recommendations.Take(3))}"
         };
     }
 
@@ -949,16 +943,6 @@ Please provide a thoughtful translation that adapts the concept to the {request.
 public record LLMResponse(string Content, double Confidence, string Reasoning, List<string> Sources);
 public record LLMConfigValidation(bool IsValid, string ErrorMessage);
 
-public record FutureAnalysis(
-    string Id,
-    string AnalysisType,
-    int TotalResponses,
-    double AverageConfidence,
-    List<string> CommonThemes,
-    Dictionary<string, int> ConfidenceDistribution,
-    Dictionary<string, object> TimePatterns,
-    DateTime GeneratedAt
-);
 
 // Request/Response Types
 [ResponseType("codex.llm.future-query-response", "FutureQueryResponse", "Future query response")]

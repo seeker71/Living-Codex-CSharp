@@ -15,8 +15,10 @@ public sealed class EventStreamingModule : IModule
     private readonly RealtimeModule? _realtimeModule;
     private readonly ConcurrentQueue<StreamEvent> _eventHistory = new();
     private readonly ConcurrentDictionary<string, EventSubscription> _subscriptions = new();
+    private readonly ConcurrentDictionary<string, CrossServiceSubscription> _crossServiceSubscriptions = new();
     private readonly object _lock = new object();
     private int _maxHistorySize = 1000;
+    private CoreApiService? _coreApiService;
 
     public EventStreamingModule(NodeRegistry registry, RealtimeModule? realtimeModule = null)
     {
@@ -75,6 +77,8 @@ public sealed class EventStreamingModule : IModule
 
     public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
+        // Store CoreApiService reference for cross-service communication
+        _coreApiService = coreApi;
         // HTTP endpoints will be registered via ApiRouteDiscovery
     }
 
@@ -451,6 +455,177 @@ public sealed class EventStreamingModule : IModule
         }, userId);
     }
 
+    /// <summary>
+    /// Publish event to other services in the ecosystem
+    /// </summary>
+    [ApiRoute("POST", "/events/publish-cross-service", "PublishCrossServiceEvent", "Publish event to other services", "codex.event-streaming")]
+    public async Task<object> PublishCrossServiceEventAsync([ApiParameter("request", "Cross-service event publish request")] CrossServiceEventRequest request)
+    {
+        try
+        {
+            var streamEvent = new StreamEvent
+            {
+                EventId = Guid.NewGuid().ToString(),
+                EventType = request.EventType,
+                EntityType = request.EntityType,
+                EntityId = request.EntityId,
+                Data = request.Data,
+                UserId = request.UserId,
+                Timestamp = DateTimeOffset.UtcNow,
+                Description = request.Description ?? $"{request.EventType} for {request.EntityType} {request.EntityId}",
+                SourceServiceId = request.SourceServiceId,
+                TargetServices = request.TargetServices
+            };
+
+            // Add to local history
+            _eventHistory.Enqueue(streamEvent);
+
+            // Maintain history size
+            lock (_lock)
+            {
+                while (_eventHistory.Count > _maxHistorySize)
+                {
+                    _eventHistory.TryDequeue(out _);
+                }
+            }
+
+            // Notify local real-time subscribers
+            if (_realtimeModule != null)
+            {
+                await _realtimeModule.PublishSystemEventAsync(request.EventType, streamEvent, request.UserId);
+            }
+
+            // Notify local subscribers
+            await NotifySubscribersAsync(streamEvent);
+
+            // Publish to target services
+            var crossServiceTasks = new List<Task>();
+            foreach (var targetService in request.TargetServices ?? new List<string>())
+            {
+                crossServiceTasks.Add(PublishToServiceAsync(targetService, streamEvent));
+            }
+
+            await Task.WhenAll(crossServiceTasks);
+
+            _logger.Info($"Published cross-service event: {request.EventType} to {request.TargetServices?.Count ?? 0} services");
+            
+            return new
+            {
+                success = true,
+                eventId = streamEvent.EventId,
+                publishedToServices = request.TargetServices?.Count ?? 0,
+                message = "Cross-service event published successfully"
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error publishing cross-service event: {ex.Message}", ex);
+            return new ErrorResponse($"Failed to publish cross-service event: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Exchange a concept between services using event-driven approach
+    /// </summary>
+    [ApiRoute("POST", "/events/exchange-concept", "ExchangeConcept", "Exchange a concept between services", "codex.event-streaming")]
+    public async Task<object> ExchangeConceptAsync([ApiParameter("request", "Concept exchange request")] ConceptExchangeRequest request)
+    {
+        try
+        {
+            if (_coreApiService == null)
+            {
+                return new ErrorResponse("CoreApiService not available for concept exchange");
+            }
+
+            // Publish concept exchange request event
+            var exchangeEvent = new StreamEvent
+            {
+                EventId = Guid.NewGuid().ToString(),
+                EventType = "concept_exchange_request",
+                EntityType = "concept",
+                EntityId = request.ConceptId,
+                Data = new Dictionary<string, object>
+                {
+                    ["sourceServiceId"] = request.SourceServiceId,
+                    ["targetServiceId"] = request.TargetServiceId,
+                    ["conceptId"] = request.ConceptId,
+                    ["targetBeliefSystem"] = request.TargetBeliefSystem ?? new Dictionary<string, object>(),
+                    ["translationPreferences"] = request.TranslationPreferences ?? new Dictionary<string, object>()
+                },
+                UserId = request.UserId,
+                Timestamp = DateTimeOffset.UtcNow,
+                Description = $"Concept exchange request for {request.ConceptId}",
+                SourceServiceId = request.SourceServiceId,
+                TargetServices = new List<string> { request.TargetServiceId }
+            };
+
+            // Publish the exchange event
+            var publishRequest = new CrossServiceEventRequest(
+                EventType: "concept_exchange_request",
+                EntityType: "concept",
+                EntityId: request.ConceptId,
+                Data: exchangeEvent.Data,
+                UserId: request.UserId,
+                SourceServiceId: request.SourceServiceId,
+                TargetServices: new List<string> { request.TargetServiceId },
+                Description: $"Concept exchange request for {request.ConceptId}"
+            );
+
+            var publishResult = await PublishCrossServiceEventAsync(publishRequest);
+
+            return new
+            {
+                success = true,
+                exchangeId = exchangeEvent.EventId,
+                message = "Concept exchange request published successfully",
+                targetService = request.TargetServiceId
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error exchanging concept: {ex.Message}", ex);
+            return new ErrorResponse($"Failed to exchange concept: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Subscribe to events from other services
+    /// </summary>
+    [ApiRoute("POST", "/events/subscribe-cross-service", "SubscribeToCrossServiceEvents", "Subscribe to events from other services", "codex.event-streaming")]
+    public async Task<object> SubscribeToCrossServiceEventsAsync([ApiParameter("request", "Cross-service subscription request")] CrossServiceSubscriptionRequest request)
+    {
+        try
+        {
+            var subscription = new CrossServiceSubscription(
+                SubscriptionId: Guid.NewGuid().ToString(),
+                SourceServiceId: request.SourceServiceId,
+                EventTypes: request.EventTypes ?? new List<string>(),
+                EntityTypes: request.EntityTypes ?? new List<string>(),
+                EntityIds: request.EntityIds ?? new List<string>(),
+                CallbackUrl: request.CallbackUrl,
+                Filters: request.Filters ?? new Dictionary<string, object>(),
+                CreatedAt: DateTimeOffset.UtcNow,
+                IsActive: true
+            );
+
+            _crossServiceSubscriptions[subscription.SubscriptionId] = subscription;
+
+            _logger.Info($"Created cross-service subscription: {subscription.SubscriptionId} for service: {request.SourceServiceId}");
+            
+            return new
+            {
+                success = true,
+                subscriptionId = subscription.SubscriptionId,
+                message = "Cross-service subscription created successfully"
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error creating cross-service subscription: {ex.Message}", ex);
+            return new ErrorResponse($"Failed to create cross-service subscription: {ex.Message}");
+        }
+    }
+
     // Private helper methods
     private async Task PublishEventAsync(string eventType, string entityType, string entityId, object data, string? userId = null)
     {
@@ -493,7 +668,7 @@ public sealed class EventStreamingModule : IModule
     private async Task NotifySubscribersAsync(StreamEvent streamEvent)
     {
         var matchingSubscriptions = _subscriptions.Values
-            .Where(s => s.IsActive && 
+            .Where(s => s.IsActive &&
                        (s.EventTypes.Count == 0 || s.EventTypes.Contains(streamEvent.EventType)) &&
                        (s.EntityTypes.Count == 0 || s.EntityTypes.Contains(streamEvent.EntityType)) &&
                        (s.EntityIds.Count == 0 || s.EntityIds.Contains(streamEvent.EntityId)))
@@ -513,6 +688,46 @@ public sealed class EventStreamingModule : IModule
         }
     }
 
+    /// <summary>
+    /// Publish event to a specific service using CoreApiService
+    /// </summary>
+    private async Task PublishToServiceAsync(string serviceId, StreamEvent streamEvent)
+    {
+        try
+        {
+            if (_coreApiService == null)
+            {
+                _logger.Warn("CoreApiService not available for cross-service publishing");
+                return;
+            }
+
+            // Use CoreApiService to call the target service's event handler
+            var call = new DynamicCall(
+                ModuleId: serviceId,
+                Api: "event-receive",
+                Args: JsonSerializer.SerializeToElement(new
+                {
+                    EventId = streamEvent.EventId,
+                    EventType = streamEvent.EventType,
+                    EntityType = streamEvent.EntityType,
+                    EntityId = streamEvent.EntityId,
+                    Data = streamEvent.Data,
+                    UserId = streamEvent.UserId,
+                    Timestamp = streamEvent.Timestamp,
+                    Description = streamEvent.Description,
+                    SourceServiceId = streamEvent.SourceServiceId
+                })
+            );
+
+            await _coreApiService.ExecuteDynamicCall(call);
+            _logger.Debug($"Published event {streamEvent.EventId} to service {serviceId}");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error publishing event to service {serviceId}: {ex.Message}", ex);
+        }
+    }
+
     // Data models
     public record EventStreamQuery(
         string[]? EventTypes = null,
@@ -522,6 +737,15 @@ public sealed class EventStreamingModule : IModule
         DateTimeOffset? Until = null,
         int? Skip = null,
         int? Take = null
+    );
+
+    public record ConceptExchangeRequest(
+        string SourceServiceId,
+        string TargetServiceId,
+        string ConceptId,
+        string? UserId = null,
+        Dictionary<string, object>? TargetBeliefSystem = null,
+        Dictionary<string, object>? TranslationPreferences = null
     );
 
     public record EventHistoryQuery(
@@ -545,6 +769,38 @@ public sealed class EventStreamingModule : IModule
         Dictionary<string, object>? Filters = null
     );
 
+    public record CrossServiceEventRequest(
+        string EventType,
+        string EntityType,
+        string EntityId,
+        object Data,
+        string? UserId = null,
+        string? Description = null,
+        string? SourceServiceId = null,
+        List<string>? TargetServices = null
+    );
+
+    public record CrossServiceSubscriptionRequest(
+        string SourceServiceId,
+        List<string>? EventTypes = null,
+        List<string>? EntityTypes = null,
+        List<string>? EntityIds = null,
+        string? CallbackUrl = null,
+        Dictionary<string, object>? Filters = null
+    );
+
+    public record CrossServiceSubscription(
+        string SubscriptionId,
+        string SourceServiceId,
+        List<string> EventTypes,
+        List<string> EntityTypes,
+        List<string> EntityIds,
+        string? CallbackUrl,
+        Dictionary<string, object> Filters,
+        DateTimeOffset CreatedAt,
+        bool IsActive
+    );
+
     public record EventAggregationRequest(
         string[]? EventTypes = null,
         string[]? EntityTypes = null,
@@ -560,10 +816,12 @@ public sealed class EventStreamingModule : IModule
         object Data,
         string? UserId = null,
         DateTimeOffset Timestamp = default,
-        string? Description = null
+        string? Description = null,
+        string? SourceServiceId = null,
+        List<string>? TargetServices = null
     )
     {
-        public StreamEvent() : this("", "", "", "", new { }, null, DateTimeOffset.UtcNow, null) { }
+        public StreamEvent() : this("", "", "", "", new { }, null, DateTimeOffset.UtcNow, null, null, null) { }
     }
 
     public record EventSubscription(

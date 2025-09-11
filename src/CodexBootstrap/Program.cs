@@ -69,12 +69,28 @@ var healthService = app.Services.GetRequiredService<HealthService>();
 // Initialize meta-node system
 InitializeMetaNodeSystem(registry);
 
-// Load only absolutely core modules statically
-LoadCoreModules(moduleLoader, app.Services, registry);
+// Load all built-in modules using the standardized approach
+moduleLoader.LoadBuiltInModules();
 
 // Load external modules from ./modules/*.dll
 var moduleDir = Path.Combine(AppContext.BaseDirectory, "modules");
 moduleLoader.LoadExternalModules(moduleDir);
+
+// Generate meta-nodes for all loaded modules and spec files
+moduleLoader.GenerateMetaNodes();
+
+// Display comprehensive module loading summary
+var loadedModules = moduleLoader.GetLoadedModules();
+var logger = new Log4NetLogger("Program");
+logger.Info($"Module Loading Summary:");
+logger.Info($"  Successfully loaded: {loadedModules.Count} modules");
+foreach (var module in loadedModules)
+{
+    var moduleNode = module.GetModuleNode();
+    var name = moduleNode.Meta?.GetValueOrDefault("name")?.ToString() ?? moduleNode.Title;
+    var version = moduleNode.Meta?.GetValueOrDefault("version")?.ToString() ?? "0.1.0";
+    logger.Info($"  {name} v{version} ({moduleNode.Id})");
+}
 
 // Register HTTP endpoints from all modules
 moduleLoader.RegisterHttpEndpoints(app, registry, coreApi);
@@ -101,6 +117,16 @@ app.MapGet("/modules/{id}", (string id) =>
 {
     var module = coreApi.GetModule(id);
     return module != null ? Results.Ok(module) : Results.NotFound();
+});
+
+// Module loading report
+app.MapGet("/modules/loading-report", () => new {
+    loadedModules = moduleLoader.GetLoadedModules().Count,
+    modules = moduleLoader.GetLoadedModules().Select(m => new {
+        name = m.GetModuleNode().Title,
+        id = m.GetModuleNode().Id,
+        version = m.GetModuleNode().Meta?.GetValueOrDefault("version")?.ToString() ?? "0.1.0"
+    })
 });
 
 // Health endpoint
@@ -160,81 +186,4 @@ static void InitializeMetaNodeSystem(NodeRegistry registry)
     {
         registry.Upsert(node);
     }
-}
-
-// Load only absolutely core modules that are essential for basic system operation
-static void LoadCoreModules(ModuleLoader moduleLoader, IServiceProvider serviceProvider, NodeRegistry registry)
-{
-    var logger = new Log4NetLogger("Program");
-    logger.Info("Loading absolutely core modules...");
-    
-    // Define absolutely core module types that must be loaded statically
-    var coreModuleTypes = new[]
-    {
-        "CodexBootstrap.Modules.CoreModule",
-        "CodexBootstrap.Modules.StorageModule",
-        "CodexBootstrap.Modules.AuthenticationModule",
-        "CodexBootstrap.Modules.PhaseModule",
-        "CodexBootstrap.Modules.DeltaModule",
-        "CodexBootstrap.Modules.SpecModule",
-        "CodexBootstrap.Modules.HydrateModule"
-    };
-    
-    var assembly = Assembly.GetExecutingAssembly();
-    var loadedCount = 0;
-    
-    foreach (var moduleTypeName in coreModuleTypes)
-    {
-        try
-        {
-            var moduleType = assembly.GetType(moduleTypeName);
-            if (moduleType != null && typeof(IModule).IsAssignableFrom(moduleType))
-            {
-                // Module loading is logged by ModuleLoader.LoadModule()
-                var module = ActivatorUtilities.CreateInstance(serviceProvider, moduleType) as IModule;
-                if (module != null)
-                {
-                    // Special handling for StorageModule - replace NodeRegistry with PersistentNodeRegistry
-                    if (module is StorageModule storageModule)
-                    {
-                        var storageBackend = storageModule.GetStorageBackend();
-                        if (storageBackend != null)
-                        {
-                            // Replace the basic NodeRegistry with PersistentNodeRegistry
-                            var persistentRegistry = new PersistentNodeRegistry(storageBackend);
-                            
-                            // Update the service provider to use the persistent registry
-                            // This is a bit of a hack, but necessary for the current architecture
-                            logger.Info("Replacing NodeRegistry with PersistentNodeRegistry");
-                            
-                            // Initialize the persistent storage
-                            persistentRegistry.InitializeAsync().Wait();
-                            logger.Info("Persistent storage initialized");
-                            
-                            // Update the registry reference
-                            registry = persistentRegistry;
-                        }
-                    }
-                    
-                    moduleLoader.LoadModule(module);
-                    loadedCount++;
-                    // Success is logged by ModuleLoader.LoadModule()
-                }
-                else
-                {
-                    logger.Warn($"Failed to create core module: {moduleTypeName}");
-                }
-            }
-            else
-            {
-                logger.Warn($"Core module type not found: {moduleTypeName}");
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.Error($"Failed to load core module {moduleTypeName}: {ex.Message}", ex);
-        }
-    }
-    
-    logger.Info($"Loaded {loadedCount} core modules");
 }
