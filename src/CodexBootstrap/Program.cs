@@ -52,16 +52,6 @@ builder.Services.AddSingleton<RouteDiscovery>();
 builder.Services.AddSingleton<CoreApiService>();
 builder.Services.AddSingleton<HealthService>();
 
-// UCore services - these will be loaded dynamically from external modules
-// builder.Services.AddSingleton<UCoreOntology>();
-// builder.Services.AddSingleton<UCoreResonanceEngine>(sp => 
-//     new UCoreResonanceEngine(sp.GetRequiredService<UCoreOntology>()));
-// builder.Services.AddSingleton<UCoreLLMResponseHandler>(sp => 
-//     new UCoreLLMResponseHandler(
-//         sp.GetRequiredService<IApiRouter>(), 
-//         sp.GetRequiredService<NodeRegistry>(), 
-//         (object)sp.GetRequiredService<UCoreResonanceEngine>()));
-
 // HTTP client for adapters
 builder.Services.AddHttpClient();
 
@@ -74,8 +64,6 @@ var coreApi = app.Services.GetRequiredService<CoreApiService>();
 var moduleLoader = app.Services.GetRequiredService<ModuleLoader>();
 var routeDiscovery = app.Services.GetRequiredService<RouteDiscovery>();
 var healthService = app.Services.GetRequiredService<HealthService>();
-
-// Persistent storage initialization is now handled by StorageModule
 
 // Initialize meta-node system
 InitializeMetaNodeSystem(registry);

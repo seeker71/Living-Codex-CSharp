@@ -69,15 +69,18 @@ public sealed class StorageModule : IModule
         var statsApi = NodeStorage.CreateApiNode("codex.storage", "storage-stats", "/storage/stats", "Get storage statistics");
         var syncApi = NodeStorage.CreateApiNode("codex.storage", "storage-sync", "/storage/sync", "Sync cache with storage");
         var healthApi = NodeStorage.CreateApiNode("codex.storage", "storage-health", "/storage/health", "Check storage health");
+        var cacheApi = NodeStorage.CreateApiNode("codex.storage", "storage-cache", "/storage/cache", "Get cache statistics");
         
         registry.Upsert(statsApi);
         registry.Upsert(syncApi);
         registry.Upsert(healthApi);
+        registry.Upsert(cacheApi);
         
         // Register edges
         registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.storage", "storage-stats"));
         registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.storage", "storage-sync"));
         registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.storage", "storage-health"));
+        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.storage", "storage-cache"));
     }
 
     public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
@@ -183,6 +186,39 @@ public sealed class StorageModule : IModule
                 message = $"Storage health check failed: {ex.Message}",
                 available = false
             };
+        }
+    }
+
+    [ApiRoute("GET", "/storage/cache", "storage-cache", "Get cache statistics", "codex.storage")]
+    public async Task<object> GetCacheStatsAsync()
+    {
+        try
+        {
+            if (_registry is PersistentNodeRegistry persistentRegistry)
+            {
+                var cacheStats = await persistentRegistry.GetCacheStatsAsync();
+                return new
+                {
+                    success = true,
+                    cache = new
+                    {
+                        iceNodeCount = cacheStats.IceNodeCount,
+                        waterNodeCount = cacheStats.WaterNodeCount,
+                        gasNodeCount = cacheStats.GasNodeCount,
+                        edgeCount = cacheStats.EdgeCount,
+                        totalMemoryUsage = cacheStats.TotalMemoryUsage,
+                        lastUpdated = cacheStats.LastUpdated
+                    }
+                };
+            }
+            else
+            {
+                return new ErrorResponse("Registry is not persistent");
+            }
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to get cache stats: {ex.Message}");
         }
     }
 

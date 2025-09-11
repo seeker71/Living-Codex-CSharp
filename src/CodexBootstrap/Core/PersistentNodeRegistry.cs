@@ -3,20 +3,19 @@ using System.Collections.Concurrent;
 namespace CodexBootstrap.Core;
 
 /// <summary>
-/// Persistent NodeRegistry that uses a storage backend
+/// Persistent NodeRegistry that uses a storage backend and cache manager
 /// </summary>
 public class PersistentNodeRegistry : NodeRegistry
 {
     private readonly IStorageBackend _storage;
-    private readonly ConcurrentDictionary<string, Node> _nodeCache = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentBag<Edge> _edgeCache = new();
-    private readonly SemaphoreSlim _cacheLock = new(1, 1);
+    private readonly ICacheManager _cacheManager;
     private readonly ILogger _logger;
     private bool _isInitialized = false;
 
     public PersistentNodeRegistry(IStorageBackend storage)
     {
         _storage = storage;
+        _cacheManager = new NodeCacheManager(storage);
         _logger = new Log4NetLogger(typeof(PersistentNodeRegistry));
     }
 
@@ -24,30 +23,9 @@ public class PersistentNodeRegistry : NodeRegistry
     {
         if (_isInitialized) return;
 
-        await _storage.InitializeAsync();
-        
-        // Load all data into cache
-        await _cacheLock.WaitAsync();
-        try
-        {
-            var nodes = await _storage.GetAllNodesAsync();
-            foreach (var node in nodes)
-            {
-                _nodeCache[node.Id] = node;
-            }
-
-            var edges = await _storage.GetAllEdgesAsync();
-            foreach (var edge in edges)
-            {
-                _edgeCache.Add(edge);
-            }
-
-            _isInitialized = true;
-        }
-        finally
-        {
-            _cacheLock.Release();
-        }
+        await _cacheManager.InitializeAsync();
+        _isInitialized = true;
+        _logger.Info("PersistentNodeRegistry initialized with cache manager");
     }
 
     public override void Upsert(Node node)
@@ -57,18 +35,16 @@ public class PersistentNodeRegistry : NodeRegistry
             throw new InvalidOperationException("Registry not initialized. Call InitializeAsync() first.");
         }
 
-        _nodeCache[node.Id] = node;
-        
-        // Persist to storage asynchronously
+        // Use cache manager to handle different node states appropriately
         _ = Task.Run(async () =>
         {
             try
             {
-                await _storage.StoreNodeAsync(node);
+                await _cacheManager.StoreNodeAsync(node);
             }
             catch (Exception ex)
             {
-                _logger.Error($"Error persisting node {node.Id}: {ex.Message}", ex);
+                _logger.Error($"Error storing node {node.Id}: {ex.Message}", ex);
             }
         });
     }
@@ -80,18 +56,16 @@ public class PersistentNodeRegistry : NodeRegistry
             throw new InvalidOperationException("Registry not initialized. Call InitializeAsync() first.");
         }
 
-        _edgeCache.Add(edge);
-        
-        // Persist to storage asynchronously
+        // Use cache manager to store edges
         _ = Task.Run(async () =>
         {
             try
             {
-                await _storage.StoreEdgeAsync(edge);
+                await _cacheManager.StoreEdgeAsync(edge);
             }
             catch (Exception ex)
             {
-                _logger.Error($"Error persisting edge {edge.FromId}->{edge.ToId}: {ex.Message}", ex);
+                _logger.Error($"Error storing edge {edge.FromId}->{edge.ToId}: {ex.Message}", ex);
             }
         });
     }
@@ -103,7 +77,11 @@ public class PersistentNodeRegistry : NodeRegistry
             throw new InvalidOperationException("Registry not initialized. Call InitializeAsync() first.");
         }
 
-        return _nodeCache.TryGetValue(id, out node!);
+        // Use cache manager to get node (handles Water/Gas generation)
+        var nodeTask = _cacheManager.GetNodeAsync(id);
+        nodeTask.Wait();
+        node = nodeTask.Result!;
+        return node != null;
     }
 
     public override IEnumerable<Edge> AllEdges()
@@ -113,7 +91,9 @@ public class PersistentNodeRegistry : NodeRegistry
             throw new InvalidOperationException("Registry not initialized. Call InitializeAsync() first.");
         }
 
-        return _edgeCache.ToList();
+        var edgesTask = _cacheManager.GetAllEdgesAsync();
+        edgesTask.Wait();
+        return edgesTask.Result.ToList();
     }
 
     public override IEnumerable<Node> AllNodes()
@@ -123,7 +103,14 @@ public class PersistentNodeRegistry : NodeRegistry
             throw new InvalidOperationException("Registry not initialized. Call InitializeAsync() first.");
         }
 
-        return _nodeCache.Values;
+        // Get all nodes from all states
+        var iceNodesTask = _cacheManager.GetNodesByStateAsync(ContentState.Ice);
+        var waterNodesTask = _cacheManager.GetNodesByStateAsync(ContentState.Water);
+        
+        iceNodesTask.Wait();
+        waterNodesTask.Wait();
+        
+        return iceNodesTask.Result.Concat(waterNodesTask.Result).ToList();
     }
 
     public override IEnumerable<Node> GetNodesByType(string typeId)
@@ -133,7 +120,8 @@ public class PersistentNodeRegistry : NodeRegistry
             throw new InvalidOperationException("Registry not initialized. Call InitializeAsync() first.");
         }
 
-        return _nodeCache.Values.Where(n => n.TypeId == typeId);
+        var allNodes = AllNodes();
+        return allNodes.Where(n => n.TypeId == typeId).ToList();
     }
 
     public override IEnumerable<Edge> GetEdgesFrom(string fromId)
@@ -143,7 +131,9 @@ public class PersistentNodeRegistry : NodeRegistry
             throw new InvalidOperationException("Registry not initialized. Call InitializeAsync() first.");
         }
 
-        return _edgeCache.Where(e => e.FromId == fromId);
+        var edgesTask = _cacheManager.GetAllEdgesAsync();
+        edgesTask.Wait();
+        return edgesTask.Result.Where(e => e.FromId == fromId).ToList();
     }
 
     public override IEnumerable<Edge> GetEdgesTo(string toId)
@@ -153,7 +143,9 @@ public class PersistentNodeRegistry : NodeRegistry
             throw new InvalidOperationException("Registry not initialized. Call InitializeAsync() first.");
         }
 
-        return _edgeCache.Where(e => e.ToId == toId);
+        var edgesTask = _cacheManager.GetAllEdgesAsync();
+        edgesTask.Wait();
+        return edgesTask.Result.Where(e => e.ToId == toId).ToList();
     }
 
     /// <summary>
@@ -166,19 +158,13 @@ public class PersistentNodeRegistry : NodeRegistry
             throw new InvalidOperationException("Registry not initialized. Call InitializeAsync() first.");
         }
 
-        // Remove from cache
-        _nodeCache.TryRemove(id, out _);
+        // Clear cache for this node
+        await _cacheManager.ClearCacheAsync();
         
-        // Remove associated edges from cache
-        var edgesToRemove = _edgeCache.Where(e => e.FromId == id || e.ToId == id).ToList();
-        foreach (var edge in edgesToRemove)
-        {
-            // Note: ConcurrentBag doesn't support removal, so we'll mark them for removal
-            // In a production system, you'd want a more sophisticated cache
-        }
-
         // Persist deletion to storage
         await _storage.DeleteNodeAsync(id);
+        
+        _logger.Info($"Deleted node {id} and cleared cache");
     }
 
     /// <summary>
@@ -207,6 +193,19 @@ public class PersistentNodeRegistry : NodeRegistry
     }
 
     /// <summary>
+    /// Get cache statistics
+    /// </summary>
+    public async Task<CacheStats> GetCacheStatsAsync()
+    {
+        if (!_isInitialized)
+        {
+            throw new InvalidOperationException("Registry not initialized. Call InitializeAsync() first.");
+        }
+
+        return await _cacheManager.GetCacheStatsAsync();
+    }
+
+    /// <summary>
     /// Check if storage is available
     /// </summary>
     public async Task<bool> IsStorageAvailableAsync()
@@ -219,29 +218,15 @@ public class PersistentNodeRegistry : NodeRegistry
     /// </summary>
     public async Task SyncWithStorageAsync()
     {
-        await _cacheLock.WaitAsync();
-        try
+        if (!_isInitialized)
         {
-            // Clear cache
-            _nodeCache.Clear();
-            _edgeCache.Clear();
-
-            // Reload from storage
-            var nodes = await _storage.GetAllNodesAsync();
-            foreach (var node in nodes)
-            {
-                _nodeCache[node.Id] = node;
-            }
-
-            var edges = await _storage.GetAllEdgesAsync();
-            foreach (var edge in edges)
-            {
-                _edgeCache.Add(edge);
-            }
+            throw new InvalidOperationException("Registry not initialized. Call InitializeAsync() first.");
         }
-        finally
-        {
-            _cacheLock.Release();
-        }
+
+        // Clear cache and reinitialize
+        await _cacheManager.ClearCacheAsync();
+        await _cacheManager.InitializeAsync();
+        
+        _logger.Info("Cache synced with storage");
     }
 }
