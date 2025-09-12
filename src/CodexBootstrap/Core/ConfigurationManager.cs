@@ -187,13 +187,13 @@ namespace CodexBootstrap.Core
         }
 
         /// <summary>
-        /// Create default news sources configuration
+        /// Create comprehensive news sources configuration covering all major categories
         /// </summary>
         private List<NewsSourceConfig> CreateDefaultNewsSources()
         {
             return new List<NewsSourceConfig>
             {
-                // Science & Research (L0-L2)
+                // ===== SCIENCE & RESEARCH (L0-L2) =====
                 new NewsSourceConfig
                 {
                     Id = "nature-science",
@@ -230,8 +230,106 @@ namespace CodexBootstrap.Core
                     UpdateIntervalMinutes = 180,
                     Priority = 3
                 },
+                new NewsSourceConfig
+                {
+                    Id = "science-daily",
+                    Name = "Science Daily",
+                    Type = "rss",
+                    Url = "https://www.sciencedaily.com/rss/all.xml",
+                    Categories = new[] { "science", "research", "technology", "discovery" },
+                    OntologyLevels = new[] { "L0-L2" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 90,
+                    Priority = 4
+                },
+                new NewsSourceConfig
+                {
+                    Id = "new-scientist",
+                    Name = "New Scientist",
+                    Type = "rss",
+                    Url = "https://www.newscientist.com/feed/home/",
+                    Categories = new[] { "science", "technology", "research", "innovation" },
+                    OntologyLevels = new[] { "L0-L2" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 120,
+                    Priority = 5
+                },
+                new NewsSourceConfig
+                {
+                    Id = "mit-technology-review",
+                    Name = "MIT Technology Review",
+                    Type = "rss",
+                    Url = "https://www.technologyreview.com/feed/",
+                    Categories = new[] { "technology", "innovation", "research", "consciousness" },
+                    OntologyLevels = new[] { "L0-L2" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 180,
+                    Priority = 6
+                },
 
-                // Spirituality & Consciousness (L3-L4)
+                // ===== ENGINEERING & TECHNOLOGY (L1-L3) =====
+                new NewsSourceConfig
+                {
+                    Id = "ieee-spectrum",
+                    Name = "IEEE Spectrum",
+                    Type = "rss",
+                    Url = "https://spectrum.ieee.org/rss/fulltext",
+                    Categories = new[] { "engineering", "technology", "innovation", "consciousness" },
+                    OntologyLevels = new[] { "L1-L3" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 120,
+                    Priority = 1
+                },
+                new NewsSourceConfig
+                {
+                    Id = "arstechnica-tech",
+                    Name = "Ars Technica",
+                    Type = "rss",
+                    Url = "https://feeds.arstechnica.com/arstechnica/index/",
+                    Categories = new[] { "technology", "engineering", "innovation", "consciousness" },
+                    OntologyLevels = new[] { "L1-L3" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 90,
+                    Priority = 2
+                },
+                new NewsSourceConfig
+                {
+                    Id = "hacker-news",
+                    Name = "Hacker News",
+                    Type = "api",
+                    Url = "https://hacker-news.firebaseio.com/v0/",
+                    Categories = new[] { "technology", "programming", "innovation", "consciousness" },
+                    OntologyLevels = new[] { "L1-L3" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 60,
+                    Priority = 3
+                },
+                new NewsSourceConfig
+                {
+                    Id = "techcrunch",
+                    Name = "TechCrunch",
+                    Type = "rss",
+                    Url = "https://techcrunch.com/feed/",
+                    Categories = new[] { "technology", "startups", "innovation", "consciousness" },
+                    OntologyLevels = new[] { "L1-L3" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 60,
+                    Priority = 4
+                },
+                new NewsSourceConfig
+                {
+                    Id = "wired-tech",
+                    Name = "Wired Technology",
+                    Type = "rss",
+                    Url = "https://www.wired.com/feed/rss",
+                    Categories = new[] { "technology", "innovation", "culture", "consciousness" },
+                    OntologyLevels = new[] { "L1-L3" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 120,
+                    Priority = 5
+                },
+
+                // ===== SPIRITUALITY & CONSCIOUSNESS (L3-L4) =====
                 new NewsSourceConfig
                 {
                     Id = "lions-roar-spirituality",
@@ -256,8 +354,44 @@ namespace CodexBootstrap.Core
                     UpdateIntervalMinutes = 300,
                     Priority = 2
                 },
+                new NewsSourceConfig
+                {
+                    Id = "mindful-org",
+                    Name = "Mindful.org",
+                    Type = "rss",
+                    Url = "https://www.mindful.org/feed/",
+                    Categories = new[] { "mindfulness", "meditation", "consciousness", "wellness" },
+                    OntologyLevels = new[] { "L3-L4" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 240,
+                    Priority = 3
+                },
+                new NewsSourceConfig
+                {
+                    Id = "consciousness-research",
+                    Name = "Consciousness Research Network",
+                    Type = "rss",
+                    Url = "https://consciousness-research.org/feed/",
+                    Categories = new[] { "consciousness", "research", "spirituality", "science" },
+                    OntologyLevels = new[] { "L3-L4" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 360,
+                    Priority = 4
+                },
+                new NewsSourceConfig
+                {
+                    Id = "integral-life",
+                    Name = "Integral Life",
+                    Type = "rss",
+                    Url = "https://integrallife.com/feed/",
+                    Categories = new[] { "consciousness", "spirituality", "evolution", "wisdom" },
+                    OntologyLevels = new[] { "L3-L4" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 300,
+                    Priority = 5
+                },
 
-                // Unity Consciousness (L5-L6)
+                // ===== UNITY CONSCIOUSNESS & GLOBAL COLLABORATION (L5-L6) =====
                 new NewsSourceConfig
                 {
                     Id = "global-citizen-unity",
@@ -282,8 +416,208 @@ namespace CodexBootstrap.Core
                     UpdateIntervalMinutes = 240,
                     Priority = 2
                 },
+                new NewsSourceConfig
+                {
+                    Id = "world-economic-forum",
+                    Name = "World Economic Forum",
+                    Type = "rss",
+                    Url = "https://www.weforum.org/feeds/",
+                    Categories = new[] { "global", "collaboration", "consciousness", "unity" },
+                    OntologyLevels = new[] { "L5-L6" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 300,
+                    Priority = 3
+                },
+                new NewsSourceConfig
+                {
+                    Id = "global-issues",
+                    Name = "Global Issues",
+                    Type = "rss",
+                    Url = "https://www.globalissues.org/news/rss",
+                    Categories = new[] { "global", "unity", "consciousness", "collaboration" },
+                    OntologyLevels = new[] { "L5-L6" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 360,
+                    Priority = 4
+                },
 
-                // Cosmology & Quantum (L15-L16)
+                // ===== WORLD NEWS & INTERNATIONAL (L7-L8) =====
+                new NewsSourceConfig
+                {
+                    Id = "bbc-world",
+                    Name = "BBC World News",
+                    Type = "rss",
+                    Url = "http://feeds.bbci.co.uk/news/world/rss.xml",
+                    Categories = new[] { "world", "international", "consciousness", "unity" },
+                    OntologyLevels = new[] { "L7-L8" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 30,
+                    Priority = 1
+                },
+                new NewsSourceConfig
+                {
+                    Id = "reuters-world",
+                    Name = "Reuters World News",
+                    Type = "rss",
+                    Url = "https://feeds.reuters.com/Reuters/worldNews",
+                    Categories = new[] { "world", "international", "consciousness", "unity" },
+                    OntologyLevels = new[] { "L7-L8" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 30,
+                    Priority = 2
+                },
+                new NewsSourceConfig
+                {
+                    Id = "guardian-world",
+                    Name = "The Guardian World",
+                    Type = "rss",
+                    Url = "https://www.theguardian.com/world/rss",
+                    Categories = new[] { "world", "international", "consciousness", "unity" },
+                    OntologyLevels = new[] { "L7-L8" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 45,
+                    Priority = 3
+                },
+                new NewsSourceConfig
+                {
+                    Id = "al-jazeera-world",
+                    Name = "Al Jazeera World",
+                    Type = "rss",
+                    Url = "https://www.aljazeera.com/xml/rss/all.xml",
+                    Categories = new[] { "world", "international", "consciousness", "unity" },
+                    OntologyLevels = new[] { "L7-L8" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 60,
+                    Priority = 4
+                },
+
+                // ===== FINANCIAL & ECONOMIC (L9-L10) =====
+                new NewsSourceConfig
+                {
+                    Id = "bloomberg-finance",
+                    Name = "Bloomberg Finance",
+                    Type = "rss",
+                    Url = "https://feeds.bloomberg.com/markets/news.rss",
+                    Categories = new[] { "finance", "economics", "consciousness", "abundance" },
+                    OntologyLevels = new[] { "L9-L10" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 30,
+                    Priority = 1
+                },
+                new NewsSourceConfig
+                {
+                    Id = "reuters-business",
+                    Name = "Reuters Business",
+                    Type = "rss",
+                    Url = "https://feeds.reuters.com/reuters/businessNews",
+                    Categories = new[] { "finance", "business", "consciousness", "abundance" },
+                    OntologyLevels = new[] { "L9-L10" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 30,
+                    Priority = 2
+                },
+                new NewsSourceConfig
+                {
+                    Id = "financial-times",
+                    Name = "Financial Times",
+                    Type = "rss",
+                    Url = "https://www.ft.com/rss/home",
+                    Categories = new[] { "finance", "economics", "consciousness", "abundance" },
+                    OntologyLevels = new[] { "L9-L10" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 60,
+                    Priority = 3
+                },
+                new NewsSourceConfig
+                {
+                    Id = "wall-street-journal",
+                    Name = "Wall Street Journal",
+                    Type = "rss",
+                    Url = "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
+                    Categories = new[] { "finance", "markets", "consciousness", "abundance" },
+                    OntologyLevels = new[] { "L9-L10" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 60,
+                    Priority = 4
+                },
+
+                // ===== HEALTH & WELLNESS (L11-L12) =====
+                new NewsSourceConfig
+                {
+                    Id = "webmd-health",
+                    Name = "WebMD Health News",
+                    Type = "rss",
+                    Url = "https://rssfeeds.webmd.com/rss/rss.aspx?RSSSource=RSS_PUBLIC",
+                    Categories = new[] { "health", "wellness", "consciousness", "healing" },
+                    OntologyLevels = new[] { "L11-L12" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 120,
+                    Priority = 1
+                },
+                new NewsSourceConfig
+                {
+                    Id = "medical-news-today",
+                    Name = "Medical News Today",
+                    Type = "rss",
+                    Url = "https://www.medicalnewstoday.com/rss",
+                    Categories = new[] { "health", "medicine", "consciousness", "healing" },
+                    OntologyLevels = new[] { "L11-L12" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 180,
+                    Priority = 2
+                },
+                new NewsSourceConfig
+                {
+                    Id = "mayo-clinic-health",
+                    Name = "Mayo Clinic Health",
+                    Type = "rss",
+                    Url = "https://www.mayoclinic.org/rss/all-mayo-clinic-news",
+                    Categories = new[] { "health", "wellness", "consciousness", "healing" },
+                    OntologyLevels = new[] { "L11-L12" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 240,
+                    Priority = 3
+                },
+
+                // ===== ENVIRONMENT & SUSTAINABILITY (L13-L14) =====
+                new NewsSourceConfig
+                {
+                    Id = "environmental-news-network",
+                    Name = "Environmental News Network",
+                    Type = "rss",
+                    Url = "https://www.enn.com/rss.xml",
+                    Categories = new[] { "environment", "sustainability", "consciousness", "unity" },
+                    OntologyLevels = new[] { "L13-L14" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 180,
+                    Priority = 1
+                },
+                new NewsSourceConfig
+                {
+                    Id = "treehugger-environment",
+                    Name = "TreeHugger Environment",
+                    Type = "rss",
+                    Url = "https://www.treehugger.com/feeds/all.rss",
+                    Categories = new[] { "environment", "sustainability", "consciousness", "unity" },
+                    OntologyLevels = new[] { "L13-L14" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 240,
+                    Priority = 2
+                },
+                new NewsSourceConfig
+                {
+                    Id = "national-geographic-environment",
+                    Name = "National Geographic Environment",
+                    Type = "rss",
+                    Url = "https://feeds.nationalgeographic.com/ng/News/News_Environment",
+                    Categories = new[] { "environment", "nature", "consciousness", "unity" },
+                    OntologyLevels = new[] { "L13-L14" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 300,
+                    Priority = 3
+                },
+
+                // ===== COSMOLOGY & QUANTUM (L15-L16) =====
                 new NewsSourceConfig
                 {
                     Id = "space-cosmic-consciousness",
@@ -307,6 +641,106 @@ namespace CodexBootstrap.Core
                     IsActive = true,
                     UpdateIntervalMinutes = 120,
                     Priority = 2
+                },
+                new NewsSourceConfig
+                {
+                    Id = "nasa-space-news",
+                    Name = "NASA Space News",
+                    Type = "rss",
+                    Url = "https://www.nasa.gov/rss/dyn/breaking_news.rss",
+                    Categories = new[] { "space", "cosmology", "consciousness", "exploration" },
+                    OntologyLevels = new[] { "L15-L16" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 180,
+                    Priority = 3
+                },
+                new NewsSourceConfig
+                {
+                    Id = "quantum-magazine",
+                    Name = "Quantum Magazine",
+                    Type = "rss",
+                    Url = "https://www.quantamagazine.org/feed/",
+                    Categories = new[] { "quantum", "physics", "consciousness", "cosmology" },
+                    OntologyLevels = new[] { "L15-L16" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 240,
+                    Priority = 4
+                },
+
+                // ===== ART & CULTURE (L17-L18) =====
+                new NewsSourceConfig
+                {
+                    Id = "artsy-art-news",
+                    Name = "Artsy Art News",
+                    Type = "rss",
+                    Url = "https://www.artsy.net/rss/news",
+                    Categories = new[] { "art", "culture", "consciousness", "creativity" },
+                    OntologyLevels = new[] { "L17-L18" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 360,
+                    Priority = 1
+                },
+                new NewsSourceConfig
+                {
+                    Id = "hyperallergic-art",
+                    Name = "Hyperallergic Art",
+                    Type = "rss",
+                    Url = "https://hyperallergic.com/feed/",
+                    Categories = new[] { "art", "culture", "consciousness", "creativity" },
+                    OntologyLevels = new[] { "L17-L18" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 300,
+                    Priority = 2
+                },
+                new NewsSourceConfig
+                {
+                    Id = "artnews-culture",
+                    Name = "ARTnews Culture",
+                    Type = "rss",
+                    Url = "https://www.artnews.com/feed/",
+                    Categories = new[] { "art", "culture", "consciousness", "creativity" },
+                    OntologyLevels = new[] { "L17-L18" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 360,
+                    Priority = 3
+                },
+
+                // ===== PHILOSOPHY & WISDOM (L19-L20) =====
+                new NewsSourceConfig
+                {
+                    Id = "philosophy-now",
+                    Name = "Philosophy Now",
+                    Type = "rss",
+                    Url = "https://philosophynow.org/rss",
+                    Categories = new[] { "philosophy", "wisdom", "consciousness", "truth" },
+                    OntologyLevels = new[] { "L19-L20" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 480,
+                    Priority = 1
+                },
+                new NewsSourceConfig
+                {
+                    Id = "ieet-future-consciousness",
+                    Name = "IEET Future Consciousness",
+                    Type = "rss",
+                    Url = "https://ieet.org/index.php/IEET2/rss",
+                    Categories = new[] { "philosophy", "future", "consciousness", "wisdom" },
+                    OntologyLevels = new[] { "L19-L20" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 360,
+                    Priority = 2
+                },
+                new NewsSourceConfig
+                {
+                    Id = "big-think-wisdom",
+                    Name = "Big Think Wisdom",
+                    Type = "rss",
+                    Url = "https://bigthink.com/feed/",
+                    Categories = new[] { "philosophy", "wisdom", "consciousness", "truth" },
+                    OntologyLevels = new[] { "L19-L20" },
+                    IsActive = true,
+                    UpdateIntervalMinutes = 300,
+                    Priority = 3
                 }
             };
         }

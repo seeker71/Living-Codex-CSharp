@@ -24,6 +24,7 @@ namespace CodexBootstrap.Modules
         private readonly NodeRegistry _registry;
         private readonly HttpClient _httpClient;
         private readonly Core.ConfigurationManager _configManager;
+        private readonly IApiRouter _apiRouter;
         private readonly Timer _ingestionTimer;
         private readonly Timer _cleanupTimer;
         private readonly int _ingestionIntervalMinutes = 15;
@@ -37,12 +38,13 @@ namespace CodexBootstrap.Modules
         private const string FRACTAL_NEWS_NODE_TYPE = "codex.news.fractal";
         private const string NEWS_SUBSCRIPTION_NODE_TYPE = "codex.news.subscription";
 
-        public RealtimeNewsStreamModule(NodeRegistry registry, HttpClient? httpClient = null, Core.ConfigurationManager? configManager = null)
+        public RealtimeNewsStreamModule(NodeRegistry registry, HttpClient? httpClient = null, Core.ConfigurationManager? configManager = null, IApiRouter? apiRouter = null)
         {
             _logger = new Log4NetLogger(typeof(RealtimeNewsStreamModule));
             _registry = registry;
             _httpClient = httpClient ?? new HttpClient();
             _configManager = configManager ?? new Core.ConfigurationManager(registry, new Log4NetLogger(typeof(Core.ConfigurationManager)));
+            _apiRouter = apiRouter ?? throw new ArgumentNullException(nameof(apiRouter), "IApiRouter is required for AI module integration");
             
             // Set up timers
             _ingestionTimer = new Timer(async _ => await IngestNewsFromSources(null), null, TimeSpan.Zero, TimeSpan.FromMinutes(_ingestionIntervalMinutes));
@@ -454,11 +456,11 @@ namespace CodexBootstrap.Modules
                     Id = $"fractal-{newsItem.Id}",
                     OriginalNewsId = newsItem.Id,
                     Headline = fractalTransformation.Headline,
-                    BeliefSystemTranslation = fractalTransformation.BeliefTranslation,
+                    BeliefSystemTranslation = fractalTransformation.BeliefSystemTranslation,
                     Summary = fractalTransformation.Summary,
-                    ImpactAreas = fractalTransformation.ImpactAreas,
-                    AmplificationFactors = fractalTransformation.AmplificationFactors,
-                    ResonanceData = fractalTransformation.ResonanceData,
+                    ImpactAreas = fractalTransformation.ImpactAreas.ToList(),
+                    AmplificationFactors = fractalTransformation.AmplificationFactors.Select(kvp => $"{kvp.Key}: {kvp.Value}").ToList(),
+                    ResonanceData = new ResonanceData(),
                     ProcessedAt = DateTimeOffset.UtcNow,
                     Metadata = fractalTransformation.Metadata
                 };
@@ -475,77 +477,309 @@ namespace CodexBootstrap.Modules
         {
             try
             {
-                // Check for cached analysis first
-                var cacheKey = $"concept_analysis_{newsItem.Id}";
-                var cachedAnalysis = await GetCachedAnalysis<ConceptAnalysis>(cacheKey);
-                if (cachedAnalysis != null)
+                _logger.Debug($"Attempting AI concept extraction for news item: {newsItem.Title}");
+
+                // Call AI module via router API
+                var request = new
                 {
-                    _logger.Debug($"Using cached concept analysis for {newsItem.Id}");
-                    return cachedAnalysis;
+                    title = newsItem.Title,
+                    content = newsItem.Content,
+                    categories = newsItem.Tags ?? Array.Empty<string>(),
+                    source = newsItem.Source,
+                    url = newsItem.Url
+                };
+
+                var result = _apiRouter.TryGetHandler("ai", "extract-concepts", out var handler);
+                if (!result)
+                {
+                    _logger.Warn($"AI handler 'ai.extract-concepts' not found, falling back to local extraction");
+                    return await FallbackConceptExtraction(newsItem);
                 }
 
-                // Generate AI analysis code dynamically
-                var analysisCode = await GenerateConceptExtractionCode(newsItem);
-                var analysis = await ExecuteAnalysisCode(analysisCode, newsItem);
+                if (handler == null)
+                {
+                    _logger.Warn($"AI handler 'ai.extract-concepts' is null, falling back to local extraction");
+                    return await FallbackConceptExtraction(newsItem);
+                }
 
-                // Cache the result
-                await CacheAnalysis(cacheKey, analysis, TimeSpan.FromHours(24));
+                _logger.Debug($"Calling AI module for concept extraction: {newsItem.Title}");
+                var response = await handler(JsonSerializer.SerializeToElement(request));
+                
+                if (response == null)
+                {
+                    _logger.Warn($"AI module returned null response for concept extraction: {newsItem.Title}");
+                    return await FallbackConceptExtraction(newsItem);
+                }
 
-                return analysis;
+                if (response is JsonElement jsonResponse)
+                {
+                    if (jsonResponse.TryGetProperty("success", out var success) && success.GetBoolean())
+                    {
+                        if (jsonResponse.TryGetProperty("concepts", out var concepts) && 
+                            jsonResponse.TryGetProperty("confidence", out var confidence) &&
+                            jsonResponse.TryGetProperty("ontologyLevels", out var ontologyLevels))
+                        {
+                            _logger.Info($"AI concept extraction successful for: {newsItem.Title} (confidence: {confidence.GetDouble()})");
+                            
+                            // Create ConceptAnalysis from response
+                            return new ConceptAnalysis
+                            {
+                                Id = $"concept-{Guid.NewGuid():N}",
+                                NewsItemId = newsItem.Id,
+                                Concepts = concepts.EnumerateArray().Select(c => c.GetString() ?? "").ToList(),
+                                Confidence = confidence.GetDouble(),
+                                OntologyLevels = ontologyLevels.EnumerateArray().Select(o => o.GetString() ?? "").ToArray(),
+                                ExtractedAt = DateTimeOffset.UtcNow,
+                                Metadata = new Dictionary<string, object>
+                                {
+                                    ["source"] = "ai-module",
+                                    ["originalTitle"] = newsItem.Title,
+                                    ["processingTime"] = DateTimeOffset.UtcNow
+                                }
+                            };
+                        }
+                        else
+                        {
+                            _logger.Warn($"AI module response missing required fields for concept extraction: {newsItem.Title}");
+                        }
+                    }
+                    else
+                    {
+                        _logger.Warn($"AI module returned error for concept extraction: {newsItem.Title}");
+                        if (jsonResponse.TryGetProperty("error", out var error))
+                        {
+                            _logger.Warn($"AI module error: {error.GetString()}");
+                        }
+                    }
+                }
+                else
+                {
+                    _logger.Warn($"AI module returned unexpected response type for concept extraction: {newsItem.Title}");
+                }
+            }
+            catch (JsonException ex)
+            {
+                _logger.Error($"JSON serialization/deserialization error in AI concept extraction for {newsItem.Title}: {ex.Message}", ex);
             }
             catch (Exception ex)
             {
-                _logger.Error($"Error in AI concept extraction: {ex.Message}", ex);
-                return await FallbackConceptExtraction(newsItem);
+                _logger.Error($"Unexpected error calling AI module for concept extraction {newsItem.Title}: {ex.Message}", ex);
             }
+
+            _logger.Info($"Falling back to local concept extraction for: {newsItem.Title}");
+            return await FallbackConceptExtraction(newsItem);
         }
 
         private async Task<ScoringAnalysis> PerformAIScoringAnalysis(ConceptAnalysis conceptAnalysis, NewsItem newsItem)
         {
             try
             {
-                var cacheKey = $"scoring_analysis_{newsItem.Id}";
-                var cachedAnalysis = await GetCachedAnalysis<ScoringAnalysis>(cacheKey);
-                if (cachedAnalysis != null)
+                _logger.Debug($"Attempting AI scoring analysis for news item: {newsItem.Title}");
+
+                // Call AI module via router API
+                var request = new
                 {
-                    return cachedAnalysis;
+                    conceptAnalysis = conceptAnalysis,
+                    content = new
+                    {
+                        title = newsItem.Title,
+                        content = newsItem.Content,
+                        categories = newsItem.Tags ?? Array.Empty<string>(),
+                        source = newsItem.Source,
+                        url = newsItem.Url
+                    }
+                };
+
+                var result = _apiRouter.TryGetHandler("ai", "score-analysis", out var handler);
+                if (!result)
+                {
+                    _logger.Warn($"AI handler 'ai.score-analysis' not found, falling back to local analysis");
+                    return await FallbackScoringAnalysis(conceptAnalysis, newsItem);
                 }
 
-                var scoringCode = await GenerateScoringAnalysisCode(conceptAnalysis, newsItem);
-                var analysis = await ExecuteScoringCode(scoringCode, conceptAnalysis, newsItem);
+                if (handler == null)
+                {
+                    _logger.Warn($"AI handler 'ai.score-analysis' is null, falling back to local analysis");
+                    return await FallbackScoringAnalysis(conceptAnalysis, newsItem);
+                }
 
-                await CacheAnalysis(cacheKey, analysis, TimeSpan.FromHours(12));
-                return analysis;
+                _logger.Debug($"Calling AI module for scoring analysis: {newsItem.Title}");
+                var response = await handler(JsonSerializer.SerializeToElement(request));
+                
+                if (response == null)
+                {
+                    _logger.Warn($"AI module returned null response for scoring analysis: {newsItem.Title}");
+                    return await FallbackScoringAnalysis(conceptAnalysis, newsItem);
+                }
+
+                if (response is JsonElement jsonResponse)
+                {
+                    if (jsonResponse.TryGetProperty("success", out var success) && success.GetBoolean())
+                    {
+                        if (jsonResponse.TryGetProperty("abundanceScore", out var abundanceScore) &&
+                            jsonResponse.TryGetProperty("consciousnessScore", out var consciousnessScore) &&
+                            jsonResponse.TryGetProperty("unityScore", out var unityScore) &&
+                            jsonResponse.TryGetProperty("overallScore", out var overallScore))
+                        {
+                            _logger.Info($"AI scoring analysis successful for: {newsItem.Title} (overall: {overallScore.GetDouble()})");
+                            
+                            // Create ScoringAnalysis from response
+                            return new ScoringAnalysis
+                            {
+                                Id = $"scoring-{Guid.NewGuid():N}",
+                                NewsItemId = newsItem.Id,
+                                ConceptAnalysisId = conceptAnalysis.Id,
+                                AbundanceScore = abundanceScore.GetDouble(),
+                                ConsciousnessScore = consciousnessScore.GetDouble(),
+                                UnityScore = unityScore.GetDouble(),
+                                OverallScore = overallScore.GetDouble(),
+                                ScoredAt = DateTimeOffset.UtcNow,
+                                Metadata = new Dictionary<string, object>
+                                {
+                                    ["source"] = "ai-module",
+                                    ["originalTitle"] = newsItem.Title,
+                                    ["processingTime"] = DateTimeOffset.UtcNow
+                                }
+                            };
+                        }
+                        else
+                        {
+                            _logger.Warn($"AI module response missing required fields for scoring analysis: {newsItem.Title}");
+                        }
+                    }
+                    else
+                    {
+                        _logger.Warn($"AI module returned error for scoring analysis: {newsItem.Title}");
+                        if (jsonResponse.TryGetProperty("error", out var error))
+                        {
+                            _logger.Warn($"AI module error: {error.GetString()}");
+                        }
+                    }
+                }
+                else
+                {
+                    _logger.Warn($"AI module returned unexpected response type for scoring analysis: {newsItem.Title}");
+                }
+            }
+            catch (JsonException ex)
+            {
+                _logger.Error($"JSON serialization/deserialization error in AI scoring analysis for {newsItem.Title}: {ex.Message}", ex);
             }
             catch (Exception ex)
             {
-                _logger.Error($"Error in AI scoring analysis: {ex.Message}", ex);
-                return await FallbackScoringAnalysis(conceptAnalysis, newsItem);
+                _logger.Error($"Unexpected error calling AI module for scoring analysis {newsItem.Title}: {ex.Message}", ex);
             }
+
+            _logger.Info($"Falling back to local scoring analysis for: {newsItem.Title}");
+            return await FallbackScoringAnalysis(conceptAnalysis, newsItem);
         }
 
         private async Task<FractalTransformation> PerformAIFractalTransformation(NewsItem newsItem, ConceptAnalysis conceptAnalysis, ScoringAnalysis scoringAnalysis)
         {
             try
             {
-                var cacheKey = $"fractal_transformation_{newsItem.Id}";
-                var cachedTransformation = await GetCachedAnalysis<FractalTransformation>(cacheKey);
-                if (cachedTransformation != null)
+                _logger.Debug($"Attempting AI fractal transformation for news item: {newsItem.Title}");
+
+                // Call AI module via router API
+                var request = new
                 {
-                    return cachedTransformation;
+                    content = new
+                    {
+                        title = newsItem.Title,
+                        content = newsItem.Content,
+                        categories = newsItem.Tags ?? Array.Empty<string>(),
+                        source = newsItem.Source,
+                        url = newsItem.Url
+                    },
+                    conceptAnalysis = conceptAnalysis,
+                    scoringAnalysis = scoringAnalysis
+                };
+
+                var result = _apiRouter.TryGetHandler("ai", "fractal-transform", out var handler);
+                if (!result)
+                {
+                    _logger.Warn($"AI handler 'ai.fractal-transform' not found, falling back to local transformation");
+                    return await FallbackFractalTransformation(newsItem, conceptAnalysis, scoringAnalysis);
                 }
 
-                var transformationCode = await GenerateFractalTransformationCode(newsItem, conceptAnalysis, scoringAnalysis);
-                var transformation = await ExecuteTransformationCode(transformationCode, newsItem, conceptAnalysis, scoringAnalysis);
+                if (handler == null)
+                {
+                    _logger.Warn($"AI handler 'ai.fractal-transform' is null, falling back to local transformation");
+                    return await FallbackFractalTransformation(newsItem, conceptAnalysis, scoringAnalysis);
+                }
 
-                await CacheAnalysis(cacheKey, transformation, TimeSpan.FromHours(6));
-                return transformation;
+                _logger.Debug($"Calling AI module for fractal transformation: {newsItem.Title}");
+                var response = await handler(JsonSerializer.SerializeToElement(request));
+                
+                if (response == null)
+                {
+                    _logger.Warn($"AI module returned null response for fractal transformation: {newsItem.Title}");
+                    return await FallbackFractalTransformation(newsItem, conceptAnalysis, scoringAnalysis);
+                }
+
+                if (response is JsonElement jsonResponse)
+                {
+                    if (jsonResponse.TryGetProperty("success", out var success) && success.GetBoolean())
+                    {
+                        if (jsonResponse.TryGetProperty("headline", out var headline) &&
+                            jsonResponse.TryGetProperty("beliefTranslation", out var beliefTranslation) &&
+                            jsonResponse.TryGetProperty("summary", out var summary) &&
+                            jsonResponse.TryGetProperty("impactAreas", out var impactAreas))
+                        {
+                            _logger.Info($"AI fractal transformation successful for: {newsItem.Title}");
+                            
+                            // Create FractalTransformation from response
+                            return new FractalTransformation
+                            {
+                                Id = $"fractal-{Guid.NewGuid():N}",
+                                NewsItemId = newsItem.Id,
+                                Headline = headline.GetString() ?? newsItem.Title,
+                                BeliefSystemTranslation = beliefTranslation.GetString() ?? newsItem.Content,
+                                Summary = summary.GetString() ?? newsItem.Content,
+                                ImpactAreas = impactAreas.EnumerateArray().Select(a => a.GetString() ?? "").ToArray(),
+                                AmplificationFactors = new Dictionary<string, double> { { "resonance", 0.8 } },
+                                ResonanceData = new Dictionary<string, object>(),
+                                TransformationType = "consciousness-expansion",
+                                ConsciousnessLevel = "L5",
+                                TransformedAt = DateTimeOffset.UtcNow,
+                                Metadata = new Dictionary<string, object>
+                                {
+                                    ["source"] = "ai-module",
+                                    ["originalTitle"] = newsItem.Title,
+                                    ["processingTime"] = DateTimeOffset.UtcNow
+                                }
+                            };
+                        }
+                        else
+                        {
+                            _logger.Warn($"AI module response missing required fields for fractal transformation: {newsItem.Title}");
+                        }
+                    }
+                    else
+                    {
+                        _logger.Warn($"AI module returned error for fractal transformation: {newsItem.Title}");
+                        if (jsonResponse.TryGetProperty("error", out var error))
+                        {
+                            _logger.Warn($"AI module error: {error.GetString()}");
+                        }
+                    }
+                }
+                else
+                {
+                    _logger.Warn($"AI module returned unexpected response type for fractal transformation: {newsItem.Title}");
+                }
+            }
+            catch (JsonException ex)
+            {
+                _logger.Error($"JSON serialization/deserialization error in AI fractal transformation for {newsItem.Title}: {ex.Message}", ex);
             }
             catch (Exception ex)
             {
-                _logger.Error($"Error in AI fractal transformation: {ex.Message}", ex);
-                return await FallbackFractalTransformation(newsItem, conceptAnalysis, scoringAnalysis);
+                _logger.Error($"Unexpected error calling AI module for fractal transformation {newsItem.Title}: {ex.Message}", ex);
             }
+
+            _logger.Info($"Falling back to local fractal transformation for: {newsItem.Title}");
+            return await FallbackFractalTransformation(newsItem, conceptAnalysis, scoringAnalysis);
         }
 
         private double CalculateAbundanceScore(List<string> concepts, NewsItem newsItem)
@@ -590,21 +824,6 @@ namespace CodexBootstrap.Modules
             return $"📰 {newsItem.Title} - Potential for Collective Growth and Understanding";
         }
 
-        private List<string> DetermineImpactAreas(List<string> concepts)
-        {
-            var impactAreas = new List<string>();
-            
-            if (concepts.Contains("ai") || concepts.Contains("artificial intelligence"))
-                impactAreas.Add("AI & Technology");
-            if (concepts.Contains("abundance") || concepts.Contains("amplification"))
-                impactAreas.Add("Collective Abundance");
-            if (concepts.Contains("sustainability") || concepts.Contains("climate"))
-                impactAreas.Add("Environmental Impact");
-            if (concepts.Contains("startup") || concepts.Contains("funding"))
-                impactAreas.Add("Economic Innovation");
-            
-            return impactAreas.Any() ? impactAreas : new List<string> { "General Technology" };
-        }
 
         private List<string> DetermineAmplificationFactors(List<string> concepts, double abundanceScore)
         {
@@ -1236,6 +1455,220 @@ namespace CodexBootstrap.Modules
                 };
             }
         }
+
+        // Fallback methods for when AI module is not available
+        private async Task<ConceptAnalysis> FallbackConceptExtraction(NewsItem newsItem)
+        {
+            _logger.Info($"Using fallback concept extraction for: {newsItem.Title}");
+            
+            var concepts = ExtractTagsFromContent(newsItem.Content).ToList();
+            var tags = newsItem.Tags?.ToList() ?? new List<string>();
+            var entities = ExtractEntitiesFromContent(newsItem.Content);
+            var themes = ExtractThemesFromContent(newsItem.Content);
+            
+            return new ConceptAnalysis
+            {
+                Id = $"concept-{Guid.NewGuid():N}",
+                NewsItemId = newsItem.Id,
+                Concepts = concepts,
+                Confidence = 0.7,
+                OntologyLevels = OntologyLevelHelper.DetermineOntologyLevelsFromCategories(tags),
+                ExtractedAt = DateTimeOffset.UtcNow,
+                Metadata = new Dictionary<string, object>
+                {
+                    ["extractionMethod"] = "fallback",
+                    ["source"] = "local",
+                    ["processedAt"] = DateTimeOffset.UtcNow,
+                    ["tags"] = tags,
+                    ["entities"] = entities,
+                    ["themes"] = themes
+                }
+            };
+        }
+
+        private async Task<ScoringAnalysis> FallbackScoringAnalysis(ConceptAnalysis conceptAnalysis, NewsItem newsItem)
+        {
+            _logger.Info($"Using fallback scoring analysis for: {newsItem.Title}");
+            
+            var abundanceScore = CalculateAbundanceScore(conceptAnalysis.Concepts, newsItem);
+            var consciousnessScore = CalculateConsciousnessScore(conceptAnalysis.Concepts, newsItem);
+            var unityScore = CalculateUnityScore(conceptAnalysis.Concepts, newsItem);
+            var innovationScore = CalculateInnovationScore(conceptAnalysis.Concepts, newsItem);
+            var impactScore = CalculateImpactScore(conceptAnalysis.Concepts, newsItem);
+            
+            return new ScoringAnalysis
+            {
+                Id = $"scoring-{Guid.NewGuid():N}",
+                NewsItemId = newsItem.Id,
+                ConceptAnalysisId = conceptAnalysis.Id,
+                AbundanceScore = abundanceScore,
+                ConsciousnessScore = consciousnessScore,
+                UnityScore = unityScore,
+                OverallScore = (abundanceScore + consciousnessScore + unityScore + innovationScore + impactScore) / 5.0,
+                ScoredAt = DateTimeOffset.UtcNow,
+                Metadata = new Dictionary<string, object>
+                {
+                    ["scoringMethod"] = "fallback",
+                    ["source"] = "local",
+                    ["processedAt"] = DateTimeOffset.UtcNow
+                }
+            };
+        }
+
+        private async Task<FractalTransformation> FallbackFractalTransformation(NewsItem newsItem, ConceptAnalysis conceptAnalysis, ScoringAnalysis scoringAnalysis)
+        {
+            _logger.Info($"Using fallback fractal transformation for: {newsItem.Title}");
+            
+            return new FractalTransformation
+            {
+                Id = $"fractal-{Guid.NewGuid():N}",
+                NewsItemId = newsItem.Id,
+                Headline = TransformHeadline(newsItem.Title, conceptAnalysis.Concepts),
+                BeliefSystemTranslation = TransformToBeliefSystem(newsItem.Content, conceptAnalysis.Concepts),
+                Summary = TransformSummary(newsItem.Content, conceptAnalysis.Concepts),
+                ImpactAreas = DetermineImpactAreas(conceptAnalysis.Concepts),
+                AmplificationFactors = CalculateAmplificationFactors(scoringAnalysis),
+                ResonanceData = new Dictionary<string, object>
+                {
+                    ["resonanceScore"] = scoringAnalysis.OverallScore,
+                    ["consciousnessLevel"] = DetermineConsciousnessLevel(scoringAnalysis.OverallScore),
+                    ["transformationType"] = "consciousness-expansion"
+                },
+                TransformationType = "consciousness-expansion",
+                ConsciousnessLevel = DetermineConsciousnessLevel(scoringAnalysis.OverallScore),
+                TransformedAt = DateTimeOffset.UtcNow,
+                Metadata = new Dictionary<string, object>
+                {
+                    ["transformationMethod"] = "fallback",
+                    ["source"] = "local",
+                    ["processedAt"] = DateTimeOffset.UtcNow
+                }
+            };
+        }
+
+        // Helper methods for fallback implementations
+        private List<string> ExtractEntitiesFromContent(string content)
+        {
+            // Simple entity extraction - look for capitalized words
+            var words = content.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            return words.Where(w => w.Length > 2 && char.IsUpper(w[0]) && w.All(c => char.IsLetter(c)))
+                       .Distinct()
+                       .Take(10)
+                       .ToList();
+        }
+
+        private List<string> ExtractThemesFromContent(string content)
+        {
+            var themes = new List<string>();
+            var lowerContent = content.ToLower();
+            
+            var themeKeywords = new Dictionary<string, string[]>
+            {
+                ["technology"] = new[] { "tech", "digital", "ai", "software", "computer", "internet" },
+                ["science"] = new[] { "research", "study", "discovery", "experiment", "data" },
+                ["consciousness"] = new[] { "mind", "awareness", "consciousness", "mindfulness", "meditation" },
+                ["unity"] = new[] { "together", "collaboration", "community", "global", "united" },
+                ["abundance"] = new[] { "growth", "prosperity", "wealth", "success", "opportunity" }
+            };
+
+            foreach (var theme in themeKeywords)
+            {
+                if (theme.Value.Any(keyword => lowerContent.Contains(keyword)))
+                {
+                    themes.Add(theme.Key);
+                }
+            }
+
+            return themes;
+        }
+
+        private string TransformHeadline(string originalTitle, List<string> concepts)
+        {
+            // Simple headline transformation based on concepts
+            if (concepts.Contains("consciousness"))
+                return $"Consciousness Expansion: {originalTitle}";
+            if (concepts.Contains("unity"))
+                return $"Unity in Action: {originalTitle}";
+            if (concepts.Contains("abundance"))
+                return $"Abundance Through: {originalTitle}";
+            
+            return $"Transformative Insight: {originalTitle}";
+        }
+
+        private string TransformToBeliefSystem(string content, List<string> concepts)
+        {
+            // Simple belief system translation
+            var beliefPrefix = "From a consciousness-expanded perspective: ";
+            return beliefPrefix + content;
+        }
+
+        private string TransformSummary(string content, List<string> concepts)
+        {
+            // Simple summary transformation
+            var summary = content.Length > 200 ? content.Substring(0, 200) + "..." : content;
+            return $"This transformative insight reveals: {summary}";
+        }
+
+        private string[] DetermineImpactAreas(List<string> concepts)
+        {
+            var impactAreas = new List<string>();
+            
+            if (concepts.Contains("consciousness")) impactAreas.Add("consciousness");
+            if (concepts.Contains("unity")) impactAreas.Add("unity");
+            if (concepts.Contains("abundance")) impactAreas.Add("abundance");
+            if (concepts.Contains("technology")) impactAreas.Add("technology");
+            if (concepts.Contains("science")) impactAreas.Add("science");
+            
+            return impactAreas.Count > 0 ? impactAreas.ToArray() : new[] { "consciousness" };
+        }
+
+        private Dictionary<string, double> CalculateAmplificationFactors(ScoringAnalysis scoring)
+        {
+            return new Dictionary<string, double>
+            {
+                ["resonance"] = scoring.OverallScore,
+                ["consciousness"] = scoring.ConsciousnessScore,
+                ["unity"] = scoring.UnityScore,
+                ["abundance"] = scoring.AbundanceScore
+            };
+        }
+
+        private string DetermineConsciousnessLevel(double overallScore)
+        {
+            if (overallScore >= 0.8) return "L5";
+            if (overallScore >= 0.6) return "L4";
+            if (overallScore >= 0.4) return "L3";
+            if (overallScore >= 0.2) return "L2";
+            return "L1";
+        }
+
+        private double CalculateInnovationScore(List<string> concepts, NewsItem newsItem)
+        {
+            var innovationKeywords = new[] { "innovation", "breakthrough", "discovery", "new", "revolutionary", "cutting-edge" };
+            var innovationCount = concepts.Count(c => innovationKeywords.Contains(c));
+            return Math.Min(1.0, innovationCount / 2.0);
+        }
+
+        private double CalculateImpactScore(List<string> concepts, NewsItem newsItem)
+        {
+            var impactKeywords = new[] { "impact", "change", "transformation", "breakthrough", "revolutionary", "significant" };
+            var impactCount = concepts.Count(c => impactKeywords.Contains(c));
+            return Math.Min(1.0, impactCount / 2.0);
+        }
+
+        private double CalculateConsciousnessScore(List<string> concepts, NewsItem newsItem)
+        {
+            var consciousnessKeywords = new[] { "consciousness", "awareness", "mindfulness", "meditation", "wisdom", "enlightenment", "spiritual", "transcendence" };
+            var consciousnessCount = concepts.Count(c => consciousnessKeywords.Contains(c));
+            return Math.Min(1.0, consciousnessCount / 3.0);
+        }
+
+        private double CalculateUnityScore(List<string> concepts, NewsItem newsItem)
+        {
+            var unityKeywords = new[] { "unity", "collaboration", "collective", "together", "community", "global", "international", "cooperation" };
+            var unityCount = concepts.Count(c => unityKeywords.Contains(c));
+            return Math.Min(1.0, unityCount / 3.0);
+        }
     }
 
     // Data Transfer Objects
@@ -1262,42 +1695,7 @@ namespace CodexBootstrap.Modules
         public Dictionary<string, object> Metadata { get; set; } = new();
     }
 
-    // AI Analysis Data Structures
-    public class ConceptAnalysis
-    {
-        public List<string> Concepts { get; set; } = new();
-        public List<string> Tags { get; set; } = new();
-        public List<string> Entities { get; set; } = new();
-        public List<string> Themes { get; set; } = new();
-        public Dictionary<string, double> ConceptWeights { get; set; } = new();
-        public Dictionary<string, string> ConceptRelationships { get; set; } = new();
-        public List<string> OntologyLevels { get; set; } = new();
-        public Dictionary<string, object> Metadata { get; set; } = new();
-    }
-
-    public class ScoringAnalysis
-    {
-        public double AbundanceScore { get; set; }
-        public double ConsciousnessLevel { get; set; }
-        public double ResonanceScore { get; set; }
-        public double InnovationScore { get; set; }
-        public double ImpactScore { get; set; }
-        public double UnityScore { get; set; }
-        public Dictionary<string, double> DetailedScores { get; set; } = new();
-        public List<string> ScoringFactors { get; set; } = new();
-        public Dictionary<string, object> Metadata { get; set; } = new();
-    }
-
-    public class FractalTransformation
-    {
-        public string Headline { get; set; } = string.Empty;
-        public string BeliefTranslation { get; set; } = string.Empty;
-        public string Summary { get; set; } = string.Empty;
-        public List<string> ImpactAreas { get; set; } = new();
-        public List<string> AmplificationFactors { get; set; } = new();
-        public ResonanceData ResonanceData { get; set; } = new();
-        public Dictionary<string, object> Metadata { get; set; } = new();
-    }
+    // AI Analysis Data Structures are now defined in AIModule.cs
 
     public class FractalNewsItem
     {
