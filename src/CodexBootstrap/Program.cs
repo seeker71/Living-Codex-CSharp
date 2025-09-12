@@ -62,6 +62,16 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
         
         // Add generic logging
         builder.Services.AddLogging(configure => configure.AddConsole().AddDebug());
+        
+        // Register custom logger interface
+        builder.Services.AddSingleton<CodexBootstrap.Core.ILogger, Log4NetLogger>(sp => 
+            new Log4NetLogger("Program"));
+
+        // Register self-updating system services
+        builder.Services.AddSingleton<ModuleCompiler>();
+        builder.Services.AddSingleton<HotReloadManager>();
+        builder.Services.AddSingleton<SelfUpdateSystem>();
+        builder.Services.AddSingleton<StableCore>();
 
 // HTTP client for adapters
 builder.Services.AddHttpClient();
