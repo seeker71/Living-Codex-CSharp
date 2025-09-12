@@ -265,6 +265,35 @@ public sealed class SpecModule : IModule
         }
     }
 
+    [ApiRoute("GET", "/spec/debug/registry", "spec-debug-registry", "Debug registry contents", "codex.spec")]
+    public object DebugRegistry()
+    {
+        try
+        {
+            var allNodes = _registry.AllNodes().ToList();
+            var nodeTypes = allNodes.GroupBy(n => n.TypeId)
+                .ToDictionary(g => g.Key, g => g.Count());
+            
+            var apiNodes = allNodes
+                .Where(node => node.TypeId == "api" || node.TypeId == "codex.meta/api")
+                .ToList();
+
+            return new
+            {
+                success = true,
+                totalNodes = allNodes.Count,
+                nodeTypes = nodeTypes,
+                apiNodesCount = apiNodes.Count,
+                apiNodeIds = apiNodes.Take(10).Select(n => new { n.Id, n.TypeId, n.Title }).ToList(),
+                sampleApiNode = apiNodes.FirstOrDefault()?.Meta
+            };
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Debug failed: {ex.Message}");
+        }
+    }
+
     [ApiRoute("GET", "/spec/features/map", "spec-get-features-map", "Get modules mapped to features", "codex.spec")]
     public async Task<object> GetFeaturesMap()
     {
@@ -656,9 +685,15 @@ public sealed class SpecModule : IModule
         try
         {
             // Get all API nodes from registry
-            var apiNodes = _registry.AllNodes()
-                .Where(node => node.TypeId == "api")
+            var allNodes = _registry.AllNodes().ToList();
+            var apiNodes = allNodes
+                .Where(node => node.TypeId == "api" || node.TypeId == "codex.meta/api")
                 .ToList();
+            
+            _logger.Info($"Total nodes in registry: {allNodes.Count}");
+            _logger.Info($"API nodes found: {apiNodes.Count}");
+            _logger.Info($"API node TypeIds: {string.Join(", ", apiNodes.Select(n => n.TypeId).Distinct())}");
+            _logger.Info($"All TypeIds in registry: {string.Join(", ", allNodes.Select(n => n.TypeId).Distinct().Take(20))}");
 
             foreach (var apiNode in apiNodes)
             {

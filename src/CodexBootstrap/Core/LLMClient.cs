@@ -24,6 +24,23 @@ public class LLMClient
     }
 
     /// <summary>
+    /// Check if LLM service is available
+    /// </summary>
+    public async Task<bool> IsServiceAvailableAsync()
+    {
+        try
+        {
+            using var client = new HttpClient();
+            var response = await client.GetAsync("http://localhost:11434/api/tags");
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Send a query to the LLM
     /// </summary>
     public async Task<LLMResponse> QueryAsync(string prompt, CodexBootstrap.Modules.LLMConfig config)

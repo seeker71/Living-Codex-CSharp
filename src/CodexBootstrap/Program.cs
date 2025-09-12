@@ -10,6 +10,34 @@ using CodexBootstrap.Modules;
 using log4net;
 using log4net.Config;
 
+// Load environment variables from .env file
+try
+{
+    var envFile = Path.Combine(Directory.GetCurrentDirectory(), "../../.env");
+    if (File.Exists(envFile))
+    {
+        foreach (var line in File.ReadAllLines(envFile))
+        {
+            if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#")) continue;
+            
+            var parts = line.Split('=', 2);
+            if (parts.Length == 2)
+            {
+                Environment.SetEnvironmentVariable(parts[0].Trim(), parts[1].Trim());
+            }
+        }
+        Console.WriteLine($".env file loaded from: {envFile}");
+    }
+    else
+    {
+        Console.WriteLine($".env file not found at: {envFile}");
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Error loading .env file: {ex.Message}");
+}
+
 // Configure log4net
 var configFile = new FileInfo("log4net.config");
 if (configFile.Exists)

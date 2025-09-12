@@ -517,7 +517,7 @@ namespace CodexBootstrap.Modules
                                 NewsItemId = newsItem.Id,
                                 Concepts = concepts.EnumerateArray().Select(c => c.GetString() ?? "").ToList(),
                                 Confidence = confidence.GetDouble(),
-                                OntologyLevels = ontologyLevels.EnumerateArray().Select(o => o.GetString() ?? "").ToArray(),
+                                OntologyLevels = ontologyLevels.EnumerateArray().Select(o => o.GetString() ?? "").ToList(),
                                 ExtractedAt = DateTimeOffset.UtcNow,
                                 Metadata = new Dictionary<string, object>
                                 {
@@ -1461,7 +1461,7 @@ namespace CodexBootstrap.Modules
                 NewsItemId = newsItem.Id,
                 Concepts = concepts,
                 Confidence = 0.7,
-                OntologyLevels = OntologyLevelHelper.DetermineOntologyLevelsFromCategories(tags),
+                OntologyLevels = OntologyLevelHelper.DetermineOntologyLevelsFromCategories(tags).ToList(),
                 ExtractedAt = DateTimeOffset.UtcNow,
                 Metadata = new Dictionary<string, object>
                 {

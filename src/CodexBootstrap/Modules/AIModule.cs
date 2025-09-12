@@ -1,8 +1,6 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using CodexBootstrap.Core;
@@ -10,85 +8,616 @@ using CodexBootstrap.Runtime;
 
 namespace CodexBootstrap.Modules
 {
-    // LLM Integration Data Structures
-    public record LLMFutureQueryRequest(
-        string Query,
-        string Context,
-        string TimeHorizon,
-        string Perspective,
-        LLMConfig LLMConfig,
-        Dictionary<string, object> Metadata
-    );
+    public record ConceptExtractionRequest(string Content, string? Model = null, string? Provider = null);
+    public record FractalTransformRequest(string Content, string? Model = null, string? Provider = null);
+    public record AIFutureQueryRequest(string Query, string? Model = null, string? Provider = null);
 
-    public record LLMFutureQueryResponse(
-        string Id,
-        string Query,
-        string Response,
-        double Confidence,
-        string Reasoning,
-        List<string> Sources,
-        DateTimeOffset GeneratedAt,
-        LLMConfig UsedConfig
-    );
+    public static class LLMConfigurations
+    {
+        private static LLMConfig CreateConfig(string id, string name, string provider, string model, 
+            double temperature, int maxTokens, double topP, string baseUrl = "http://localhost:11434")
+        {
+            var apiKey = provider.ToLowerInvariant() == "openai" 
+                ? Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? ""
+                : "";
+                
+            return new LLMConfig(
+                Id: id,
+                Name: name,
+                Provider: provider,
+                Model: model,
+                ApiKey: apiKey,
+                BaseUrl: baseUrl,
+                MaxTokens: maxTokens,
+                Temperature: temperature,
+                TopP: topP,
+                Parameters: new Dictionary<string, object>()
+            );
+        }
 
-    public record LLMTranslationRequest(
+        // Mac M1 optimized configurations
+        public static readonly LLMConfig MacM1_ConceptExtraction = CreateConfig(
+            "macm1-concept-extraction", "Mac M1 Concept Extraction", "ollama", "llama3.1:8b", 
+            0.3f, 2048, 0.9f);
+
+        public static readonly LLMConfig MacM1_FractalTransform = CreateConfig(
+            "macm1-fractal-transform", "Mac M1 Fractal Transform", "ollama", "llama3.1:8b", 
+            0.7f, 4096, 0.95f);
+
+        public static readonly LLMConfig MacM1_FutureQuery = CreateConfig(
+            "macm1-future-query", "Mac M1 Future Query", "ollama", "llama3.1:8b", 
+            0.8f, 3072, 0.9f);
+
+        // Ollama Turbo mode configurations
+        public static readonly LLMConfig OllamaTurbo_ConceptExtraction = CreateConfig(
+            "ollama-turbo-concept-extraction", "Ollama Turbo Concept Extraction", "ollama", "llama3.1:8b-instruct-q4_0", 
+            0.2f, 1024, 0.8f);
+
+        public static readonly LLMConfig OllamaTurbo_FractalTransform = CreateConfig(
+            "ollama-turbo-fractal-transform", "Ollama Turbo Fractal Transform", "ollama", "llama3.1:8b-instruct-q4_0", 
+            0.6f, 2048, 0.9f);
+
+        public static readonly LLMConfig OllamaTurbo_FutureQuery = CreateConfig(
+            "ollama-turbo-future-query", "Ollama Turbo Future Query", "ollama", "llama3.1:8b-instruct-q4_0", 
+            0.7f, 1536, 0.85f);
+
+        // OpenAI configurations
+        public static readonly LLMConfig OpenAI_ConceptExtraction = CreateConfig(
+            "openai-concept-extraction", "OpenAI Concept Extraction", "openai", "gpt-4o-mini", 
+            0.3f, 2048, 0.9f, "https://api.openai.com/v1");
+
+        public static readonly LLMConfig OpenAI_FractalTransform = CreateConfig(
+            "openai-fractal-transform", "OpenAI Fractal Transform", "openai", "gpt-4o", 
+            0.7f, 4096, 0.95f, "https://api.openai.com/v1");
+
+        public static readonly LLMConfig OpenAI_FutureQuery = CreateConfig(
+            "openai-future-query", "OpenAI Future Query", "openai", "gpt-4o", 
+            0.8f, 3072, 0.9f, "https://api.openai.com/v1");
+
+        // Get configuration for a specific task
+        public static LLMConfig GetConfigForTask(string task, string? preferredProvider = null, string? preferredModel = null)
+        {
+            // If specific model/provider requested, use them
+            if (!string.IsNullOrEmpty(preferredProvider) && !string.IsNullOrEmpty(preferredModel))
+            {
+                var endpoint = preferredProvider.ToLowerInvariant() == "openai" ? "https://api.openai.com/v1" : "http://localhost:11434";
+                return CreateConfig(
+                    $"{preferredProvider}-{task}-custom", 
+                    $"{preferredProvider} {task} (Custom)", 
+                    preferredProvider, 
+                    preferredModel,
+                    GetDefaultTemperature(task),
+                    GetDefaultMaxTokens(task),
+                    GetDefaultTopP(task),
+                    endpoint
+                );
+            }
+
+            // Auto-detect best configuration based on available services
+            // For now, default to Mac M1 optimized configs
+            return task.ToLowerInvariant() switch
+            {
+                "concept-extraction" => MacM1_ConceptExtraction,
+                "fractal-transform" => MacM1_FractalTransform,
+                "future-query" => MacM1_FutureQuery,
+                _ => MacM1_ConceptExtraction
+            };
+        }
+
+        private static float GetDefaultTemperature(string task) => task.ToLowerInvariant() switch
+        {
+            "concept-extraction" => 0.3f,
+            "fractal-transform" => 0.7f,
+            "future-query" => 0.8f,
+            _ => 0.5f
+        };
+
+        private static int GetDefaultMaxTokens(string task) => task.ToLowerInvariant() switch
+        {
+            "concept-extraction" => 2048,
+            "fractal-transform" => 4096,
+            "future-query" => 3072,
+            _ => 2048
+        };
+
+        private static float GetDefaultTopP(string task) => task.ToLowerInvariant() switch
+        {
+            "concept-extraction" => 0.9f,
+            "fractal-transform" => 0.95f,
+            "future-query" => 0.9f,
+            _ => 0.9f
+        };
+    }
+
+    /// <summary>
+    /// Refactored AI Module - Concise, configurable, and pattern-driven
+    /// </summary>
+    public class AIModule : IModule
+    {
+        private readonly NodeRegistry _registry;
+        private readonly Core.ILogger _logger;
+        private readonly LLMOrchestrator _llmOrchestrator;
+        private readonly PromptTemplateRepository _promptRepo;
+
+        public AIModule(NodeRegistry registry)
+        {
+            _registry = registry;
+            _logger = new Log4NetLogger(typeof(AIModule));
+            
+            // Initialize LLM infrastructure
+            var httpClient = new HttpClient();
+            var llmClient = new LLMClient(httpClient, _logger);
+            _promptRepo = new PromptTemplateRepository(registry);
+            _llmOrchestrator = new LLMOrchestrator(llmClient, _promptRepo, _logger);
+            
+            // Register default prompt templates
+            RegisterPromptTemplates();
+        }
+
+        public string Name => "AI Module (Refactored)";
+        public string Description => "Streamlined AI functionality with configurable prompts and reusable patterns";
+        public string Version => "2.0.0";
+
+        public Node GetModuleNode()
+        {
+            return NodeStorage.CreateModuleNode(
+                id: "ai-module",
+                name: Name,
+                version: Version,
+                description: Description,
+                capabilities: new[] { "concept-extraction", "llm-integration", "fractal-transformation", "analysis" },
+                tags: new[] { "ai", "concepts", "llm", "analysis", "refactored" },
+                specReference: "codex.spec.ai"
+            );
+        }
+
+        public void Register(NodeRegistry registry)
+        {
+            registry.Upsert(GetModuleNode());
+        }
+
+        public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+        {
+            // API handlers are registered via [ApiRoute] attributes
+        }
+
+        public void RegisterHttpEndpoints(Microsoft.AspNetCore.Builder.WebApplication app, NodeRegistry registry, Runtime.CoreApiService coreApiService, Runtime.ModuleLoader moduleLoader)
+        {
+            // HTTP endpoints registration - not needed for this module
+        }
+
+        private void RegisterPromptTemplates()
+        {
+            var defaultLLMConfig = new LLMConfig(
+                Id: "default-ai",
+                Name: "Default AI Config",
+                Provider: "ollama",
+                Model: "llama2",
+                ApiKey: "",
+                BaseUrl: "http://localhost:11434",
+                MaxTokens: 1000,
+                Temperature: 0.3,
+                TopP: 0.9,
+                Parameters: new Dictionary<string, object> { ["stop"] = new[] { "---", "###" } }
+            );
+
+            var templates = new[]
+            {
+                new PromptTemplate(
+                    Id: "concept-extraction",
+                    Name: "Concept Extraction",
+                    Template: @"Analyze the following text for consciousness-related concepts.
+
+Text: ""{content}""
+
+Focus on: consciousness, transformation, unity, love, wisdom, energy, healing, abundance, sacred patterns.
+
+Return JSON array:
+[
+  {{
+    ""concept"": ""concept_name"",
+    ""score"": 0.0-1.0,
+    ""description"": ""brief description"",
+    ""category"": ""consciousness|transformation|unity|love|wisdom|energy|healing|abundance|sacred|fractal"",
+    ""confidence"": 0.0-1.0
+  }}
+]",
+                    DefaultParameters: new Dictionary<string, object> { ["content"] = "" },
+                    DefaultLLMConfig: defaultLLMConfig,
+                    Category: "analysis"
+                ),
+
+                new PromptTemplate(
+                    Id: "fractal-transformation",
+                    Name: "Fractal Transformation",
+                    Template: @"Transform the following content using fractal consciousness principles.
+
+Content: ""{content}""
+Consciousness Level: {consciousnessLevel}
+
+Apply fractal patterns for:
+1. Self-similarity across scales
+2. Recursive depth expansion
+3. Consciousness elevation
+4. Unity resonance amplification
+
+Return JSON:
+{{
+  ""transformedContent"": ""transformed version"",
+  ""fractalPatterns"": [""pattern1"", ""pattern2""],
+  ""consciousnessLevel"": ""L1-L7"",
+  ""resonanceFrequency"": 0.0-1.0,
+  ""unityScore"": 0.0-1.0
+}}",
+                    DefaultParameters: new Dictionary<string, object> 
+                    { 
+                        ["content"] = "", 
+                        ["consciousnessLevel"] = "L3" 
+                    },
+                    DefaultLLMConfig: defaultLLMConfig,
+                    Category: "transformation"
+                ),
+
+                new PromptTemplate(
+                    Id: "future-query",
+                    Name: "Future Knowledge Query",
+                    Template: @"You are an advanced AI specializing in future knowledge and consciousness expansion.
+
+Context: {context}
+Time Horizon: {timeHorizon}
+Perspective: {perspective}
+
+Query: {query}
+
+Provide insights focusing on:
+1. Future scenarios and trends
+2. Consciousness implications
+3. Practical applications
+4. Spiritual insights
+
+Response:",
+                    DefaultParameters: new Dictionary<string, object> 
+                    { 
+                        ["context"] = "",
+                        ["timeHorizon"] = "5 years",
+                        ["perspective"] = "consciousness-expanding",
+                        ["query"] = ""
+                    },
+                    DefaultLLMConfig: defaultLLMConfig,
+                    Category: "future"
+                )
+            };
+
+            foreach (var template in templates)
+            {
+                _promptRepo.RegisterTemplate(template);
+            }
+        }
+
+        #region API Handlers
+
+        [ApiRoute("GET", "/ai/health", "ai-health", "AI Module health check", "ai-module")]
+        public async Task<object> HandleHealthAsync(Dictionary<string, string> parameters)
+        {
+            var llmAvailable = await new LLMClient(new HttpClient(), _logger).IsServiceAvailableAsync();
+            var promptCount = _promptRepo.GetTemplatesByCategory("analysis").Count + 
+                             _promptRepo.GetTemplatesByCategory("transformation").Count + 
+                             _promptRepo.GetTemplatesByCategory("future").Count;
+
+            return new
+            {
+                success = true,
+                module = Name,
+                version = Version,
+                llmServiceAvailable = llmAvailable,
+                promptTemplatesLoaded = promptCount,
+                timestamp = DateTimeOffset.UtcNow
+            };
+        }
+
+        [ApiRoute("POST", "/ai/extract-concepts", "ai-extract-concepts", "Extract concepts using configurable prompts", "ai-module")]
+        public async Task<object> HandleConceptExtractionAsync([ApiParameter("request", "Concept extraction request", Required = true, Location = "body")] ConceptExtractionRequest request)
+        {
+            try
+            {
+                if (request == null || string.IsNullOrEmpty(request.Content))
+                {
+                    return new { success = false, error = "Content is required" };
+                }
+
+                var config = LLMConfigurations.GetConfigForTask("concept-extraction", request.Provider, request.Model);
+                var result = await _llmOrchestrator.ExecuteAsync("concept-extraction", new Dictionary<string, object>
+                {
+                    ["content"] = request.Content
+                }, config);
+
+                if (!result.Success)
+                {
+                    return new { success = false, error = result.Error };
+                }
+
+                var concepts = _llmOrchestrator.ParseStructuredResponse<List<ConceptScore>>(result);
+
+                return new
+                {
+                    success = true,
+                    data = new
+                    {
+                        concepts = concepts ?? new List<ConceptScore>(),
+                        confidence = result.Confidence,
+                        isFallback = result.IsFallback,
+                        timestamp = result.Timestamp,
+                        tracking = new
+                        {
+                            templateId = result.TemplateId,
+                            provider = result.Provider,
+                            model = result.Model,
+                            executionTimeMs = result.ExecutionTime.TotalMilliseconds
+                        }
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in concept extraction: {ex.Message}", ex);
+                return new { success = false, error = ex.Message };
+            }
+        }
+
+        [ApiRoute("POST", "/ai/fractal-transform", "ai-fractal-transform", "Transform content using fractal patterns", "ai-module")]
+        public async Task<object> HandleFractalTransformAsync([ApiParameter("request", "Fractal transform request", Required = true, Location = "body")] FractalTransformRequest request)
+        {
+            try
+            {
+                if (request == null || string.IsNullOrEmpty(request.Content))
+                {
+                    return new { success = false, error = "Content is required" };
+                }
+
+                var config = LLMConfigurations.GetConfigForTask("fractal-transform", request.Provider, request.Model);
+                var result = await _llmOrchestrator.ExecuteAsync("fractal-transformation", new Dictionary<string, object>
+                {
+                    ["content"] = request.Content,
+                    ["consciousnessLevel"] = "L3" // Default consciousness level
+                }, config);
+
+                if (!result.Success)
+                {
+                    return new { success = false, error = result.Error };
+                }
+
+                var transformation = _llmOrchestrator.ParseStructuredResponse<FractalTransformationResult>(result);
+
+                return new
+                {
+                    success = true,
+                    data = transformation,
+                    confidence = result.Confidence,
+                    isFallback = result.IsFallback,
+                    timestamp = result.Timestamp,
+                    tracking = new
+                    {
+                        templateId = result.TemplateId,
+                        provider = result.Provider,
+                        model = result.Model,
+                        executionTimeMs = result.ExecutionTime.TotalMilliseconds
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in fractal transformation: {ex.Message}", ex);
+                return new { success = false, error = ex.Message };
+            }
+        }
+
+        [ApiRoute("POST", "/ai/future-query", "ai-future-query", "Query future knowledge with consciousness expansion", "ai-module")]
+        public async Task<object> HandleFutureQueryAsync([ApiParameter("request", "Future query request", Required = true, Location = "body")] AIFutureQueryRequest request)
+        {
+            try
+            {
+                if (request == null || string.IsNullOrEmpty(request.Query))
+                {
+                    return new { success = false, error = "Query is required" };
+                }
+
+                var config = LLMConfigurations.GetConfigForTask("future-query", request.Provider, request.Model);
+                var result = await _llmOrchestrator.ExecuteAsync("future-query", new Dictionary<string, object>
+                {
+                    ["query"] = request.Query,
+                    ["context"] = "", // Default context
+                    ["timeHorizon"] = "5 years", // Default time horizon
+                    ["perspective"] = "consciousness-expanding" // Default perspective
+                }, config);
+
+                if (!result.Success)
+                {
+                    return new { success = false, error = result.Error };
+                }
+
+                return new
+                {
+                    success = true,
+                    data = new
+                    {
+                        query = request.Query,
+                        response = result.Content,
+                        confidence = result.Confidence,
+                        isFallback = result.IsFallback,
+                        context = "", // Default context
+                        timeHorizon = "5 years", // Default time horizon
+                        perspective = "consciousness-expanding", // Default perspective
+                        timestamp = result.Timestamp,
+                        tracking = new
+                        {
+                            templateId = result.TemplateId,
+                            provider = result.Provider,
+                            model = result.Model,
+                            executionTimeMs = result.ExecutionTime.TotalMilliseconds
+                        }
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in future query: {ex.Message}", ex);
+                return new { success = false, error = ex.Message };
+            }
+        }
+
+        [ApiRoute("GET", "/ai/prompts", "ai-list-prompts", "List all available prompt templates", "ai-module")]
+        public async Task<object> HandleListPromptsAsync(Dictionary<string, string> parameters)
+        {
+            try
+            {
+                var allTemplates = new List<PromptTemplate>();
+                var categories = new[] { "analysis", "transformation", "future" };
+                
+                foreach (var category in categories)
+                {
+                    allTemplates.AddRange(_promptRepo.GetTemplatesByCategory(category));
+                }
+
+                return new
+                {
+                    success = true,
+                    data = allTemplates.Select(t => new
+                    {
+                        id = t.Id,
+                        name = t.Name,
+                        category = t.Category,
+                        parameters = t.DefaultParameters.Keys.ToArray()
+                    }).ToArray(),
+                    totalCount = allTemplates.Count
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error listing prompts: {ex.Message}", ex);
+                return new { success = false, error = ex.Message };
+            }
+        }
+
+        [ApiRoute("GET", "/ai/prompts/{category}", "ai-get-prompts-by-category", "Get prompt templates by category", "ai-module")]
+        public async Task<object> HandleGetPromptsByCategoryAsync(Dictionary<string, string> parameters)
+        {
+            try
+            {
+                if (!parameters.TryGetValue("category", out var category) || string.IsNullOrEmpty(category))
+                {
+                    return new { success = false, error = "Category is required" };
+                }
+
+                var templates = _promptRepo.GetTemplatesByCategory(category);
+                
+                return new
+                {
+                    success = true,
+                    data = templates.Select(t => new
+                    {
+                        id = t.Id,
+                        name = t.Name,
+                        template = t.Template,
+                        defaultParameters = t.DefaultParameters,
+                        defaultLLMConfig = t.DefaultLLMConfig
+                    }).ToArray(),
+                    category = category,
+                    count = templates.Count
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error getting prompts by category: {ex.Message}", ex);
+                return new { success = false, error = ex.Message };
+            }
+        }
+
+        [ApiRoute("GET", "/ai/configurations", "ai-get-configurations", "Get available LLM configurations", "ai-module")]
+        public async Task<object> HandleGetConfigurationsAsync(Dictionary<string, string> parameters)
+        {
+            try
+            {
+                var configurations = new
+                {
+                    macM1 = new
+                    {
+                        conceptExtraction = LLMConfigurations.MacM1_ConceptExtraction,
+                        fractalTransform = LLMConfigurations.MacM1_FractalTransform,
+                        futureQuery = LLMConfigurations.MacM1_FutureQuery
+                    },
+                    ollamaTurbo = new
+                    {
+                        conceptExtraction = LLMConfigurations.OllamaTurbo_ConceptExtraction,
+                        fractalTransform = LLMConfigurations.OllamaTurbo_FractalTransform,
+                        futureQuery = LLMConfigurations.OllamaTurbo_FutureQuery
+                    },
+                    openai = new
+                    {
+                        conceptExtraction = LLMConfigurations.OpenAI_ConceptExtraction,
+                        fractalTransform = LLMConfigurations.OpenAI_FractalTransform,
+                        futureQuery = LLMConfigurations.OpenAI_FutureQuery
+                    }
+                };
+
+                return new
+                {
+                    success = true,
+                    data = configurations,
+                    timestamp = DateTimeOffset.UtcNow
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error getting configurations: {ex.Message}", ex);
+                return new { success = false, error = ex.Message };
+            }
+        }
+
+    #endregion
+    }
+
+    #region Data Structures
+
+    public record ConceptScore(
         string Concept,
-        string SourceLanguage,
-        string TargetLanguage,
-        LLMConfig LLMConfig,
-        Dictionary<string, object> Context
+        double Score,
+        string Description,
+        string Category,
+        double Confidence
     );
 
-    public record LLMTranslationResponse(
-        string Id,
-        string OriginalConcept,
-        string TranslatedConcept,
-        string SourceLanguage,
-        string TargetLanguage,
-        double Confidence,
-        string Reasoning,
-        DateTimeOffset GeneratedAt,
-        LLMConfig UsedConfig
+    public record FractalTransformationResult(
+        string TransformedContent,
+        string[] FractalPatterns,
+        string ConsciousnessLevel,
+        double ResonanceFrequency,
+        double UnityScore
     );
 
-    public record LLMConfigRequest(
-        LLMConfig Config
-    );
+    // Legacy data structures for compatibility
+    public class FractalTransformation
+    {
+        public string Id { get; set; } = "";
+        public string NewsItemId { get; set; } = "";
+        public string Headline { get; set; } = "";
+        public string BeliefSystemTranslation { get; set; } = "";
+        public string Summary { get; set; } = "";
+        public string[] ImpactAreas { get; set; } = Array.Empty<string>();
+        public Dictionary<string, double> AmplificationFactors { get; set; } = new();
+        public Dictionary<string, object> ResonanceData { get; set; } = new();
+        public string TransformationType { get; set; } = "";
+        public string ConsciousnessLevel { get; set; } = "";
+        public DateTimeOffset TransformedAt { get; set; }
+        public Dictionary<string, object> Metadata { get; set; } = new();
+    }
 
-    public record LLMConfigResponse(
-        bool Success,
-        LLMConfig Config,
-        string Message,
-        DateTimeOffset Timestamp
-    );
+    public class CachedAnalysis
+    {
+        public object Data { get; set; } = new();
+    }
 
-    public record LLMHandlerConversionRequest(
-        string Response,
-        string ResponseType,
-        Dictionary<string, object> Context
-    );
-
-    public record LLMHandlerConversionResponse(
-        bool Success,
-        int NodesCreated,
-        int EdgesCreated,
-        List<string> DiffPatches,
-        string Message,
-        DateTimeOffset Timestamp
-    );
-
-    public record LLMHandlerParseRequest(
-        string Response,
-        string ResponseType,
-        Dictionary<string, object> Options
-    );
-
-    public record LLMHandlerParseResponse(
-        bool Success,
-        Dictionary<string, object> ParsedStructure,
-        string Message,
-        DateTimeOffset Timestamp
-    );
+    // Legacy record types for compatibility with other modules
+    public record LLMConfigRequest(LLMConfig Config);
 
     public record AIConceptExtractionResponse(
         string Content,
@@ -110,2742 +639,6 @@ namespace CodexBootstrap.Modules
         Dictionary<string, object> Parameters
     );
 
-    /// <summary>
-    /// AI Module - Consolidated AI functionality including concept extraction, LLM integration, scoring, and fractal transformation
-    /// </summary>
-    public class AIModule : IModule
-    {
-        private readonly Core.ILogger _logger;
-        private readonly NodeRegistry _registry;
-        private readonly ConcurrentDictionary<string, CachedAnalysis> _analysisCache;
-        private readonly ConcurrentDictionary<string, DateTimeOffset> _cacheTimestamps;
-        private readonly TimeSpan _cacheExpiration = TimeSpan.FromHours(24);
-        private readonly SemaphoreSlim _analysisSemaphore = new(10, 10);
-        private readonly ModuleCommunicationWrapper _moduleComm;
-        private readonly LLMClient _llmClient;
-
-        public AIModule(NodeRegistry registry)
-        {
-            _registry = registry;
-            _logger = new Log4NetLogger(typeof(AIModule));
-            _analysisCache = new ConcurrentDictionary<string, CachedAnalysis>();
-            _cacheTimestamps = new ConcurrentDictionary<string, DateTimeOffset>();
-            _moduleComm = new ModuleCommunicationWrapper(_logger);
-            
-            // Initialize LLM client
-            var httpClient = new HttpClient();
-            _llmClient = new LLMClient(httpClient, _logger);
-        }
-
-        public string Name => "AI Module";
-        public string Description => "Consolidated AI functionality for concept extraction, LLM integration, scoring, and fractal transformation";
-        public string Version => "1.0.0";
-
-        public Node GetModuleNode()
-        {
-            return NodeStorage.CreateModuleNode(
-                id: "ai-module",
-                name: Name,
-                version: Version,
-                description: Description,
-                capabilities: new[] { "concept-extraction", "llm-integration", "fractal-transformation", "analysis", "caching" },
-                tags: new[] { "ai", "concepts", "llm", "analysis" },
-                specReference: "codex.spec.ai"
-            );
-        }
-
-        public void Register(NodeRegistry registry)
-        {
-            registry.Upsert(GetModuleNode());
-        }
-
-        public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
-        {
-            router.Register("ai", "extract-concepts", async (JsonElement? request) => 
-            {
-                if (request == null || !request.HasValue)
-                    return new ErrorResponse("Invalid request", "MISSING_REQUEST");
-                
-                var requestObj = JsonSerializer.Deserialize<ConceptExtractionRequest>(request.Value.GetRawText());
-                if (requestObj == null)
-                    return new ErrorResponse("Invalid request format", "INVALID_REQUEST_FORMAT");
-                
-                return await ExtractConceptsAsync(requestObj);
-            });
-            router.Register("ai", "score-analysis", async (JsonElement? request) => await ScoreAnalysisAsync(request));
-            router.Register("ai", "fractal-transform", async (JsonElement? request) => await FractalTransformAsync(request));
-            router.Register("ai", "health", async (JsonElement? request) => await HealthCheckAsync(request));
-            
-            // LLM Integration endpoints
-            router.Register("ai", "llm-future-query", async (JsonElement? request) => await LLMFutureQueryAsync(request));
-            router.Register("ai", "llm-translate", async (JsonElement? request) => await LLMTranslateConceptAsync(request));
-            router.Register("ai", "llm-config", async (JsonElement? request) => await LLMConfigCreateAsync(request));
-            router.Register("ai", "llm-configs", async (JsonElement? request) => await LLMConfigsGetAsync(request));
-            router.Register("ai", "llm-handler-convert", async (JsonElement? request) => await LLMHandlerConvertAsync(request));
-            router.Register("ai", "llm-handler-parse", async (JsonElement? request) => await LLMHandlerParseAsync(request));
-        }
-
-        public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
-        {
-            // HTTP endpoints are registered via ApiRoute attributes
-        }
-
-        #region API Endpoints with Proper Error Handling
-
-        [Post("/ai/extract-concepts", "Extract Concepts", "Extract concepts from content using advanced AI analysis", "ai-analysis")]
-        public async Task<object> ExtractConceptsAsync([ApiParameter("request", "Concept extraction request", Required = true, Location = "body")] ConceptExtractionRequest requestObj)
-        {
-            try
-            {
-                if (requestObj == null)
-                {
-                    _logger.Warn("ExtractConceptsAsync called with null request");
-                    return CreateErrorResponse("Invalid request", "MISSING_REQUEST");
-                }
-
-                _logger.Info($"Extracting concepts from content: {requestObj.Title}");
-
-                var analysis = await PerformConceptExtraction(requestObj);
-
-                // Store analysis as Water node
-                var analysisNode = new Node(
-                    Id: $"concept-analysis-{analysis.Id}",
-                    TypeId: "codex.ai.concept-analysis",
-                    State: ContentState.Water,
-                    Locale: "en-US",
-                    Title: $"Concept Analysis: {requestObj.Title}",
-                    Description: $"AI-generated concept analysis for {requestObj.Title}",
-                    Content: new ContentRef(
-                        MediaType: "application/json",
-                        InlineJson: JsonSerializer.Serialize(analysis),
-                        InlineBytes: null,
-                        ExternalUri: null
-                    ),
-                    Meta: new Dictionary<string, object>
-                    {
-                        ["analysisId"] = analysis.Id,
-                        ["analysisType"] = "concept-extraction",
-                        ["processedAt"] = analysis.ExtractedAt,
-                        ["conceptCount"] = analysis.Concepts.Count,
-                        ["confidence"] = analysis.Confidence
-                    }
-                );
-
-                _registry.Upsert(analysisNode);
-
-                return new
-                {
-                    success = true,
-                    analysisId = analysis.Id,
-                    concepts = analysis.Concepts,
-                    confidence = analysis.Confidence,
-                    ontologyLevels = analysis.OntologyLevels,
-                    message = "Concept extraction completed successfully"
-                };
-            }
-            catch (JsonException ex)
-            {
-                _logger.Error($"JSON deserialization error in ExtractConceptsAsync: {ex.Message}", ex);
-                return CreateErrorResponse("Invalid JSON format", "JSON_DESERIALIZATION_ERROR");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Unexpected error in ExtractConceptsAsync: {ex.Message}", ex);
-                return CreateErrorResponse("Internal server error during concept extraction", "INTERNAL_ERROR");
-            }
-        }
-
-        [Post("/ai/score-analysis", "Score Analysis", "Perform scoring analysis on concept analysis", "ai-analysis")]
-        public async Task<object> ScoreAnalysisAsync(JsonElement? request)
-        {
-            try
-            {
-                if (request == null || !request.HasValue)
-                {
-                    _logger.Warn("ScoreAnalysisAsync called with null or empty request");
-                    return CreateErrorResponse("Invalid request", "MISSING_REQUEST");
-                }
-
-                var requestObj = JsonSerializer.Deserialize<ScoringAnalysisRequest>(request.Value.GetRawText());
-                if (requestObj == null)
-                {
-                    _logger.Warn("Failed to deserialize ScoringAnalysisRequest");
-                    return CreateErrorResponse("Invalid request format", "INVALID_REQUEST_FORMAT");
-                }
-
-                _logger.Info($"Scoring analysis for content: {requestObj.Content?.Title ?? "Unknown"}");
-
-                var scoring = await PerformScoringAnalysis(requestObj.ConceptAnalysis, requestObj.Content);
-
-                // Store scoring as Water node
-                var scoringNode = new Node(
-                    Id: $"scoring-analysis-{scoring.Id}",
-                    TypeId: "codex.ai.scoring-analysis",
-                    State: ContentState.Water,
-                    Locale: "en-US",
-                    Title: $"Scoring Analysis: {requestObj.Content?.Title ?? "Unknown"}",
-                    Description: $"AI-generated scoring analysis",
-                    Content: new ContentRef(
-                        MediaType: "application/json",
-                        InlineJson: JsonSerializer.Serialize(scoring),
-                        InlineBytes: null,
-                        ExternalUri: null
-                    ),
-                    Meta: new Dictionary<string, object>
-                    {
-                        ["scoringId"] = scoring.Id,
-                        ["analysisType"] = "scoring-analysis",
-                        ["processedAt"] = scoring.ScoredAt,
-                        ["abundanceScore"] = scoring.AbundanceScore,
-                        ["consciousnessScore"] = scoring.ConsciousnessScore,
-                        ["unityScore"] = scoring.UnityScore
-                    }
-                );
-
-                _registry.Upsert(scoringNode);
-
-                return new
-                {
-                    success = true,
-                    scoringId = scoring.Id,
-                    abundanceScore = scoring.AbundanceScore,
-                    consciousnessScore = scoring.ConsciousnessScore,
-                    unityScore = scoring.UnityScore,
-                    overallScore = scoring.OverallScore,
-                    message = "Scoring analysis completed successfully"
-                };
-            }
-            catch (JsonException ex)
-            {
-                _logger.Error($"JSON deserialization error in ScoreAnalysisAsync: {ex.Message}", ex);
-                return CreateErrorResponse("Invalid JSON format", "JSON_DESERIALIZATION_ERROR");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Unexpected error in ScoreAnalysisAsync: {ex.Message}", ex);
-                return CreateErrorResponse("Internal server error during scoring analysis", "INTERNAL_ERROR");
-            }
-        }
-
-        [Post("/ai/fractal-transform", "Fractal Transform", "Transform content using fractal analysis", "ai-analysis")]
-        public async Task<object> FractalTransformAsync(JsonElement? request)
-        {
-            try
-            {
-                if (request == null || !request.HasValue)
-                {
-                    _logger.Warn("FractalTransformAsync called with null or empty request");
-                    return CreateErrorResponse("Invalid request", "MISSING_REQUEST");
-                }
-
-                var requestObj = JsonSerializer.Deserialize<FractalTransformationRequest>(request.Value.GetRawText());
-                if (requestObj == null)
-                {
-                    _logger.Warn("Failed to deserialize FractalTransformationRequest");
-                    return CreateErrorResponse("Invalid request format", "INVALID_REQUEST_FORMAT");
-                }
-
-                _logger.Info($"Performing fractal transformation for content: {requestObj.Content?.Title ?? "Unknown"}");
-
-                var transformation = await PerformFractalTransformation(requestObj.Content, requestObj.ConceptAnalysis, requestObj.ScoringAnalysis);
-
-                // Store transformation as Water node
-                var transformationNode = new Node(
-                    Id: $"fractal-transformation-{transformation.Id}",
-                    TypeId: "codex.ai.fractal-transformation",
-                    State: ContentState.Water,
-                    Locale: "en-US",
-                    Title: $"Fractal Transformation: {requestObj.Content?.Title ?? "Unknown"}",
-                    Description: $"AI-generated fractal transformation",
-                    Content: new ContentRef(
-                        MediaType: "application/json",
-                        InlineJson: JsonSerializer.Serialize(transformation),
-                        InlineBytes: null,
-                        ExternalUri: null
-                    ),
-                    Meta: new Dictionary<string, object>
-                    {
-                        ["transformationId"] = transformation.Id,
-                        ["analysisType"] = "fractal-transformation",
-                        ["processedAt"] = transformation.TransformedAt,
-                        ["transformationType"] = transformation.TransformationType,
-                        ["consciousnessLevel"] = transformation.ConsciousnessLevel
-                    }
-                );
-
-                _registry.Upsert(transformationNode);
-
-                return new
-                {
-                    success = true,
-                    transformationId = transformation.Id,
-                    headline = transformation.Headline,
-                    beliefTranslation = transformation.BeliefSystemTranslation,
-                    summary = transformation.Summary,
-                    impactAreas = transformation.ImpactAreas,
-                    amplificationFactors = transformation.AmplificationFactors,
-                    message = "Fractal transformation completed successfully"
-                };
-            }
-            catch (JsonException ex)
-            {
-                _logger.Error($"JSON deserialization error in FractalTransformAsync: {ex.Message}", ex);
-                return CreateErrorResponse("Invalid JSON format", "JSON_DESERIALIZATION_ERROR");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Unexpected error in FractalTransformAsync: {ex.Message}", ex);
-                return CreateErrorResponse("Internal server error during fractal transformation", "INTERNAL_ERROR");
-            }
-        }
-
-        [Get("/ai/health", "AI Health", "Check AI module health", "ai-analysis")]
-        public async Task<object> HealthCheckAsync(JsonElement? request)
-        {
-            try
-            {
-                var analysisNodes = _registry.GetNodesByType("codex.ai.concept-analysis").Count();
-                var scoringNodes = _registry.GetNodesByType("codex.ai.scoring-analysis").Count();
-                var transformationNodes = _registry.GetNodesByType("codex.ai.fractal-transformation").Count();
-
-                return new
-                {
-                    success = true,
-                    status = "healthy",
-                    module = "AI Module",
-                    version = Version,
-                    statistics = new
-                    {
-                        conceptAnalyses = analysisNodes,
-                        scoringAnalyses = scoringNodes,
-                        fractalTransformations = transformationNodes,
-                        totalAnalyses = analysisNodes + scoringNodes + transformationNodes,
-                        cacheItems = _analysisCache.Count
-                    },
-                    capabilities = new[]
-                    {
-                        "concept-extraction",
-                        "scoring-analysis", 
-                        "fractal-transformation",
-                        "caching"
-                    },
-                    timestamp = DateTimeOffset.UtcNow
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Error in AI health check: {ex.Message}", ex);
-                return CreateErrorResponse("Health check failed", "HEALTH_CHECK_ERROR");
-            }
-        }
-
-        #endregion
-
-        #region LLM Integration Endpoints
-
-        [Post("/ai/llm/future/query", "LLM Future Query", "Query future knowledge using LLM", "ai-llm")]
-        public async Task<object> LLMFutureQueryAsync(JsonElement? request)
-        {
-            try
-            {
-                if (request == null || !request.HasValue)
-                {
-                    _logger.Warn("LLMFutureQueryAsync called with null or empty request");
-                    return CreateErrorResponse("Invalid request", "MISSING_REQUEST");
-                }
-
-                var requestObj = JsonSerializer.Deserialize<LLMFutureQueryRequest>(request.Value.GetRawText());
-                if (requestObj == null)
-                {
-                    _logger.Warn("Failed to deserialize LLMFutureQueryRequest");
-                    return CreateErrorResponse("Invalid request format", "INVALID_REQUEST_FORMAT");
-                }
-
-                _logger.Info($"Processing LLM future query: {requestObj.Query}");
-
-                // Check if LLM service is available
-                var isAvailable = await _llmClient.IsAvailableAsync();
-                if (!isAvailable)
-                {
-                    _logger.Warn("LLM service not available, falling back to mock response");
-                    var mockResponse = new LLMFutureQueryResponse(
-                        Id: Guid.NewGuid().ToString(),
-                        Query: requestObj.Query,
-                        Response: "LLM service not available. This is a fallback response for future query functionality.",
-                        Confidence: 0.5,
-                        Reasoning: "Generated using fallback algorithms (LLM service unavailable)",
-                        Sources: new List<string> { "Fallback patterns", "Basic analysis" },
-                        GeneratedAt: DateTimeOffset.UtcNow,
-                        UsedConfig: requestObj.LLMConfig
-                    );
-                    return new
-                    {
-                        success = true,
-                        data = mockResponse,
-                        timestamp = DateTimeOffset.UtcNow,
-                        warning = "LLM service unavailable, using fallback"
-                    };
-                }
-
-                // Create enhanced prompt for future query
-                var prompt = $@"You are an advanced AI system specializing in future knowledge and consciousness expansion. 
-Context: {requestObj.Context}
-Time Horizon: {requestObj.TimeHorizon}
-Perspective: {requestObj.Perspective}
-
-Query: {requestObj.Query}
-
-Please provide a thoughtful, consciousness-expanding response that considers future possibilities, patterns, and insights. Focus on:
-1. Potential future scenarios and trends
-2. Consciousness and awareness implications
-3. Practical applications and considerations
-4. Deeper philosophical and spiritual insights
-
-Response:";
-
-                var llmResponse = await _llmClient.QueryAsync(prompt, requestObj.LLMConfig);
-                
-                var response = new LLMFutureQueryResponse(
-                    Id: Guid.NewGuid().ToString(),
-                    Query: requestObj.Query,
-                    Response: llmResponse.Response,
-                    Confidence: llmResponse.Confidence,
-                    Reasoning: "Generated using advanced LLM with consciousness-expansion focus",
-                    Sources: new List<string> { "LLM Analysis", "Future Pattern Recognition", "Consciousness Modeling" },
-                    GeneratedAt: DateTimeOffset.UtcNow,
-                    UsedConfig: requestObj.LLMConfig
-                );
-
-                return new
-                {
-                    success = true,
-                    data = response,
-                    timestamp = DateTimeOffset.UtcNow
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Error in LLM future query: {ex.Message}", ex);
-                return CreateErrorResponse("Internal server error during LLM future query", "INTERNAL_ERROR");
-            }
-        }
-
-        [Post("/ai/llm/translate", "LLM Translate Concept", "Translate concept through belief system using LLM", "ai-llm")]
-        public async Task<object> LLMTranslateConceptAsync(JsonElement? request)
-        {
-            try
-            {
-                if (request == null || !request.HasValue)
-                {
-                    _logger.Warn("LLMTranslateConceptAsync called with null or empty request");
-                    return CreateErrorResponse("Invalid request", "MISSING_REQUEST");
-                }
-
-                var requestObj = JsonSerializer.Deserialize<LLMTranslationRequest>(request.Value.GetRawText());
-                if (requestObj == null)
-                {
-                    _logger.Warn("Failed to deserialize LLMTranslationRequest");
-                    return CreateErrorResponse("Invalid request format", "INVALID_REQUEST_FORMAT");
-                }
-
-                _logger.Info($"Processing LLM translation: {requestObj.Concept}");
-
-                // Check if LLM service is available
-                var isAvailable = await _llmClient.IsAvailableAsync();
-                if (!isAvailable)
-                {
-                    _logger.Warn("LLM service not available, falling back to mock response");
-                    var mockResponse = new LLMTranslationResponse(
-                        Id: Guid.NewGuid().ToString(),
-                        OriginalConcept: requestObj.Concept,
-                        TranslatedConcept: $"Translated: {requestObj.Concept}",
-                        SourceLanguage: requestObj.SourceLanguage,
-                        TargetLanguage: requestObj.TargetLanguage,
-                        Confidence: 0.5,
-                        Reasoning: "Generated using fallback algorithms (LLM service unavailable)",
-                        GeneratedAt: DateTimeOffset.UtcNow,
-                        UsedConfig: requestObj.LLMConfig
-                    );
-                    return new
-                    {
-                        success = true,
-                        data = mockResponse,
-                        timestamp = DateTimeOffset.UtcNow,
-                        warning = "LLM service unavailable, using fallback"
-                    };
-                }
-
-                // Create enhanced prompt for concept translation
-                var prompt = $@"You are an advanced AI system specializing in concept translation and consciousness mapping across different belief systems and languages.
-
-Original Concept: {requestObj.Concept}
-Source Language: {requestObj.SourceLanguage}
-Target Language: {requestObj.TargetLanguage}
-Context: {JsonSerializer.Serialize(requestObj.Context)}
-
-Please translate this concept while:
-1. Preserving the core meaning and consciousness-expanding potential
-2. Adapting to the target language's cultural and linguistic nuances
-3. Maintaining the spiritual and philosophical depth
-4. Ensuring the translation resonates with the target belief system
-
-Provide a thoughtful, accurate translation that honors both the original concept and the target language's unique expression.
-
-Translation:";
-
-                var llmResponse = await _llmClient.QueryAsync(prompt, requestObj.LLMConfig);
-                
-                var response = new LLMTranslationResponse(
-                    Id: Guid.NewGuid().ToString(),
-                    OriginalConcept: requestObj.Concept,
-                    TranslatedConcept: llmResponse.Response,
-                    SourceLanguage: requestObj.SourceLanguage,
-                    TargetLanguage: requestObj.TargetLanguage,
-                    Confidence: llmResponse.Confidence,
-                    Reasoning: "Generated using advanced LLM with consciousness-preserving translation focus",
-                    GeneratedAt: DateTimeOffset.UtcNow,
-                    UsedConfig: requestObj.LLMConfig
-                );
-
-                return new
-                {
-                    success = true,
-                    data = response,
-                    timestamp = DateTimeOffset.UtcNow
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Error in LLM translation: {ex.Message}", ex);
-                return CreateErrorResponse("Internal server error during LLM translation", "INTERNAL_ERROR");
-            }
-        }
-
-        [Post("/ai/llm/config", "LLM Config Create", "Create or update LLM configuration", "ai-llm")]
-        public async Task<object> LLMConfigCreateAsync(JsonElement? request)
-        {
-            try
-            {
-                if (request == null || !request.HasValue)
-                {
-                    _logger.Warn("LLMConfigCreateAsync called with null or empty request");
-                    return CreateErrorResponse("Invalid request", "MISSING_REQUEST");
-                }
-
-                var requestObj = JsonSerializer.Deserialize<LLMConfigRequest>(request.Value.GetRawText());
-                if (requestObj == null)
-                {
-                    _logger.Warn("Failed to deserialize LLMConfigRequest");
-                    return CreateErrorResponse("Invalid request format", "INVALID_REQUEST_FORMAT");
-                }
-
-                _logger.Info($"Creating/updating LLM config: {requestObj.Config.Name}");
-
-                // TODO: Implement actual LLM config storage logic
-                var response = new LLMConfigResponse(
-                    Success: true,
-                    Config: requestObj.Config,
-                    Message: "LLM configuration created/updated successfully",
-                    Timestamp: DateTimeOffset.UtcNow
-                );
-
-                return new
-                {
-                    success = true,
-                    data = response,
-                    timestamp = DateTimeOffset.UtcNow
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Error in LLM config creation: {ex.Message}", ex);
-                return CreateErrorResponse("Internal server error during LLM config creation", "INTERNAL_ERROR");
-            }
-        }
-
-        [Get("/ai/llm/configs", "LLM Configs", "Get all LLM configurations", "ai-llm")]
-        public async Task<object> LLMConfigsGetAsync(JsonElement? request)
-        {
-            try
-            {
-                _logger.Info("Retrieving all LLM configurations");
-
-                // TODO: Implement actual LLM config retrieval logic
-                var configs = new List<LLMConfig>
-                {
-                    new LLMConfig(
-                        Id: "openai-gpt4",
-                        Name: "OpenAI GPT-4",
-                        Provider: "OpenAI",
-                        Model: "gpt-4",
-                        ApiKey: "sk-***",
-                        BaseUrl: "https://api.openai.com/v1",
-                        MaxTokens: 2000,
-                        Temperature: 0.7,
-                        TopP: 0.9,
-                        Parameters: new Dictionary<string, object>()
-                    )
-                };
-
-                return new
-                {
-                    success = true,
-                    data = new
-                    {
-                        configs = configs,
-                        totalCount = configs.Count
-                    },
-                    timestamp = DateTimeOffset.UtcNow
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Error retrieving LLM configs: {ex.Message}", ex);
-                return CreateErrorResponse("Internal server error during LLM config retrieval", "INTERNAL_ERROR");
-            }
-        }
-
-        [Post("/ai/llm/handler/convert", "LLM Handler Convert", "Convert LLM response to nodes and edges", "ai-llm")]
-        public async Task<object> LLMHandlerConvertAsync(JsonElement? request)
-        {
-            try
-            {
-                if (request == null || !request.HasValue)
-                {
-                    _logger.Warn("LLMHandlerConvertAsync called with null or empty request");
-                    return CreateErrorResponse("Invalid request", "MISSING_REQUEST");
-                }
-
-                var requestObj = JsonSerializer.Deserialize<LLMHandlerConversionRequest>(request.Value.GetRawText());
-                if (requestObj == null)
-                {
-                    _logger.Warn("Failed to deserialize LLMHandlerConversionRequest");
-                    return CreateErrorResponse("Invalid request format", "INVALID_REQUEST_FORMAT");
-                }
-
-                _logger.Info($"Converting LLM response to nodes and edges");
-
-                // TODO: Implement actual LLM response conversion logic
-                var response = new LLMHandlerConversionResponse(
-                    Success: true,
-                    NodesCreated: 5,
-                    EdgesCreated: 8,
-                    DiffPatches: new List<string> { "patch1", "patch2" },
-                    Message: "LLM response successfully converted to nodes and edges",
-                    Timestamp: DateTimeOffset.UtcNow
-                );
-
-                return new
-                {
-                    success = true,
-                    data = response,
-                    timestamp = DateTimeOffset.UtcNow
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Error in LLM handler conversion: {ex.Message}", ex);
-                return CreateErrorResponse("Internal server error during LLM handler conversion", "INTERNAL_ERROR");
-            }
-        }
-
-        [Post("/ai/llm/handler/parse", "LLM Handler Parse", "Parse LLM response structure", "ai-llm")]
-        public async Task<object> LLMHandlerParseAsync(JsonElement? request)
-        {
-            try
-            {
-                if (request == null || !request.HasValue)
-                {
-                    _logger.Warn("LLMHandlerParseAsync called with null or empty request");
-                    return CreateErrorResponse("Invalid request", "MISSING_REQUEST");
-                }
-
-                var requestObj = JsonSerializer.Deserialize<LLMHandlerParseRequest>(request.Value.GetRawText());
-                if (requestObj == null)
-                {
-                    _logger.Warn("Failed to deserialize LLMHandlerParseRequest");
-                    return CreateErrorResponse("Invalid request format", "INVALID_REQUEST_FORMAT");
-                }
-
-                _logger.Info($"Parsing LLM response structure");
-
-                // TODO: Implement actual LLM response parsing logic
-                var response = new LLMHandlerParseResponse(
-                    Success: true,
-                    ParsedStructure: new Dictionary<string, object>
-                    {
-                        ["entities"] = new[] { "entity1", "entity2" },
-                        ["relationships"] = new[] { "rel1", "rel2" },
-                        ["concepts"] = new[] { "concept1", "concept2" }
-                    },
-                    Message: "LLM response structure parsed successfully",
-                    Timestamp: DateTimeOffset.UtcNow
-                );
-
-                return new
-                {
-                    success = true,
-                    data = response,
-                    timestamp = DateTimeOffset.UtcNow
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Error in LLM handler parsing: {ex.Message}", ex);
-                return CreateErrorResponse("Internal server error during LLM handler parsing", "INTERNAL_ERROR");
-            }
-        }
-
-        #endregion
-
-        #region Private Implementation Methods
-
-        private async Task<ConceptAnalysis> PerformConceptExtraction(ConceptExtractionRequest request)
-        {
-            var cacheKey = $"concept-{request.Title.GetHashCode()}-{request.Content.GetHashCode()}";
-            
-            // Check cache first
-            if (TryGetCachedAnalysis<ConceptAnalysis>(cacheKey, out var cachedAnalysis))
-            {
-                _logger.Debug($"Using cached concept analysis for {request.Title}");
-                return cachedAnalysis;
-            }
-
-            await _analysisSemaphore.WaitAsync();
-            try
-            {
-                // Double-check cache after acquiring semaphore
-                if (TryGetCachedAnalysis<ConceptAnalysis>(cacheKey, out cachedAnalysis))
-                {
-                    return cachedAnalysis;
-                }
-
-                _logger.Info($"Performing concept extraction for: {request.Title}");
-
-                // Sophisticated concept extraction algorithm
-                var analysis = await ExtractConceptsWithAdvancedAlgorithm(request);
-
-                // Cache the result
-                CacheAnalysis(cacheKey, analysis);
-
-                _logger.Info($"Concept extraction completed for {request.Title}: {analysis.Concepts.Count} concepts found");
-                return analysis;
-            }
-            finally
-            {
-                _analysisSemaphore.Release();
-            }
-        }
-
-        private async Task<ConceptAnalysis> ExtractConceptsWithAdvancedAlgorithm(ConceptExtractionRequest request)
-        {
-            var content = $"{request.Title} {request.Content}";
-            var concepts = new List<ConceptScore>();
-            var confidence = 0.0;
-
-            try
-            {
-                // Get optimal LLM configuration for concept extraction
-                var optimalConfig = LLMConfigurationSystem.GetOptimalConfiguration("concept-extraction");
-                
-                // Ensure the model is available before use
-                var modelAvailable = await LLMConfigurationSystem.ModelManager.EnsureModelAvailableAsync(optimalConfig.Model);
-                if (!modelAvailable)
-                {
-                    _logger.Error($"Model {optimalConfig.Model} is not available and could not be pulled");
-                    // Fallback to keyword-based extraction
-                    concepts = ExtractConceptsByKeywords(content.ToLower(), request);
-                    confidence = 0.5;
-                }
-                else
-                {
-                    // Build sophisticated concept extraction prompt
-                    var prompt = BuildConceptExtractionPrompt(request, optimalConfig);
-                    
-                    // Convert LLMConfigurationSystem.LLMConfiguration to LLMConfig
-                    var llmConfig = new LLMConfig(
-                        Id: optimalConfig.Id,
-                        Name: optimalConfig.Id,
-                        Provider: optimalConfig.Provider,
-                        Model: optimalConfig.Model,
-                        ApiKey: "",
-                        BaseUrl: "http://localhost:11434",
-                        MaxTokens: optimalConfig.MaxTokens,
-                        Temperature: optimalConfig.Temperature,
-                        TopP: optimalConfig.TopP,
-                        Parameters: optimalConfig.Parameters
-                    );
-                    
-                    // Call LLM with real Ollama integration
-                    var llmResponse = await CallLLM(llmConfig, prompt);
-                    
-                    if (llmResponse.Content.Contains("LLM unavailable"))
-                    {
-                        // Fallback to keyword-based extraction
-                        _logger.Warn("LLM unavailable, falling back to keyword-based concept extraction");
-                        concepts = ExtractConceptsByKeywords(content.ToLower(), request);
-                        confidence = 0.6; // Lower confidence for fallback
-                    }
-                    else
-                    {
-                        // Parse LLM response for concepts
-                        concepts = ParseLLMConceptResponse(llmResponse.Content);
-                        confidence = llmResponse.Confidence;
-                    }
-                }
-
-                // Layer 1: AI-powered semantic pattern extraction
-                var semanticConcepts = await ExtractConceptsBySemanticPatterns(content, request);
-                concepts.AddRange(semanticConcepts);
-
-                // Layer 2: Context-aware extraction
-                var contextConcepts = await ExtractConceptsByContext(content, request);
-                concepts.AddRange(contextConcepts);
-
-                // Layer 3: Ontology-based extraction
-                var ontologyConcepts = await ExtractConceptsByOntology(content, request);
-                concepts.AddRange(ontologyConcepts);
-
-                // Layer 4: Keyword-based extraction as backup
-                var keywordConcepts = ExtractConceptsByKeywords(content.ToLower(), request);
-                concepts.AddRange(keywordConcepts);
-
-                // Deduplicate and merge similar concepts
-                concepts = await MergeSimilarConcepts(concepts);
-
-                // Calculate final confidence
-                confidence = Math.Max(confidence, await CalculateConfidence(concepts, content, request));
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Error in concept extraction: {ex.Message}", ex);
-                // Fallback to keyword-based extraction
-                concepts = ExtractConceptsByKeywords(content.ToLower(), request);
-                confidence = 0.5;
-            }
-
-            return new ConceptAnalysis
-            {
-                Id = $"concept-{Guid.NewGuid():N}",
-                NewsItemId = request.Title, // Using title as identifier for now
-                Concepts = concepts.Select(c => c.Concept).ToList(),
-                Confidence = confidence,
-                OntologyLevels = DetermineOntologyLevels(concepts.Select(c => c.Concept).ToList()),
-                ExtractedAt = DateTimeOffset.UtcNow,
-                Metadata = new Dictionary<string, object>
-                {
-                    ["extractionMethod"] = "advanced-multi-layer",
-                    ["sourceLength"] = content.Length,
-                    ["conceptScores"] = concepts.GroupBy(c => c.Concept).ToDictionary(g => g.Key, g => g.Average(c => c.Score)),
-                    ["extractionLayers"] = new[] { "keywords", "semantic", "context", "ontology" },
-                    ["processingTime"] = DateTimeOffset.UtcNow
-                }
-            };
-        }
-
-        private async Task<ScoringAnalysis> PerformScoringAnalysis(ConceptAnalysis conceptAnalysis, ConceptExtractionRequest content)
-        {
-            // TODO: Implement sophisticated scoring analysis
-            return new ScoringAnalysis
-            {
-                Id = $"scoring-{Guid.NewGuid():N}",
-                NewsItemId = content.Title,
-                ConceptAnalysisId = conceptAnalysis.Id,
-                AbundanceScore = 0.5,
-                ConsciousnessScore = 0.5,
-                UnityScore = 0.5,
-                OverallScore = 0.5,
-                ScoredAt = DateTimeOffset.UtcNow,
-                Metadata = new Dictionary<string, object>()
-            };
-        }
-
-        private async Task<FractalTransformation> PerformFractalTransformation(ConceptExtractionRequest content, ConceptAnalysis conceptAnalysis, ScoringAnalysis scoringAnalysis)
-        {
-            _logger.Info($"Performing sophisticated fractal transformation for: {content.Title}");
-            
-            // Analyze content for fractal patterns
-            var fractalPatterns = AnalyzeFractalPatterns(content.Content, conceptAnalysis);
-            
-            // Calculate consciousness level based on content analysis
-            var consciousnessLevel = CalculateConsciousnessLevel(content, conceptAnalysis, scoringAnalysis);
-            
-            // Generate belief system translation
-            var beliefSystemTranslation = await GenerateBeliefSystemTranslation(content, conceptAnalysis, fractalPatterns);
-            
-            // Identify impact areas based on fractal analysis
-            var impactAreas = IdentifyImpactAreas(fractalPatterns, conceptAnalysis);
-            
-            // Calculate amplification factors
-            var amplificationFactors = CalculateAmplificationFactors(fractalPatterns, scoringAnalysis);
-            
-            // Generate resonance data
-            var resonanceData = GenerateResonanceData(fractalPatterns, conceptAnalysis);
-            
-            // Determine transformation type
-            var transformationType = DetermineTransformationType(fractalPatterns, consciousnessLevel);
-            
-            return new FractalTransformation
-            {
-                Id = $"fractal-{Guid.NewGuid():N}",
-                NewsItemId = content.Title,
-                Headline = content.Title,
-                BeliefSystemTranslation = beliefSystemTranslation,
-                Summary = GenerateFractalSummary(content, fractalPatterns, consciousnessLevel),
-                ImpactAreas = impactAreas,
-                AmplificationFactors = amplificationFactors,
-                ResonanceData = resonanceData,
-                TransformationType = transformationType,
-                ConsciousnessLevel = consciousnessLevel,
-                TransformedAt = DateTimeOffset.UtcNow,
-                Metadata = new Dictionary<string, object>
-                {
-                    ["fractalPatterns"] = fractalPatterns,
-                    ["originalConcepts"] = conceptAnalysis.Concepts,
-                    ["confidence"] = conceptAnalysis.Confidence,
-                    ["scoring"] = new Dictionary<string, double>
-                    {
-                        ["abundance"] = scoringAnalysis.AbundanceScore,
-                        ["consciousness"] = scoringAnalysis.ConsciousnessScore,
-                        ["unity"] = scoringAnalysis.UnityScore,
-                        ["overall"] = scoringAnalysis.OverallScore
-                    },
-                    ["transformationComplexity"] = CalculateTransformationComplexity(fractalPatterns)
-                }
-            };
-        }
-
-        // Helper methods for fractal transformation
-        private Dictionary<string, object> AnalyzeFractalPatterns(string content, ConceptAnalysis conceptAnalysis)
-        {
-            var patterns = new Dictionary<string, object>();
-            
-            // Analyze recursive patterns in content
-            var recursiveDepth = AnalyzeRecursiveDepth(content);
-            patterns["recursiveDepth"] = recursiveDepth;
-            
-            // Identify self-similar structures
-            var selfSimilarity = CalculateSelfSimilarity(content);
-            patterns["selfSimilarity"] = selfSimilarity;
-            
-            // Analyze consciousness expansion patterns
-            var consciousnessPatterns = AnalyzeConsciousnessPatterns(content, conceptAnalysis);
-            patterns["consciousnessPatterns"] = consciousnessPatterns;
-            
-            // Calculate fractal dimension
-            var fractalDimension = CalculateFractalDimension(content);
-            patterns["fractalDimension"] = fractalDimension;
-            
-            // Identify resonance frequencies
-            var resonanceFrequencies = CalculateResonanceFrequencies(content);
-            patterns["resonanceFrequencies"] = resonanceFrequencies;
-            
-            return patterns;
-        }
-        
-        private string CalculateConsciousnessLevel(ConceptExtractionRequest content, ConceptAnalysis conceptAnalysis, ScoringAnalysis scoringAnalysis)
-        {
-            var consciousnessKeywords = new[] { "love", "unity", "consciousness", "awareness", "spiritual", "divine", "sacred", "enlightenment", "wisdom", "compassion" };
-            var contentLower = content.Content.ToLower();
-            
-            var consciousnessScore = consciousnessKeywords.Sum(keyword => 
-                contentLower.Split(' ').Count(word => word.Contains(keyword))) / (double)consciousnessKeywords.Length;
-            
-            var conceptScore = conceptAnalysis.Concepts.Count(c => 
-                consciousnessKeywords.Any(k => c.ToLower().Contains(k))) / (double)Math.Max(conceptAnalysis.Concepts.Count, 1);
-            
-            var totalScore = (consciousnessScore + conceptScore + scoringAnalysis.OverallScore) / 3.0;
-            
-            return totalScore switch
-            {
-                >= 0.8 => "L7", // Transcendent
-                >= 0.6 => "L6", // Universal
-                >= 0.4 => "L5", // Cosmic
-                >= 0.2 => "L4", // Planetary
-                _ => "L3"        // Personal
-            };
-        }
-        
-        private async Task<string> GenerateBeliefSystemTranslation(ConceptExtractionRequest content, ConceptAnalysis conceptAnalysis, Dictionary<string, object> fractalPatterns)
-        {
-            // Create a consciousness-expanding translation
-            var translation = $"In the infinite dance of consciousness, this content reveals: {content.Title}\n\n";
-            
-            translation += $"Fractal patterns emerge at depth {fractalPatterns["recursiveDepth"]}, ";
-            translation += $"showing self-similarity of {fractalPatterns["selfSimilarity"]:F2}.\n\n";
-            
-            translation += $"The concepts {string.Join(", ", conceptAnalysis.Concepts.Take(5))} ";
-            translation += $"resonate with consciousness level {CalculateConsciousnessLevel(content, conceptAnalysis, new ScoringAnalysis())}.\n\n";
-            
-            translation += "This transformation invites us to see beyond the surface, ";
-            translation += "recognizing the sacred geometry of existence that connects all things.";
-            
-            return translation;
-        }
-        
-        private string[] IdentifyImpactAreas(Dictionary<string, object> fractalPatterns, ConceptAnalysis conceptAnalysis)
-        {
-            var areas = new List<string>();
-            
-            if ((double)fractalPatterns["recursiveDepth"] > 3)
-                areas.Add("deep-consciousness");
-            
-            if ((double)fractalPatterns["selfSimilarity"] > 0.7)
-                areas.Add("unity-awareness");
-            
-            if (conceptAnalysis.Concepts.Any(c => c.ToLower().Contains("love")))
-                areas.Add("heart-opening");
-            
-            if (conceptAnalysis.Concepts.Any(c => c.ToLower().Contains("wisdom")))
-                areas.Add("knowledge-integration");
-            
-            if (conceptAnalysis.Concepts.Any(c => c.ToLower().Contains("spiritual")))
-                areas.Add("soul-evolution");
-            
-            return areas.ToArray();
-        }
-        
-        private Dictionary<string, double> CalculateAmplificationFactors(Dictionary<string, object> fractalPatterns, ScoringAnalysis scoringAnalysis)
-        {
-            var factors = new Dictionary<string, double>();
-            
-            // Resonance amplification based on fractal patterns
-            factors["resonance"] = Math.Min((double)fractalPatterns["selfSimilarity"] * 2.0, 1.0);
-            
-            // Consciousness amplification
-            factors["consciousness"] = scoringAnalysis.OverallScore;
-            
-            // Unity amplification
-            factors["unity"] = (double)fractalPatterns["recursiveDepth"] / 10.0;
-            
-            // Love amplification
-            factors["love"] = scoringAnalysis.UnityScore;
-            
-            return factors;
-        }
-        
-        private Dictionary<string, object> GenerateResonanceData(Dictionary<string, object> fractalPatterns, ConceptAnalysis conceptAnalysis)
-        {
-            return new Dictionary<string, object>
-            {
-                ["fractalDimension"] = fractalPatterns["fractalDimension"],
-                ["resonanceFrequencies"] = fractalPatterns["resonanceFrequencies"],
-                ["conceptResonance"] = conceptAnalysis.Concepts.ToDictionary(c => c, c => Math.Sin(c.GetHashCode())),
-                ["consciousnessResonance"] = CalculateConsciousnessResonance(conceptAnalysis)
-            };
-        }
-        
-        private string DetermineTransformationType(Dictionary<string, object> fractalPatterns, string consciousnessLevel)
-        {
-            var depth = (double)fractalPatterns["recursiveDepth"];
-            var similarity = (double)fractalPatterns["selfSimilarity"];
-            
-            return (depth, similarity, consciousnessLevel) switch
-            {
-                (>= 5, >= 0.8, "L7") => "transcendent-unity",
-                (>= 4, >= 0.6, "L6") => "universal-consciousness",
-                (>= 3, >= 0.4, "L5") => "cosmic-awareness",
-                (>= 2, >= 0.2, "L4") => "planetary-evolution",
-                _ => "personal-growth"
-            };
-        }
-        
-        private string GenerateFractalSummary(ConceptExtractionRequest content, Dictionary<string, object> fractalPatterns, string consciousnessLevel)
-        {
-            return $"Fractal transformation reveals {fractalPatterns["recursiveDepth"]} levels of recursive depth, " +
-                   $"with {fractalPatterns["selfSimilarity"]:P} self-similarity, " +
-                   $"elevating consciousness to {consciousnessLevel} level. " +
-                   $"This content becomes a sacred mirror reflecting the infinite patterns of existence.";
-        }
-        
-        private double CalculateTransformationComplexity(Dictionary<string, object> fractalPatterns)
-        {
-            var depth = (double)fractalPatterns["recursiveDepth"];
-            var similarity = (double)fractalPatterns["selfSimilarity"];
-            var dimension = (double)fractalPatterns["fractalDimension"];
-            
-            return (depth * similarity * dimension) / 10.0;
-        }
-        
-        // Helper methods for fractal analysis
-        private int AnalyzeRecursiveDepth(string content)
-        {
-            // Simple recursive depth analysis based on nested structures
-            var depth = 0;
-            var maxDepth = 0;
-            
-            foreach (var c in content)
-            {
-                if (c == '(' || c == '[' || c == '{')
-                {
-                    depth++;
-                    maxDepth = Math.Max(maxDepth, depth);
-                }
-                else if (c == ')' || c == ']' || c == '}')
-                {
-                    depth--;
-                }
-            }
-            
-            return Math.Max(maxDepth, 1);
-        }
-        
-        private double CalculateSelfSimilarity(string content)
-        {
-            // Calculate self-similarity based on repeated patterns
-            var words = content.ToLower().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            var wordCounts = words.GroupBy(w => w).ToDictionary(g => g.Key, g => g.Count());
-            
-            if (wordCounts.Count == 0) return 0.0;
-            
-            var totalWords = words.Length;
-            var uniqueWords = wordCounts.Count;
-            var repetitionScore = wordCounts.Values.Sum(count => count * (count - 1)) / (double)(totalWords * (totalWords - 1));
-            
-            return Math.Min(repetitionScore, 1.0);
-        }
-        
-        private Dictionary<string, object> AnalyzeConsciousnessPatterns(string content, ConceptAnalysis conceptAnalysis)
-        {
-            var patterns = new Dictionary<string, object>();
-            
-            var consciousnessWords = new[] { "consciousness", "awareness", "mind", "soul", "spirit", "divine", "sacred" };
-            var contentLower = content.ToLower();
-            
-            patterns["consciousnessDensity"] = consciousnessWords.Sum(word => 
-                contentLower.Split(' ').Count(w => w.Contains(word))) / (double)consciousnessWords.Length;
-            
-            patterns["conceptConsciousness"] = conceptAnalysis.Concepts.Count(c => 
-                consciousnessWords.Any(w => c.ToLower().Contains(w))) / (double)Math.Max(conceptAnalysis.Concepts.Count, 1);
-            
-            return patterns;
-        }
-        
-        private double CalculateFractalDimension(string content)
-        {
-            // Simplified fractal dimension calculation
-            var words = content.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            var uniqueWords = words.Distinct().Count();
-            var totalWords = words.Length;
-            
-            if (totalWords == 0) return 0.0;
-            
-            return Math.Log(uniqueWords) / Math.Log(totalWords);
-        }
-        
-        private double[] CalculateResonanceFrequencies(string content)
-        {
-            // Calculate resonance frequencies based on character patterns
-            var frequencies = new double[7]; // 7 chakra frequencies
-            
-            for (int i = 0; i < content.Length; i++)
-            {
-                var charValue = (int)content[i];
-                var frequency = (charValue % 7);
-                frequencies[frequency] += 1.0;
-            }
-            
-            var total = frequencies.Sum();
-            return total > 0 ? frequencies.Select(f => f / total).ToArray() : frequencies;
-        }
-        
-        private Dictionary<string, double> CalculateConsciousnessResonance(ConceptAnalysis conceptAnalysis)
-        {
-            var resonance = new Dictionary<string, double>();
-            
-            foreach (var concept in conceptAnalysis.Concepts)
-            {
-                var hash = concept.GetHashCode();
-                var frequency = Math.Abs(Math.Sin(hash)) * 1000; // Convert to Hz range
-                resonance[concept] = frequency;
-            }
-            
-            return resonance;
-        }
-
-        // Helper methods for concept extraction
-        private List<ConceptScore> ExtractConceptsByKeywords(string content, ConceptExtractionRequest request)
-        {
-            var keywords = new Dictionary<string, double>
-            {
-                ["consciousness"] = 0.9,
-                ["unity"] = 0.8,
-                ["abundance"] = 0.7,
-                ["collaboration"] = 0.6,
-                ["innovation"] = 0.5
-            };
-
-            var concepts = new List<ConceptScore>();
-            foreach (var keyword in keywords)
-            {
-                if (content.Contains(keyword.Key))
-                {
-                    concepts.Add(new ConceptScore { Concept = keyword.Key, Score = keyword.Value });
-                }
-            }
-
-            return concepts;
-        }
-
-        private async Task<List<ConceptScore>> ExtractConceptsBySemanticPatterns(string content, ConceptExtractionRequest request)
-        {
-            var concepts = new List<ConceptScore>();
-            
-            try
-            {
-                // Get optimal LLM configuration for semantic analysis
-                var optimalConfig = LLMConfigurationSystem.GetOptimalConfiguration("concept-extraction");
-                var modelAvailable = await LLMConfigurationSystem.ModelManager.EnsureModelAvailableAsync(optimalConfig.Model);
-                
-                if (modelAvailable)
-                {
-                    // Use AI for advanced semantic pattern recognition
-                    var llmConfig = new LLMConfig(
-                        Id: optimalConfig.Id,
-                        Name: optimalConfig.Id,
-                        Provider: optimalConfig.Provider,
-                        Model: optimalConfig.Model,
-                        ApiKey: "",
-                        BaseUrl: "http://localhost:11434",
-                        MaxTokens: 1000,
-                        Temperature: 0.3, // Lower temperature for more consistent results
-                        TopP: 0.9,
-                        Parameters: new Dictionary<string, object>
-                        {
-                            ["stop"] = new[] { "---", "###" }
-                        }
-                    );
-
-                    var semanticPrompt = $@"Analyze the following text for consciousness-related concepts and semantic patterns. 
-Focus on identifying concepts related to: consciousness, transformation, unity, love, wisdom, energy, healing, abundance, sacred geometry, and fractal patterns.
-
-Text: ""{content}""
-
-Return your analysis as a JSON array of concepts with the following structure:
-[
-  {{
-    ""concept"": ""concept_name"",
-    ""score"": 0.0-1.0,
-    ""description"": ""brief description"",
-    ""category"": ""consciousness|transformation|unity|love|wisdom|energy|healing|abundance|sacred|fractal"",
-    ""confidence"": 0.0-1.0,
-    ""semanticPatterns"": [""pattern1"", ""pattern2""]
-  }}
-]
-
-Be thorough but concise. Focus on the most significant concepts with high confidence scores.";
-
-                    var llmResponse = await CallLLMAsync(semanticPrompt, llmConfig);
-                    
-                    if (!llmResponse.Content.Contains("LLM unavailable"))
-                    {
-                        // Parse AI response
-                        var aiConcepts = ParseLLMConceptResponse(llmResponse.Content);
-                        concepts.AddRange(aiConcepts);
-                        _logger.Info($"AI semantic analysis found {aiConcepts.Count} concepts");
-                    }
-                    else
-                    {
-                        _logger.Warn("AI semantic analysis failed, falling back to pattern matching");
-                        concepts.AddRange(ExtractConceptsByPatternMatching(content));
-                    }
-                }
-                else
-                {
-                    _logger.Warn("LLM not available for semantic analysis, using pattern matching");
-                    concepts.AddRange(ExtractConceptsByPatternMatching(content));
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Error in AI semantic pattern extraction: {ex.Message}", ex);
-                concepts.AddRange(ExtractConceptsByPatternMatching(content));
-            }
-
-            return concepts;
-        }
-
-        private List<ConceptScore> ExtractConceptsByPatternMatching(string content)
-        {
-            var concepts = new List<ConceptScore>();
-            
-            // Define semantic patterns for consciousness-related concepts
-            var semanticPatterns = new Dictionary<string, (string pattern, double weight, string category)>
-            {
-                // Consciousness and awareness patterns
-                { "consciousness", (@"\b(consciousness|awareness|mindfulness|presence|awakening)\b", 0.9, "consciousness") },
-                { "transformation", (@"\b(transformation|evolution|growth|change|shift|breakthrough)\b", 0.85, "transformation") },
-                { "unity", (@"\b(unity|oneness|connection|wholeness|integration|harmony)\b", 0.8, "unity") },
-                { "love", (@"\b(love|compassion|empathy|kindness|heart|unconditional)\b", 0.8, "love") },
-                { "wisdom", (@"\b(wisdom|knowledge|insight|understanding|clarity|enlightenment)\b", 0.75, "wisdom") },
-                { "energy", (@"\b(energy|vibration|frequency|resonance|flow|chi|prana)\b", 0.7, "energy") },
-                { "healing", (@"\b(healing|recovery|restoration|wholeness|wellness|balance)\b", 0.7, "healing") },
-                { "abundance", (@"\b(abundance|prosperity|wealth|success|fulfillment|manifestation)\b", 0.65, "abundance") },
-                { "sacred", (@"\b(sacred|divine|holy|spiritual|transcendent|mystical)\b", 0.8, "sacred") },
-                { "fractal", (@"\b(fractal|pattern|geometry|structure|design|blueprint)\b", 0.6, "fractal") }
-            };
-
-            // Apply semantic pattern matching
-            foreach (var pattern in semanticPatterns)
-            {
-                var matches = System.Text.RegularExpressions.Regex.Matches(content, pattern.Value.pattern, 
-                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                
-                if (matches.Count > 0)
-                {
-                    var concept = new ConceptScore
-                    {
-                        Concept = pattern.Key,
-                        Score = pattern.Value.weight * Math.Min(matches.Count / 3.0, 1.0), // Scale by frequency
-                        Description = $"Semantic pattern match for {pattern.Key}",
-                        Category = pattern.Value.category,
-                        Confidence = Math.Min(matches.Count * 0.1, 0.9)
-                    };
-                    concepts.Add(concept);
-                }
-            }
-
-            // Extract compound concepts using n-grams
-            var words = content.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            for (int i = 0; i < words.Length - 1; i++)
-            {
-                var bigram = $"{words[i]} {words[i + 1]}".ToLower();
-                var trigram = i < words.Length - 2 ? $"{words[i]} {words[i + 1]} {words[i + 2]}".ToLower() : "";
-                
-                // Check for compound consciousness concepts
-                var compoundPatterns = new Dictionary<string, (double weight, string category)>
-                {
-                    { "consciousness expansion", (0.9, "consciousness") },
-                    { "spiritual growth", (0.85, "transformation") },
-                    { "inner wisdom", (0.8, "wisdom") },
-                    { "divine love", (0.85, "love") },
-                    { "sacred geometry", (0.8, "sacred") },
-                    { "energy healing", (0.75, "healing") },
-                    { "abundance consciousness", (0.8, "abundance") },
-                    { "fractal patterns", (0.7, "fractal") }
-                };
-
-                foreach (var compound in compoundPatterns)
-                {
-                    if (bigram.Contains(compound.Key) || trigram.Contains(compound.Key))
-                    {
-                        var concept = new ConceptScore
-                        {
-                            Concept = compound.Key,
-                            Score = compound.Value.weight,
-                            Description = $"Compound concept: {compound.Key}",
-                            Category = compound.Value.category,
-                            Confidence = 0.8
-                        };
-                        concepts.Add(concept);
-                    }
-                }
-            }
-
-            return concepts;
-        }
-
-        private async Task<List<ConceptScore>> ExtractConceptsByContext(string content, ConceptExtractionRequest request)
-        {
-            var concepts = new List<ConceptScore>();
-            
-            try
-            {
-                // Get optimal LLM configuration for context analysis
-                var optimalConfig = LLMConfigurationSystem.GetOptimalConfiguration("concept-extraction");
-                var modelAvailable = await LLMConfigurationSystem.ModelManager.EnsureModelAvailableAsync(optimalConfig.Model);
-                
-                if (modelAvailable)
-                {
-                    // Use AI for context-aware concept extraction
-                    var llmConfig = new LLMConfig(
-                        Id: optimalConfig.Id,
-                        Name: optimalConfig.Id,
-                        Provider: optimalConfig.Provider,
-                        Model: optimalConfig.Model,
-                        ApiKey: "",
-                        BaseUrl: "http://localhost:11434",
-                        MaxTokens: 800,
-                        Temperature: 0.4, // Slightly higher for context creativity
-                        TopP: 0.9,
-                        Parameters: new Dictionary<string, object>
-                        {
-                            ["stop"] = new[] { "---", "###" }
-                        }
-                    );
-
-                    var contextInfo = new StringBuilder();
-                    contextInfo.AppendLine($"Categories: {string.Join(", ", request.Categories ?? new string[0])}");
-                    contextInfo.AppendLine($"Source: {request.Source ?? "unknown"}");
-                    contextInfo.AppendLine($"URL: {request.Url ?? "none"}");
-
-                    var contextPrompt = $@"Analyze the following text for consciousness-related concepts, taking into account the specific context and domain.
-
-Context Information:
-{contextInfo}
-
-Text: ""{content}""
-
-Based on the context, identify concepts that are most relevant and meaningful. Consider how the domain, language, time horizon, and perspective affect the interpretation of consciousness-related concepts.
-
-Return your analysis as a JSON array of concepts with the following structure:
-[
-  {{
-    ""concept"": ""concept_name"",
-    ""score"": 0.0-1.0,
-    ""description"": ""brief description"",
-    ""category"": ""consciousness|transformation|unity|love|wisdom|energy|healing|abundance|sacred|fractal"",
-    ""confidence"": 0.0-1.0,
-    ""contextRelevance"": 0.0-1.0,
-    ""domainSpecific"": ""domain_name""
-  }}
-]
-
-Focus on concepts that are most relevant to the given context and domain.";
-
-                    var llmResponse = await CallLLMAsync(contextPrompt, llmConfig);
-                    
-                    if (!llmResponse.Content.Contains("LLM unavailable"))
-                    {
-                        // Parse AI response
-                        var aiConcepts = ParseLLMConceptResponse(llmResponse.Content);
-                        concepts.AddRange(aiConcepts);
-                        _logger.Info($"AI context analysis found {aiConcepts.Count} concepts");
-                    }
-                    else
-                    {
-                        _logger.Warn("AI context analysis failed, falling back to rule-based context extraction");
-                        concepts.AddRange(ExtractConceptsByContextRules(content, request));
-                    }
-                }
-                else
-                {
-                    _logger.Warn("LLM not available for context analysis, using rule-based extraction");
-                    concepts.AddRange(ExtractConceptsByContextRules(content, request));
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Error in AI context extraction: {ex.Message}", ex);
-                concepts.AddRange(ExtractConceptsByContextRules(content, request));
-            }
-
-            return concepts;
-        }
-
-        private List<ConceptScore> ExtractConceptsByContextRules(string content, ConceptExtractionRequest request)
-        {
-            var concepts = new List<ConceptScore>();
-            
-            // Analyze context from request metadata
-            var contextFactors = new Dictionary<string, double>();
-            
-            // Domain-based context weighting
-            if (request.Categories != null && request.Categories.Length > 0)
-            {
-                foreach (var category in request.Categories)
-                {
-                    var trimmedCategory = category.Trim().ToLower();
-                    switch (trimmedCategory)
-                    {
-                    case "technology":
-                        case "ai":
-                        case "artificial intelligence":
-                            contextFactors["consciousness"] = 0.8;
-                            contextFactors["transformation"] = 0.7;
-                            contextFactors["wisdom"] = 0.6;
-                        break;
-                        case "spirituality":
-                    case "consciousness":
-                        case "meditation":
-                            contextFactors["consciousness"] = 0.9;
-                            contextFactors["sacred"] = 0.8;
-                            contextFactors["unity"] = 0.8;
-                        break;
-                        case "health":
-                        case "wellness":
-                        case "healing":
-                            contextFactors["healing"] = 0.9;
-                            contextFactors["energy"] = 0.7;
-                            contextFactors["balance"] = 0.8;
-                        break;
-                        case "business":
-                        case "success":
-                        case "wealth":
-                            contextFactors["abundance"] = 0.8;
-                            contextFactors["transformation"] = 0.6;
-                            contextFactors["wisdom"] = 0.5;
-                        break;
-                        case "science":
-                        case "research":
-                            contextFactors["wisdom"] = 0.8;
-                            contextFactors["fractal"] = 0.7;
-                            contextFactors["consciousness"] = 0.6;
-                        break;
-                }
-            }
-            }
-
-            // Source-based context weighting
-            if (!string.IsNullOrEmpty(request.Source))
-            {
-                var source = request.Source.ToLower();
-                if (source.Contains("news") || source.Contains("article"))
-                {
-                    contextFactors["transformation"] += 0.1;
-                    contextFactors["consciousness"] += 0.1;
-                }
-                else if (source.Contains("research") || source.Contains("study"))
-                {
-                    contextFactors["wisdom"] += 0.2;
-                    contextFactors["fractal"] += 0.1;
-                }
-                else if (source.Contains("spiritual") || source.Contains("meditation"))
-                {
-                    contextFactors["sacred"] += 0.2;
-                    contextFactors["unity"] += 0.2;
-                }
-            }
-
-            // Title-based context analysis
-            if (!string.IsNullOrEmpty(request.Title))
-            {
-                var title = request.Title.ToLower();
-                
-                // Look for consciousness-related keywords in title
-                var titleKeywords = new Dictionary<string, double>
-                {
-                    { "breakthrough", 0.8 },
-                    { "discovery", 0.7 },
-                    { "revolution", 0.8 },
-                    { "evolution", 0.7 },
-                    { "awakening", 0.9 },
-                    { "consciousness", 0.9 },
-                    { "spiritual", 0.8 },
-                    { "healing", 0.8 },
-                    { "abundance", 0.7 },
-                    { "wisdom", 0.7 }
-                };
-
-                foreach (var keyword in titleKeywords)
-                {
-                    if (title.Contains(keyword.Key))
-                    {
-                        // Boost related concepts based on title keywords
-                        switch (keyword.Key)
-                        {
-                            case "breakthrough":
-                            case "discovery":
-                            case "revolution":
-                                contextFactors["transformation"] = Math.Max(contextFactors.GetValueOrDefault("transformation", 0), keyword.Value);
-                                break;
-                            case "consciousness":
-                            case "awakening":
-                                contextFactors["consciousness"] = Math.Max(contextFactors.GetValueOrDefault("consciousness", 0), keyword.Value);
-                                break;
-                            case "spiritual":
-                                contextFactors["sacred"] = Math.Max(contextFactors.GetValueOrDefault("sacred", 0), keyword.Value);
-                                contextFactors["unity"] = Math.Max(contextFactors.GetValueOrDefault("unity", 0), keyword.Value);
-                                break;
-                            case "healing":
-                                contextFactors["healing"] = Math.Max(contextFactors.GetValueOrDefault("healing", 0), keyword.Value);
-                                break;
-                            case "abundance":
-                                contextFactors["abundance"] = Math.Max(contextFactors.GetValueOrDefault("abundance", 0), keyword.Value);
-                                break;
-                            case "wisdom":
-                                contextFactors["wisdom"] = Math.Max(contextFactors.GetValueOrDefault("wisdom", 0), keyword.Value);
-                                break;
-                        }
-                    }
-                }
-            }
-
-            // Content length and complexity analysis
-            var wordCount = content.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
-            var sentenceCount = content.Split('.', '!', '?').Length;
-            var avgWordsPerSentence = wordCount / Math.Max(sentenceCount, 1);
-
-            // Adjust context factors based on content complexity
-            if (avgWordsPerSentence > 20) // Complex, academic content
-            {
-                contextFactors["wisdom"] = Math.Max(contextFactors.GetValueOrDefault("wisdom", 0), 0.7);
-                contextFactors["fractal"] = Math.Max(contextFactors.GetValueOrDefault("fractal", 0), 0.6);
-            }
-            else if (avgWordsPerSentence < 10) // Simple, accessible content
-            {
-                contextFactors["consciousness"] = Math.Max(contextFactors.GetValueOrDefault("consciousness", 0), 0.6);
-                contextFactors["love"] = Math.Max(contextFactors.GetValueOrDefault("love", 0), 0.6);
-            }
-
-            // Generate context-aware concepts
-            foreach (var factor in contextFactors)
-            {
-                if (factor.Value > 0.5) // Only include significant context factors
-                {
-                    var concept = new ConceptScore
-                    {
-                        Concept = factor.Key,
-                        Score = factor.Value,
-                        Description = $"Context-aware concept based on {factor.Key} domain",
-                        Category = factor.Key,
-                        Confidence = Math.Min(factor.Value + 0.2, 1.0)
-                    };
-                    concepts.Add(concept);
-                }
-            }
-
-            return concepts;
-        }
-
-        private async Task<List<ConceptScore>> ExtractConceptsByOntology(string content, ConceptExtractionRequest request)
-        {
-            var concepts = new List<ConceptScore>();
-            
-            try
-            {
-                // Get optimal LLM configuration for ontology analysis
-                var optimalConfig = LLMConfigurationSystem.GetOptimalConfiguration("concept-extraction");
-                var modelAvailable = await LLMConfigurationSystem.ModelManager.EnsureModelAvailableAsync(optimalConfig.Model);
-                
-                if (modelAvailable)
-                {
-                    // Use AI for ontology-aware concept extraction
-                    var llmConfig = new LLMConfig(
-                        Id: optimalConfig.Id,
-                        Name: optimalConfig.Id,
-                        Provider: optimalConfig.Provider,
-                        Model: optimalConfig.Model,
-                        ApiKey: "",
-                        BaseUrl: "http://localhost:11434",
-                        MaxTokens: 1000,
-                        Temperature: 0.2, // Very low temperature for consistent ontology matching
-                        TopP: 0.8,
-                        Parameters: new Dictionary<string, object>
-                        {
-                            ["stop"] = new[] { "---", "###" }
-                        }
-                    );
-
-                    // Get existing ontology concepts for context
-                    var ontologyContext = await GetOntologyContext();
-                    
-                    var ontologyPrompt = $@"Analyze the following text for concepts that match or relate to the existing U-CORE ontology.
-
-Existing Ontology Concepts:
-{ontologyContext}
-
-Text: ""{content}""
-
-Identify concepts that:
-1. Exactly match existing ontology concepts
-2. Are semantically related to existing concepts
-3. Represent new concepts that should be added to the ontology
-4. Follow the U-CORE framework principles (consciousness, unity, resonance, fractal patterns, sacred geometry)
-
-Return your analysis as a JSON array of concepts with the following structure:
-[
-  {{
-    ""concept"": ""concept_name"",
-    ""score"": 0.0-1.0,
-    ""description"": ""brief description"",
-    ""category"": ""consciousness|transformation|unity|love|wisdom|energy|healing|abundance|sacred|fractal|u-core"",
-    ""confidence"": 0.0-1.0,
-    ""ontologyMatch"": ""exact|semantic|new"",
-    ""relatedConcepts"": [""concept1"", ""concept2""],
-    ""frequency"": ""432hz|528hz|741hz|custom""
-  }}
-]
-
-Focus on high-confidence matches and meaningful relationships to the U-CORE ontology.";
-
-                    var llmResponse = await CallLLMAsync(ontologyPrompt, llmConfig);
-                    
-                    if (!llmResponse.Content.Contains("LLM unavailable"))
-                    {
-                        // Parse AI response
-                        var aiConcepts = ParseLLMConceptResponse(llmResponse.Content);
-                        concepts.AddRange(aiConcepts);
-                        _logger.Info($"AI ontology analysis found {aiConcepts.Count} concepts");
-                    }
-                    else
-                    {
-                        _logger.Warn("AI ontology analysis failed, falling back to rule-based ontology extraction");
-                        concepts.AddRange(await ExtractConceptsByOntologyRules(content, request));
-                    }
-                }
-                else
-                {
-                    _logger.Warn("LLM not available for ontology analysis, using rule-based extraction");
-                    concepts.AddRange(await ExtractConceptsByOntologyRules(content, request));
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Error in AI ontology extraction: {ex.Message}", ex);
-                concepts.AddRange(await ExtractConceptsByOntologyRules(content, request));
-            }
-
-            return concepts;
-        }
-
-        private async Task<List<ConceptScore>> ExtractConceptsByOntologyRules(string content, ConceptExtractionRequest request)
-        {
-            var concepts = new List<ConceptScore>();
-            
-            try
-            {
-                // Use existing concept registry to get ontology concepts
-                var httpClient = new HttpClient();
-                var baseUrl = "http://localhost:5000"; // Use current service
-                
-                // Get all existing concepts from the ontology
-                var response = await httpClient.GetAsync($"{baseUrl}/concept/ontology/frequencies");
-                if (response.IsSuccessStatusCode)
-                {
-                    var jsonContent = await response.Content.ReadAsStringAsync();
-                    var frequencyData = System.Text.Json.JsonSerializer.Deserialize<dynamic>(jsonContent);
-                    
-                    // Extract concept names from the frequency mapping
-                    var existingConcepts = new List<string>();
-                    if (frequencyData != null)
-                    {
-                        // Parse the JSON to extract concept names
-                        var jsonDoc = System.Text.Json.JsonDocument.Parse(jsonContent);
-                        if (jsonDoc.RootElement.TryGetProperty("frequencyMappings", out var mappings))
-                        {
-                            foreach (var mapping in mappings.EnumerateArray())
-                            {
-                                if (mapping.TryGetProperty("name", out var name))
-                                {
-                                    existingConcepts.Add(name.GetString() ?? "");
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Match content against existing ontology concepts
-                    var contentLower = content.ToLower();
-                    foreach (var existingConcept in existingConcepts.Where(c => !string.IsNullOrEmpty(c)))
-                    {
-                        var conceptLower = existingConcept.ToLower();
-                        
-                        // Check for exact matches
-                        if (contentLower.Contains(conceptLower))
-                        {
-                            var concept = new ConceptScore
-                            {
-                                Concept = existingConcept,
-                                Score = 0.9, // High score for ontology matches
-                                Description = $"Ontology match: {existingConcept}",
-                                Category = "ontology",
-                                Confidence = 0.9
-                            };
-                            concepts.Add(concept);
-                        }
-                        // Check for partial matches (substring)
-                        else if (conceptLower.Length > 3 && contentLower.Contains(conceptLower.Substring(0, Math.Min(conceptLower.Length, 8))))
-                        {
-                            var concept = new ConceptScore
-                            {
-                                Concept = existingConcept,
-                                Score = 0.6, // Medium score for partial matches
-                                Description = $"Partial ontology match: {existingConcept}",
-                                Category = "ontology",
-                                Confidence = 0.6
-                            };
-                            concepts.Add(concept);
-                        }
-                    }
-                }
-                
-                // Also check for U-CORE specific concepts
-                var uCoreConcepts = new Dictionary<string, (string pattern, double weight, string category)>
-                {
-                    { "U-CORE", (@"\b(u-?core|universal consciousness resonance engine)\b", 0.95, "u-core") },
-                    { "Sacred Frequencies", (@"\b(432hz|528hz|741hz|sacred frequency|healing frequency)\b", 0.9, "frequencies") },
-                    { "Chakra System", (@"\b(chakra|root|sacral|solar plexus|heart|throat|third eye|crown)\b", 0.8, "chakras") },
-                    { "Resonance", (@"\b(resonance|vibration|frequency|harmony|alignment)\b", 0.8, "resonance") },
-                    { "Fractal Consciousness", (@"\b(fractal consciousness|living codex|node|edge|graph)\b", 0.9, "fractal") },
-                    { "Abundance Amplification", (@"\b(abundance|amplification|collective energy|contribution)\b", 0.8, "abundance") }
-                };
-                
-                foreach (var uCoreConcept in uCoreConcepts)
-                {
-                    var matches = System.Text.RegularExpressions.Regex.Matches(content, uCoreConcept.Value.pattern, 
-                        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                    
-                    if (matches.Count > 0)
-                    {
-                        var concept = new ConceptScore
-                        {
-                            Concept = uCoreConcept.Key,
-                            Score = uCoreConcept.Value.weight,
-                            Description = $"U-CORE ontology concept: {uCoreConcept.Key}",
-                            Category = uCoreConcept.Value.category,
-                            Confidence = 0.9
-                        };
-                        concepts.Add(concept);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Error in ontology-aware concept extraction: {ex.Message}", ex);
-                // Fallback to basic ontology concepts
-                    concepts.Add(new ConceptScore
-                    {
-                    Concept = "consciousness",
-                    Score = 0.7,
-                    Description = "Fallback ontology concept",
-                    Category = "consciousness",
-                    Confidence = 0.5
-                });
-            }
-
-            return concepts;
-        }
-
-        private async Task<CodexBootstrap.Core.BasicLLMResponse> CallLLMAsync(string prompt, LLMConfig config)
-        {
-            try
-            {
-                // Use the new LLMClient for consistency
-                var llmResponse = await _llmClient.QueryAsync(prompt, config);
-                
-                if (!llmResponse.Success)
-                {
-                    _logger.Warn($"LLM call failed: {llmResponse.Response}");
-                    return new CodexBootstrap.Core.BasicLLMResponse(
-                        Content: "LLM unavailable - service error",
-                        Model: config.Model,
-                        CreatedAt: DateTime.UtcNow
-                    );
-                }
-                
-                return new CodexBootstrap.Core.BasicLLMResponse(
-                    Content: llmResponse.Response,
-                    Model: config.Model,
-                    CreatedAt: DateTime.UtcNow
-                );
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"LLM call failed: {ex.Message}", ex);
-                return new CodexBootstrap.Core.BasicLLMResponse(
-                    Content: "LLM unavailable - connection error",
-                    Model: config.Model,
-                    CreatedAt: DateTime.UtcNow
-                );
-            }
-        }
-
-        private async Task<string> GetOntologyContext()
-        {
-            try
-            {
-                var httpClient = new HttpClient();
-                var baseUrl = "http://localhost:5000";
-                
-                // Get ontology concepts
-                var response = await httpClient.GetAsync($"{baseUrl}/concept/ontology/frequencies");
-                if (response.IsSuccessStatusCode)
-                {
-                    var jsonContent = await response.Content.ReadAsStringAsync();
-                    return jsonContent;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Warn($"Failed to get ontology context: {ex.Message}");
-            }
-            
-            // Fallback to basic U-CORE concepts
-            return @"{
-                ""frequencyMappings"": [
-                    {""name"": ""consciousness"", ""frequency"": ""432hz""},
-                    {""name"": ""unity"", ""frequency"": ""528hz""},
-                    {""name"": ""transformation"", ""frequency"": ""741hz""},
-                    {""name"": ""love"", ""frequency"": ""528hz""},
-                    {""name"": ""wisdom"", ""frequency"": ""432hz""},
-                    {""name"": ""energy"", ""frequency"": ""741hz""},
-                    {""name"": ""healing"", ""frequency"": ""528hz""},
-                    {""name"": ""abundance"", ""frequency"": ""741hz""},
-                    {""name"": ""sacred geometry"", ""frequency"": ""432hz""},
-                    {""name"": ""fractal patterns"", ""frequency"": ""528hz""}
-                ]
-            }";
-        }
-
-        private async Task<List<ConceptScore>> MergeSimilarConcepts(List<ConceptScore> concepts)
-        {
-            if (concepts == null || concepts.Count <= 1)
-            return concepts;
-
-            try
-            {
-                // Get optimal LLM configuration for concept merging
-                var optimalConfig = LLMConfigurationSystem.GetOptimalConfiguration("concept-extraction");
-                var modelAvailable = await LLMConfigurationSystem.ModelManager.EnsureModelAvailableAsync(optimalConfig.Model);
-                
-                if (modelAvailable && concepts.Count > 5) // Use AI for larger sets
-                {
-                    return await MergeSimilarConceptsWithAI(concepts, optimalConfig);
-                }
-                else
-                {
-                    return MergeSimilarConceptsWithRules(concepts);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Error in AI concept merging: {ex.Message}", ex);
-                return MergeSimilarConceptsWithRules(concepts);
-            }
-        }
-
-        private async Task<List<ConceptScore>> MergeSimilarConceptsWithAI(List<ConceptScore> concepts, LLMConfigurationSystem.LLMConfiguration config)
-        {
-            var llmConfig = new LLMConfig(
-                Id: config.Id,
-                Name: config.Id,
-                Provider: config.Provider,
-                Model: config.Model,
-                ApiKey: "",
-                BaseUrl: "http://localhost:11434",
-                MaxTokens: 1500,
-                Temperature: 0.1, // Very low temperature for consistent merging
-                TopP: 0.8,
-                Parameters: new Dictionary<string, object>
-                {
-                    ["stop"] = new[] { "---", "###" }
-                }
-            );
-
-            var conceptsJson = System.Text.Json.JsonSerializer.Serialize(concepts.Select(c => new {
-                concept = c.Concept,
-                score = c.Score,
-                description = c.Description,
-                category = c.Category,
-                confidence = c.Confidence
-            }));
-
-            var mergePrompt = $@"Analyze the following list of concepts and identify which ones are similar or should be merged together.
-
-Concepts:
-{conceptsJson}
-
-Identify concepts that:
-1. Have the same or very similar names (e.g., ""consciousness"" and ""conscious awareness"")
-2. Are semantically equivalent (e.g., ""love"" and ""unconditional love"")
-3. Represent the same concept with different wording
-4. Are closely related and should be grouped together
-
-For each group of similar concepts, create a merged concept that:
-- Uses the most descriptive name
-- Combines the highest scores
-- Merges descriptions meaningfully
-- Uses the most specific category
-- Takes the highest confidence
-
-Return your analysis as a JSON array of merged concepts with the following structure:
-[
-  {{
-    ""concept"": ""merged_concept_name"",
-    ""score"": 0.0-1.0,
-    ""description"": ""merged description"",
-    ""category"": ""most_specific_category"",
-    ""confidence"": 0.0-1.0,
-    ""mergedFrom"": [""original_concept1"", ""original_concept2""]
-  }}
-]
-
-Only merge concepts that are truly similar. Keep distinct concepts separate.";
-
-            var llmResponse = await CallLLMAsync(mergePrompt, llmConfig);
-            
-            if (!llmResponse.Content.Contains("LLM unavailable"))
-            {
-                var mergedConcepts = ParseLLMConceptResponse(llmResponse.Content);
-                _logger.Info($"AI concept merging reduced {concepts.Count} concepts to {mergedConcepts.Count}");
-                return mergedConcepts;
-            }
-            else
-            {
-                _logger.Warn("AI concept merging failed, falling back to rule-based merging");
-                return MergeSimilarConceptsWithRules(concepts);
-            }
-        }
-
-        private List<ConceptScore> MergeSimilarConceptsWithRules(List<ConceptScore> concepts)
-        {
-            var mergedConcepts = new List<ConceptScore>();
-            var processedIndices = new HashSet<int>();
-
-            for (int i = 0; i < concepts.Count; i++)
-            {
-                if (processedIndices.Contains(i))
-                    continue;
-
-                var currentConcept = concepts[i];
-                var similarConcepts = new List<ConceptScore> { currentConcept };
-                processedIndices.Add(i);
-
-                // Find similar concepts
-                for (int j = i + 1; j < concepts.Count; j++)
-                {
-                    if (processedIndices.Contains(j))
-                        continue;
-
-                    var otherConcept = concepts[j];
-                    if (AreConceptsSimilar(currentConcept, otherConcept))
-                    {
-                        similarConcepts.Add(otherConcept);
-                        processedIndices.Add(j);
-                    }
-                }
-
-                // Merge similar concepts
-                if (similarConcepts.Count > 1)
-                {
-                    var mergedConcept = MergeConceptGroup(similarConcepts);
-                    mergedConcepts.Add(mergedConcept);
-                }
-                else
-                {
-                    mergedConcepts.Add(currentConcept);
-                }
-            }
-
-            return mergedConcepts;
-        }
-
-        private bool AreConceptsSimilar(ConceptScore concept1, ConceptScore concept2)
-        {
-            // Check for exact name matches
-            if (string.Equals(concept1.Concept, concept2.Concept, StringComparison.OrdinalIgnoreCase))
-                return true;
-
-            // Check for substring matches
-            var name1 = concept1.Concept.ToLower();
-            var name2 = concept2.Concept.ToLower();
-            
-            if (name1.Contains(name2) || name2.Contains(name1))
-                return true;
-
-            // Check for semantic similarity using word overlap
-            var words1 = name1.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            var words2 = name2.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            
-            var commonWords = words1.Intersect(words2, StringComparer.OrdinalIgnoreCase).Count();
-            var totalWords = Math.Max(words1.Length, words2.Length);
-            
-            if (totalWords > 0 && (double)commonWords / totalWords > 0.5)
-                return true;
-
-            // Check for category similarity
-            if (string.Equals(concept1.Category, concept2.Category, StringComparison.OrdinalIgnoreCase))
-            {
-                // Additional check for similar concepts in same category
-                var categorySimilarity = CalculateCategorySimilarity(concept1.Concept, concept2.Concept);
-                if (categorySimilarity > 0.6)
-                    return true;
-            }
-
-            return false;
-        }
-
-        private double CalculateCategorySimilarity(string concept1, string concept2)
-        {
-            // Define concept families within categories
-            var conceptFamilies = new Dictionary<string, string[]>
-            {
-                { "consciousness", new[] { "awareness", "mindfulness", "presence", "awakening", "conscious" } },
-                { "transformation", new[] { "evolution", "growth", "change", "shift", "breakthrough", "transform" } },
-                { "unity", new[] { "oneness", "connection", "wholeness", "integration", "harmony", "unite" } },
-                { "love", new[] { "compassion", "empathy", "kindness", "heart", "unconditional", "loving" } },
-                { "wisdom", new[] { "knowledge", "insight", "understanding", "clarity", "enlightenment", "wise" } },
-                { "energy", new[] { "vibration", "frequency", "resonance", "flow", "chi", "prana", "energetic" } },
-                { "healing", new[] { "recovery", "restoration", "wholeness", "wellness", "balance", "heal" } },
-                { "abundance", new[] { "prosperity", "wealth", "success", "fulfillment", "manifestation", "abundant" } },
-                { "sacred", new[] { "divine", "holy", "spiritual", "transcendent", "mystical", "sacred" } },
-                { "fractal", new[] { "pattern", "geometry", "structure", "design", "blueprint", "fractal" } }
-            };
-
-            var name1 = concept1.ToLower();
-            var name2 = concept2.ToLower();
-
-            foreach (var family in conceptFamilies.Values)
-            {
-                var match1 = family.Any(word => name1.Contains(word));
-                var match2 = family.Any(word => name2.Contains(word));
-                
-                if (match1 && match2)
-                    return 0.8; // High similarity within concept family
-            }
-
-            return 0.0;
-        }
-
-        private ConceptScore MergeConceptGroup(List<ConceptScore> concepts)
-        {
-            if (concepts.Count == 1)
-                return concepts[0];
-
-            // Use the concept with the highest score as the base
-            var baseConcept = concepts.OrderByDescending(c => c.Score).First();
-            
-            // Calculate weighted averages for scores
-            var totalWeight = concepts.Sum(c => c.Score);
-            var weightedConfidence = concepts.Sum(c => c.Confidence * c.Score) / totalWeight;
-            
-            // Combine descriptions
-            var descriptions = concepts.Select(c => c.Description).Distinct();
-            var combinedDescription = string.Join("; ", descriptions);
-            
-            // Determine the best category (most common or highest scoring)
-            var categoryGroups = concepts.GroupBy(c => c.Category)
-                .OrderByDescending(g => g.Sum(c => c.Score))
-                .First();
-            var bestCategory = categoryGroups.Key;
-
-            return new ConceptScore
-            {
-                Concept = baseConcept.Concept,
-                Score = baseConcept.Score, // Keep the highest score
-                Description = combinedDescription,
-                Category = bestCategory,
-                Confidence = Math.Min(weightedConfidence, 1.0)
-            };
-        }
-
-        private async Task<double> CalculateConfidence(List<ConceptScore> concepts, string content, ConceptExtractionRequest request)
-        {
-            if (concepts == null || concepts.Count == 0)
-                return 0.0;
-
-            try
-            {
-                // Get optimal LLM configuration for confidence analysis
-                var optimalConfig = LLMConfigurationSystem.GetOptimalConfiguration("concept-extraction");
-                var modelAvailable = await LLMConfigurationSystem.ModelManager.EnsureModelAvailableAsync(optimalConfig.Model);
-                
-                if (modelAvailable && concepts.Count > 3) // Use AI for larger sets
-                {
-                    return await CalculateConfidenceWithAI(concepts, content, request, optimalConfig);
-                }
-                else
-                {
-                    return CalculateConfidenceWithRules(concepts, content, request);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Error in AI confidence calculation: {ex.Message}", ex);
-                return CalculateConfidenceWithRules(concepts, content, request);
-            }
-        }
-
-        private async Task<double> CalculateConfidenceWithAI(List<ConceptScore> concepts, string content, ConceptExtractionRequest request, LLMConfigurationSystem.LLMConfiguration config)
-        {
-            var llmConfig = new LLMConfig(
-                Id: config.Id,
-                Name: config.Id,
-                Provider: config.Provider,
-                Model: config.Model,
-                ApiKey: "",
-                BaseUrl: "http://localhost:11434",
-                MaxTokens: 500,
-                Temperature: 0.1, // Very low temperature for consistent scoring
-                TopP: 0.8,
-                Parameters: new Dictionary<string, object>
-                {
-                    ["stop"] = new[] { "---", "###" }
-                }
-            );
-
-            var conceptsJson = System.Text.Json.JsonSerializer.Serialize(concepts.Select(c => new {
-                concept = c.Concept,
-                score = c.Score,
-                description = c.Description,
-                category = c.Category,
-                confidence = c.Confidence
-            }));
-
-            var confidencePrompt = $@"Analyze the quality and confidence of the following concept extraction results.
-
-Content: ""{content}""
-Request Context: Categories={string.Join(", ", request.Categories ?? new string[0])}, Source={request.Source ?? "unknown"}
-
-Extracted Concepts:
-{conceptsJson}
-
-Evaluate the overall confidence of this concept extraction based on:
-1. Relevance of concepts to the content
-2. Semantic coherence between concepts
-3. Appropriateness of concept categories
-4. Quality of concept descriptions
-5. Overall extraction completeness
-
-Return a confidence score between 0.0 and 1.0 as a JSON object:
-{{
-  ""confidence"": 0.0-1.0,
-  ""reasoning"": ""brief explanation of the confidence score"",
-  ""strengths"": [""strength1"", ""strength2""],
-  ""weaknesses"": [""weakness1"", ""weakness2""]
-}}
-
-Be conservative but fair in your assessment.";
-
-            var llmResponse = await CallLLMAsync(confidencePrompt, llmConfig);
-            
-            if (!llmResponse.Content.Contains("LLM unavailable"))
-            {
-                try
-                {
-                    var responseJson = System.Text.Json.JsonDocument.Parse(llmResponse.Content);
-                    if (responseJson.RootElement.TryGetProperty("confidence", out var confidenceElement))
-                    {
-                        var aiConfidence = confidenceElement.GetDouble();
-                        _logger.Info($"AI confidence calculation: {aiConfidence:F2}");
-                        return Math.Max(0.0, Math.Min(1.0, aiConfidence));
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.Warn($"Failed to parse AI confidence response: {ex.Message}");
-                }
-            }
-            
-            _logger.Warn("AI confidence calculation failed, falling back to rule-based calculation");
-            return CalculateConfidenceWithRules(concepts, content, request);
-        }
-
-        private double CalculateConfidenceWithRules(List<ConceptScore> concepts, string content, ConceptExtractionRequest request)
-        {
-            // Base confidence factors
-            var confidenceFactors = new List<double>();
-
-            // 1. Concept count factor (more concepts = higher confidence, but with diminishing returns)
-            var conceptCountFactor = Math.Min(concepts.Count / 10.0, 1.0);
-            confidenceFactors.Add(conceptCountFactor * 0.2);
-
-            // 2. Average concept confidence
-            var avgConceptConfidence = concepts.Average(c => c.Confidence);
-            confidenceFactors.Add(avgConceptConfidence * 0.3);
-
-            // 3. Content quality factors
-            var contentQuality = CalculateContentQuality(content, request);
-            confidenceFactors.Add(contentQuality * 0.2);
-
-            // 4. Concept diversity factor
-            var diversityFactor = CalculateConceptDiversity(concepts);
-            confidenceFactors.Add(diversityFactor * 0.15);
-
-            // 5. Semantic coherence factor
-            var coherenceFactor = CalculateSemanticCoherence(concepts, content);
-            confidenceFactors.Add(coherenceFactor * 0.15);
-
-            // Calculate weighted average
-            var totalConfidence = confidenceFactors.Sum();
-            
-            // Apply bonus for high-quality extractions
-            if (concepts.Any(c => c.Score > 0.8))
-                totalConfidence += 0.1;
-
-            // Apply penalty for very low scores
-            if (concepts.All(c => c.Score < 0.3))
-                totalConfidence *= 0.7;
-
-            return Math.Min(Math.Max(totalConfidence, 0.0), 1.0);
-        }
-
-        private double CalculateContentQuality(string content, ConceptExtractionRequest request)
-        {
-            var qualityScore = 0.0;
-
-            // Length factor (optimal length range)
-            var wordCount = content.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
-            if (wordCount >= 50 && wordCount <= 1000)
-                qualityScore += 0.3;
-            else if (wordCount >= 20 && wordCount <= 2000)
-                qualityScore += 0.2;
-
-            // Title presence factor
-            if (!string.IsNullOrEmpty(request.Title) && request.Title.Length > 5)
-                qualityScore += 0.2;
-
-            // Category presence factor
-            if (request.Categories != null && request.Categories.Length > 0)
-                qualityScore += 0.1;
-
-            // Source presence factor
-            if (!string.IsNullOrEmpty(request.Source))
-                qualityScore += 0.1;
-
-            // Content structure factor (sentences, paragraphs)
-            var sentenceCount = content.Split('.', '!', '?').Length;
-            if (sentenceCount >= 3)
-                qualityScore += 0.2;
-            else if (sentenceCount >= 1)
-                qualityScore += 0.1;
-
-            // URL factor (if present, indicates external validation)
-            if (!string.IsNullOrEmpty(request.Url))
-                qualityScore += 0.1;
-
-            return Math.Min(qualityScore, 1.0);
-        }
-
-        private double CalculateConceptDiversity(List<ConceptScore> concepts)
-        {
-            if (concepts.Count <= 1)
-                return concepts.Count == 1 ? 0.5 : 0.0;
-
-            // Count unique categories
-            var uniqueCategories = concepts.Select(c => c.Category).Distinct().Count();
-            var categoryDiversity = (double)uniqueCategories / concepts.Count;
-
-            // Count unique concept names (excluding exact duplicates)
-            var uniqueConcepts = concepts.Select(c => c.Concept.ToLower()).Distinct().Count();
-            var conceptDiversity = (double)uniqueConcepts / concepts.Count;
-
-            // Calculate average diversity
-            return (categoryDiversity + conceptDiversity) / 2.0;
-        }
-
-        private double CalculateSemanticCoherence(List<ConceptScore> concepts, string content)
-        {
-            if (concepts.Count <= 1)
-                return 0.5;
-
-            var coherenceScore = 0.0;
-
-            // Check for concept relationships within the same category
-            var categoryGroups = concepts.GroupBy(c => c.Category);
-            foreach (var group in categoryGroups)
-            {
-                if (group.Count() > 1)
-                {
-                    // Concepts in the same category are more coherent
-                    coherenceScore += 0.3 * (group.Count() - 1) / concepts.Count;
-                }
-            }
-
-            // Check for concept frequency in content
-            var contentLower = content.ToLower();
-            var conceptFrequency = 0.0;
-            foreach (var concept in concepts)
-            {
-                var conceptLower = concept.Concept.ToLower();
-                var frequency = contentLower.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                    .Count(word => word.Contains(conceptLower) || conceptLower.Contains(word));
-                
-                if (frequency > 0)
-                    conceptFrequency += 1.0;
-            }
-            coherenceScore += (conceptFrequency / concepts.Count) * 0.4;
-
-            // Check for high-confidence concepts (indicates better extraction)
-            var highConfidenceCount = concepts.Count(c => c.Confidence > 0.7);
-            coherenceScore += (double)highConfidenceCount / concepts.Count * 0.3;
-
-            return Math.Min(coherenceScore, 1.0);
-        }
-
-        private string[] DetermineOntologyLevels(List<string> concepts)
-        {
-            // TODO: Implement ontology level determination
-            return new[] { "L5", "L8" };
-        }
-
-        private string BuildConceptExtractionPrompt(ConceptExtractionRequest request, LLMConfigurationSystem.LLMConfiguration config)
-        {
-            return $@"You are an advanced AI system specialized in extracting meaningful concepts from text content for consciousness expansion and spiritual growth.
-
-TASK: Extract key concepts from the following content and analyze their spiritual, consciousness, and transformative potential.
-
-CONTENT TO ANALYZE:
-Title: {request.Title}
-Content: {request.Content}
-Categories: {string.Join(", ", request.Categories)}
-Source: {request.Source}
-
-INSTRUCTIONS:
-1. Identify 5-10 key concepts that represent core ideas, themes, or principles
-2. For each concept, provide:
-   - Concept name (1-3 words)
-   - Confidence score (0.0-1.0)
-   - Brief description of its meaning
-   - Spiritual/consciousness significance
-   - Potential for transformation or growth
-   - Sacred frequency alignment (432Hz, 528Hz, 741Hz, etc.)
-
-3. Focus on concepts that relate to:
-   - Consciousness expansion
-   - Spiritual growth and transformation
-   - Unity and connection
-   - Abundance and prosperity
-   - Healing and harmony
-   - Wisdom and knowledge
-   - Love and compassion
-   - Sacred geometry and frequencies
-
-4. Consider the content categories: {string.Join(", ", request.Categories)}
-
-RESPONSE FORMAT (JSON):
-{{
-  ""concepts"": [
-    {{
-      ""concept"": ""concept_name"",
-      ""score"": 0.85,
-      ""description"": ""Brief description"",
-      ""spiritualSignificance"": ""How this relates to consciousness"",
-      ""transformationPotential"": ""Growth opportunities"",
-      ""sacredFrequency"": 528.0,
-      ""category"": ""consciousness|emotion|transformation|energy""
-    }}
-  ],
-  ""overallAnalysis"": ""Summary of the content's consciousness expansion potential"",
-  ""recommendedFrequencies"": [432.0, 528.0, 741.0],
-  ""resonanceLevel"": ""high|medium|low""
-}}
-
-Please provide a thoughtful, spiritually-aware analysis that honors the sacred nature of consciousness expansion.";
-        }
-
-        private async Task<AIConceptExtractionResponse> CallLLM(LLMConfig config, string prompt)
-        {
-            try
-            {
-                _logger.Info($"[LLM] Making real call to Ollama with model: {config.Model}");
-                _logger.Info($"[LLM] Prompt: {prompt.Substring(0, Math.Min(200, prompt.Length))}...");
-                
-                // Use the new LLMClient for consistency
-                var llmResponse = await _llmClient.QueryAsync(prompt, config);
-                
-                if (!llmResponse.Success)
-                {
-                    _logger.Warn($"[LLM] LLM call failed: {llmResponse.Response}");
-                    return new AIConceptExtractionResponse(
-                        Content: $"LLM unavailable: {llmResponse.Response}. Concept extraction fallback for: {prompt.Substring(0, Math.Min(100, prompt.Length))}...",
-                        Confidence: 0.5,
-                        Reasoning: "Generated using fallback algorithms (LLM service unavailable)",
-                        Sources: new List<string> { "Fallback", "Basic Analysis" }
-                    );
-                }
-
-                _logger.Info($"[LLM] LLM response received: {llmResponse.Response.Substring(0, Math.Min(200, llmResponse.Response.Length))}...");
-
-                return new AIConceptExtractionResponse(
-                    Content: llmResponse.Response,
-                    Confidence: llmResponse.Confidence,
-                    Reasoning: "Generated using real LLM integration with Ollama",
-                    Sources: new List<string> { "Real LLM", "Ollama API", "Advanced AI" }
-                );
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"[LLM] Error: {ex.Message}");
-                // Fallback to mock response if LLM is not available
-                return new AIConceptExtractionResponse(
-                    Content: $"LLM unavailable: {ex.Message}. Concept extraction fallback for: {prompt.Substring(0, Math.Min(100, prompt.Length))}...",
-                    Confidence: 0.5,
-                    Reasoning: "Fallback response due to LLM unavailability",
-                    Sources: new List<string> { "Fallback system", "Error handling" }
-                );
-            }
-        }
-
-        private List<ConceptScore> ParseLLMConceptResponse(string llmResponse)
-        {
-            var concepts = new List<ConceptScore>();
-            
-            try
-            {
-                // Clean the response - remove markdown code blocks if present
-                var cleanedResponse = llmResponse.Trim();
-                if (cleanedResponse.StartsWith("```json"))
-                {
-                    cleanedResponse = cleanedResponse.Substring(7); // Remove ```json
-                }
-                if (cleanedResponse.StartsWith("```"))
-                {
-                    cleanedResponse = cleanedResponse.Substring(3); // Remove ```
-                }
-                if (cleanedResponse.EndsWith("```"))
-                {
-                    cleanedResponse = cleanedResponse.Substring(0, cleanedResponse.Length - 3); // Remove trailing ```
-                }
-                cleanedResponse = cleanedResponse.Trim();
-
-                _logger.Info($"[LLM] Cleaned response: {cleanedResponse.Substring(0, Math.Min(200, cleanedResponse.Length))}...");
-
-                // Try to parse JSON response first
-                try
-                {
-                    var jsonDoc = JsonDocument.Parse(cleanedResponse);
-                    var root = jsonDoc.RootElement;
-                    
-                    if (root.TryGetProperty("concepts", out var conceptsArray))
-                    {
-                        foreach (var conceptElement in conceptsArray.EnumerateArray())
-                        {
-                            if (conceptElement.ValueKind == JsonValueKind.String)
-                            {
-                                // Handle string array format
-                                var conceptName = conceptElement.GetString() ?? "unknown";
-                                var cleanConcept = CleanConceptName(conceptName);
-                                if (!string.IsNullOrEmpty(cleanConcept))
-                                {
-                    concepts.Add(new ConceptScore
-                    {
-                                        Concept = cleanConcept,
-                                        Score = 0.8
-                                    });
-                                }
-                            }
-                            else if (conceptElement.TryGetProperty("concept", out var conceptName) &&
-                                     conceptElement.TryGetProperty("score", out var score))
-                            {
-                                // Handle object format
-                                var cleanConcept = CleanConceptName(conceptName.GetString() ?? "unknown");
-                                if (!string.IsNullOrEmpty(cleanConcept))
-                                {
-                                    concepts.Add(new ConceptScore
-                                    {
-                                        Concept = cleanConcept,
-                                        Score = score.GetDouble()
-                                    });
-                                }
-                            }
-                        }
-                    }
-                }
-                catch (JsonException)
-                {
-                    // If JSON parsing fails, try to extract from markdown format
-                    concepts = ExtractConceptsFromMarkdown(cleanedResponse);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Error parsing LLM response: {ex.Message}");
-                concepts = ExtractConceptsFromText(llmResponse);
-            }
-
-            return concepts;
-        }
-
-        private List<ConceptScore> ExtractConceptsFromMarkdown(string markdownResponse)
-        {
-            var concepts = new List<ConceptScore>();
-            
-            try
-            {
-                // Look for numbered list items with **bold** concept names
-                var lines = markdownResponse.Split('\n');
-                foreach (var line in lines)
-                {
-                    // Match pattern: "1. **Concept Name**" or "**Concept Name**"
-                    var match = System.Text.RegularExpressions.Regex.Match(line, @"\d+\.\s*\*\*([^*]+)\*\*");
-                    if (!match.Success)
-                    {
-                        // Try alternative pattern without numbers
-                        match = System.Text.RegularExpressions.Regex.Match(line, @"\*\*([^*]+)\*\*");
-                    }
-                    
-                    if (match.Success)
-                    {
-                        var conceptName = match.Groups[1].Value.Trim();
-                        var cleanConcept = CleanConceptName(conceptName);
-                        
-                        if (!string.IsNullOrEmpty(cleanConcept))
-                        {
-                            // Try to extract confidence score from the line
-                            var scoreMatch = System.Text.RegularExpressions.Regex.Match(line, @"Confidence score:\s*([0-9.]+)");
-                            var score = scoreMatch.Success ? double.Parse(scoreMatch.Groups[1].Value) : 0.8;
-                            
-                            concepts.Add(new ConceptScore
-                            {
-                                Concept = cleanConcept,
-                                Score = score
-                            });
-                        }
-                    }
-                }
-                
-                // If no concepts found with the above pattern, try a simpler approach
-                if (concepts.Count == 0)
-                {
-                    var boldMatches = System.Text.RegularExpressions.Regex.Matches(markdownResponse, @"\*\*([^*]+)\*\*");
-                    foreach (System.Text.RegularExpressions.Match match in boldMatches)
-                    {
-                        var conceptName = match.Groups[1].Value.Trim();
-                        var cleanConcept = CleanConceptName(conceptName);
-                        
-                        if (!string.IsNullOrEmpty(cleanConcept) && !conceptName.ToLower().Contains("analysis") && 
-                            !conceptName.ToLower().Contains("concepts") && !conceptName.ToLower().Contains("key"))
-                        {
-                            concepts.Add(new ConceptScore
-                            {
-                                Concept = cleanConcept,
-                                Score = 0.8
-                            });
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Warn($"Error extracting concepts from markdown: {ex.Message}");
-            }
-            
-            return concepts;
-        }
-
-        private string CleanConceptName(string conceptName)
-        {
-            if (string.IsNullOrEmpty(conceptName))
-                return string.Empty;
-
-            // Remove extra quotes, commas, and other artifacts
-            var cleaned = conceptName.Trim()
-                .Replace("\"", "")
-                .Replace(",", "")
-                .Replace("**", "")
-                .Replace("\\", "")
-                .Trim();
-
-            // Only return if it's a meaningful concept
-            if (cleaned.Length > 2 && char.IsLetter(cleaned[0]) && !cleaned.Contains("**"))
-            {
-                return cleaned.ToLower();
-            }
-
-            return string.Empty;
-        }
-
-        private List<ConceptScore> ExtractConceptsFromText(string text)
-        {
-            var concepts = new List<ConceptScore>();
-            
-            // Look for JSON-like structure in the text
-            var jsonMatch = System.Text.RegularExpressions.Regex.Match(text, @"\[(.*?)\]", System.Text.RegularExpressions.RegexOptions.Singleline);
-            if (jsonMatch.Success)
-            {
-                var jsonArray = jsonMatch.Groups[1].Value;
-                var conceptMatches = System.Text.RegularExpressions.Regex.Matches(jsonArray, @"""([^""]+)""");
-                
-                foreach (System.Text.RegularExpressions.Match match in conceptMatches)
-                {
-                    var concept = match.Groups[1].Value.Trim();
-                    if (!string.IsNullOrEmpty(concept) && concept.Length > 2 && !concept.Contains("**") && !concept.Contains("\""))
-                    {
-                        concepts.Add(new ConceptScore
-                        {
-                            Concept = concept.ToLower(),
-                            Score = 0.8
-                        });
-                    }
-                }
-            }
-            
-            // Fallback: extract meaningful words from the text
-            if (concepts.Count == 0)
-            {
-                var words = text.Split(new[] { ' ', '\n', '\r', '\t', ',', '.', '!', '?', ';', ':' }, StringSplitOptions.RemoveEmptyEntries);
-                var meaningfulWords = words.Where(w => w.Length > 3 && char.IsLetter(w[0]) && !w.Contains("**") && !w.Contains("\"")).Take(10);
-                
-                foreach (var word in meaningfulWords)
-                {
-                    concepts.Add(new ConceptScore
-                    {
-                        Concept = word.ToLower(),
-                        Score = 0.6
-                    });
-                }
-            }
-            
-            return concepts;
-        }
-
-        // Caching infrastructure
-        private bool TryGetCachedAnalysis<T>(string cacheKey, out T analysis) where T : class
-        {
-            analysis = null;
-            if (_analysisCache.TryGetValue(cacheKey, out var cached) &&
-                _cacheTimestamps.TryGetValue(cacheKey, out var timestamp) &&
-                DateTimeOffset.UtcNow - timestamp < _cacheExpiration)
-            {
-                analysis = cached.Data as T;
-                return analysis != null;
-            }
-            return false;
-        }
-
-        private void CacheAnalysis<T>(string cacheKey, T analysis) where T : class
-        {
-            _analysisCache[cacheKey] = new CachedAnalysis { Data = analysis };
-            _cacheTimestamps[cacheKey] = DateTimeOffset.UtcNow;
-        }
-
-        private ErrorResponse CreateErrorResponse(string message, string code)
-        {
-            return new ErrorResponse
-            {
-                Success = false,
-                Error = message,
-                Code = code,
-                Timestamp = DateTime.UtcNow
-            };
-        }
-
-        #endregion
-    }
-
-    // Data structures for the AI module
-
-    public class OllamaResponse
-    {
-        public string Response { get; set; } = "";
-        public string Model { get; set; } = "";
-        public DateTime CreatedAt { get; set; }
-    }
-
-    public class ConceptExtractionRequest
-    {
-        public string Title { get; set; } = "";
-        public string Content { get; set; } = "";
-        public string[] Categories { get; set; } = Array.Empty<string>();
-        public string Source { get; set; } = "";
-        public string Url { get; set; } = "";
-    }
-
-    public class ScoringAnalysisRequest
-    {
-        public ConceptAnalysis ConceptAnalysis { get; set; } = new();
-        public ConceptExtractionRequest Content { get; set; } = new();
-    }
-
-    public class FractalTransformationRequest
-    {
-        public ConceptExtractionRequest Content { get; set; } = new();
-        public ConceptAnalysis ConceptAnalysis { get; set; } = new();
-        public ScoringAnalysis ScoringAnalysis { get; set; } = new();
-    }
-
-    public class ConceptAnalysis
-    {
-        public string Id { get; set; } = "";
-        public string NewsItemId { get; set; } = "";
-        public List<string> Concepts { get; set; } = new();
-        public double Confidence { get; set; }
-        public string[] OntologyLevels { get; set; } = Array.Empty<string>();
-        public DateTimeOffset ExtractedAt { get; set; }
-        public Dictionary<string, object> Metadata { get; set; } = new();
-    }
-
     public class ScoringAnalysis
     {
         public string Id { get; set; } = "";
@@ -2859,481 +652,14 @@ Please provide a thoughtful, spiritually-aware analysis that honors the sacred n
         public Dictionary<string, object> Metadata { get; set; } = new();
     }
 
-    public class FractalTransformation
-    {
-        public string Id { get; set; } = "";
-        public string NewsItemId { get; set; } = "";
-        public string Headline { get; set; } = "";
-        public string BeliefSystemTranslation { get; set; } = "";
-        public string Summary { get; set; } = "";
-        public string[] ImpactAreas { get; set; } = Array.Empty<string>();
-        public Dictionary<string, double> AmplificationFactors { get; set; } = new();
-        public Dictionary<string, object> ResonanceData { get; set; } = new();
-        public string TransformationType { get; set; } = "";
-        public string ConsciousnessLevel { get; set; } = "";
-        public DateTimeOffset TransformedAt { get; set; }
-        public Dictionary<string, object> Metadata { get; set; } = new();
-    }
+    // Additional missing record types
+    public record LLMConfigResponse(
+        bool Success,
+        LLMConfig Config,
+        string Message,
+        DateTimeOffset Timestamp
+    );
 
-    public class ConceptScore
-    {
-        public string Concept { get; set; } = "";
-        public double Score { get; set; }
-        public string Description { get; set; } = "";
-        public string Category { get; set; } = "";
-        public double Confidence { get; set; }
-    }
 
-    public class CachedAnalysis
-    {
-        public object Data { get; set; } = new();
-    }
-
-    // Missing AI concept extraction methods
-    private async Task<List<ConceptScore>> ExtractConceptsByOntology(string content, ConceptExtractionRequest request)
-    {
-        var concepts = new List<ConceptScore>();
-        
-        try
-        {
-            // Get optimal LLM configuration for ontology analysis
-            var optimalConfig = LLMConfigurationSystem.GetOptimalConfiguration("concept-extraction");
-            var modelAvailable = await LLMConfigurationSystem.ModelManager.EnsureModelAvailableAsync(optimalConfig.Model);
-            
-            if (modelAvailable)
-            {
-                // Use AI for ontology-based concept extraction
-                var llmConfig = new LLMConfig(
-                    Id: optimalConfig.Id,
-                    Name: optimalConfig.Id,
-                    Provider: optimalConfig.Provider,
-                    Model: optimalConfig.Model,
-                    ApiKey: "",
-                    BaseUrl: "http://localhost:11434",
-                    MaxTokens: 800,
-                    Temperature: 0.2, // Very low temperature for consistent ontology mapping
-                    TopP: 0.8,
-                    Parameters: new Dictionary<string, object>
-                    {
-                        ["stop"] = new[] { "---", "###" }
-                    }
-                );
-
-                var ontologyPrompt = $@"Analyze the following text using a consciousness-based ontology. Map concepts to their hierarchical relationships and ontological levels.
-
-Text: ""{content}""
-
-Use this consciousness ontology structure:
-- L1: Physical (body, matter, form)
-- L2: Emotional (feelings, emotions, relationships)
-- L3: Mental (thoughts, beliefs, mental models)
-- L4: Spiritual (soul, spirit, higher purpose)
-- L5: Cosmic (universal consciousness, unity)
-- L6: Transcendent (beyond form, pure awareness)
-- L7: Divine (source, absolute, infinite)
-
-Return your analysis as a JSON array of concepts with ontological mapping:
-[
-  {{
-    ""concept"": ""concept_name"",
-    ""score"": 0.0-1.0,
-    ""description"": ""brief description"",
-    ""category"": ""consciousness|transformation|unity|love|wisdom|energy|healing|abundance|sacred|fractal"",
-    ""confidence"": 0.0-1.0
-  }}
-]
-
-Focus on identifying the ontological level and relationships of each concept.";
-
-                var llmResponse = await CallLLMAsync(ontologyPrompt, llmConfig);
-                
-                if (!llmResponse.Content.Contains("LLM unavailable"))
-                {
-                    // Parse AI response
-                    var aiConcepts = ParseLLMOntologyResponse(llmResponse.Content);
-                    concepts.AddRange(aiConcepts);
-                    _logger.Info($"AI ontology analysis found {aiConcepts.Count} concepts");
-                }
-                else
-                {
-                    _logger.Warn("AI ontology analysis failed, falling back to rule-based extraction");
-                    concepts.AddRange(ExtractConceptsByOntologyRules(content, request));
-                }
-            }
-            else
-            {
-                _logger.Warn("LLM not available for ontology analysis, using rule-based extraction");
-                concepts.AddRange(ExtractConceptsByOntologyRules(content, request));
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"Error in AI ontology extraction: {ex.Message}", ex);
-            concepts.AddRange(ExtractConceptsByOntologyRules(content, request));
-        }
-
-        return concepts;
-    }
-
-    private List<ConceptScore> ExtractConceptsByOntologyRules(string content, ConceptExtractionRequest request)
-    {
-        var concepts = new List<ConceptScore>();
-        
-        // Define ontology-based concept mapping
-        var ontologyConcepts = new Dictionary<string, (string level, double weight, string[] parents, string[] children)>
-        {
-            // L1: Physical
-            { "body", ("L1", 0.6, new[] { "form", "matter" }, new[] { "health", "movement" }) },
-            { "matter", ("L1", 0.5, new[] { "form" }, new[] { "body", "substance" }) },
-            { "form", ("L1", 0.4, new string[0], new[] { "matter", "body", "structure" }) },
-            
-            // L2: Emotional
-            { "emotion", ("L2", 0.7, new[] { "feeling" }, new[] { "love", "joy", "fear" }) },
-            { "feeling", ("L2", 0.6, new[] { "emotion" }, new[] { "sensation", "experience" }) },
-            { "love", ("L2", 0.9, new[] { "emotion", "connection" }, new[] { "compassion", "unity" }) },
-            
-            // L3: Mental
-            { "thought", ("L3", 0.7, new[] { "mind" }, new[] { "belief", "idea", "concept" }) },
-            { "belief", ("L3", 0.8, new[] { "thought" }, new[] { "faith", "conviction" }) },
-            { "mind", ("L3", 0.8, new[] { "consciousness" }, new[] { "thought", "intellect" }) },
-            
-            // L4: Spiritual
-            { "soul", ("L4", 0.9, new[] { "spirit" }, new[] { "essence", "being" }) },
-            { "spirit", ("L4", 0.9, new[] { "soul" }, new[] { "divine", "sacred" }) },
-            { "purpose", ("L4", 0.8, new[] { "meaning" }, new[] { "mission", "calling" }) },
-            
-            // L5: Cosmic
-            { "consciousness", ("L5", 0.95, new[] { "awareness" }, new[] { "mind", "spirit" }) },
-            { "unity", ("L5", 0.9, new[] { "oneness" }, new[] { "connection", "wholeness" }) },
-            { "universal", ("L5", 0.85, new[] { "cosmic" }, new[] { "infinite", "eternal" }) },
-            
-            // L6: Transcendent
-            { "transcendence", ("L6", 0.95, new[] { "beyond" }, new[] { "enlightenment", "awakening" }) },
-            { "enlightenment", ("L6", 0.9, new[] { "transcendence" }, new[] { "wisdom", "clarity" }) },
-            { "awakening", ("L6", 0.85, new[] { "consciousness" }, new[] { "realization", "insight" }) },
-            
-            // L7: Divine
-            { "divine", ("L7", 0.98, new[] { "sacred" }, new[] { "god", "source" }) },
-            { "sacred", ("L7", 0.95, new[] { "divine" }, new[] { "holy", "blessed" }) },
-            { "source", ("L7", 0.98, new[] { "origin" }, new[] { "creator", "absolute" }) }
-        };
-
-        // Apply ontology-based concept extraction
-        foreach (var concept in ontologyConcepts)
-        {
-            var pattern = $@"\b{concept.Key}\b";
-            var matches = System.Text.RegularExpressions.Regex.Matches(content.ToLower(), pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            
-            if (matches.Count > 0)
-            {
-                var score = concept.Value.weight * Math.Min(matches.Count / 3.0, 1.0);
-                concepts.Add(new ConceptScore
-                {
-                    Concept = concept.Key,
-                    Score = score,
-                    Description = $"Ontological concept at {concept.Value.level} level",
-                    Category = "ontology",
-                    Confidence = Math.Min(score * 1.2, 1.0)
-                });
-            }
-        }
-
-        return concepts;
-    }
-
-    private async Task<List<ConceptScore>> MergeSimilarConcepts(List<ConceptScore> concepts)
-    {
-        var mergedConcepts = new List<ConceptScore>();
-        var processed = new HashSet<string>();
-        
-        try
-        {
-            // Get optimal LLM configuration for concept merging
-            var optimalConfig = LLMConfigurationSystem.GetOptimalConfiguration("concept-extraction");
-            var modelAvailable = await LLMConfigurationSystem.ModelManager.EnsureModelAvailableAsync(optimalConfig.Model);
-            
-            if (modelAvailable)
-            {
-                // Use AI for intelligent concept merging
-                var llmConfig = new LLMConfig(
-                    Id: optimalConfig.Id,
-                    Name: optimalConfig.Id,
-                    Provider: optimalConfig.Provider,
-                    Model: optimalConfig.Model,
-                    ApiKey: "",
-                    BaseUrl: "http://localhost:11434",
-                    MaxTokens: 1000,
-                    Temperature: 0.1, // Very low temperature for consistent merging
-                    TopP: 0.7,
-                    Parameters: new Dictionary<string, object>
-                    {
-                        ["stop"] = new[] { "---", "###" }
-                    }
-                );
-
-                var conceptsJson = JsonSerializer.Serialize(concepts.Select(c => new { c.Concept, c.Score, c.Description, c.Category, c.Confidence }));
-                
-                var mergePrompt = $@"Analyze the following concepts and merge similar ones. Group concepts that represent the same or very similar ideas.
-
-Concepts: {conceptsJson}
-
-Return your analysis as a JSON array of merged concepts:
-[
-  {{
-    ""concept"": ""merged_concept_name"",
-    ""score"": 0.0-1.0,
-    ""description"": ""merged description"",
-    ""category"": ""category"",
-    ""confidence"": 0.0-1.0
-  }}
-]
-
-Focus on merging concepts that are semantically similar or represent the same underlying idea.";
-
-                var llmResponse = await CallLLMAsync(mergePrompt, llmConfig);
-                
-                if (!llmResponse.Content.Contains("LLM unavailable"))
-                {
-                    // Parse AI response
-                    var aiMergedConcepts = ParseLLMMergeResponse(llmResponse.Content);
-                    mergedConcepts.AddRange(aiMergedConcepts);
-                    _logger.Info($"AI concept merging processed {concepts.Count} concepts into {aiMergedConcepts.Count} merged concepts");
-                }
-                else
-                {
-                    _logger.Warn("AI concept merging failed, falling back to rule-based merging");
-                    mergedConcepts.AddRange(MergeSimilarConceptsRules(concepts));
-                }
-            }
-            else
-            {
-                _logger.Warn("LLM not available for concept merging, using rule-based merging");
-                mergedConcepts.AddRange(MergeSimilarConceptsRules(concepts));
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"Error in AI concept merging: {ex.Message}", ex);
-            mergedConcepts.AddRange(MergeSimilarConceptsRules(concepts));
-        }
-
-        return mergedConcepts;
-    }
-
-    private List<ConceptScore> MergeSimilarConceptsRules(List<ConceptScore> concepts)
-    {
-        var mergedConcepts = new List<ConceptScore>();
-        var processed = new HashSet<string>();
-        
-        // Define similarity groups
-        var similarityGroups = new Dictionary<string, List<string>>
-        {
-            ["consciousness"] = new[] { "awareness", "mindfulness", "presence", "awakening" }.ToList(),
-            ["love"] = new[] { "compassion", "empathy", "kindness", "heart" }.ToList(),
-            ["unity"] = new[] { "oneness", "connection", "wholeness", "integration" }.ToList(),
-            ["wisdom"] = new[] { "knowledge", "insight", "understanding", "clarity" }.ToList(),
-            ["transformation"] = new[] { "evolution", "growth", "change", "shift" }.ToList(),
-            ["energy"] = new[] { "vibration", "frequency", "resonance", "flow" }.ToList(),
-            ["healing"] = new[] { "recovery", "restoration", "wholeness", "balance" }.ToList(),
-            ["abundance"] = new[] { "prosperity", "wealth", "success", "fulfillment" }.ToList()
-        };
-
-        foreach (var concept in concepts)
-        {
-            if (processed.Contains(concept.Concept.ToLower()))
-                continue;
-
-            // Find the best group for this concept
-            var bestGroup = similarityGroups.FirstOrDefault(g => 
-                g.Value.Contains(concept.Concept.ToLower()) || 
-                g.Key.Equals(concept.Concept.ToLower(), StringComparison.OrdinalIgnoreCase));
-
-            if (bestGroup.Key != null)
-            {
-                // Find all similar concepts in this group
-                var similarConcepts = concepts.Where(c => 
-                    bestGroup.Value.Contains(c.Concept.ToLower()) || 
-                    c.Concept.ToLower() == bestGroup.Key).ToList();
-
-                if (similarConcepts.Count > 1)
-                {
-                    // Merge similar concepts
-                    var mergedConcept = new ConceptScore
-                    {
-                        Concept = bestGroup.Key,
-                        Score = similarConcepts.Max(c => c.Score),
-                        Description = $"Merged from: {string.Join(", ", similarConcepts.Select(c => c.Concept))}",
-                        Category = similarConcepts.First().Category,
-                        Confidence = similarConcepts.Average(c => c.Confidence)
-                    };
-                    
-                    mergedConcepts.Add(mergedConcept);
-                    
-                    // Mark all similar concepts as processed
-                    foreach (var similar in similarConcepts)
-                    {
-                        processed.Add(similar.Concept.ToLower());
-                    }
-                }
-                else
-                {
-                    mergedConcepts.Add(concept);
-                    processed.Add(concept.Concept.ToLower());
-                }
-            }
-            else
-            {
-                mergedConcepts.Add(concept);
-                processed.Add(concept.Concept.ToLower());
-            }
-        }
-
-        return mergedConcepts;
-    }
-
-    private async Task<double> CalculateConfidence(List<ConceptScore> concepts, string content, ConceptExtractionRequest request)
-    {
-        try
-        {
-            // Get optimal LLM configuration for confidence calculation
-            var optimalConfig = LLMConfigurationSystem.GetOptimalConfiguration("concept-extraction");
-            var modelAvailable = await LLMConfigurationSystem.ModelManager.EnsureModelAvailableAsync(optimalConfig.Model);
-            
-            if (modelAvailable)
-            {
-                // Use AI for intelligent confidence calculation
-                var llmConfig = new LLMConfig(
-                    Id: optimalConfig.Id,
-                    Name: optimalConfig.Id,
-                    Provider: optimalConfig.Provider,
-                    Model: optimalConfig.Model,
-                    ApiKey: "",
-                    BaseUrl: "http://localhost:11434",
-                    MaxTokens: 500,
-                    Temperature: 0.1, // Very low temperature for consistent confidence scoring
-                    TopP: 0.7,
-                    Parameters: new Dictionary<string, object>
-                    {
-                        ["stop"] = new[] { "---", "###" }
-                    }
-                );
-
-                var conceptsJson = JsonSerializer.Serialize(concepts.Select(c => new { c.Concept, c.Score, c.Description, c.Category, c.Confidence }));
-                
-                var confidencePrompt = $@"Analyze the confidence of the following concept extraction results.
-
-Original Text: ""{content}""
-Extracted Concepts: {conceptsJson}
-
-Consider these factors:
-1. Relevance of concepts to the text
-2. Semantic coherence of the concepts
-3. Completeness of concept coverage
-4. Quality of concept descriptions
-5. Consistency of confidence scores
-
-Return a single confidence score between 0.0 and 1.0 as a JSON number:
-0.9-1.0: Excellent extraction with high relevance and coherence
-0.7-0.9: Good extraction with minor issues
-0.5-0.7: Fair extraction with some relevant concepts
-0.3-0.5: Poor extraction with limited relevance
-0.0-0.3: Very poor extraction with minimal relevance
-
-Confidence Score:";
-
-                var llmResponse = await CallLLMAsync(confidencePrompt, llmConfig);
-                
-                if (!llmResponse.Content.Contains("LLM unavailable"))
-                {
-                    // Parse AI confidence score
-                    var confidenceText = llmResponse.Content.Trim();
-                    if (double.TryParse(confidenceText, out var aiConfidence))
-                    {
-                        _logger.Info($"AI confidence calculation: {aiConfidence:F2}");
-                        return Math.Max(0.0, Math.Min(1.0, aiConfidence));
-                    }
-                }
-            }
-            
-            // Fallback to rule-based confidence calculation
-            return CalculateConfidenceRules(concepts, content, request);
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"Error in AI confidence calculation: {ex.Message}", ex);
-            return CalculateConfidenceRules(concepts, content, request);
-        }
-    }
-
-    private double CalculateConfidenceRules(List<ConceptScore> concepts, string content, ConceptExtractionRequest request)
-    {
-        if (concepts.Count == 0)
-            return 0.0;
-
-        // Base confidence from concept scores
-        var avgConceptScore = concepts.Average(c => c.Score);
-        var avgConfidence = concepts.Average(c => c.Confidence);
-        
-        // Coverage factor (how much of the text is covered by concepts)
-        var textLength = content.Length;
-        var conceptCoverage = Math.Min(concepts.Count / (textLength / 100.0), 1.0);
-        
-        // Diversity factor (how diverse are the concept categories)
-        var uniqueCategories = concepts.Select(c => c.Category).Distinct().Count();
-        var diversityFactor = Math.Min(uniqueCategories / 5.0, 1.0);
-        
-        // Quality factor (how many high-quality concepts)
-        var highQualityConcepts = concepts.Count(c => c.Score > 0.7 && c.Confidence > 0.7);
-        var qualityFactor = (double)highQualityConcepts / concepts.Count;
-        
-        // Calculate final confidence
-        var confidence = (avgConceptScore * 0.3 + avgConfidence * 0.3 + conceptCoverage * 0.2 + diversityFactor * 0.1 + qualityFactor * 0.1);
-        
-        return Math.Max(0.0, Math.Min(1.0, confidence));
-    }
-
-    // Helper methods for parsing LLM responses
-    private List<ConceptScore> ParseLLMOntologyResponse(string response)
-    {
-        try
-        {
-            var jsonStart = response.IndexOf('[');
-            var jsonEnd = response.LastIndexOf(']') + 1;
-            
-            if (jsonStart >= 0 && jsonEnd > jsonStart)
-            {
-                var json = response.Substring(jsonStart, jsonEnd - jsonStart);
-                var concepts = JsonSerializer.Deserialize<List<ConceptScore>>(json);
-                return concepts ?? new List<ConceptScore>();
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"Error parsing LLM ontology response: {ex.Message}", ex);
-        }
-        
-        return new List<ConceptScore>();
-    }
-
-    private List<ConceptScore> ParseLLMMergeResponse(string response)
-    {
-        try
-        {
-            var jsonStart = response.IndexOf('[');
-            var jsonEnd = response.LastIndexOf(']') + 1;
-            
-            if (jsonStart >= 0 && jsonEnd > jsonStart)
-            {
-                var json = response.Substring(jsonStart, jsonEnd - jsonStart);
-                var concepts = JsonSerializer.Deserialize<List<ConceptScore>>(json);
-                return concepts ?? new List<ConceptScore>();
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"Error parsing LLM merge response: {ex.Message}", ex);
-        }
-        
-        return new List<ConceptScore>();
-    }
+    #endregion
 }
