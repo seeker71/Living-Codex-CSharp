@@ -138,6 +138,9 @@ moduleLoader.LoadExternalModules(moduleDir);
 // Generate meta-nodes for all loaded modules and spec files
 moduleLoader.GenerateMetaNodes();
 
+// Inject ModuleLoader into HealthService for accurate module counting
+healthService.SetModuleLoader(moduleLoader);
+
 // Display comprehensive module loading summary
 var loadedModules = moduleLoader.GetLoadedModules();
 var logger = app.Services.GetRequiredService<ILogger<Program>>();

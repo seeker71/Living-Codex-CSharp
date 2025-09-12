@@ -13,6 +13,7 @@ public sealed class HealthService
     private readonly DateTime _startTime;
     private long _requestCount;
     private readonly object _lock = new object();
+    private ModuleLoader? _moduleLoader;
 
     public HealthService(NodeRegistry registry)
     {
@@ -20,6 +21,11 @@ public sealed class HealthService
         _logger = new Log4NetLogger(typeof(HealthService));
         _startTime = DateTime.UtcNow;
         _requestCount = 0;
+    }
+
+    public void SetModuleLoader(ModuleLoader moduleLoader)
+    {
+        _moduleLoader = moduleLoader;
     }
 
     /// <summary>
@@ -32,7 +38,10 @@ public sealed class HealthService
             var uptime = DateTime.UtcNow - _startTime;
             var nodeCount = _registry.AllNodes().Count();
             var edgeCount = _registry.AllEdges().Count();
-            var moduleCount = _registry.GetNodesByType("module").Count();
+            // Use actual loaded module count from ModuleLoader instead of NodeRegistry count
+            var moduleCount = _moduleLoader?.GetLoadedModules().Count ?? 
+                             (_registry.GetNodesByType("module").Count() + 
+                              _registry.GetNodesByType("codex.module").Count());
 
             return new HealthStatus(
                 Status: "healthy",
