@@ -12,10 +12,10 @@ public class NodeRegistry
     public virtual void Upsert(Edge edge) => _edges.Add(edge);
     public virtual bool TryGet(string id, out Node node) => _nodes.TryGetValue(id, out node!);
     public virtual IEnumerable<Edge> AllEdges() => _edges;
-    public virtual IEnumerable<Node> AllNodes() => _nodes.Values;
+    public virtual IEnumerable<Node> AllNodes() => _nodes.Values.ToList();
     
     public virtual IEnumerable<Node> GetNodesByType(string typeId) => 
-        _nodes.Values.Where(n => n.TypeId == typeId);
+        _nodes.Values.ToList().Where(n => n.TypeId == typeId);
     
     public virtual IEnumerable<Edge> GetEdgesFrom(string fromId) => 
         _edges.Where(e => e.FromId == fromId);

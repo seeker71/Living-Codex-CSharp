@@ -98,6 +98,9 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
         // Add generic logging
         builder.Services.AddLogging(configure => configure.AddConsole().AddDebug());
         
+        // Add SignalR services for RealtimeModule
+        builder.Services.AddSignalR();
+        
         // Register custom logger interface
         builder.Services.AddSingleton<CodexBootstrap.Core.ILogger, Log4NetLogger>(sp => 
             new Log4NetLogger("Program"));

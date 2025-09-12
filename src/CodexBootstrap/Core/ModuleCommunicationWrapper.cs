@@ -348,11 +348,11 @@ namespace CodexBootstrap.Core
     public class ModuleResponse<T>
     {
         public bool Success { get; set; }
-        public T Data { get; set; }
-        public string Error { get; set; }
+        public T Data { get; set; } = default!;
+        public string Error { get; set; } = "";
         public System.Net.HttpStatusCode? StatusCode { get; set; }
         public TimeSpan Duration { get; set; }
-        public string CallId { get; set; }
+        public string CallId { get; set; } = "";
     }
 
     /// <summary>
@@ -360,11 +360,11 @@ namespace CodexBootstrap.Core
     /// </summary>
     public class ModuleCall
     {
-        public string ModuleName { get; set; }
-        public string Endpoint { get; set; }
-        public object Request { get; set; }
+        public string ModuleName { get; set; } = "";
+        public string Endpoint { get; set; } = "";
+        public object Request { get; set; } = new();
         public HttpMethod Method { get; set; } = HttpMethod.Post;
-        public Dictionary<string, string> Headers { get; set; }
+        public Dictionary<string, string> Headers { get; set; } = new();
         public int TimeoutSeconds { get; set; } = 30;
     }
 
@@ -373,10 +373,10 @@ namespace CodexBootstrap.Core
     /// </summary>
     public class ModuleHealthResponse
     {
-        public string Status { get; set; }
-        public string ModuleName { get; set; }
+        public string Status { get; set; } = "";
+        public string ModuleName { get; set; } = "";
         public DateTime Timestamp { get; set; }
-        public Dictionary<string, object> Metrics { get; set; }
+        public Dictionary<string, object> Metrics { get; set; } = new();
     }
 
 
@@ -392,8 +392,8 @@ namespace CodexBootstrap.Core
 
     public class ConceptAnalysis
     {
-        public string Id { get; set; }
-        public string NewsItemId { get; set; }
+        public string Id { get; set; } = "";
+        public string NewsItemId { get; set; } = "";
         public List<string> Concepts { get; set; } = new();
         public double Confidence { get; set; }
         public List<string> OntologyLevels { get; set; } = new();
@@ -407,20 +407,20 @@ namespace CodexBootstrap.Core
         public string Context { get; set; } = "";
         public string TimeHorizon { get; set; } = "";
         public string Perspective { get; set; } = "";
-        public LLMConfig LLMConfig { get; set; }
+        public LLMConfig? LLMConfig { get; set; }
         public Dictionary<string, object> Metadata { get; set; } = new();
     }
 
     public class LLMFutureQueryResponse
     {
-        public string Id { get; set; }
-        public string Query { get; set; }
-        public string Response { get; set; }
+        public string Id { get; set; } = "";
+        public string Query { get; set; } = "";
+        public string Response { get; set; } = "";
         public double Confidence { get; set; }
-        public string Reasoning { get; set; }
+        public string Reasoning { get; set; } = "";
         public List<string> Sources { get; set; } = new();
         public DateTimeOffset GeneratedAt { get; set; }
-        public LLMConfig UsedConfig { get; set; }
+        public LLMConfig? UsedConfig { get; set; }
     }
 
 
@@ -435,10 +435,10 @@ namespace CodexBootstrap.Core
 
     public class ConceptRegistrationResponse
     {
-        public string Id { get; set; }
-        public string Name { get; set; }
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
         public bool Success { get; set; }
-        public string Message { get; set; }
+        public string Message { get; set; } = "";
     }
 
     public class ConceptDiscoveryRequest
@@ -457,12 +457,12 @@ namespace CodexBootstrap.Core
 
     public class ConceptInfo
     {
-        public string Id { get; set; }
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public string Category { get; set; }
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Category { get; set; } = "";
         public double Score { get; set; }
-        public string Frequency { get; set; }
+        public string Frequency { get; set; } = "";
     }
 
     public class JoyCalculationRequest
@@ -474,7 +474,7 @@ namespace CodexBootstrap.Core
     public class JoyCalculationResponse
     {
         public bool Success { get; set; }
-        public string Message { get; set; }
+        public string Message { get; set; } = "";
         public double JoyLevel { get; set; }
     }
 
@@ -487,16 +487,16 @@ namespace CodexBootstrap.Core
     public class ResonanceCalculationResponse
     {
         public bool Success { get; set; }
-        public string Message { get; set; }
+        public string Message { get; set; } = "";
         public double ResonanceLevel { get; set; }
         public List<ResonancePattern> Patterns { get; set; } = new();
     }
 
     public class ResonancePattern
     {
-        public string Name { get; set; }
+        public string Name { get; set; } = "";
         public double Strength { get; set; }
-        public string Frequency { get; set; }
+        public string Frequency { get; set; } = "";
         public DateTime Timestamp { get; set; }
     }
 
@@ -510,9 +510,9 @@ namespace CodexBootstrap.Core
 
     public class TranslationResponse
     {
-        public string TranslatedText { get; set; }
-        public string SourceLanguage { get; set; }
-        public string TargetLanguage { get; set; }
+        public string TranslatedText { get; set; } = "";
+        public string SourceLanguage { get; set; } = "";
+        public string TargetLanguage { get; set; } = "";
         public double Confidence { get; set; }
         public DateTimeOffset TranslatedAt { get; set; }
     }

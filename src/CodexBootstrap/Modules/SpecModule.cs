@@ -448,7 +448,7 @@ public sealed class SpecModule : IModule
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase
                 };
                 
-                atomsData = JsonSerializer.Deserialize<AtomsData>(atoms.GetRawText(), jsonOptions);
+                atomsData = JsonSerializer.Deserialize<AtomsData>(atoms.GetRawText(), jsonOptions) ?? new AtomsData();
                 if (atomsData == null) 
             {
                 _logger.Warn("AtomsData is null after deserialization");

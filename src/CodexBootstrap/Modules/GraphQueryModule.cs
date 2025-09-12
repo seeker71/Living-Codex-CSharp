@@ -267,7 +267,10 @@ public class GraphQueryModule : IModule
 
             // Use existing HydrateModule to load files
             var projectRoot = Directory.GetCurrentDirectory();
-            var specFiles = Directory.GetFiles(projectRoot, "*.md", SearchOption.TopDirectoryOnly);
+            var specFiles = Directory.GetFiles(projectRoot, "*.md", SearchOption.TopDirectoryOnly)
+                .Where(f => !Path.GetFileName(f).StartsWith("README") && 
+                           !Path.GetFileName(f).Equals("README.md", StringComparison.OrdinalIgnoreCase))
+                .ToArray();
 
             foreach (var specFile in specFiles)
             {

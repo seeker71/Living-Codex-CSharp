@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -30,7 +31,8 @@ namespace CodexBootstrap.Modules
         private readonly int _ingestionIntervalMinutes = 15;
         private readonly int _cleanupIntervalHours = 24;
         private readonly int _maxItemsPerSource = 50; // Increased from 10
-        private readonly HashSet<string> _processedNewsIds = new(); // Track processed news to prevent duplicates
+        private readonly ConcurrentDictionary<string, bool> _processedNewsIds = new(); // Track processed news to prevent duplicates
+        private readonly SemaphoreSlim _semaphore = new(1, 1); // Semaphore for async thread safety
 
         // Node type constants
         private const string NEWS_SOURCE_NODE_TYPE = "codex.news.source";
@@ -107,6 +109,7 @@ namespace CodexBootstrap.Modules
             _ingestionTimer?.Dispose();
             _cleanupTimer?.Dispose();
             _httpClient?.Dispose();
+            _semaphore?.Dispose();
         }
 
         private void InitializeNewsSources()
@@ -199,14 +202,17 @@ namespace CodexBootstrap.Modules
 
         private async Task IngestNewsFromSources(object? state)
         {
+            await _semaphore.WaitAsync();
             try
             {
                 _logger.Info("Starting news ingestion from all sources");
 
-                // Get all active news source nodes
+                // Get all active news source nodes - create a copy to avoid collection modification issues
                 var sourceNodes = _registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE)
-                    .Where(n => n.Meta?.ContainsKey("isActive") == true && (bool)n.Meta["isActive"]);
+                    .Where(n => n.Meta?.ContainsKey("isActive") == true && (bool)n.Meta["isActive"])
+                    .ToList(); // Create a copy to prevent collection modification during iteration
 
+                // Process sources sequentially to avoid collection modification issues
                 foreach (var sourceNode in sourceNodes)
                 {
                     try
@@ -236,6 +242,10 @@ namespace CodexBootstrap.Modules
             {
                 _logger.Error($"Error during news ingestion: {ex.Message}", ex);
             }
+            finally
+            {
+                _semaphore.Release();
+            }
         }
 
         private async Task IngestRssFeed(NewsSource source)
@@ -245,7 +255,7 @@ namespace CodexBootstrap.Modules
                 using var reader = XmlReader.Create(source.Url);
                 var feed = SyndicationFeed.Load(reader);
 
-                foreach (var item in feed.Items.Take(_maxItemsPerSource))
+                foreach (var item in feed.Items.Take(_maxItemsPerSource).ToList())
                 {
                     var newsItem = new NewsItem
                     {
@@ -344,12 +354,15 @@ namespace CodexBootstrap.Modules
         {
             try
             {
-                // Check for duplicates
-                if (_processedNewsIds.Contains(newsItem.Id))
+                // Check for duplicates (ConcurrentDictionary is thread-safe)
+                if (_processedNewsIds.ContainsKey(newsItem.Id))
                 {
                     _logger.Debug($"Skipping duplicate news item: {newsItem.Id}");
                     return;
                 }
+                
+                // Mark as processed before processing
+                _processedNewsIds.TryAdd(newsItem.Id, true);
 
                 // Check if news item already exists in registry
                 var existingNewsNode = _registry.GetNodesByType(NEWS_ITEM_NODE_TYPE)
@@ -360,9 +373,6 @@ namespace CodexBootstrap.Modules
                     _logger.Debug($"News item already exists in registry: {newsItem.Id}");
                     return;
                 }
-
-                // Mark as processed
-                _processedNewsIds.Add(newsItem.Id);
 
                 // Store news item as node
                 var newsNode = new Node(

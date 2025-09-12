@@ -441,7 +441,7 @@ public sealed class ModuleLoader
             var specFiles = Directory.GetFiles(projectRoot, "*.md")
                 .Concat(Directory.GetFiles(projectRoot, "*.spec"))
                 .Concat(Directory.GetFiles(projectRoot, "*.txt"))
-                .Where(f => Path.GetFileName(f).StartsWith("FRACTAL_") || 
+                .Where(f => (Path.GetFileName(f).StartsWith("FRACTAL_") || 
                            Path.GetFileName(f).StartsWith("U-CORE_") ||
                            Path.GetFileName(f).StartsWith("UCORE_") ||
                            Path.GetFileName(f).StartsWith("MULTI_SERVICE_") ||
@@ -456,8 +456,9 @@ public sealed class ModuleLoader
                            Path.GetFileName(f).StartsWith("JOY_") ||
                            Path.GetFileName(f).StartsWith("FUTURE_") ||
                            Path.GetFileName(f).StartsWith("END_TO_END_") ||
-                           Path.GetFileName(f).StartsWith("test_") ||
-                           Path.GetFileName(f).StartsWith("README"))
+                           Path.GetFileName(f).StartsWith("test_")) &&
+                           !Path.GetFileName(f).StartsWith("README") &&
+                           !Path.GetFileName(f).Equals("README.md", StringComparison.OrdinalIgnoreCase))
                 .ToArray();
             
             _logger.Info($"Found {specFiles.Length} spec files to process");
