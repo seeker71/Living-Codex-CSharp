@@ -1,0 +1,180 @@
+groups:
+- name: living-codex.rules
+  rules:
+  # API Health Rules
+  - alert: LivingCodexAPIDown
+    expr: up{job="living-codex-api"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Living Codex API is down"
+      description: "Living Codex API has been down for more than 1 minute."
+
+  - alert: LivingCodexAPIHighErrorRate
+    expr: rate(living_codex_api_errors_total[5m]) > 0.1
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High error rate in Living Codex API"
+      description: "Error rate is {{ $value }} errors per second."
+
+  - alert: LivingCodexAPIHighResponseTime
+    expr: histogram_quantile(0.95, rate(living_codex_api_request_duration_seconds_bucket[5m])) > 2
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High response time in Living Codex API"
+      description: "95th percentile response time is {{ $value }} seconds."
+
+  # Database Health Rules
+  - alert: PostgreSQLDown
+    expr: up{job="postgres"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "PostgreSQL is down"
+      description: "PostgreSQL database has been down for more than 1 minute."
+
+  - alert: PostgreSQLHighConnections
+    expr: postgres_stat_activity_count > 80
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High number of PostgreSQL connections"
+      description: "PostgreSQL has {{ $value }} active connections."
+
+  - alert: PostgreSQLSlowQueries
+    expr: rate(postgres_stat_activity_max_tx_duration[5m]) > 30
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Slow PostgreSQL queries detected"
+      description: "PostgreSQL has queries running for {{ $value }} seconds."
+
+  # Redis Health Rules
+  - alert: RedisDown
+    expr: up{job="redis"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Redis is down"
+      description: "Redis cache has been down for more than 1 minute."
+
+  - alert: RedisHighMemoryUsage
+    expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High Redis memory usage"
+      description: "Redis memory usage is {{ $value | humanizePercentage }}."
+
+  - alert: RedisLowHitRate
+    expr: rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) < 0.8
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Low Redis hit rate"
+      description: "Redis hit rate is {{ $value | humanizePercentage }}."
+
+  # Resource Usage Rules
+  - alert: HighCPUUsage
+    expr: rate(container_cpu_usage_seconds_total[5m]) > 0.8
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High CPU usage"
+      description: "CPU usage is {{ $value | humanizePercentage }}."
+
+  - alert: HighMemoryUsage
+    expr: container_memory_usage_bytes / container_spec_memory_limit_bytes > 0.9
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High memory usage"
+      description: "Memory usage is {{ $value | humanizePercentage }}."
+
+  - alert: DiskSpaceLow
+    expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.1
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Low disk space"
+      description: "Disk space is {{ $value | humanizePercentage }} available."
+
+  # Business Metrics Rules
+  - alert: LowTranslationSuccessRate
+    expr: rate(living_codex_translations_success_total[5m]) / rate(living_codex_translations_total[5m]) < 0.9
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Low translation success rate"
+      description: "Translation success rate is {{ $value | humanizePercentage }}."
+
+  - alert: HighResonanceCalculationTime
+    expr: histogram_quantile(0.95, rate(living_codex_resonance_calculation_duration_seconds_bucket[5m])) > 5
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High resonance calculation time"
+      description: "95th percentile resonance calculation time is {{ $value }} seconds."
+
+  - alert: LowCacheHitRate
+    expr: rate(living_codex_cache_hits_total[5m]) / (rate(living_codex_cache_hits_total[5m]) + rate(living_codex_cache_misses_total[5m])) < 0.7
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Low cache hit rate"
+      description: "Cache hit rate is {{ $value | humanizePercentage }}."
+
+  # Security Rules
+  - alert: HighAuthenticationFailures
+    expr: rate(living_codex_auth_failures_total[5m]) > 10
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High authentication failure rate"
+      description: "Authentication failure rate is {{ $value }} failures per second."
+
+  - alert: SuspiciousAPIUsage
+    expr: rate(living_codex_api_requests_total[1m]) > 100
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Suspicious API usage pattern"
+      description: "API request rate is {{ $value }} requests per second."
+
+  # Service Discovery Rules
+  - alert: ServiceDiscoveryIssues
+    expr: up{job="service-discovery"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Service discovery is down"
+      description: "Service discovery service has been down for more than 1 minute."
+
+  - alert: HighServiceRegistrationFailures
+    expr: rate(living_codex_service_registration_failures_total[5m]) > 0.1
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High service registration failure rate"
+      description: "Service registration failure rate is {{ $value }} failures per second."

@@ -1,0 +1,186 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: living-codex-config
+  namespace: living-codex
+data:
+  # Application Configuration
+  ASPNETCORE_ENVIRONMENT: "Production"
+  ASPNETCORE_URLS: "http://+:5000;https://+:5001"
+  LOG_LEVEL: "Information"
+  
+  # Database Configuration
+  ConnectionStrings__DefaultConnection: "Host=postgres-service;Database=livingcodex;Username=postgres;Password=postgres;Port=5432"
+  ConnectionStrings__Redis: "redis-service:6379"
+  ConnectionStrings__RabbitMQ: "amqp://guest:guest@rabbitmq-service:5672"
+  
+  # LLM Configuration
+  OLLAMA_BASE_URL: "http://ollama-service:11434"
+  
+  # Monitoring Configuration
+  PROMETHEUS_ENDPOINT: "http://prometheus-service:9090"
+  JAEGER_ENDPOINT: "http://jaeger-service:14268"
+  
+  # Security Configuration
+  JWT_ISSUER: "living-codex"
+  JWT_AUDIENCE: "living-codex-users"
+  JWT_EXPIRY_HOURS: "24"
+  
+  # Performance Configuration
+  CACHE_TTL_MINUTES: "60"
+  MAX_CONCURRENT_REQUESTS: "100"
+  REQUEST_TIMEOUT_SECONDS: "30"
+  
+  # Feature Flags
+  ENABLE_SWAGGER: "false"
+  ENABLE_METRICS: "true"
+  ENABLE_TRACING: "true"
+  ENABLE_CACHING: "true"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  namespace: living-codex
+data:
+  POSTGRES_DB: "livingcodex"
+  POSTGRES_USER: "postgres"
+  POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+  namespace: living-codex
+data:
+  redis.conf: |
+    # Redis configuration for production
+    maxmemory 2gb
+    maxmemory-policy allkeys-lru
+    save 900 1
+    save 300 10
+    save 60 10000
+    tcp-keepalive 300
+    timeout 0
+    tcp-backlog 511
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: living-codex
+data:
+  nginx.conf: |
+    events {
+        worker_connections 1024;
+    }
+    
+    http {
+        upstream living_codex_api {
+            server living-codex-service:5000;
+        }
+        
+        # Rate limiting
+        limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+        limit_req_zone $binary_remote_addr zone=auth:10m rate=5r/s;
+        
+        # Logging
+        log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" '
+                        '"$http_user_agent" "$http_x_forwarded_for"';
+        
+        access_log /var/log/nginx/access.log main;
+        error_log /var/log/nginx/error.log warn;
+        
+        # Gzip compression
+        gzip on;
+        gzip_vary on;
+        gzip_min_length 1024;
+        gzip_proxied any;
+        gzip_comp_level 6;
+        gzip_types
+            text/plain
+            text/css
+            text/xml
+            text/javascript
+            application/json
+            application/javascript
+            application/xml+rss
+            application/atom+xml
+            image/svg+xml;
+        
+        # Security headers
+        add_header X-Frame-Options DENY;
+        add_header X-Content-Type-Options nosniff;
+        add_header X-XSS-Protection "1; mode=block";
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        
+        server {
+            listen 80;
+            server_name _;
+            
+            # Health check endpoint
+            location /health {
+                proxy_pass http://living_codex_api/health;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+            
+            # API routes
+            location /api/ {
+                limit_req zone=api burst=20 nodelay;
+                
+                proxy_pass http://living_codex_api;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_set_header X-Forwarded-Host $host;
+                proxy_set_header X-Forwarded-Port $server_port;
+                
+                # Timeouts
+                proxy_connect_timeout 30s;
+                proxy_send_timeout 30s;
+                proxy_read_timeout 30s;
+                
+                # Buffer settings
+                proxy_buffering on;
+                proxy_buffer_size 4k;
+                proxy_buffers 8 4k;
+            }
+            
+            # Authentication routes (stricter rate limiting)
+            location /api/security/ {
+                limit_req zone=auth burst=10 nodelay;
+                
+                proxy_pass http://living_codex_api;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+            
+            # WebSocket support
+            location /ws {
+                proxy_pass http://living_codex_api;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+            
+            # Health check
+            location /health {
+                proxy_pass http://living_codex_api/health;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+        }
+    }

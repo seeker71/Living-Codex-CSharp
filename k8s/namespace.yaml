@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: living-codex
+  labels:
+    name: living-codex
+    app: living-codex
+    environment: production
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: living-codex-monitoring
+  labels:
+    name: living-codex-monitoring
+    app: living-codex
+    environment: production

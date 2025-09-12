@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>News Feed Demo - Living Codex</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .header h1 {
+            color: #2c3e50;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .header p {
+            color: #7f8c8d;
+            font-size: 1.2em;
+        }
+        .demo-section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+        .demo-section h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px;
+            transition: transform 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        .result {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 15px;
+            border-left: 5px solid #667eea;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .news-item {
+            background: white;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-radius: 10px;
+            border-left: 5px solid #4facfe;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .news-item h4 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+        .news-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #7f8c8d;
+        }
+        .concept-tag {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 3px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            margin: 2px;
+            display: inline-block;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📰 News Feed Demo</h1>
+            <p>Intelligent news analysis and concept extraction for personalized feeds</p>
+        </div>
+
+        <div class="demo-section">
+            <h3>🎯 Test News Feed Integration</h3>
+            <p>This demo shows how the Living Codex system can analyze news articles, extract concepts, and match them to user interests, contributions, and investments.</p>
+            
+            <button class="btn" onclick="testNewsFeed()">📰 Get Personalized News Feed</button>
+            <button class="btn" onclick="testNewsConcepts()">🔍 Get News Concepts</button>
+            <button class="btn" onclick="testIngestNews()">📥 Ingest News Item</button>
+            <button class="btn" onclick="testAnalyzeNews()">🔬 Analyze News Item</button>
+            
+            <div id="result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="demo-section">
+            <h3>📊 News Feed Results</h3>
+            <div id="newsResults" class="loading">Click a button above to test the news feed functionality</div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000';
+        
+        function showResult(data) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = JSON.stringify(data, null, 2);
+        }
+        
+        function showNewsResults(data) {
+            const resultsDiv = document.getElementById('newsResults');
+            
+            if (data.newsItems && data.newsItems.length > 0) {
+                resultsDiv.innerHTML = data.newsItems.map(news => `
+                    <div class="news-item">
+                        <h4>${news.title}</h4>
+                        <p>${news.content}</p>
+                        <div class="news-meta">
+                            <span><strong>Source:</strong> ${news.source}</span>
+                            <span><strong>Published:</strong> ${new Date(news.publishedAt).toLocaleString()}</span>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <strong>Tags:</strong> ${news.tags.map(tag => `<span class="concept-tag">${tag}</span>`).join('')}
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                resultsDiv.innerHTML = '<p>No news items found. Try ingesting some news first!</p>';
+            }
+        }
+        
+        async function testNewsFeed() {
+            try {
+                const response = await fetch(`${API_BASE}/future/news/feed`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        userId: 'user1',
+                        interestAreas: ['AI', 'abundance', 'technology'],
+                        contributionTypes: ['Create', 'Innovation'],
+                        investmentAreas: ['technology', 'sustainability'],
+                        maxItems: 5
+                    })
+                });
+                
+                const data = await response.json();
+                showResult(data);
+                showNewsResults(data);
+            } catch (error) {
+                showResult({ error: error.message });
+            }
+        }
+        
+        async function testNewsConcepts() {
+            try {
+                const response = await fetch(`${API_BASE}/future/news/concepts`);
+                const data = await response.json();
+                showResult(data);
+            } catch (error) {
+                showResult({ error: error.message });
+            }
+        }
+        
+        async function testIngestNews() {
+            try {
+                const response = await fetch(`${API_BASE}/future/news/ingest`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        id: 'news-demo-1',
+                        title: 'Breakthrough in Quantum AI for Abundance Systems',
+                        content: 'Researchers have developed a new quantum AI system that can process abundance amplification algorithms 1000x faster than classical computers. This breakthrough could revolutionize how we calculate collective resonance and amplify individual contributions.',
+                        source: 'QuantumNews',
+                        url: 'https://example.com/quantum-ai-abundance',
+                        publishedAt: new Date().toISOString(),
+                        tags: ['quantum', 'AI', 'abundance', 'breakthrough', 'computing'],
+                        metadata: {
+                            category: 'technology',
+                            sentiment: 'positive',
+                            impact: 'high'
+                        }
+                    })
+                });
+                
+                const data = await response.json();
+                showResult(data);
+            } catch (error) {
+                showResult({ error: error.message });
+            }
+        }
+        
+        async function testAnalyzeNews() {
+            try {
+                const response = await fetch(`${API_BASE}/future/news/analyze/news-demo-1?userId=user1&interestAreas=AI,quantum&contributionTypes=Create&investmentAreas=technology`);
+                const data = await response.json();
+                showResult(data);
+            } catch (error) {
+                showResult({ error: error.message });
+            }
+        }
+    </script>
+</body>
+</html>

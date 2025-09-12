@@ -1573,3 +1573,641 @@ Respond with structured analysis including pattern descriptions, confidence scor
         return actions;
     }
 }
+
+// Pattern Recognition DTOs
+public record PatternDiscoveryRequest(
+    List<string> DataSources,
+    List<string> PatternTypes,
+    Dictionary<string, object> Filters
+);
+
+public record PatternDiscoveryResponse(
+    bool Success,
+    List<DiscoveredPattern> Patterns,
+    List<PatternInsight> Insights,
+    int DataSourceCount,
+    DateTime DiscoveredAt,
+    string Message
+);
+
+public record PatternAnalysisRequest(
+    string PatternId,
+    Dictionary<string, object> AnalysisOptions,
+    string TimeHorizon = "30d"
+);
+
+public record PatternAnalysisResponse(
+    bool Success,
+    string PatternId,
+    PatternAnalysis Analysis,
+    List<PatternPrediction> Predictions,
+    List<PatternRecommendation> Recommendations,
+    DateTime AnalyzedAt,
+    string Message
+);
+
+public record TrendingPatternsResponse(
+    bool Success,
+    List<TrendingPattern> Patterns,
+    string Timeframe,
+    int Count,
+    DateTime GeneratedAt,
+    string Message
+);
+
+public record PatternPredictionRequest(
+    string PatternId,
+    string HistoricalPeriod,
+    string PredictionHorizon,
+    double ConfidenceLevel
+);
+
+public record PatternPredictionResponse(
+    bool Success,
+    string PatternId,
+    PatternPrediction Prediction,
+    List<PredictionScenario> Scenarios,
+    double Confidence,
+    DateTime PredictedAt,
+    string Message
+);
+
+public record PatternData(
+    string Id,
+    string Type,
+    string Content,
+    DateTime Timestamp,
+    Dictionary<string, object> Metadata
+);
+
+public record DiscoveredPattern(
+    string Id,
+    string Name,
+    string Type,
+    double Strength,
+    double Confidence,
+    List<string> Evidence,
+    DateTime DiscoveredAt
+);
+
+public record PatternInsight(
+    string Id,
+    string Title,
+    string Description,
+    string PatternId,
+    double Confidence
+);
+
+public record PatternAnalysis(
+    string PatternId,
+    double TrendStrength,
+    double Stability,
+    List<string> KeyFactors,
+    Dictionary<string, object> Metrics
+);
+
+public record PatternPrediction(
+    string PatternId,
+    string TimeHorizon,
+    double PredictedStrength,
+    double Confidence,
+    List<string> KeyDrivers
+);
+
+public record PatternRecommendation(
+    string Id,
+    string Type,
+    string Title,
+    string Description,
+    double Priority,
+    List<string> Actions
+);
+
+public record TrendingPattern(
+    string PatternId,
+    string Name,
+    double TrendScore,
+    double GrowthRate,
+    DateTime LastSeen
+);
+
+public record PredictionScenario(
+    string Name,
+    double Probability,
+    string Description,
+    List<string> Conditions
+);
+
+// Request/Response Types
+
+[ResponseType("codex.future.knowledge-response", "FutureKnowledgeResponse", "Future knowledge response")]
+public record FutureKnowledgeResponse(bool Success, string Message, string? KnowledgeId = null, object? Knowledge = null);
+
+[RequestType("codex.future.knowledge-request", "FutureKnowledgeRequest", "Future knowledge request")]
+public record FutureKnowledgeRequest(string Query, string Context = "");
+
+[RequestType("codex.future.apply-delta-request", "ApplyDeltaRequest", "Apply delta request")]
+public record ApplyDeltaRequest(string TargetNodeId, string DeltaId);
+
+[RequestType("codex.future.merge-request", "MergeRequest", "Merge request")]
+public record MergeRequest(string KnowledgeId, List<string> TargetNodeIds);
+
+[ResponseType("codex.future.merge-response", "MergeResponse", "Merge response")]
+public record MergeResponse(bool Success, string Message, List<MergeResult> Results);
+
+[ResponseType("codex.future.search-response", "SearchResponse", "Search response")]
+public record SearchResponse(bool Success, string Message, List<FutureKnowledgeSummary> Results);
+
+public record MergeResult(string NodeId, bool Success, string Message);
+
+public record FutureKnowledgeSummary(string Id, string Query, double Confidence, DateTime Timestamp);
+
+// Cross-service concept import data models
+public record ConceptImportRequest(
+    string SourceServiceId,
+    List<string> ConceptIds,
+    string AnalysisContext = "",
+    Dictionary<string, object>? TargetBeliefSystem = null
+);
+
+public record ConceptImportResponse(
+    bool Success,
+    List<ImportedConcept> ImportedConcepts,
+    List<FutureInsight> FutureInsights,
+    string Message
+);
+
+public record FutureInsightsResponse(
+    bool Success,
+    List<FutureInsight> Insights,
+    int Count,
+    string Message
+);
+
+public record ImportedConcept(
+    ConceptNode OriginalConcept,
+    ConceptNode? TranslatedConcept,
+    FutureAnalysis FutureAnalysis,
+    DateTime ImportTimestamp,
+    string SourceServiceId
+);
+
+public record FutureInsight(
+    string ConceptId,
+    string ConceptName,
+    double FuturePotential,
+    double Confidence,
+    List<string> Recommendations,
+    string SourceServiceId,
+    DateTime GeneratedAt
+);
+
+public record ConceptNode(
+    string Id,
+    string Name,
+    string Description,
+    Dictionary<string, object>? Metadata = null
+);
+
+public record FutureAnalysis(
+    double FuturePotential,
+    double Confidence,
+    List<string> Recommendations
+);
+
+// News Feed Data Structures
+public record NewsItem(
+    string Id,
+    string Title,
+    string Content,
+    string Source,
+    string Url,
+    DateTimeOffset PublishedAt,
+    List<string> Tags,
+    Dictionary<string, object> Metadata
+);
+
+public record NewsConcept(
+    string ConceptId,
+    string ConceptName,
+    string ConceptType,
+    double RelevanceScore,
+    List<string> RelatedConcepts,
+    Dictionary<string, object> Properties
+);
+
+public record NewsAnalysis(
+    string NewsItemId,
+    List<NewsConcept> Concepts,
+    List<string> KeyThemes,
+    double SentimentScore,
+    double ImpactScore,
+    List<string> UserMatches,
+    Dictionary<string, object> Insights
+);
+
+public record NewsFeedRequest(
+    string UserId,
+    List<string> InterestAreas,
+    List<string> ContributionTypes,
+    List<string> InvestmentAreas,
+    int MaxItems = 20,
+    DateTimeOffset? Since = null
+);
+
+public record NewsFeedResponse(
+    bool Success,
+    List<NewsItem> NewsItems,
+    List<NewsAnalysis> Analyses,
+    Dictionary<string, double> ConceptRelevance,
+    List<string> RecommendedActions,
+    DateTimeOffset GeneratedAt
+);
+
+    // News Feed API Endpoints
+    [ApiRoute("POST", "/future/news/feed", "GetPersonalizedNewsFeed", "Get personalized news feed based on user interests and contributions", "codex.future")]
+    public async Task<object> GetPersonalizedNewsFeedAsync([ApiParameter("body", "News feed request")] NewsFeedRequest request)
+    {
+        try
+        {
+            _logger.Info($"Generating personalized news feed for user {request.UserId}");
+
+            // Fetch news items (in real implementation, this would fetch from news APIs)
+            var newsItems = await FetchNewsItemsAsync(request);
+            
+            // Analyze news items for concepts and user relevance
+            var analyses = new List<NewsAnalysis>();
+            var conceptRelevance = new Dictionary<string, double>();
+            
+            foreach (var newsItem in newsItems)
+            {
+                var analysis = await AnalyzeNewsItemAsync(newsItem, request);
+                analyses.Add(analysis);
+                _newsAnalyses[newsItem.Id] = analysis;
+                
+                // Update concept relevance scores
+                foreach (var concept in analysis.Concepts)
+                {
+                    if (conceptRelevance.ContainsKey(concept.ConceptId))
+                    {
+                        conceptRelevance[concept.ConceptId] = Math.Max(conceptRelevance[concept.ConceptId], concept.RelevanceScore);
+                    }
+                    else
+                    {
+                        conceptRelevance[concept.ConceptId] = concept.RelevanceScore;
+                    }
+                }
+            }
+
+            // Generate recommended actions based on news analysis
+            var recommendedActions = GenerateRecommendedActions(analyses, request);
+
+            return new NewsFeedResponse(
+                Success: true,
+                NewsItems: newsItems,
+                Analyses: analyses,
+                ConceptRelevance: conceptRelevance,
+                RecommendedActions: recommendedActions,
+                GeneratedAt: DateTimeOffset.UtcNow
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Failed to generate personalized news feed: {ex.Message}", ex);
+            return new { success = false, message = ex.Message };
+        }
+    }
+
+    [ApiRoute("GET", "/future/news/analyze/{newsItemId}", "AnalyzeNewsItem", "Analyze a specific news item for concepts and user relevance", "codex.future")]
+    public async Task<object> AnalyzeNewsItemAsync(string newsItemId, [ApiParameter("query", "Analysis parameters")] NewsAnalysisRequest? request)
+    {
+        try
+        {
+            var newsItem = _newsItems.FirstOrDefault(n => n.Id == newsItemId);
+            if (newsItem == null)
+            {
+                return new { success = false, message = "News item not found" };
+            }
+
+            request ??= new NewsAnalysisRequest { UserId = "default" };
+            var analysis = await AnalyzeNewsItemAsync(newsItem, new NewsFeedRequest(
+                UserId: request.UserId,
+                InterestAreas: request.InterestAreas ?? new List<string>(),
+                ContributionTypes: request.ContributionTypes ?? new List<string>(),
+                InvestmentAreas: request.InvestmentAreas ?? new List<string>()
+            ));
+
+            return new { success = true, analysis = analysis };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Failed to analyze news item: {ex.Message}", ex);
+            return new { success = false, message = ex.Message };
+        }
+    }
+
+    [ApiRoute("GET", "/future/news/concepts", "GetNewsConcepts", "Get all concepts discovered from news analysis", "codex.future")]
+    public async Task<object> GetNewsConceptsAsync()
+    {
+        try
+        {
+            var allConcepts = _newsAnalyses.Values
+                .SelectMany(a => a.Concepts)
+                .GroupBy(c => c.ConceptId)
+                .Select(g => new
+                {
+                    ConceptId = g.Key,
+                    ConceptName = g.First().ConceptName,
+                    ConceptType = g.First().ConceptType,
+                    AverageRelevance = g.Average(c => c.RelevanceScore),
+                    OccurrenceCount = g.Count(),
+                    RelatedConcepts = g.First().RelatedConcepts,
+                    Properties = g.First().Properties
+                })
+                .OrderByDescending(c => c.AverageRelevance)
+                .ToList();
+
+            return new { success = true, concepts = allConcepts };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Failed to get news concepts: {ex.Message}", ex);
+            return new { success = false, message = ex.Message };
+        }
+    }
+
+    [ApiRoute("POST", "/future/news/ingest", "IngestNewsItem", "Ingest a new news item for analysis", "codex.future")]
+    public async Task<object> IngestNewsItemAsync([ApiParameter("body", "News item to ingest")] NewsItem newsItem)
+    {
+        try
+        {
+            _newsItems.Add(newsItem);
+            
+            // Analyze the news item immediately
+            var analysis = await AnalyzeNewsItemAsync(newsItem, new NewsFeedRequest(
+                UserId: "system",
+                InterestAreas: new List<string>(),
+                ContributionTypes: new List<string>(),
+                InvestmentAreas: new List<string>()
+            ));
+            
+            _newsAnalyses[newsItem.Id] = analysis;
+
+            _logger.Info($"Ingested news item: {newsItem.Title}");
+            return new { success = true, newsItemId = newsItem.Id, analysis = analysis };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Failed to ingest news item: {ex.Message}", ex);
+            return new { success = false, message = ex.Message };
+        }
+    }
+
+    // Helper Methods for News Analysis
+    private async Task<List<NewsItem>> FetchNewsItemsAsync(NewsFeedRequest request)
+    {
+        await Task.Delay(100); // Simulate async work
+        
+        // In real implementation, this would fetch from news APIs
+        // For now, return mock news items
+        return new List<NewsItem>
+        {
+            new NewsItem(
+                Id: "news-1",
+                Title: "Revolutionary AI Algorithm for Abundance Amplification",
+                Content: "Scientists have developed a new AI algorithm that can amplify individual contributions by up to 10x through collective resonance analysis...",
+                Source: "TechNews",
+                Url: "https://example.com/news/ai-abundance",
+                PublishedAt: DateTimeOffset.UtcNow.AddHours(-2),
+                Tags: new List<string> { "AI", "abundance", "amplification", "technology" },
+                Metadata: new Dictionary<string, object> { { "category", "technology" }, { "sentiment", "positive" } }
+            ),
+            new NewsItem(
+                Id: "news-2",
+                Title: "Community Collaboration Platform Reaches 1M Users",
+                Content: "A new platform that enables community collaboration and knowledge sharing has reached 1 million active users...",
+                Source: "CommunityNews",
+                Url: "https://example.com/news/community-platform",
+                PublishedAt: DateTimeOffset.UtcNow.AddHours(-4),
+                Tags: new List<string> { "community", "collaboration", "platform", "growth" },
+                Metadata: new Dictionary<string, object> { { "category", "social" }, { "sentiment", "positive" } }
+            ),
+            new NewsItem(
+                Id: "news-3",
+                Title: "Sustainable Energy Breakthrough in Quantum Computing",
+                Content: "Researchers have made a breakthrough in quantum computing that could revolutionize sustainable energy production...",
+                Source: "ScienceDaily",
+                Url: "https://example.com/news/quantum-energy",
+                PublishedAt: DateTimeOffset.UtcNow.AddHours(-6),
+                Tags: new List<string> { "quantum", "energy", "sustainability", "computing" },
+                Metadata: new Dictionary<string, object> { { "category", "science" }, { "sentiment", "positive" } }
+            )
+        };
+    }
+
+    private async Task<NewsAnalysis> AnalyzeNewsItemAsync(NewsItem newsItem, NewsFeedRequest request)
+    {
+        await Task.Delay(50); // Simulate async work
+        
+        // Extract concepts from news item using AI/pattern recognition
+        var concepts = ExtractConceptsFromNews(newsItem);
+        
+        // Calculate user relevance based on interests, contributions, and investments
+        var userMatches = CalculateUserRelevance(concepts, request);
+        
+        // Calculate sentiment and impact scores
+        var sentimentScore = CalculateSentimentScore(newsItem);
+        var impactScore = CalculateImpactScore(newsItem, concepts);
+        
+        // Extract key themes
+        var keyThemes = ExtractKeyThemes(newsItem, concepts);
+        
+        // Generate insights
+        var insights = GenerateNewsInsights(newsItem, concepts, userMatches);
+
+        return new NewsAnalysis(
+            NewsItemId: newsItem.Id,
+            Concepts: concepts,
+            KeyThemes: keyThemes,
+            SentimentScore: sentimentScore,
+            ImpactScore: impactScore,
+            UserMatches: userMatches,
+            Insights: insights
+        );
+    }
+
+    private List<NewsConcept> ExtractConceptsFromNews(NewsItem newsItem)
+    {
+        // In real implementation, this would use AI/LLM to extract concepts
+        var concepts = new List<NewsConcept>();
+        
+        // Simple concept extraction based on tags and content
+        foreach (var tag in newsItem.Tags)
+        {
+            concepts.Add(new NewsConcept(
+                ConceptId: $"concept-{tag.ToLower()}",
+                ConceptName: tag,
+                ConceptType: GetConceptType(tag),
+                RelevanceScore: 0.8,
+                RelatedConcepts: GetRelatedConcepts(tag),
+                Properties: new Dictionary<string, object> { { "source", "news" }, { "confidence", 0.8 } }
+            ));
+        }
+
+        return concepts;
+    }
+
+    private string GetConceptType(string concept)
+    {
+        return concept.ToLower() switch
+        {
+            "ai" or "technology" or "computing" => "technology",
+            "community" or "collaboration" or "social" => "social",
+            "energy" or "sustainability" or "environment" => "environment",
+            "abundance" or "amplification" or "growth" => "economic",
+            _ => "general"
+        };
+    }
+
+    private List<string> GetRelatedConcepts(string concept)
+    {
+        return concept.ToLower() switch
+        {
+            "ai" => new List<string> { "technology", "computing", "automation" },
+            "abundance" => new List<string> { "amplification", "growth", "prosperity" },
+            "community" => new List<string> { "collaboration", "social", "networking" },
+            "energy" => new List<string> { "sustainability", "environment", "renewable" },
+            _ => new List<string>()
+        };
+    }
+
+    private List<string> CalculateUserRelevance(List<NewsConcept> concepts, NewsFeedRequest request)
+    {
+        var matches = new List<string>();
+        
+        foreach (var concept in concepts)
+        {
+            // Check if concept matches user interests
+            if (request.InterestAreas.Any(area => 
+                area.ToLower().Contains(concept.ConceptName.ToLower()) ||
+                concept.ConceptName.ToLower().Contains(area.ToLower())))
+            {
+                matches.Add($"Interest: {concept.ConceptName}");
+            }
+            
+            // Check if concept matches contribution types
+            if (request.ContributionTypes.Any(type => 
+                type.ToLower().Contains(concept.ConceptName.ToLower()) ||
+                concept.ConceptName.ToLower().Contains(type.ToLower())))
+            {
+                matches.Add($"Contribution: {concept.ConceptName}");
+            }
+            
+            // Check if concept matches investment areas
+            if (request.InvestmentAreas.Any(area => 
+                area.ToLower().Contains(concept.ConceptName.ToLower()) ||
+                concept.ConceptName.ToLower().Contains(area.ToLower())))
+            {
+                matches.Add($"Investment: {concept.ConceptName}");
+            }
+        }
+        
+        return matches;
+    }
+
+    private double CalculateSentimentScore(NewsItem newsItem)
+    {
+        // Simple sentiment analysis based on keywords
+        var positiveWords = new[] { "breakthrough", "revolutionary", "success", "growth", "innovation", "achievement" };
+        var negativeWords = new[] { "crisis", "failure", "decline", "problem", "issue", "concern" };
+        
+        var content = $"{newsItem.Title} {newsItem.Content}".ToLower();
+        var positiveCount = positiveWords.Count(word => content.Contains(word));
+        var negativeCount = negativeWords.Count(word => content.Contains(word));
+        
+        return Math.Max(0, Math.Min(1, 0.5 + (positiveCount - negativeCount) * 0.1));
+    }
+
+    private double CalculateImpactScore(NewsItem newsItem, List<NewsConcept> concepts)
+    {
+        // Calculate impact based on concept relevance and news metadata
+        var baseImpact = concepts.Average(c => c.RelevanceScore);
+        var conceptCount = concepts.Count;
+        var diversityScore = concepts.Select(c => c.ConceptType).Distinct().Count() / 5.0;
+        
+        return Math.Min(1.0, baseImpact * 0.7 + (conceptCount / 10.0) * 0.2 + diversityScore * 0.1);
+    }
+
+    private List<string> ExtractKeyThemes(NewsItem newsItem, List<NewsConcept> concepts)
+    {
+        var themes = new List<string>();
+        
+        // Extract themes based on concept types
+        var conceptTypes = concepts.GroupBy(c => c.ConceptType);
+        foreach (var group in conceptTypes)
+        {
+            themes.Add($"{group.Key} innovation");
+        }
+        
+        // Add themes based on content analysis
+        if (newsItem.Content.ToLower().Contains("breakthrough"))
+            themes.Add("scientific breakthrough");
+        if (newsItem.Content.ToLower().Contains("community"))
+            themes.Add("community development");
+        if (newsItem.Content.ToLower().Contains("sustainable"))
+            themes.Add("sustainability");
+            
+        return themes.Distinct().ToList();
+    }
+
+    private Dictionary<string, object> GenerateNewsInsights(NewsItem newsItem, List<NewsConcept> concepts, List<string> userMatches)
+    {
+        var insights = new Dictionary<string, object>
+        {
+            ["conceptCount"] = concepts.Count,
+            ["userMatchCount"] = userMatches.Count,
+            ["topConcept"] = concepts.OrderByDescending(c => c.RelevanceScore).FirstOrDefault()?.ConceptName ?? "none",
+            ["conceptTypes"] = concepts.Select(c => c.ConceptType).Distinct().ToList(),
+            ["relevanceScore"] = concepts.Average(c => c.RelevanceScore),
+            ["isHighImpact"] = concepts.Count > 3 && concepts.Average(c => c.RelevanceScore) > 0.7
+        };
+        
+        return insights;
+    }
+
+    private List<string> GenerateRecommendedActions(List<NewsAnalysis> analyses, NewsFeedRequest request)
+    {
+        var actions = new List<string>();
+        
+        // Generate actions based on analysis results
+        var highImpactNews = analyses.Where(a => a.ImpactScore > 0.7).ToList();
+        if (highImpactNews.Any())
+        {
+            actions.Add("Consider contributing to high-impact areas identified in the news");
+        }
+        
+        var userMatches = analyses.SelectMany(a => a.UserMatches).Distinct().ToList();
+        if (userMatches.Any())
+        {
+            actions.Add($"Explore opportunities in: {string.Join(", ", userMatches.Take(3))}");
+        }
+        
+        var newConcepts = analyses.SelectMany(a => a.Concepts)
+            .Where(c => c.Properties.ContainsKey("source") && c.Properties["source"].ToString() == "news")
+            .ToList();
+        if (newConcepts.Any())
+        {
+            actions.Add("Research emerging concepts and their potential applications");
+        }
+        
+        return actions;
+    }
+
+    public record NewsAnalysisRequest
+    {
+        public string UserId { get; init; } = "";
+        public List<string>? InterestAreas { get; init; }
+        public List<string>? ContributionTypes { get; init; }
+        public List<string>? InvestmentAreas { get; init; }
+    }
+}

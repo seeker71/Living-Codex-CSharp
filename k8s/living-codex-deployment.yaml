@@ -1,0 +1,148 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: living-codex-api
+  namespace: living-codex
+  labels:
+    app: living-codex-api
+    version: v1.0.0
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: living-codex-api
+  template:
+    metadata:
+      labels:
+        app: living-codex-api
+        version: v1.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: living-codex-api
+        image: living-codex-api:latest
+        ports:
+        - containerPort: 5000
+          name: http
+        - containerPort: 5001
+          name: https
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: living-codex-config
+              key: ASPNETCORE_ENVIRONMENT
+        - name: ConnectionStrings__DefaultConnection
+          valueFrom:
+            configMapKeyRef:
+              name: living-codex-config
+              key: ConnectionStrings__DefaultConnection
+        - name: ConnectionStrings__Redis
+          valueFrom:
+            configMapKeyRef:
+              name: living-codex-config
+              key: ConnectionStrings__Redis
+        - name: ConnectionStrings__RabbitMQ
+          valueFrom:
+            configMapKeyRef:
+              name: living-codex-config
+              key: ConnectionStrings__RabbitMQ
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: living-codex-secrets
+              key: JWT_SECRET
+        - name: ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: living-codex-secrets
+              key: ENCRYPTION_KEY
+        - name: OLLAMA_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: living-codex-config
+              key: OLLAMA_BASE_URL
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        - name: data
+          mountPath: /app/data
+      volumes:
+      - name: logs
+        emptyDir: {}
+      - name: data
+        emptyDir: {}
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: living-codex-service
+  namespace: living-codex
+  labels:
+    app: living-codex-api
+spec:
+  selector:
+    app: living-codex-api
+  ports:
+  - name: http
+    port: 5000
+    targetPort: 5000
+    protocol: TCP
+  - name: https
+    port: 5001
+    targetPort: 5001
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: living-codex-hpa
+  namespace: living-codex
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: living-codex-api
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
