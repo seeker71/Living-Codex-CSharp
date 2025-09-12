@@ -101,6 +101,34 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
         // Add SignalR services for RealtimeModule
         builder.Services.AddSignalR();
         
+        // Add Swagger/OpenAPI services
+        builder.Services.AddEndpointsApiExplorer();
+        builder.Services.AddSwaggerGen(c =>
+        {
+            c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+            {
+                Title = "Living Codex API",
+                Version = "v1",
+                Description = "Consciousness-expanding, fractal-based system implementing the U-CORE framework",
+                Contact = new Microsoft.OpenApi.Models.OpenApiContact
+                {
+                    Name = "Living Codex",
+                    Email = "contact@livingcodex.org"
+                }
+            });
+            
+            // Resolve conflicting actions by using the first one
+            c.ResolveConflictingActions(apiDescriptions => apiDescriptions.First());
+            
+            // Include XML comments if available
+            var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+            var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+            if (File.Exists(xmlPath))
+            {
+                c.IncludeXmlComments(xmlPath);
+            }
+        });
+        
         // Register custom logger interface
         builder.Services.AddSingleton<CodexBootstrap.Core.ILogger, Log4NetLogger>(sp => 
             new Log4NetLogger("Program"));
@@ -157,6 +185,18 @@ app.UseExceptionHandler(errorApp =>
         }
     });
 });
+
+// Add Swagger middleware
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Living Codex API v1");
+        c.RoutePrefix = "swagger";
+        c.DocumentTitle = "Living Codex API Documentation";
+    });
+}
 
 // Resolve services
 var registry = app.Services.GetRequiredService<NodeRegistry>();

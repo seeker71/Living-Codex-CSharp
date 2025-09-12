@@ -856,12 +856,8 @@ public sealed class SpecModule : IModule
 
     private string ExtractHttpMethod(Node apiNode)
     {
-        var route = apiNode.Meta?.GetValueOrDefault("route")?.ToString() ?? "";
-        if (route.StartsWith("GET", StringComparison.OrdinalIgnoreCase)) return "GET";
-        if (route.StartsWith("POST", StringComparison.OrdinalIgnoreCase)) return "POST";
-        if (route.StartsWith("PUT", StringComparison.OrdinalIgnoreCase)) return "PUT";
-        if (route.StartsWith("DELETE", StringComparison.OrdinalIgnoreCase)) return "DELETE";
-        if (route.StartsWith("PATCH", StringComparison.OrdinalIgnoreCase)) return "PATCH";
+        var verb = apiNode.Meta?.GetValueOrDefault("verb")?.ToString() ?? "";
+        if (!string.IsNullOrEmpty(verb)) return verb.ToUpperInvariant();
         return "GET"; // Default
     }
 

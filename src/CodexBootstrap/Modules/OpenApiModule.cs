@@ -1,18 +1,19 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.OpenApi.Models;
+using Swashbuckle.AspNetCore.SwaggerGen;
 using CodexBootstrap.Core;
 using CodexBootstrap.Runtime;
 
 namespace CodexBootstrap.Modules;
 
-// OpenAPI module specific response types
+// Simplified OpenAPI module response types
 public record OpenApiGenerationResponse(string ModuleId, bool Success, string Message = "OpenAPI generated successfully", object? OpenApiSpec = null);
 
 public record OpenApiSpecResponse(
     string OpenApi = "3.0.3",
     OpenApiInfo? Info = null,
-    Dictionary<string, object>? Components = null,
     Dictionary<string, object>? Paths = null
 );
 
@@ -37,57 +38,7 @@ public record OpenApiSpecInfo(
     string? SpecType
 );
 
-// OpenAPI data structures
-public sealed record OpenApiInfoData(
-    string Title,
-    string Version,
-    string? Description = null
-);
-
-public sealed record OpenApiSchema(
-    string Type,
-    string? Format = null,
-    string? Description = null,
-    Dictionary<string, OpenApiSchema>? Properties = null,
-    OpenApiSchema? Items = null,
-    IReadOnlyList<string>? Enum = null,
-    IReadOnlyList<object>? Example = null
-);
-
-public sealed record OpenApiParameter(
-    string Name,
-    string In,
-    bool Required,
-    OpenApiSchema Schema,
-    string? Description = null
-);
-
-public sealed record OpenApiResponse(
-    string Description,
-    Dictionary<string, OpenApiSchema>? Content = null
-);
-
-public sealed record OpenApiOperation(
-    string OperationId,
-    IReadOnlyList<string>? Tags = null,
-    string? Summary = null,
-    string? Description = null,
-    IReadOnlyList<OpenApiParameter>? Parameters = null,
-    OpenApiSchema? RequestBody = null,
-    Dictionary<string, OpenApiResponse>? Responses = null
-);
-
-public sealed record OpenApiPathItem(
-    Dictionary<string, OpenApiOperation>? Operations = null
-);
-
-public sealed record OpenApiDocument(
-    string OpenApi,
-    OpenApiInfo Info,
-    Dictionary<string, OpenApiSchema>? Components = null,
-    Dictionary<string, OpenApiPathItem>? Paths = null
-);
-
+[MetaNode(Id = "codex.openapi", Name = "OpenAPI Module", Description = "Module for generating comprehensive OpenAPI 3.0 specifications from meta-node attributes")]
 public sealed class OpenApiModule : IModule
 {
     private readonly NodeRegistry _registry;
@@ -187,49 +138,7 @@ public sealed class OpenApiModule : IModule
         _registry.Upsert(edge);
     }
 
-    private void CreateApiOperationNode(string moduleId, ApiSpec apiSpec, object operation, string path)
-    {
-        var operationId = $"openapi-operation-{moduleId}-{apiSpec.Name}";
-        var operationNode = new Node(
-            Id: operationId,
-            TypeId: "codex.openapi/operation",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: $"{apiSpec.Verb.ToUpper()} {path}",
-            Description: apiSpec.Description ?? $"API operation {apiSpec.Name}",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(operation, new JsonSerializerOptions { WriteIndented = true }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = moduleId,
-                ["apiName"] = apiSpec.Name,
-                ["verb"] = apiSpec.Verb,
-                ["path"] = path,
-                ["operationId"] = apiSpec.Name
-            }
-        );
-
-        _registry.Upsert(operationNode);
-
-        // Create edge from module to operation
-        var edge = new Edge(
-            FromId: moduleId,
-            ToId: operationId,
-            Role: "hasOperation",
-            Weight: 1.0,
-            Meta: new Dictionary<string, object>
-            {
-                ["verb"] = apiSpec.Verb,
-                ["path"] = path,
-                ["operationId"] = apiSpec.Name
-            }
-        );
-        _registry.Upsert(edge);
-    }
+    // Simplified - using built-in ASP.NET Core OpenAPI support
 
     private object GenerateOpenApiSpec(string moduleId, Node moduleNode)
     {
@@ -237,44 +146,48 @@ public sealed class OpenApiModule : IModule
         var moduleVersion = moduleNode.Meta?.GetValueOrDefault("version")?.ToString() ?? "1.0.0";
         var moduleDescription = moduleNode.Description ?? $"API for {moduleName}";
 
-        var info = new
-        {
-            title = moduleName,
-            version = moduleVersion,
-            description = moduleDescription
-        };
-
-        var components = new Dictionary<string, object>();
-        var paths = new Dictionary<string, object>();
-
-        // Get all API nodes for this module (both "api" and "codex.meta/api" types)
+        // Get all API nodes for this module
         var apiNodes = _registry.GetNodesByType("codex.meta/api")
-            .Concat(_registry.GetNodesByType("api"))
             .Where(n => n.Meta?.GetValueOrDefault("moduleId")?.ToString() == moduleId)
             .ToList();
+
+        var paths = new Dictionary<string, object>();
 
         foreach (var apiNode in apiNodes)
         {
             var apiName = apiNode.Meta?.GetValueOrDefault("apiName")?.ToString();
+            var verb = apiNode.Meta?.GetValueOrDefault("verb")?.ToString()?.ToLower() ?? "get";
+            var route = apiNode.Meta?.GetValueOrDefault("route")?.ToString() ?? "/";
+            var description = apiNode.Description ?? apiName ?? "API endpoint";
+
             if (string.IsNullOrEmpty(apiName)) continue;
 
-            // Parse API specification from content
-            var apiSpec = ParseApiSpec(apiNode);
-            if (apiSpec == null) continue;
-
-            // Generate OpenAPI operation
-            var operation = GenerateOpenApiOperation(apiSpec, components);
-            if (operation == null) continue;
-
-            // Generate path
-            var path = GenerateOpenApiPath(apiSpec, operation);
-            if (path.HasValue)
+            // Generate simple OpenAPI path item
+            var pathItem = new Dictionary<string, object>
             {
-                paths[path.Value.Key] = path.Value.Value;
-                
-                // Create a node for this API operation
-                CreateApiOperationNode(moduleId, apiSpec, operation, path.Value.Key);
-            }
+                [verb] = new
+                {
+                    operationId = apiName,
+                    summary = description,
+                    description = description,
+                    responses = new Dictionary<string, object>
+                    {
+                        ["200"] = new
+                        {
+                            description = "Successful response",
+                            content = new Dictionary<string, object>
+                            {
+                                ["application/json"] = new
+                                {
+                                    schema = new { type = "object" }
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+            paths[route] = pathItem;
         }
 
         return new OpenApiSpecResponse(
@@ -284,157 +197,11 @@ public sealed class OpenApiModule : IModule
                 Version: moduleVersion,
                 Description: moduleDescription
             ),
-            Components: components.Any() ? components : null,
             Paths: paths.Any() ? paths : null
         );
     }
 
-    private ApiSpec? ParseApiSpec(Node apiNode)
-    {
-        try
-        {
-            if (apiNode.Content?.InlineJson == null) return null;
-
-            var apiContent = JsonSerializer.Deserialize<JsonElement>(apiNode.Content.InlineJson);
-            
-            // Handle two different formats:
-            // Format 1: {"name": "apiName", "verb": "GET", "route": "/path", "parameters": [...]}
-            // Format 2: {"moduleId": "module", "apiName": "apiName", "route": "/path", "description": "..."}
-            
-            string name;
-            string verb;
-            string route;
-            string? description;
-            List<ParameterSpec> parameters = new();
-
-            if (apiContent.TryGetProperty("name", out var nameElement))
-            {
-                // Format 1: Full API spec format
-                name = nameElement.GetString() ?? "unknown";
-                verb = apiContent.TryGetProperty("verb", out var verbElement) ? verbElement.GetString() ?? "GET" : "GET";
-                route = apiContent.TryGetProperty("route", out var routeElement) ? routeElement.GetString() ?? "/" : "/";
-                description = apiContent.TryGetProperty("description", out var descElement) ? descElement.GetString() : null;
-
-                // Parse parameters if they exist
-                if (apiContent.TryGetProperty("parameters", out var paramsElement))
-                {
-                    foreach (var paramElement in paramsElement.EnumerateArray())
-                    {
-                        var paramName = paramElement.GetProperty("name").GetString() ?? "param";
-                        var paramType = paramElement.GetProperty("type").GetString() ?? "string";
-                        var paramRequired = paramElement.TryGetProperty("required", out var paramReq) && paramReq.GetBoolean();
-                        var paramDescription = paramElement.TryGetProperty("description", out var paramDesc) ? paramDesc.GetString() : null;
-
-                        parameters.Add(new ParameterSpec(paramName, paramType, paramRequired, paramDescription));
-                    }
-                }
-            }
-            else if (apiContent.TryGetProperty("apiName", out var apiNameElement))
-            {
-                // Format 2: Simple format
-                name = apiNameElement.GetString() ?? "unknown";
-                verb = "POST"; // Default to POST for simple format
-                route = apiContent.TryGetProperty("route", out var routeElement) ? routeElement.GetString() ?? "/" : "/";
-                description = apiContent.TryGetProperty("description", out var descElement) ? descElement.GetString() : null;
-            }
-            else
-            {
-                return null;
-            }
-
-            return new ApiSpec(name, verb, route, description, parameters.Any() ? parameters : null);
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private object? GenerateOpenApiOperation(ApiSpec apiSpec, Dictionary<string, object> components)
-    {
-        var operationId = $"{apiSpec.Name}";
-        var summary = apiSpec.Description ?? apiSpec.Name;
-        var description = apiSpec.Description;
-
-        var parameters = new List<object>();
-        if (apiSpec.Parameters != null)
-        {
-            foreach (var param in apiSpec.Parameters)
-            {
-                var paramSchema = GenerateOpenApiSchema(param.Type, components);
-                parameters.Add(new
-                {
-                    name = param.Name,
-                    @in = "query", // Default to query parameter
-                    required = param.Required,
-                    description = param.Description,
-                    schema = paramSchema
-                });
-            }
-        }
-
-        var responses = new Dictionary<string, object>
-        {
-            ["200"] = new
-            {
-                description = "Successful response",
-                content = new Dictionary<string, object>
-                {
-                    ["application/json"] = new
-                    {
-                        schema = new
-                        {
-                            type = "object",
-                            description = "Response object"
-                        }
-                    }
-                }
-            }
-        };
-
-        return new
-        {
-            operationId = operationId,
-            summary = summary,
-            description = description,
-            parameters = parameters.Any() ? parameters : null,
-            responses = responses
-        };
-    }
-
-    private KeyValuePair<string, object>? GenerateOpenApiPath(ApiSpec apiSpec, object operation)
-    {
-        // Convert route to OpenAPI path format
-        var path = apiSpec.Route;
-        if (path.StartsWith("/"))
-        {
-            path = path.Substring(1);
-        }
-
-        // Convert {id} to {id} format for OpenAPI
-        path = path.Replace("{", "{").Replace("}", "}");
-
-        var pathItem = new Dictionary<string, object>
-        {
-            [apiSpec.Verb.ToLower()] = operation
-        };
-
-        return new KeyValuePair<string, object>($"/{path}", pathItem);
-    }
-
-    private object GenerateOpenApiSchema(string type, Dictionary<string, object> components)
-    {
-        return type.ToLower() switch
-        {
-            "string" => new { type = "string" },
-            "int" or "integer" => new { type = "integer" },
-            "bool" or "boolean" => new { type = "boolean" },
-            "double" or "float" or "number" => new { type = "number" },
-            "object" => new { type = "object" },
-            "array" => new { type = "array", items = new { type = "string" } },
-            _ => new { type = "string", description = $"Type: {type}" }
-        };
-    }
+    // Simplified - using built-in ASP.NET Core OpenAPI support
 
     public void Register(NodeRegistry registry)
     {
@@ -553,12 +320,14 @@ public sealed class OpenApiModule : IModule
 
     public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
-        // OpenAPI specifications for modules - use a different route to avoid conflicts
-        app.MapGet("/openapi/spec/{moduleId}", (string moduleId) =>
+        // Swagger UI is automatically configured in Program.cs
+        // This module provides additional OpenAPI endpoints for module-specific specs
+        
+        // Get OpenAPI spec for a specific module
+        app.MapGet("/openapi/module/{moduleId}", (string moduleId) =>
         {
             try
             {
-                // Get the module node to find the module instance
                 var moduleNode = coreApi.GetModule(moduleId);
                 if (moduleNode == null)
                 {
@@ -574,12 +343,11 @@ public sealed class OpenApiModule : IModule
             }
         });
 
-        // List all OpenAPI specifications as nodes - use a different route to avoid conflicts
-        app.MapGet("/openapi-specs", async () =>
+        // List all available OpenAPI specifications
+        app.MapGet("/openapi/specs", async () =>
         {
             try
             {
-                // Use the list-specs API
                 var result = await coreApi.ExecuteDynamicCall(new DynamicCall("codex.openapi", "list-specs", null));
                 return Results.Ok(result);
             }
