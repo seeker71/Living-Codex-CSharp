@@ -24,44 +24,14 @@ public sealed class IdentityManagementModule : IModule
 
     public Node GetModuleNode()
     {
-        return new Node(
-            Id: "codex.identity-management",
-            TypeId: "codex.module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Identity Management Module",
-            Description: "Comprehensive identity and credential management system",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    version = "0.1.0",
-                    capabilities = new[]
-                    {
-                        "create_identity",
-                        "update_identity",
-                        "delete_identity",
-                        "get_identity",
-                        "list_identities",
-                        "add_credential",
-                        "remove_credential",
-                        "verify_credential",
-                        "add_claim",
-                        "remove_claim",
-                        "verify_claim",
-                        "generate_identity_proof",
-                        "verify_identity_proof"
-                    }
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["name"] = "Identity Management Module",
-                ["version"] = "0.1.0",
-                ["description"] = "Comprehensive identity and credential management system"
-            }
+        return NodeStorage.CreateModuleNode(
+            "codex.identity-management",
+            "Identity Management Module",
+            "0.1.0",
+            "Comprehensive identity and credential management system",
+            new[] { "identity", "credentials", "claims", "authentication", "security" },
+            new[] { "create_identity", "update_identity", "delete_identity", "get_identity", "list_identities", "add_credential", "remove_credential", "verify_credential", "add_claim", "remove_claim", "verify_claim", "generate_identity_proof", "verify_identity_proof" },
+            "codex.spec.identity-management"
         );
     }
 
@@ -498,6 +468,7 @@ public sealed class IdentityManagementModule : IModule
     }
 
     // Data models
+    [ResponseType]
     public record IdentityProfile
     {
         public string IdentityId { get; init; } = string.Empty;
@@ -510,6 +481,7 @@ public sealed class IdentityManagementModule : IModule
         public Dictionary<string, object> Metadata { get; init; } = new();
     }
 
+    [ResponseType]
     public record Credential
     {
         public string Id { get; init; } = string.Empty;

@@ -28,53 +28,14 @@ public sealed class AccessControlModule : IModule
 
     public Node GetModuleNode()
     {
-        return new Node(
-            Id: "codex.access-control",
-            TypeId: "codex.module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Access Control Module",
-            Description: "Comprehensive access control and permissions management system",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    version = "0.1.0",
-                    capabilities = new[]
-                    {
-                        "create_permission",
-                        "update_permission",
-                        "delete_permission",
-                        "get_permission",
-                        "list_permissions",
-                        "create_role",
-                        "update_role",
-                        "delete_role",
-                        "get_role",
-                        "list_roles",
-                        "assign_role",
-                        "remove_role",
-                        "check_permission",
-                        "check_access",
-                        "create_policy",
-                        "update_policy",
-                        "delete_policy",
-                        "evaluate_policy",
-                        "create_rule",
-                        "update_rule",
-                        "delete_rule",
-                        "evaluate_rule"
-                    }
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["name"] = "Access Control Module",
-                ["version"] = "0.1.0",
-                ["description"] = "Comprehensive access control and permissions management system"
-            }
+        return NodeStorage.CreateModuleNode(
+            "codex.access-control",
+            "Access Control Module",
+            "0.1.0",
+            "Comprehensive access control and permissions management system",
+            new[] { "access-control", "permissions", "roles", "security", "authorization" },
+            new[] { "create_permission", "update_permission", "delete_permission", "get_permission", "list_permissions", "create_role", "update_role", "delete_role", "get_role", "list_roles", "assign_role", "remove_role", "check_permission", "check_access", "create_policy", "update_policy", "delete_policy", "evaluate_policy", "create_rule", "update_rule", "delete_rule", "evaluate_rule" },
+            "codex.spec.access-control"
         );
     }
 
@@ -835,6 +796,7 @@ public sealed class AccessControlModule : IModule
     private string GeneratePolicyId() => $"policy_{Guid.NewGuid():N}";
 
     // Data models
+    [ResponseType]
     public record Permission
     {
         public string Id { get; init; } = string.Empty;
@@ -848,6 +810,7 @@ public sealed class AccessControlModule : IModule
         public Dictionary<string, object> Metadata { get; init; } = new();
     }
 
+    [ResponseType]
     public record Role
     {
         public string Id { get; init; } = string.Empty;
@@ -859,6 +822,7 @@ public sealed class AccessControlModule : IModule
         public Dictionary<string, object> Metadata { get; init; } = new();
     }
 
+    [ResponseType]
     public record AccessPolicy
     {
         public string Id { get; init; } = string.Empty;
@@ -874,6 +838,7 @@ public sealed class AccessControlModule : IModule
         public Dictionary<string, object> Metadata { get; init; } = new();
     }
 
+    [ResponseType]
     public record AccessRule
     {
         public string Id { get; init; } = string.Empty;
@@ -896,14 +861,24 @@ public sealed class AccessControlModule : IModule
     }
 
     // Request/Response types
+    [ResponseType]
     public record CreatePermissionRequest(string Name, string Resource, string? Action = null, string? Description = null, Dictionary<string, object>? Metadata = null);
+    [ResponseType]
     public record UpdatePermissionRequest(string? Name = null, string? Resource = null, string? Action = null, string? Description = null, bool? IsActive = null, Dictionary<string, object>? Metadata = null);
+    [ResponseType]
     public record CreateRoleRequest(string Name, string? Description = null, Dictionary<string, object>? Metadata = null);
+    [ResponseType]
     public record UpdateRoleRequest(string? Name = null, string? Description = null, bool? IsActive = null, Dictionary<string, object>? Metadata = null);
+    [ResponseType]
     public record AssignRoleRequest(string RoleId);
+    [ResponseType]
     public record AssignPermissionRequest(string PermissionId);
+    [ResponseType]
     public record CheckPermissionRequest(string UserId, string PermissionName, string? Resource = null);
+    [ResponseType]
     public record CheckAccessRequest(string UserId, string Resource, string? Action = null);
+    [ResponseType]
     public record CreatePolicyRequest(string Name, string Resource, string? Action = null, Dictionary<string, object>? Conditions = null, PolicyEffect? Effect = null, int? Priority = null, Dictionary<string, object>? Metadata = null);
+    [ResponseType]
     public record EvaluatePolicyRequest(string UserId, string Resource, string? Action = null, Dictionary<string, object>? Context = null);
 }

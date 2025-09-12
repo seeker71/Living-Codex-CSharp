@@ -67,8 +67,41 @@ public sealed class ApiRouter : IApiRouter
 // Node-based storage for everything
 public static class NodeStorage
 {
-    public static Node CreateModuleNode(string id, string name, string version, string? description = null, string[]? capabilities = null, string[]? tags = null)
+    public static Node CreateModuleNode(string id, string name, string version, string? description = null, string[]? capabilities = null, string[]? tags = null, string? specReference = null)
     {
+        var content = new Dictionary<string, object>
+        {
+            ["id"] = id,
+            ["name"] = name,
+            ["version"] = version,
+            ["description"] = description,
+            ["capabilities"] = capabilities ?? new string[0],
+            ["tags"] = tags ?? new string[0],
+            ["createdAt"] = DateTime.UtcNow
+        };
+
+        if (!string.IsNullOrEmpty(specReference))
+        {
+            content["specReference"] = specReference;
+        }
+
+        var meta = new Dictionary<string, object>
+        {
+            ["moduleId"] = id,
+            ["version"] = version,
+            ["name"] = name,
+            ["description"] = description,
+            ["capabilities"] = capabilities ?? new string[0],
+            ["tags"] = tags ?? new string[0],
+            ["createdAt"] = DateTime.UtcNow,
+            ["type"] = "module"
+        };
+
+        if (!string.IsNullOrEmpty(specReference))
+        {
+            meta["specReference"] = specReference;
+        }
+
         return new Node(
             Id: id,
             TypeId: "module",
@@ -78,29 +111,11 @@ public static class NodeStorage
             Description: description,
             Content: new ContentRef(
                 MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new { 
-                    id, 
-                    name, 
-                    version, 
-                    description,
-                    capabilities = capabilities ?? new string[0],
-                    tags = tags ?? new string[0],
-                    createdAt = DateTime.UtcNow
-                }),
+                InlineJson: JsonSerializer.Serialize(content),
                 InlineBytes: null,
                 ExternalUri: null
             ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = id,
-                ["version"] = version,
-                ["name"] = name,
-                ["description"] = description,
-                ["capabilities"] = capabilities ?? new string[0],
-                ["tags"] = tags ?? new string[0],
-                ["createdAt"] = DateTime.UtcNow,
-                ["type"] = "module"
-            }
+            Meta: meta
         );
     }
 
@@ -136,6 +151,22 @@ public static class NodeStorage
         // Register the main module node
         var moduleNode = module.GetModuleNode();
         registry.Upsert(moduleNode);
+        
+        // Create spec-to-module tracking if spec reference exists
+        if (moduleNode.Meta?.ContainsKey("specReference") == true)
+        {
+            var specReference = moduleNode.Meta["specReference"]?.ToString();
+            if (!string.IsNullOrEmpty(specReference))
+            {
+                // Create edge from spec to module
+                var specModuleEdge = CreateSpecModuleEdge(specReference, moduleNode.Id);
+                registry.Upsert(specModuleEdge);
+                
+                // Create edge from module to spec
+                var moduleSpecEdge = CreateModuleSpecEdge(moduleNode.Id, specReference);
+                registry.Upsert(moduleSpecEdge);
+            }
+        }
         
         // Register record types as meta nodes if provided
         if (recordTypes != null)
@@ -237,6 +268,20 @@ public static class NodeStorage
             Meta: new Dictionary<string, object>
             {
                 ["relationship"] = "module-implements-spec"
+            }
+        );
+    }
+
+    public static Edge CreateSpecModuleEdge(string specId, string moduleId)
+    {
+        return new Edge(
+            FromId: specId,
+            ToId: moduleId,
+            Role: "has-implementation",
+            Weight: 1.0,
+            Meta: new Dictionary<string, object>
+            {
+                ["relationship"] = "spec-has-module-implementation"
             }
         );
     }

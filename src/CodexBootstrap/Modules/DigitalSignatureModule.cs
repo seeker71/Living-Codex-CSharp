@@ -25,39 +25,14 @@ public sealed class DigitalSignatureModule : IModule
 
     public Node GetModuleNode()
     {
-        return new Node(
-            Id: "codex.digital-signature",
-            TypeId: "codex.module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Digital Signature Module",
-            Description: "Cryptographic signing and verification for nodes and edges",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    version = "0.1.0",
-                    algorithm = Algorithm,
-                    capabilities = new[]
-                    {
-                        "sign_node",
-                        "verify_node",
-                        "sign_edge", 
-                        "verify_edge",
-                        "generate_keypair",
-                        "extract_public_key"
-                    }
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["name"] = "Digital Signature Module",
-                ["version"] = "0.1.0",
-                ["description"] = "Cryptographic signing and verification for nodes and edges",
-                ["algorithm"] = Algorithm
-            }
+        return NodeStorage.CreateModuleNode(
+            "codex.digital-signature",
+            "Digital Signature Module",
+            "0.1.0",
+            "Cryptographic signing and verification for nodes and edges",
+            new[] { "cryptography", "digital-signature", "security", "verification" },
+            new[] { "sign_node", "verify_node", "sign_edge", "verify_edge", "generate_keypair", "extract_public_key" },
+            "codex.spec.digital-signature"
         );
     }
 
@@ -538,9 +513,14 @@ public sealed class DigitalSignatureModule : IModule
     }
 
     // Request/Response types
+    [ResponseType]
     public record SignNodeRequest(Node Node, byte[] PrivateKey);
+    [ResponseType]
     public record VerifyNodeRequest(Node Node, byte[] PublicKey);
+    [ResponseType]
     public record SignEdgeRequest(Edge Edge, byte[] PrivateKey);
+    [ResponseType]
     public record VerifyEdgeRequest(Edge Edge, byte[] PublicKey);
+    [ResponseType]
     public record ExtractPublicKeyRequest(object SignedItem);
 }

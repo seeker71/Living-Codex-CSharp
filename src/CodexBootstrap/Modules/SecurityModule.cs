@@ -834,12 +834,14 @@ public class SecurityModule : IModule
 }
 
 // Security DTOs
+[ResponseType("codex.security.auth-request", "AuthenticationRequest", "Request for user authentication")]
 public record AuthenticationRequest(
     string Username,
     string Password,
     bool RememberMe
 );
 
+[ResponseType("codex.security.auth-response", "AuthenticationResponse", "Response for user authentication")]
 public record AuthenticationResponse(
     bool Success,
     string? Token,
@@ -848,6 +850,7 @@ public record AuthenticationResponse(
     SecurityUser? User
 );
 
+[ResponseType("codex.security.authorization-request", "AuthorizationRequest", "Request for authorization check")]
 public record AuthorizationRequest(
     string Token,
     string Action,
@@ -855,6 +858,7 @@ public record AuthorizationRequest(
     Dictionary<string, object>? Context
 );
 
+[ResponseType("codex.security.authorization-response", "AuthorizationResponse", "Response for authorization check")]
 public record AuthorizationResponse(
     bool Success,
     bool Authorized,
@@ -862,12 +866,14 @@ public record AuthorizationResponse(
     string? RequiredRole
 );
 
+[ResponseType("codex.security.encryption-request", "EncryptionRequest", "Request for data encryption")]
 public record EncryptionRequest(
     string Data,
     string Algorithm,
     string KeyId
 );
 
+[ResponseType("codex.security.encryption-response", "EncryptionResponse", "Response for data encryption")]
 public record EncryptionResponse(
     bool Success,
     string EncryptedData,
@@ -875,18 +881,21 @@ public record EncryptionResponse(
     string Algorithm
 );
 
+[ResponseType("codex.security.decryption-request", "DecryptionRequest", "Request for data decryption")]
 public record DecryptionRequest(
     string EncryptedData,
     string KeyId,
     string Algorithm
 );
 
+[ResponseType("codex.security.decryption-response", "DecryptionResponse", "Response for data decryption")]
 public record DecryptionResponse(
     bool Success,
     string DecryptedData,
     string KeyId
 );
 
+[ResponseType("codex.security.audit-log-response", "AuditLogResponse", "Response for audit log retrieval")]
 public record AuditLogResponse(
     bool Success,
     List<SecurityAuditLog> Logs,
@@ -895,10 +904,12 @@ public record AuditLogResponse(
     int PageSize
 );
 
+[ResponseType("codex.security.token-validation-request", "TokenValidationRequest", "Request for token validation")]
 public record TokenValidationRequest(
     string Token
 );
 
+[ResponseType("codex.security.token-validation-response", "TokenValidationResponse", "Response for token validation")]
 public record TokenValidationResponse(
     bool Success,
     bool Valid,
@@ -906,12 +917,14 @@ public record TokenValidationResponse(
     DateTime? ExpiresAt
 );
 
+[ResponseType("codex.security.logout-response", "LogoutResponse", "Response for user logout")]
 public record LogoutResponse(
     bool Success,
     string Message
 );
 
 // Supporting classes
+[ResponseType("codex.security.user", "SecurityUser", "Security user entity")]
 public class SecurityUser
 {
     public string Id { get; set; } = "";
@@ -921,6 +934,7 @@ public class SecurityUser
     public bool IsActive { get; set; } = true;
 }
 
+[ResponseType("codex.security.user-session", "UserSession", "User session entity")]
 public class UserSession
 {
     public string UserId { get; set; } = "";
@@ -930,6 +944,7 @@ public class UserSession
     public DateTime CreatedAt { get; set; }
 }
 
+[ResponseType("codex.security.role", "SecurityRole", "Security role entity")]
 public class SecurityRole
 {
     public string Name { get; set; } = "";
@@ -937,12 +952,14 @@ public class SecurityRole
     public List<SecurityPermission> Permissions { get; set; } = new();
 }
 
+[ResponseType("codex.security.permission", "SecurityPermission", "Security permission entity")]
 public class SecurityPermission
 {
     public string Action { get; set; } = "";
     public string Resource { get; set; } = "";
 }
 
+[ResponseType("codex.security.policy", "SecurityPolicy", "Security policy entity")]
 public class SecurityPolicy
 {
     public string Name { get; set; } = "";
@@ -950,6 +967,7 @@ public class SecurityPolicy
     public Dictionary<string, object> Rules { get; set; } = new();
 }
 
+[ResponseType("codex.security.audit-log", "SecurityAuditLog", "Security audit log entity")]
 public class SecurityAuditLog
 {
     public string Id { get; set; } = "";

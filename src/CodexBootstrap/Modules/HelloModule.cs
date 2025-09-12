@@ -30,7 +30,8 @@ public sealed class HelloModule : IModule
             version: Version,
             description: Description,
             capabilities: new[] { "echo", "greeting", "node-creation" },
-            tags: new[] { "hello", "demo", "example" }
+            tags: new[] { "hello", "demo", "example" },
+            specReference: "codex.spec.hello"
         );
     }
 
@@ -88,4 +89,5 @@ public sealed class HelloModule : IModule
 /// <summary>
 /// Hello request model
 /// </summary>
+[ResponseType("codex.hello.request", "HelloRequest", "Request for hello greeting")]
 public record HelloRequest(string? Name = null);

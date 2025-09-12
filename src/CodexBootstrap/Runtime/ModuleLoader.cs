@@ -146,19 +146,27 @@ public sealed class ModuleLoader
             var moduleNode = module.GetModuleNode();
             _logger.Info($"Module node ID: {moduleNode.Id}");
             
-            // Use standardized module registration
-            _registry.Upsert(moduleNode);
-            
-            // Register module with detailed error tracking
+            // Use enhanced module registration with spec tracking
             try
             {
-                module.Register(_registry);
-                _logger.Info($"Successfully registered module {module.GetType().Name} in NodeRegistry");
+                // Register the module and its meta nodes with spec tracking
+                NodeStorage.RegisterModuleWithMetaNodes(_registry, module);
+                _logger.Info($"Successfully registered module {module.GetType().Name} with enhanced registration");
             }
             catch (Exception ex)
             {
-                _logger.Error($"Failed to register module {module.GetType().Name} in NodeRegistry: {ex.Message}", ex);
-                // Continue loading even if Register fails - some modules might have empty Register methods
+                _logger.Error($"Failed to register module {module.GetType().Name} with enhanced registration: {ex.Message}", ex);
+                // Fallback to basic registration
+                _registry.Upsert(moduleNode);
+                try
+                {
+                    module.Register(_registry);
+                    _logger.Info($"Successfully registered module {module.GetType().Name} with basic registration");
+                }
+                catch (Exception ex2)
+                {
+                    _logger.Error($"Failed to register module {module.GetType().Name} with basic registration: {ex2.Message}", ex2);
+                }
             }
             
             // Register API handlers

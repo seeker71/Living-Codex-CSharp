@@ -362,13 +362,32 @@ public sealed class AuthenticationModule : IModule
 }
 
 // Request/Response DTOs
+[ResponseType("codex.auth.login-request", "LoginRequest", "Request for user login")]
 public record LoginRequest(string Username, string Password);
+
+[ResponseType("codex.auth.register-request", "RegisterRequest", "Request for user registration")]
 public record RegisterRequest(string Username, string Email, string Password, string[]? Roles = null);
+
+[ResponseType("codex.auth.refresh-token-request", "RefreshTokenRequest", "Request for token refresh")]
 public record RefreshTokenRequest(string RefreshToken);
+
+[ResponseType("codex.auth.logout-request", "LogoutRequest", "Request for user logout")]
 public record LogoutRequest(string Token);
+
+[ResponseType("codex.auth.change-password-request", "ChangePasswordRequest", "Request for password change")]
 public record ChangePasswordRequest(string UserId, string CurrentPassword, string NewPassword);
+
+[ResponseType("codex.auth.reset-password-request", "ResetPasswordRequest", "Request for password reset")]
 public record ResetPasswordRequest(string Email);
+
+[ResponseType("codex.auth.grant-permission-request", "GrantPermissionRequest", "Request for permission grant")]
 public record GrantPermissionRequest(string UserId, string Resource, string Action);
+
+[ResponseType("codex.auth.revoke-permission-request", "RevokePermissionRequest", "Request for permission revocation")]
 public record RevokePermissionRequest(string UserId, string Resource, string Action);
+
+[ResponseType("codex.auth.assign-role-request", "AssignRoleRequest", "Request for role assignment")]
 public record AssignRoleRequest(string UserId, string Role);
+
+[ResponseType("codex.auth.remove-role-request", "RemoveRoleRequest", "Request for role removal")]
 public record RemoveRoleRequest(string UserId, string Role);

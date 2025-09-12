@@ -5,6 +5,7 @@ using CodexBootstrap.Runtime;
 namespace CodexBootstrap.Modules;
 
 // Hydrate module specific response types
+[ResponseType("codex.hydrate.node-response", "HydrateNodeResponse", "Response for node hydration")]
 public record HydrateNodeResponse(string NodeId, object Content, bool Success, string Message = "Node hydrated successfully");
 
 public sealed class HydrateModule : IModule
@@ -30,13 +31,7 @@ public sealed class HydrateModule : IModule
 
     public void Register(NodeRegistry registry)
     {
-        // Register API nodes
-        var hydrateApi = NodeStorage.CreateApiNode("codex.hydrate", "hydrate", "/hydrate/{id}", "Hydrate node content");
-        
-        registry.Upsert(hydrateApi);
-        
-        // Register edges
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.hydrate", "hydrate"));
+        registry.Upsert(GetModuleNode());
     }
 
     public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
@@ -253,4 +248,42 @@ public sealed class HydrateModule : IModule
             synthesized = true
         });
     }
+
+    /// <summary>
+    /// Hydrate node content
+    /// </summary>
+    [ApiRoute("POST", "/hydrate/{id}", "hydrate", "Hydrate node content", "codex.hydrate")]
+    public async Task<object> HydrateNodeAsync([ApiParameter("path", "Node ID")] string id, [ApiParameter("body", "Hydration request")] HydrateRequest? request = null)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                return new HydrateNodeResponse("", new object(), false, "NodeId is required");
+            }
+
+            // Get the node from the registry
+            var node = _registry.GetNode(id);
+            if (node == null)
+            {
+                return new HydrateNodeResponse(id, new object(), false, $"Node {id} not found");
+            }
+
+            // Hydrate the node content
+            var hydratedContent = await HydrateNodeContent(node, _registry);
+            
+            return new HydrateNodeResponse(id, hydratedContent, true);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error hydrating node: {ex.Message}", ex);
+            return new HydrateNodeResponse("", new object(), false, ex.Message);
+        }
+    }
 }
+
+/// <summary>
+/// Hydrate request model
+/// </summary>
+[ResponseType("codex.hydrate.request", "HydrateRequest", "Request for node hydration")]
+public record HydrateRequest(string? Description = null);

@@ -302,17 +302,32 @@ public class UserModule : IModule
 }
 
 // Request/Response DTOs for each API
+[ResponseType("codex.user.create-request", "UserCreateRequest", "Request for user creation")]
 public record UserCreateRequest(string Username, string Email, string DisplayName, string Password);
+
+[ResponseType("codex.user.create-response", "UserCreateResponse", "Response for user creation")]
 public record UserCreateResponse(bool Success, string UserId, string Message);
 
+[ResponseType("codex.user.auth-request", "UserAuthRequest", "Request for user authentication")]
 public record UserAuthRequest(string Username, string Password);
+
+[ResponseType("codex.user.auth-response", "UserAuthResponse", "Response for user authentication")]
 public record UserAuthResponse(bool Success, string? Token, string Message);
 
+[ResponseType("codex.user.profile-request", "UserProfileRequest", "Request for user profile")]
 public record UserProfileRequest(string UserId);
+
+[ResponseType("codex.user.profile-response", "UserProfileResponse", "Response for user profile")]
 public record UserProfileResponse(string UserId, string Username, string Email, string DisplayName, DateTime CreatedAt);
 
+[ResponseType("codex.user.permissions-request", "UserPermissionsRequest", "Request for user permissions")]
 public record UserPermissionsRequest(string UserId);
+
+[ResponseType("codex.user.permissions-response", "UserPermissionsResponse", "Response for user permissions")]
 public record UserPermissionsResponse(string UserId, string[] Permissions, string[] Roles);
 
+[ResponseType("codex.user.sessions-request", "UserSessionsRequest", "Request for user sessions")]
 public record UserSessionsRequest(string UserId);
+
+[ResponseType("codex.user.sessions-response", "UserSessionsResponse", "Response for user sessions")]
 public record UserSessionsResponse(string UserId, object[] Sessions);

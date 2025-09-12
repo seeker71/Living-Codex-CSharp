@@ -6,10 +6,14 @@ using CodexBootstrap.Runtime;
 namespace CodexBootstrap.Modules;
 
 // Adapter module specific response types
+[ResponseType("codex.adapter.registration-response", "AdapterRegistrationResponse", "Response for adapter registration")]
 public record AdapterRegistrationResponse(string AdapterId, bool Success, string Message = "Adapter registered successfully");
+
+[ResponseType("codex.adapter.hydrate-response", "HydrateResponse", "Response for adapter hydration")]
 public record HydrateResponse(string NodeId, bool Success, string Message = "Node hydrated successfully", object? Content = null);
 
 // Adapter data structures
+[ResponseType("codex.adapter.info", "AdapterInfo", "Adapter information structure")]
 public sealed record AdapterInfo(
     string Id,
     string Scheme,
@@ -217,20 +221,7 @@ public sealed class AdapterModule : IModule
         );
         registry.Upsert(adapterInfoType);
 
-        // API nodes are registered via NodeStorage.CreateApiNode() below
-
-        // Hydrate API is now handled by HydrateModule
-
-        // Register API nodes for RouteDiscovery
-        var registerApi = NodeStorage.CreateApiNode("codex.adapters", "register", "/adapter/register", "Register a new content adapter");
-        var listApi = NodeStorage.CreateApiNode("codex.adapters", "list", "/adapter/list", "List all registered adapters");
-        
-        registry.Upsert(registerApi);
-        registry.Upsert(listApi);
-
-        // Register edges
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.adapters", "register"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.adapters", "list"));
+        // API nodes are now registered via attribute-based routing
     }
 
     public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)

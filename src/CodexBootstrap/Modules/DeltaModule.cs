@@ -6,10 +6,14 @@ using CodexBootstrap.Runtime;
 namespace CodexBootstrap.Modules;
 
 // Delta module specific response types
+[ResponseType("codex.delta.diff-response", "DiffResponse", "Response for diff operations")]
 public record DiffResponse(string SourceId, string TargetId, PatchDoc Patch);
+
+[ResponseType("codex.delta.patch-response", "PatchResponse", "Response for patch operations")]
 public record PatchResponse(string TargetId, bool Success, string Message = "Patch applied successfully");
 
 // Delta data structures
+[ResponseType("codex.delta.patch-op", "PatchOp", "Patch operation structure")]
 public sealed record PatchOp(
     string Op,        // "add", "remove", "replace", "move", "copy", "test"
     string Path,      // JSON pointer path
@@ -17,6 +21,7 @@ public sealed record PatchOp(
     string? From      // Source path for move/copy operations
 );
 
+[ResponseType("codex.delta.patch-doc", "PatchDoc", "Patch document structure")]
 public sealed record PatchDoc(
     string TargetId,
     IReadOnlyList<PatchOp> Ops
@@ -44,19 +49,7 @@ public sealed class DeltaModule : IModule
 
     public void Register(NodeRegistry registry)
     {
-        // Register the module node
         registry.Upsert(GetModuleNode());
-
-        // Register API nodes
-        var diffApi = NodeStorage.CreateApiNode("codex.delta", "diff", "/delta/diff", "Generate diff between two nodes");
-        var patchApi = NodeStorage.CreateApiNode("codex.delta", "patch", "/delta/patch", "Apply patch to a node");
-        
-        registry.Upsert(diffApi);
-        registry.Upsert(patchApi);
-        
-        // Register edges
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.delta", "diff"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.delta", "patch"));
 
         // Register PatchOp and PatchDoc type definitions as nodes
         var patchOpType = new Node(

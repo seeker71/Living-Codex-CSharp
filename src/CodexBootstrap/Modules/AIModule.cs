@@ -144,7 +144,8 @@ namespace CodexBootstrap.Modules
                 version: Version,
                 description: Description,
                 capabilities: new[] { "concept-extraction", "llm-integration", "fractal-transformation", "analysis", "caching" },
-                tags: new[] { "ai", "concepts", "llm", "analysis" }
+                tags: new[] { "ai", "concepts", "llm", "analysis" },
+                specReference: "codex.spec.ai"
             );
         }
 

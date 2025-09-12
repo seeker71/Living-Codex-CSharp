@@ -28,7 +28,10 @@ public sealed class CoreModule : IModule
             id: "codex.core",
             name: "Core System Module",
             version: "0.1.0",
-            description: "Self-contained module for core system operations (atoms, spec) using node-based storage"
+            description: "Self-contained module for core system operations (atoms, spec) using node-based storage",
+            capabilities: new[] { "core", "atoms", "spec", "storage", "system" },
+            tags: new[] { "get_atoms", "get_spec", "core_operations" },
+            specReference: "codex.spec.core"
         );
     }
 

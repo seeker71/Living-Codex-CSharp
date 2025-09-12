@@ -59,25 +59,7 @@ public sealed class BreathModule : IModule
 
     public void Register(NodeRegistry registry)
     {
-        // Register API nodes
-        var expandApi = NodeStorage.CreateApiNode("codex.breath", "expand", "/breath/expand/{id}", "Expand a module specification");
-        var validateApi = NodeStorage.CreateApiNode("codex.breath", "validate", "/breath/validate/{id}", "Validate a module specification");
-        var contractApi = NodeStorage.CreateApiNode("codex.breath", "contract", "/breath/contract/{id}", "Contract a module specification");
-        var breathLoopApi = NodeStorage.CreateApiNode("codex.breath", "breath-loop", "/breath/loop/{id}", "Execute full breath loop");
-        var oneshotApi = NodeStorage.CreateApiNode("codex.breath", "oneshot", "/breath/oneshot/{id}", "One-shot breath loop execution");
-        
-        registry.Upsert(expandApi);
-        registry.Upsert(validateApi);
-        registry.Upsert(contractApi);
-        registry.Upsert(breathLoopApi);
-        registry.Upsert(oneshotApi);
-        
-        // Register edges
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.breath", "expand"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.breath", "validate"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.breath", "contract"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.breath", "breath-loop"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.breath", "oneshot"));
+        registry.Upsert(GetModuleNode());
     }
 
     public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)

@@ -33,7 +33,15 @@ public class ConceptRegistryModule : IModule
 
     public Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(ModuleId, Name, Version, Description);
+        return NodeStorage.CreateModuleNode(
+            ModuleId, 
+            Name, 
+            Version, 
+            Description,
+            new[] { "concept-registry", "ontology", "discovery", "quality-assessment", "u-core" },
+            new[] { "concept-registration", "concept-discovery", "version-management", "cross-service-sync", "quality-assessment", "ontology-integration" },
+            "codex.spec.concept-registry"
+        );
     }
 
     public void Register(NodeRegistry registry)

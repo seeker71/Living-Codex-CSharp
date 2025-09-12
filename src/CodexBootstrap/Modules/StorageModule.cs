@@ -78,7 +78,10 @@ public sealed class StorageModule : IModule
             id: "codex.storage",
             name: "Storage Management Module",
             version: "0.1.0",
-            description: "Self-contained module for storage management operations using node-based storage"
+            description: "Self-contained module for storage management operations using node-based storage",
+            capabilities: new[] { "storage", "management", "nodes", "edges", "statistics" },
+            tags: new[] { "get_stats", "storage_operations", "data_management" },
+            specReference: "codex.spec.storage"
         );
     }
 

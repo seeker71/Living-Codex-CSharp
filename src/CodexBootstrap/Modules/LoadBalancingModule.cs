@@ -752,6 +752,7 @@ public class LoadBalancingModule : IModule
 }
 
 // Load Balancing DTOs
+[ResponseType("codex.loadbalancing.balance-request", "LoadBalanceRequest", "Request for load balancing")]
 public record LoadBalanceRequest(
     string ServiceName,
     string Strategy,
@@ -759,6 +760,7 @@ public record LoadBalanceRequest(
     Dictionary<string, object>? Constraints
 );
 
+[ResponseType("codex.loadbalancing.balance-response", "LoadBalanceResponse", "Response for load balancing")]
 public record LoadBalanceResponse(
     bool Success,
     ServiceInstance? SelectedInstance,
@@ -766,6 +768,7 @@ public record LoadBalanceResponse(
     TimeSpan LoadTime
 );
 
+[ResponseType("codex.loadbalancing.metrics-response", "LoadBalanceMetricsResponse", "Response for load balance metrics")]
 public record LoadBalanceMetricsResponse(
     bool Success,
     LoadBalanceMetrics Metrics,
@@ -773,6 +776,7 @@ public record LoadBalanceMetricsResponse(
     string TimeRange
 );
 
+[ResponseType("codex.loadbalancing.scaling-request", "ScalingRequest", "Request for service scaling")]
 public record ScalingRequest(
     string ServiceName,
     string Action,
@@ -780,6 +784,7 @@ public record ScalingRequest(
     string Reason
 );
 
+[ResponseType("codex.loadbalancing.scaling-response", "ScalingResponse", "Response for service scaling")]
 public record ScalingResponse(
     bool Success,
     int ScaledCount,
@@ -787,12 +792,14 @@ public record ScalingResponse(
     TimeSpan ScalingTime
 );
 
+[ResponseType("codex.loadbalancing.optimization-request", "OptimizationRequest", "Request for load balancing optimization")]
 public record OptimizationRequest(
     string OptimizationType,
     Dictionary<string, object> TargetMetrics,
     Dictionary<string, object> Constraints
 );
 
+[ResponseType("codex.loadbalancing.optimization-response", "OptimizationResponse", "Response for load balancing optimization")]
 public record OptimizationResponse(
     bool Success,
     List<LoadBalancingOptimization> OptimizationsApplied,
@@ -801,6 +808,7 @@ public record OptimizationResponse(
 );
 
 // Supporting classes
+[ResponseType("codex.loadbalancing.service-instance", "ServiceInstance", "Service instance entity")]
 public class ServiceInstance
 {
     public string Id { get; set; } = "";
@@ -813,6 +821,7 @@ public class ServiceInstance
     public DateTime LastHealthCheck { get; set; } = DateTime.UtcNow;
 }
 
+[ResponseType("codex.loadbalancing.strategy", "LoadBalancingStrategy", "Load balancing strategy entity")]
 public class LoadBalancingStrategy
 {
     public string Name { get; set; } = "";
@@ -820,6 +829,7 @@ public class LoadBalancingStrategy
     public Dictionary<string, object> Parameters { get; set; } = new();
 }
 
+[ResponseType("codex.loadbalancing.performance-metric", "PerformanceMetric", "Performance metric entity")]
 public class PerformanceMetric
 {
     public string ServiceName { get; set; } = "";
@@ -832,6 +842,7 @@ public class PerformanceMetric
     public DateTime Timestamp { get; set; }
 }
 
+[ResponseType("codex.loadbalancing.metrics", "LoadBalanceMetrics", "Load balance metrics entity")]
 public class LoadBalanceMetrics
 {
     public long TotalRequests { get; set; }
@@ -843,6 +854,7 @@ public class LoadBalanceMetrics
     public DateTime Timestamp { get; set; }
 }
 
+[ResponseType("codex.loadbalancing.scaling-recommendation", "ScalingRecommendation", "Scaling recommendation entity")]
 public class ScalingRecommendation
 {
     public string ServiceName { get; set; } = "";
@@ -852,6 +864,7 @@ public class ScalingRecommendation
     public string EstimatedImpact { get; set; } = "";
 }
 
+[ResponseType("codex.loadbalancing.optimization", "LoadBalancingOptimization", "Load balancing optimization entity")]
 public class LoadBalancingOptimization
 {
     public string Type { get; set; } = "";
@@ -860,6 +873,7 @@ public class LoadBalancingOptimization
     public string Impact { get; set; } = "";
 }
 
+[ResponseType("codex.loadbalancing.health-status", "LoadBalancerHealthStatus", "Load balancer health status entity")]
 public class LoadBalancerHealthStatus
 {
     public string Status { get; set; } = "";

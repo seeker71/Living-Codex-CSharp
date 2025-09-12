@@ -611,34 +611,59 @@ public class ConceptModule : IModule
 }
 
 // Request/Response DTOs for each API
+[ResponseType("codex.concept.create-request", "ConceptCreateRequest", "Request for concept creation")]
 public record ConceptCreateRequest(string Name, string Description, string Domain, string Complexity, string[] Tags);
+
+[ResponseType("codex.concept.create-response", "ConceptCreateResponse", "Response for concept creation")]
 public record ConceptCreateResponse(bool Success, string ConceptId, string Message);
 
+[ResponseType("codex.concept.define-request", "ConceptDefineRequest", "Request for concept definition")]
 public record ConceptDefineRequest(string ConceptId, string Definition, string[] Examples, string[] Relationships);
+
+[ResponseType("codex.concept.define-response", "ConceptDefineResponse", "Response for concept definition")]
 public record ConceptDefineResponse(string ConceptId, Dictionary<string, object> Properties, string Message);
 
+[ResponseType("codex.concept.relate-request", "ConceptRelateRequest", "Request for concept relationship")]
 public record ConceptRelateRequest(string SourceConceptId, string TargetConceptId, string RelationshipType, double Weight);
+
+[ResponseType("codex.concept.relate-response", "ConceptRelateResponse", "Response for concept relationship")]
 public record ConceptRelateResponse(bool Success, string RelationshipId, string RelationshipType, double Weight, string Message);
 
+[ResponseType("codex.concept.search-request", "ConceptSearchRequest", "Request for concept search")]
 public record ConceptSearchRequest(string Query, string Domain, string[] Tags);
+
+[ResponseType("codex.concept.search-response", "ConceptSearchResponse", "Response for concept search")]
 public record ConceptSearchResponse(object[] Concepts, int TotalCount, string Message);
 
+[ResponseType("codex.concept.semantic-request", "ConceptSemanticRequest", "Request for concept semantic analysis")]
 public record ConceptSemanticRequest(string ConceptId);
+
+[ResponseType("codex.concept.semantic-response", "ConceptSemanticResponse", "Response for concept semantic analysis")]
 public record ConceptSemanticResponse(string ConceptId, object Analysis, string Message);
 
 // User-Concept Relationship DTOs
+[ResponseType("codex.concept.user-link-request", "UserConceptLinkRequest", "Request for user-concept linking")]
 public record UserConceptLinkRequest(string UserId, string ConceptId, string RelationshipType, double Strength);
+
+[ResponseType("codex.concept.user-link-response", "UserConceptLinkResponse", "Response for user-concept linking")]
 public record UserConceptLinkResponse(bool Success, string? RelationshipId, string Message);
 
+[ResponseType("codex.concept.user-unlink-request", "UserConceptUnlinkRequest", "Request for user-concept unlinking")]
 public record UserConceptUnlinkRequest(string UserId, string ConceptId);
+
+[ResponseType("codex.concept.user-unlink-response", "UserConceptUnlinkResponse", "Response for user-concept unlinking")]
 public record UserConceptUnlinkResponse(bool Success, string Message);
 
+[ResponseType("codex.concept.user-concepts-response", "UserConceptsResponse", "Response for user concepts")]
 public record UserConceptsResponse(bool Success, string UserId, object[] Concepts, int TotalCount, string Message);
 
+[ResponseType("codex.concept.concept-users-response", "ConceptUsersResponse", "Response for concept users")]
 public record ConceptUsersResponse(bool Success, string ConceptId, object[] Users, int TotalCount, string Message);
 
+[ResponseType("codex.concept.user-relationship-response", "UserConceptRelationshipResponse", "Response for user-concept relationship")]
 public record UserConceptRelationshipResponse(bool Success, string UserId, string ConceptId, string? RelationshipType, string? Strength, string? CreatedAt, string Message);
 
+[ResponseType("codex.concept.user-belief-system", "UserBeliefSystem", "User belief system entity")]
 public record UserBeliefSystem(
     string Id,
     string UserId,
@@ -656,10 +681,17 @@ public record UserBeliefSystem(
     DateTime CreatedAt
 );
 
+[ResponseType("codex.concept.user-belief-system-request", "UserBeliefSystemRequest", "Request for user belief system")]
 public record UserBeliefSystemRequest(string UserId, string Framework, string Description, string[] Principles, string[] Values);
+
+[ResponseType("codex.concept.user-belief-system-response", "UserBeliefSystemResponse", "Response for user belief system")]
 public record UserBeliefSystemResponse(bool Success, string UserId, string? BeliefSystemId, string Message);
 
+[ResponseType("codex.concept.user-translation-request", "UserConceptTranslationRequest", "Request for user concept translation")]
 public record UserConceptTranslationRequest(string Concept, string BeliefSystemId);
+
+[ResponseType("codex.concept.user-translation-response", "UserConceptTranslationResponse", "Response for user concept translation")]
 public record UserConceptTranslationResponse(bool Success, string OriginalConcept, string? TranslatedConcept, string BeliefSystemId, double Confidence, string Message);
 
+[ResponseType("codex.concept.user-belief-system-get-response", "UserBeliefSystemGetResponse", "Response for getting user belief system")]
 public record UserBeliefSystemGetResponse(bool Success, string UserId, string? BeliefSystemId, string? Framework, string[] Principles, string[] Values, string? CreatedAt, string Message);

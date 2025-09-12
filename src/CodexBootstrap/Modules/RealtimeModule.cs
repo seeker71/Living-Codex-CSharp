@@ -552,6 +552,7 @@ public sealed class RealtimeModule : IModule
 /// <summary>
 /// SignalR Hub for real-time communication
 /// </summary>
+[ResponseType("codex.realtime.hub", "RealtimeHub", "SignalR Hub for real-time communication")]
 public class RealtimeHub : Hub
 {
     private readonly Core.ILogger _logger;

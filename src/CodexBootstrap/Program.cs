@@ -376,12 +376,11 @@ static int GetModuleEndpoints(IModule module)
 static void InitializeMetaNodeSystem(NodeRegistry registry)
 {
     // Register attribute-based meta-nodes
-    // MetaNodeDiscovery is temporarily disabled
-    // var assembly = Assembly.GetExecutingAssembly();
-    // foreach (var node in MetaNodeDiscovery.DiscoverMetaNodes(assembly))
-    // {
-    //     registry.Upsert(node);
-    // }
+    var assembly = Assembly.GetExecutingAssembly();
+    foreach (var node in MetaNodeDiscovery.DiscoverMetaNodes(assembly))
+    {
+        registry.Upsert(node);
+    }
 
     // Register legacy meta-nodes for backward compatibility
     foreach (var node in MetaNodeSystem.CreateCoreMetaNodes())

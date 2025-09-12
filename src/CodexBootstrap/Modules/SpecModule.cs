@@ -317,6 +317,86 @@ public sealed class SpecModule : IModule
         }
     }
 
+    [ApiRoute("GET", "/spec/modules/with-specs", "get-modules-with-specs", "Get all modules with their spec references", "codex.spec")]
+    public async Task<object> GetModulesWithSpecsAsync()
+    {
+        try
+        {
+            var modules = _registry.GetNodesByType("module")
+                .Where(m => m.Meta?.ContainsKey("specReference") == true)
+                .Select(m => new
+                {
+                    moduleId = m.Id,
+                    name = m.Title,
+                    version = m.Meta?.GetValueOrDefault("version")?.ToString(),
+                    description = m.Description,
+                    specReference = m.Meta?.GetValueOrDefault("specReference")?.ToString(),
+                    capabilities = m.Meta?.GetValueOrDefault("capabilities") as string[] ?? new string[0],
+                    tags = m.Meta?.GetValueOrDefault("tags") as string[] ?? new string[0]
+                })
+                .ToList();
+
+            return new
+            {
+                success = true,
+                timestamp = DateTime.UtcNow,
+                totalModules = modules.Count,
+                modules = modules
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error getting modules with specs: {ex.Message}", ex);
+            return new ErrorResponse($"Failed to get modules with specs: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("GET", "/spec/relationships/spec-to-modules", "get-spec-to-module-relationships", "Get all spec-to-module relationships", "codex.spec")]
+    public async Task<object> GetSpecToModuleRelationshipsAsync()
+    {
+        try
+        {
+            var specModuleEdges = _registry.AllEdges()
+                .Where(e => e.Role == "has-implementation" && e.Meta?.GetValueOrDefault("relationship")?.ToString() == "spec-has-module-implementation")
+                .Select(e => new
+                {
+                    specId = e.FromId,
+                    moduleId = e.ToId,
+                    relationship = e.Role,
+                    weight = e.Weight,
+                    createdAt = e.Meta?.GetValueOrDefault("createdAt")?.ToString()
+                })
+                .ToList();
+
+            var moduleSpecEdges = _registry.AllEdges()
+                .Where(e => e.Role == "implements" && e.Meta?.GetValueOrDefault("relationship")?.ToString() == "module-implements-spec")
+                .Select(e => new
+                {
+                    moduleId = e.FromId,
+                    specId = e.ToId,
+                    relationship = e.Role,
+                    weight = e.Weight,
+                    createdAt = e.Meta?.GetValueOrDefault("createdAt")?.ToString()
+                })
+                .ToList();
+
+            return new
+            {
+                success = true,
+                timestamp = DateTime.UtcNow,
+                specToModuleEdges = specModuleEdges,
+                moduleToSpecEdges = moduleSpecEdges,
+                totalSpecToModule = specModuleEdges.Count,
+                totalModuleToSpec = moduleSpecEdges.Count
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error getting spec-to-module relationships: {ex.Message}", ex);
+            return new ErrorResponse($"Failed to get spec-to-module relationships: {ex.Message}");
+        }
+    }
+
     private Task StoreAtomsAsNodes(string moduleId, JsonElement atoms)
     {
         try

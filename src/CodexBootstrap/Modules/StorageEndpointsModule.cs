@@ -27,48 +27,14 @@ public sealed class StorageEndpointsModule : IModule
 
     public Node GetModuleNode()
     {
-        return new Node(
-            Id: "codex.storage-endpoints",
-            TypeId: "codex.module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Storage Endpoints Module",
-            Description: "Direct HTTP endpoints for storage operations with comprehensive validation",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    version = "0.1.0",
-                    capabilities = new[]
-                    {
-                        "get_node",
-                        "create_node",
-                        "update_node",
-                        "delete_node",
-                        "list_nodes",
-                        "search_nodes",
-                        "get_edge",
-                        "create_edge",
-                        "update_edge",
-                        "delete_edge",
-                        "list_edges",
-                        "search_edges",
-                        "get_storage_stats",
-                        "backup_storage",
-                        "restore_storage",
-                        "validate_storage",
-                        "optimize_storage"
-                    }
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["name"] = "Storage Endpoints Module",
-                ["version"] = "0.1.0",
-                ["description"] = "Direct HTTP endpoints for storage operations with comprehensive validation"
-            }
+        return NodeStorage.CreateModuleNode(
+            "codex.storage-endpoints",
+            "Storage Endpoints Module",
+            "0.1.0",
+            "Direct HTTP endpoints for storage operations with comprehensive validation",
+            new[] { "storage", "endpoints", "validation", "http", "data-management" },
+            new[] { "get_node", "create_node", "update_node", "delete_node", "list_nodes", "search_nodes", "get_edge", "create_edge", "update_edge", "delete_edge", "list_edges", "search_edges", "get_storage_stats", "backup_storage", "restore_storage", "validate_storage", "optimize_storage" },
+            "codex.spec.storage-endpoints"
         );
     }
 
