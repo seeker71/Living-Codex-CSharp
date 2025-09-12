@@ -38,21 +38,61 @@ public sealed class HealthService
             var uptime = DateTime.UtcNow - _startTime;
             var nodeCount = _registry.AllNodes().Count();
             var edgeCount = _registry.AllEdges().Count();
+            
+            // Calculate registration metrics
+            var registrationMetrics = CalculateRegistrationMetrics();
+            
             // Use actual loaded module count from ModuleLoader instead of NodeRegistry count
             var moduleCount = _moduleLoader?.GetLoadedModules().Count ?? 
                              (_registry.GetNodesByType("module").Count() + 
                               _registry.GetNodesByType("codex.module").Count());
 
             return new HealthStatus(
-                Status: "healthy",
+                Status: registrationMetrics.ModuleRegistrationSuccessRate >= 0.9 ? "healthy" : "degraded",
                 Uptime: uptime,
                 RequestCount: _requestCount,
                 NodeCount: nodeCount,
                 EdgeCount: edgeCount,
                 ModuleCount: moduleCount,
                 Timestamp: DateTime.UtcNow,
-                Version: GetVersion()
+                Version: GetVersion(),
+                RegistrationMetrics: registrationMetrics
             );
+        }
+    }
+
+    private RegistrationMetrics CalculateRegistrationMetrics()
+    {
+        try
+        {
+            var totalModulesLoaded = _moduleLoader?.GetLoadedModules().Count ?? 0;
+            var modulesInNodeRegistry = _registry.GetNodesByType("module").Count() + 
+                                      _registry.GetNodesByType("codex.meta/module").Count();
+            var modulesWithFailedRegistration = Math.Max(0, totalModulesLoaded - modulesInNodeRegistry);
+            
+            // Count routes by looking at API nodes
+            var totalRoutesRegistered = _registry.GetNodesByType("api").Count();
+            var routesWithFailedRegistration = 0; // This would need to be tracked separately
+            
+            var moduleSuccessRate = totalModulesLoaded > 0 ? (double)modulesInNodeRegistry / totalModulesLoaded : 1.0;
+            var routeSuccessRate = 1.0; // This would need to be calculated based on actual route registration tracking
+            
+            return new RegistrationMetrics(
+                TotalModulesLoaded: totalModulesLoaded,
+                ModulesRegisteredInNodeRegistry: modulesInNodeRegistry,
+                ModulesWithFailedRegistration: modulesWithFailedRegistration,
+                TotalRoutesRegistered: totalRoutesRegistered,
+                RoutesWithFailedRegistration: routesWithFailedRegistration,
+                ModuleRegistrationSuccessRate: moduleSuccessRate,
+                RouteRegistrationSuccessRate: routeSuccessRate,
+                FailedModuleRegistrations: new List<string>(), // Would be populated from actual failure tracking
+                FailedRouteRegistrations: new List<string>()   // Would be populated from actual failure tracking
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error calculating registration metrics: {ex.Message}", ex);
+            return new RegistrationMetrics(0, 0, 0, 0, 0, 0.0, 0.0, new List<string>(), new List<string>());
         }
     }
 
@@ -93,5 +133,21 @@ public record HealthStatus(
     int EdgeCount,
     int ModuleCount,
     DateTime Timestamp,
-    string Version
+    string Version,
+    RegistrationMetrics? RegistrationMetrics = null
+);
+
+/// <summary>
+/// Registration metrics for tracking module and route registration success/failure
+/// </summary>
+public record RegistrationMetrics(
+    int TotalModulesLoaded,
+    int ModulesRegisteredInNodeRegistry,
+    int ModulesWithFailedRegistration,
+    int TotalRoutesRegistered,
+    int RoutesWithFailedRegistration,
+    double ModuleRegistrationSuccessRate,
+    double RouteRegistrationSuccessRate,
+    List<string> FailedModuleRegistrations,
+    List<string> FailedRouteRegistrations
 );

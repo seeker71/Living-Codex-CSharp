@@ -148,8 +148,30 @@ public sealed class ModuleLoader
             
             // Use standardized module registration
             _registry.Upsert(moduleNode);
-            module.Register(_registry);
-            module.RegisterApiHandlers(_router, _registry);
+            
+            // Register module with detailed error tracking
+            try
+            {
+                module.Register(_registry);
+                _logger.Info($"Successfully registered module {module.GetType().Name} in NodeRegistry");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Failed to register module {module.GetType().Name} in NodeRegistry: {ex.Message}", ex);
+                // Continue loading even if Register fails - some modules might have empty Register methods
+            }
+            
+            // Register API handlers
+            try
+            {
+                module.RegisterApiHandlers(_router, _registry);
+                _logger.Info($"Successfully registered API handlers for module {module.GetType().Name}");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Failed to register API handlers for module {module.GetType().Name}: {ex.Message}", ex);
+                // Continue loading even if API handler registration fails
+            }
             
             // Register record types as meta nodes if the module supports it
             RegisterModuleRecordTypes(module, moduleNode);

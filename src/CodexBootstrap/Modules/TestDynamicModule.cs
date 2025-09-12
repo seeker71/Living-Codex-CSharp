@@ -45,37 +45,13 @@ namespace CodexBootstrap.Modules
         /// </summary>
         public Node GetModuleNode()
         {
-            return new Node(
-                Id: "test-dynamic-module",
-                TypeId: "module",
-                State: ContentState.Ice,
-                Locale: "en",
-                Title: $"Test Dynamic Module v{_version} - AI Enhanced - HOT RELOAD TEST",
-                Description: $"A test module for demonstrating hot-reload functionality with real AI integration - Version {_version}",
-                Content: new ContentRef(
-                    MediaType: "application/json",
-                    InlineJson: System.Text.Json.JsonSerializer.Serialize(new { 
-                        id = "test-dynamic-module", 
-                        name = "TestDynamicModule", 
-                        version = _version.ToString(), 
-                        description = "A test module for demonstrating hot-reload functionality with real AI integration",
-                        callCount = _callCount,
-                        aiInsights = _aiInsights.Count,
-                        features = new[] { "Status endpoint", "Counter increment", "AI insights", "Metrics", "Real LLM integration" }
-                    }),
-                    InlineBytes: null,
-                    ExternalUri: null
-                ),
-                Meta: new Dictionary<string, object>
-                {
-                    ["name"] = "TestDynamicModule",
-                    ["version"] = _version.ToString(),
-                    ["description"] = $"A test module for demonstrating hot-reload functionality with real AI integration - Version {_version}",
-                    ["tags"] = new[] { "test", "dynamic", "hot-reload", "ai-enhanced" },
-                    ["callCount"] = _callCount,
-                    ["aiInsights"] = _aiInsights.Count,
-                    ["features"] = new[] { "Status endpoint", "Counter increment", "AI insights", "Metrics", "Real LLM integration" }
-                }
+            return NodeStorage.CreateModuleNode(
+                id: "test-dynamic-module",
+                name: $"Test Dynamic Module v{_version} - AI Enhanced - HOT RELOAD TEST",
+                version: _version.ToString(),
+                description: $"A test module for demonstrating hot-reload functionality with real AI integration - Version {_version}",
+                capabilities: new[] { "Status endpoint", "Counter increment", "AI insights", "Metrics", "Real LLM integration" },
+                tags: new[] { "test", "dynamic", "hot-reload", "ai-enhanced" }
             );
         }
 

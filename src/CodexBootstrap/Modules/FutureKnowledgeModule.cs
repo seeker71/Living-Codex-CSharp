@@ -23,27 +23,13 @@ public class FutureKnowledgeModule : IModule
 
     public Node GetModuleNode()
     {
-        return new Node(
-            Id: "codex.future",
-            TypeId: "codex.meta/module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Future Knowledge",
-            Description: "Retrieves and applies knowledge from future states",
-            Content: null,
-            Meta: new Dictionary<string, object>
-            {
-                ["version"] = "1.0.0",
-                ["capabilities"] = new[] { "future-knowledge", "pattern-recognition", "prediction" },
-                ["endpoints"] = new[] { 
-                    "/future/knowledge/retrieve", 
-                    "/future/knowledge/apply", 
-                    "/future/patterns/discover",
-                    "/future/patterns/analyze",
-                    "/future/patterns/trending",
-                    "/future/predictions/generate"
-                }
-            }
+        return NodeStorage.CreateModuleNode(
+            id: "codex.future",
+            name: "Future Knowledge",
+            version: "1.0.0",
+            description: "Retrieves and applies knowledge from future states",
+            capabilities: new[] { "future-knowledge", "pattern-recognition", "prediction" },
+            tags: new[] { "future", "knowledge", "prediction", "patterns" }
         );
     }
 

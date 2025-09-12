@@ -31,33 +31,13 @@ namespace CodexBootstrap.Modules
 
         public Node GetModuleNode()
         {
-            return new Node(
-                Id: "spec-driven-module",
-                TypeId: "module",
-                State: ContentState.Ice,
-                Locale: "en",
-                Title: "Spec-Driven Architecture Module",
-                Description: "Provides spec-driven architecture with ice/water/gas states",
-                Content: new ContentRef(
-                    MediaType: "application/json",
-                    InlineJson: System.Text.Json.JsonSerializer.Serialize(new { 
-                        id = "spec-driven-module", 
-                        name = "SpecDrivenModule", 
-                        version = "1.0.0", 
-                        description = "Provides spec-driven architecture with ice/water/gas states",
-                        architecture = "ice-water-gas"
-                    }),
-                    InlineBytes: null,
-                    ExternalUri: null
-                ),
-                Meta: new Dictionary<string, object>
-                {
-                    ["name"] = "SpecDrivenModule",
-                    ["version"] = "1.0.0",
-                    ["description"] = "Provides spec-driven architecture with ice/water/gas states",
-                    ["tags"] = new[] { "spec-driven", "architecture", "ice-water-gas" },
-                    ["architecture"] = "ice-water-gas"
-                }
+            return NodeStorage.CreateModuleNode(
+                id: "spec-driven-module",
+                name: "Spec-Driven Architecture Module",
+                version: "1.0.0",
+                description: "Provides spec-driven architecture with ice/water/gas states",
+                capabilities: new[] { "Spec-Driven Architecture", "Ice/Water/Gas States", "Dynamic Generation" },
+                tags: new[] { "spec-driven", "architecture", "ice-water-gas" }
             );
         }
 

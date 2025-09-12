@@ -51,31 +51,13 @@ namespace CodexBootstrap.Modules
         /// </summary>
         public Node GetModuleNode()
         {
-            return new Node(
-                Id: "self-update-module",
-                TypeId: "module",
-                State: ContentState.Ice,
-                Locale: "en",
-                Title: "Self Update Module",
-                Description: "Provides self-updating functionality for dynamic modules",
-                Content: new ContentRef(
-                    MediaType: "application/json",
-                    InlineJson: System.Text.Json.JsonSerializer.Serialize(new { 
-                        id = "self-update-module", 
-                        name = "SelfUpdateModule", 
-                        version = "1.0.0", 
-                        description = "Provides self-updating functionality for dynamic modules" 
-                    }),
-                    InlineBytes: null,
-                    ExternalUri: null
-                ),
-                Meta: new Dictionary<string, object>
-                {
-                    ["name"] = "SelfUpdateModule",
-                    ["version"] = "1.0.0",
-                    ["description"] = "Provides self-updating functionality for dynamic modules",
-                    ["tags"] = new[] { "self-update", "hot-reload", "modules" }
-                }
+            return NodeStorage.CreateModuleNode(
+                id: "self-update-module",
+                name: "Self Update Module",
+                version: "1.0.0",
+                description: "Provides self-updating functionality for dynamic modules",
+                capabilities: new[] { "Hot Reload", "Module Compilation", "Dynamic Loading", "Rollback" },
+                tags: new[] { "self-update", "hot-reload", "modules" }
             );
         }
 

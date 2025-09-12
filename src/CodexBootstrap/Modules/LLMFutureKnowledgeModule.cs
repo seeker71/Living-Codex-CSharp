@@ -96,34 +96,13 @@ public class LLMFutureKnowledgeModule : IModule
 
     public Node GetModuleNode()
     {
-        return new Node(
-            Id: "codex.llm.future",
-            TypeId: "codex.meta/module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "LLM-Enhanced Future Knowledge Module",
-            Description: "Uses configurable local and remote LLMs for future knowledge retrieval",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    ModuleId = "codex.llm.future",
-                    Name = "LLM-Enhanced Future Knowledge Module",
-                    Description = "Configurable LLM integration for future knowledge retrieval",
-                    Version = "1.0.0",
-                    SupportedProviders = new[] { "OpenAI", "Anthropic", "Local", "Ollama", "Custom" },
-                    Capabilities = new[] { "FutureKnowledge", "LLMIntegration", "ConfigurableProviders", "LocalAndRemote" }
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.llm.future",
-                ["version"] = "1.0.0",
-                ["createdAt"] = DateTime.UtcNow,
-                ["purpose"] = "LLM-powered future knowledge retrieval"
-            }
+        return NodeStorage.CreateModuleNode(
+            id: "codex.llm.future",
+            name: "LLM-Enhanced Future Knowledge Module",
+            version: "1.0.0",
+            description: "Uses configurable local and remote LLMs for future knowledge retrieval",
+            capabilities: new[] { "FutureKnowledge", "LLMIntegration", "ConfigurableProviders", "LocalAndRemote" },
+            tags: new[] { "llm", "future-knowledge", "ai", "concepts" }
         );
     }
 

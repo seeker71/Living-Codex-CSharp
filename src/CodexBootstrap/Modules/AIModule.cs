@@ -138,25 +138,13 @@ namespace CodexBootstrap.Modules
 
         public Node GetModuleNode()
         {
-            return new Node(
-                Id: "ai-module",
-                TypeId: "module",
-                State: ContentState.Ice,
-                Locale: "en-US",
-                Title: Name,
-                Description: Description,
-                Content: new ContentRef(
-                    MediaType: "application/json",
-                    InlineJson: JsonSerializer.Serialize(new { Name, Description, Version }),
-                    InlineBytes: null,
-                    ExternalUri: null
-                ),
-                Meta: new Dictionary<string, object>
-                {
-                    ["version"] = Version,
-                    ["type"] = "ai-module",
-                    ["capabilities"] = new[] { "concept-extraction", "llm-integration", "fractal-transformation", "analysis", "caching" }
-                }
+            return NodeStorage.CreateModuleNode(
+                id: "ai-module",
+                name: Name,
+                version: Version,
+                description: Description,
+                capabilities: new[] { "concept-extraction", "llm-integration", "fractal-transformation", "analysis", "caching" },
+                tags: new[] { "ai", "concepts", "llm", "analysis" }
             );
         }
 
