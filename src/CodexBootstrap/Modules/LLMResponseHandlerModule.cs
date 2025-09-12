@@ -35,33 +35,13 @@ public class LLMResponseHandlerModule : IModule
 
     public Node GetModuleNode()
     {
-        return new Node(
-            Id: "codex.llm.response-handler",
-            TypeId: "codex.meta/module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "LLM Response Handler Module",
-            Description: "Converts LLM responses into structured nodes and edges for bootstrap integration",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    ModuleId = "codex.llm.response-handler",
-                    Name = "LLM Response Handler Module",
-                    Description = "Converts LLM responses into structured nodes and edges",
-                    Version = "1.0.0",
-                    Capabilities = new[] { "ResponseParsing", "NodeGeneration", "EdgeCreation", "DiffPatch", "BootstrapIntegration" }
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.llm.response-handler",
-                ["version"] = "1.0.0",
-                ["createdAt"] = DateTime.UtcNow,
-                ["purpose"] = "LLM response to node conversion"
-            }
+        return NodeStorage.CreateModuleNode(
+            id: "codex.llm.response-handler",
+            name: "LLM Response Handler Module",
+            version: "1.0.0",
+            description: "Converts LLM responses into structured nodes and edges for bootstrap integration",
+            capabilities: new[] { "ResponseParsing", "NodeGeneration", "EdgeCreation", "DiffPatch", "BootstrapIntegration" },
+            tags: new[] { "llm", "response-handler", "parsing", "bootstrap" }
         );
     }
 

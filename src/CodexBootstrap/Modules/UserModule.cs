@@ -18,38 +18,13 @@ public class UserModule : IModule
 
     public Node GetModuleNode()
     {
-        return new Node(
-            Id: ModuleId,
-            TypeId: "codex.meta/module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "User Management Module",
-            Description: Description,
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    moduleId = ModuleId,
-                    version = Version,
-                    description = Description,
-                    apis = new[]
-                    {
-                        new { name = "create", spec = "/user/create/spec" },
-                        new { name = "authenticate", spec = "/user/authenticate/spec" },
-                        new { name = "profile", spec = "/user/profile/spec" },
-                        new { name = "permissions", spec = "/user/permissions/spec" },
-                        new { name = "sessions", spec = "/user/sessions/spec" }
-                    }
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = ModuleId,
-                ["version"] = Version,
-                ["type"] = "user-management"
-            }
+        return NodeStorage.CreateModuleNode(
+            id: ModuleId,
+            name: "User Management Module",
+            version: Version,
+            description: Description,
+            capabilities: new[] { "user-creation", "authentication", "profile-management", "permissions", "session-management" },
+            tags: new[] { "user", "management", "auth", "profile" }
         );
     }
 

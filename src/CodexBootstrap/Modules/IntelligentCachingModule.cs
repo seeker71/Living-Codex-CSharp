@@ -27,31 +27,13 @@ public class IntelligentCachingModule : IModule
 
     public Node GetModuleNode()
     {
-        return new Node(
-            Id: "codex.intelligent-caching",
-            TypeId: "codex.module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Intelligent Caching Module",
-            Description: "Advanced caching system with predictive pre-loading and performance optimization",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    version = "1.0.0",
-                    capabilities = new[] { "predictive-preloading", "usage-pattern-analysis", "cache-optimization", "performance-monitoring", "smart-invalidation" },
-                    endpoints = new[] { "preload-concepts", "analyze-patterns", "optimize-cache", "get-metrics", "invalidate-cache" }
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["name"] = "Intelligent Caching Module",
-                ["version"] = "1.0.0",
-                ["type"] = "caching",
-                ["capabilities"] = new[] { "predictive-preloading", "usage-pattern-analysis", "cache-optimization", "performance-monitoring" }
-            }
+        return NodeStorage.CreateModuleNode(
+            id: "codex.intelligent-caching",
+            name: "Intelligent Caching Module",
+            version: "1.0.0",
+            description: "Advanced caching system with predictive pre-loading and performance optimization",
+            capabilities: new[] { "predictive-preloading", "usage-pattern-analysis", "cache-optimization", "performance-monitoring", "smart-invalidation" },
+            tags: new[] { "caching", "performance", "optimization", "intelligent" }
         );
     }
 

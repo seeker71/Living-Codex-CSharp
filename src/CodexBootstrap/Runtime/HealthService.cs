@@ -70,8 +70,9 @@ public sealed class HealthService
                                       _registry.GetNodesByType("codex.meta/module").Count();
             var modulesWithFailedRegistration = Math.Max(0, totalModulesLoaded - modulesInNodeRegistry);
             
-            // Count routes by looking at API nodes
-            var totalRoutesRegistered = _registry.GetNodesByType("api").Count();
+            // Count routes by looking at API nodes (both standard and meta API types)
+            var totalRoutesRegistered = _registry.GetNodesByType("api").Count() + 
+                                      _registry.GetNodesByType("codex.meta/api").Count();
             var routesWithFailedRegistration = 0; // This would need to be tracked separately
             
             var moduleSuccessRate = totalModulesLoaded > 0 ? (double)modulesInNodeRegistry / totalModulesLoaded : 1.0;

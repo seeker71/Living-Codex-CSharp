@@ -43,39 +43,13 @@ public sealed class UserContributionsModule : IModule
 
     public Node GetModuleNode()
     {
-        return new Node(
-            Id: "codex.user-contributions",
-            TypeId: "codex.module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "User Contributions Module",
-            Description: "Manages user contributions with ETH ledger, change tracking, attribution, and reward sharing",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    version = "0.1.0",
-                    capabilities = new[]
-                    {
-                        "contribution_tracking",
-                        "eth_ledger",
-                        "attribution_system",
-                        "reward_sharing",
-                        "change_tracking",
-                        "contribution_validation",
-                        "reward_calculation",
-                        "attribution_verification"
-                    }
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["name"] = "User Contributions Module",
-                ["version"] = "0.1.0",
-                ["description"] = "Manages user contributions with ETH ledger, change tracking, attribution, and reward sharing"
-            }
+        return NodeStorage.CreateModuleNode(
+            id: "codex.user-contributions",
+            name: "User Contributions Module",
+            version: "0.1.0",
+            description: "Manages user contributions with ETH ledger, change tracking, attribution, and reward sharing",
+            capabilities: new[] { "contribution_tracking", "eth_ledger", "attribution_system", "reward_sharing", "change_tracking", "contribution_validation", "reward_calculation", "attribution_verification" },
+            tags: new[] { "contributions", "eth", "ledger", "rewards", "attribution" }
         );
     }
 
