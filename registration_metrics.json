@@ -1,0 +1,11 @@
+{
+  "totalModulesLoaded": 48,
+  "modulesRegisteredInNodeRegistry": 49,
+  "modulesWithFailedRegistration": 0,
+  "totalRoutesRegistered": 334,
+  "routesWithFailedRegistration": 0,
+  "moduleRegistrationSuccessRate": 1.0208333333333333,
+  "routeRegistrationSuccessRate": 1,
+  "failedModuleRegistrations": [],
+  "failedRouteRegistrations": []
+}
