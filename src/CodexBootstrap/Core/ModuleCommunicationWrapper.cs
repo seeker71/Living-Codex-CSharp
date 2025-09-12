@@ -19,11 +19,11 @@ namespace CodexBootstrap.Core
         private readonly string _baseUrl;
         private readonly JsonSerializerOptions _jsonOptions;
 
-        public ModuleCommunicationWrapper(ILogger logger, string baseUrl = "http://localhost:5000")
+        public ModuleCommunicationWrapper(ILogger logger, string baseUrl = null)
         {
             _httpClient = new HttpClient();
             _logger = logger;
-            _baseUrl = baseUrl.TrimEnd('/');
+            _baseUrl = baseUrl?.TrimEnd('/') ?? GlobalConfiguration.BaseUrl;
             _jsonOptions = new JsonSerializerOptions
             {
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,

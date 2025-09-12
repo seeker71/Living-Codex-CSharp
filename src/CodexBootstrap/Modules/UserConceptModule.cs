@@ -471,7 +471,7 @@ namespace CodexBootstrap.Modules;
                 }
             };
 
-            var response = await httpClient.PostAsJsonAsync("http://localhost:5000/llm/translate", translationRequest);
+            var response = await httpClient.PostAsJsonAsync(GlobalConfiguration.GetUrl("/llm/translate"), translationRequest);
             
             if (response.IsSuccessStatusCode)
             {

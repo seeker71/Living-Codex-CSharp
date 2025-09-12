@@ -266,7 +266,7 @@ public class ConceptRegistryModule : IModule
                     "application/json"
                 );
 
-                var response = await httpClient.PostAsync("http://localhost:5001/ai/extract-concepts", jsonContent);
+                var response = await httpClient.PostAsync(GlobalConfiguration.GetUrl("/ai/extract-concepts"), jsonContent);
                 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -352,7 +352,7 @@ public class ConceptRegistryModule : IModule
                                 "application/json"
                             );
 
-                            var ontologyResponse = await httpClient.PostAsync("http://localhost:5001/concept/ontology/register", ontologyJson);
+                            var ontologyResponse = await httpClient.PostAsync(GlobalConfiguration.GetUrl("/concept/ontology/register"), ontologyJson);
                             if (ontologyResponse.IsSuccessStatusCode)
                             {
                                 registeredConcepts.Add(conceptId);

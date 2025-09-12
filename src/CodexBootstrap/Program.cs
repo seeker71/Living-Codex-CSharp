@@ -121,6 +121,12 @@ builder.Services.AddHttpClient();
 
 var app = builder.Build();
 
+// Initialize global configuration with the application's base URL
+// Get the URL from command line args or use default
+var urls = args.Where(arg => arg.StartsWith("--urls=")).FirstOrDefault();
+var baseUrl = urls?.Split('=')[1] ?? "http://localhost:5001";
+GlobalConfiguration.Initialize(baseUrl);
+
 // Add generic error handling middleware
 app.UseExceptionHandler(errorApp =>
 {

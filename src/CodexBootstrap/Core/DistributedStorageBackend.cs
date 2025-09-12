@@ -711,7 +711,7 @@ public class DistributedStorageBackend : IDistributedStorageBackend
     private string GetLocalEndpoint()
     {
         // In a real implementation, this would get the actual endpoint
-        return $"http://localhost:5000";
+        return GlobalConfiguration.BaseUrl;
     }
 }
 
