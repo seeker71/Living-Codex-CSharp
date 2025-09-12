@@ -1,0 +1,127 @@
+using System;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
+using System.Threading.Tasks;
+using CodexBootstrap.Core;
+
+namespace CodexBootstrap.Core;
+
+/// <summary>
+/// Simple LLM client for Ollama integration
+/// </summary>
+public class LLMClient
+{
+    private readonly HttpClient _httpClient;
+    private readonly ILogger _logger;
+    private readonly string _baseUrl;
+
+    public LLMClient(HttpClient httpClient, ILogger logger, string baseUrl = "http://localhost:11434")
+    {
+        _httpClient = httpClient;
+        _logger = logger;
+        _baseUrl = baseUrl;
+    }
+
+    /// <summary>
+    /// Send a query to the LLM
+    /// </summary>
+    public async Task<LLMResponse> QueryAsync(string prompt, CodexBootstrap.Modules.LLMConfig config)
+    {
+        try
+        {
+            var request = new
+            {
+                model = config.Model,
+                prompt = prompt,
+                stream = false,
+                options = new
+                {
+                    temperature = config.Temperature,
+                    top_p = config.TopP,
+                    max_tokens = config.MaxTokens
+                }
+            };
+
+            var json = JsonSerializer.Serialize(request);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            _logger.Info($"Sending LLM query to {_baseUrl}/api/generate with model {config.Model}");
+
+            var response = await _httpClient.PostAsync($"{_baseUrl}/api/generate", content);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.Error($"LLM request failed with status {response.StatusCode}");
+                return new LLMResponse
+                {
+                    Success = false,
+                    Response = $"LLM request failed: {response.StatusCode}",
+                    Confidence = 0.0
+                };
+            }
+
+            var responseContent = await response.Content.ReadAsStringAsync();
+            var llmResponse = JsonSerializer.Deserialize<OllamaResponse>(responseContent);
+
+            return new LLMResponse
+            {
+                Success = true,
+                Response = llmResponse?.Response ?? "No response from LLM",
+                Confidence = 0.8, // Default confidence for now
+                Model = config.Model,
+                TokensUsed = llmResponse?.Done == true ? 1 : 0
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error calling LLM: {ex.Message}", ex);
+            return new LLMResponse
+            {
+                Success = false,
+                Response = $"Error calling LLM: {ex.Message}",
+                Confidence = 0.0
+            };
+        }
+    }
+
+    /// <summary>
+    /// Check if the LLM service is available
+    /// </summary>
+    public async Task<bool> IsAvailableAsync()
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"{_baseUrl}/api/tags");
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+}
+
+/// <summary>
+/// LLM response structure
+/// </summary>
+public class LLMResponse
+{
+    public bool Success { get; set; }
+    public string Response { get; set; } = "";
+    public double Confidence { get; set; }
+    public string Model { get; set; } = "";
+    public int TokensUsed { get; set; }
+    public DateTimeOffset GeneratedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+/// <summary>
+/// Ollama API response structure
+/// </summary>
+public class OllamaResponse
+{
+    public string Response { get; set; } = "";
+    public bool Done { get; set; }
+    public string Model { get; set; } = "";
+    public long CreatedAt { get; set; }
+}

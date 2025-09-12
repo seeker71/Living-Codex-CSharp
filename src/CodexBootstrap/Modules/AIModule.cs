@@ -122,6 +122,7 @@ namespace CodexBootstrap.Modules
         private readonly TimeSpan _cacheExpiration = TimeSpan.FromHours(24);
         private readonly SemaphoreSlim _analysisSemaphore = new(10, 10);
         private readonly ModuleCommunicationWrapper _moduleComm;
+        private readonly LLMClient _llmClient;
 
         public AIModule(NodeRegistry registry)
         {
@@ -130,6 +131,10 @@ namespace CodexBootstrap.Modules
             _analysisCache = new ConcurrentDictionary<string, CachedAnalysis>();
             _cacheTimestamps = new ConcurrentDictionary<string, DateTimeOffset>();
             _moduleComm = new ModuleCommunicationWrapper(_logger);
+            
+            // Initialize LLM client
+            var httpClient = new HttpClient();
+            _llmClient = new LLMClient(httpClient, _logger);
         }
 
         public string Name => "AI Module";
@@ -458,14 +463,55 @@ namespace CodexBootstrap.Modules
 
                 _logger.Info($"Processing LLM future query: {requestObj.Query}");
 
-                // TODO: Implement actual LLM future query logic
+                // Check if LLM service is available
+                var isAvailable = await _llmClient.IsAvailableAsync();
+                if (!isAvailable)
+                {
+                    _logger.Warn("LLM service not available, falling back to mock response");
+                    var mockResponse = new LLMFutureQueryResponse(
+                        Id: Guid.NewGuid().ToString(),
+                        Query: requestObj.Query,
+                        Response: "LLM service not available. This is a fallback response for future query functionality.",
+                        Confidence: 0.5,
+                        Reasoning: "Generated using fallback algorithms (LLM service unavailable)",
+                        Sources: new List<string> { "Fallback patterns", "Basic analysis" },
+                        GeneratedAt: DateTimeOffset.UtcNow,
+                        UsedConfig: requestObj.LLMConfig
+                    );
+                    return new
+                    {
+                        success = true,
+                        data = mockResponse,
+                        timestamp = DateTimeOffset.UtcNow,
+                        warning = "LLM service unavailable, using fallback"
+                    };
+                }
+
+                // Create enhanced prompt for future query
+                var prompt = $@"You are an advanced AI system specializing in future knowledge and consciousness expansion. 
+Context: {requestObj.Context}
+Time Horizon: {requestObj.TimeHorizon}
+Perspective: {requestObj.Perspective}
+
+Query: {requestObj.Query}
+
+Please provide a thoughtful, consciousness-expanding response that considers future possibilities, patterns, and insights. Focus on:
+1. Potential future scenarios and trends
+2. Consciousness and awareness implications
+3. Practical applications and considerations
+4. Deeper philosophical and spiritual insights
+
+Response:";
+
+                var llmResponse = await _llmClient.QueryAsync(prompt, requestObj.LLMConfig);
+                
                 var response = new LLMFutureQueryResponse(
                     Id: Guid.NewGuid().ToString(),
                     Query: requestObj.Query,
-                    Response: "This is a placeholder response for LLM future query functionality.",
-                    Confidence: 0.85,
-                    Reasoning: "Generated using advanced predictive algorithms",
-                    Sources: new List<string> { "Historical patterns", "Trend analysis" },
+                    Response: llmResponse.Response,
+                    Confidence: llmResponse.Confidence,
+                    Reasoning: "Generated using advanced LLM with consciousness-expansion focus",
+                    Sources: new List<string> { "LLM Analysis", "Future Pattern Recognition", "Consciousness Modeling" },
                     GeneratedAt: DateTimeOffset.UtcNow,
                     UsedConfig: requestObj.LLMConfig
                 );
@@ -504,15 +550,59 @@ namespace CodexBootstrap.Modules
 
                 _logger.Info($"Processing LLM translation: {requestObj.Concept}");
 
-                // TODO: Implement actual LLM translation logic
+                // Check if LLM service is available
+                var isAvailable = await _llmClient.IsAvailableAsync();
+                if (!isAvailable)
+                {
+                    _logger.Warn("LLM service not available, falling back to mock response");
+                    var mockResponse = new LLMTranslationResponse(
+                        Id: Guid.NewGuid().ToString(),
+                        OriginalConcept: requestObj.Concept,
+                        TranslatedConcept: $"Translated: {requestObj.Concept}",
+                        SourceLanguage: requestObj.SourceLanguage,
+                        TargetLanguage: requestObj.TargetLanguage,
+                        Confidence: 0.5,
+                        Reasoning: "Generated using fallback algorithms (LLM service unavailable)",
+                        GeneratedAt: DateTimeOffset.UtcNow,
+                        UsedConfig: requestObj.LLMConfig
+                    );
+                    return new
+                    {
+                        success = true,
+                        data = mockResponse,
+                        timestamp = DateTimeOffset.UtcNow,
+                        warning = "LLM service unavailable, using fallback"
+                    };
+                }
+
+                // Create enhanced prompt for concept translation
+                var prompt = $@"You are an advanced AI system specializing in concept translation and consciousness mapping across different belief systems and languages.
+
+Original Concept: {requestObj.Concept}
+Source Language: {requestObj.SourceLanguage}
+Target Language: {requestObj.TargetLanguage}
+Context: {JsonSerializer.Serialize(requestObj.Context)}
+
+Please translate this concept while:
+1. Preserving the core meaning and consciousness-expanding potential
+2. Adapting to the target language's cultural and linguistic nuances
+3. Maintaining the spiritual and philosophical depth
+4. Ensuring the translation resonates with the target belief system
+
+Provide a thoughtful, accurate translation that honors both the original concept and the target language's unique expression.
+
+Translation:";
+
+                var llmResponse = await _llmClient.QueryAsync(prompt, requestObj.LLMConfig);
+                
                 var response = new LLMTranslationResponse(
                     Id: Guid.NewGuid().ToString(),
                     OriginalConcept: requestObj.Concept,
-                    TranslatedConcept: $"Translated: {requestObj.Concept}",
+                    TranslatedConcept: llmResponse.Response,
                     SourceLanguage: requestObj.SourceLanguage,
                     TargetLanguage: requestObj.TargetLanguage,
-                    Confidence: 0.90,
-                    Reasoning: "Generated using advanced translation algorithms",
+                    Confidence: llmResponse.Confidence,
+                    Reasoning: "Generated using advanced LLM with consciousness-preserving translation focus",
                     GeneratedAt: DateTimeOffset.UtcNow,
                     UsedConfig: requestObj.LLMConfig
                 );
@@ -1537,47 +1627,24 @@ Focus on high-confidence matches and meaningful relationships to the U-CORE onto
         {
             try
             {
-                var httpClient = new HttpClient();
-                var baseUrl = "http://localhost:11434"; // Ollama default URL
+                // Use the new LLMClient for consistency
+                var llmResponse = await _llmClient.QueryAsync(prompt, config);
                 
-                var requestBody = new
+                if (!llmResponse.Success)
                 {
-                    model = config.Model,
-                    prompt = prompt,
-                    stream = false,
-                    options = new
-                    {
-                        temperature = config.Temperature,
-                        top_p = config.TopP,
-                        max_tokens = config.MaxTokens,
-                        stop = config.Parameters.ContainsKey("stop") ? config.Parameters["stop"] : new[] { "---", "###" }
-                    }
-                };
-
-                var jsonContent = JsonSerializer.Serialize(requestBody);
-                var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
-                
-                var response = await httpClient.PostAsync($"{baseUrl}/api/generate", content);
-                
-                if (response.IsSuccessStatusCode)
-                {
-                    var responseContent = await response.Content.ReadAsStringAsync();
-                    var llmResponse = JsonSerializer.Deserialize<OllamaResponse>(responseContent);
-                    
-                    return new CodexBootstrap.Core.BasicLLMResponse(
-                        Content: llmResponse?.Response ?? "No response generated",
-                        Model: config.Model,
-                        CreatedAt: DateTime.UtcNow
-                    );
-                }
-                else
-                {
+                    _logger.Warn($"LLM call failed: {llmResponse.Response}");
                     return new CodexBootstrap.Core.BasicLLMResponse(
                         Content: "LLM unavailable - service error",
                         Model: config.Model,
                         CreatedAt: DateTime.UtcNow
                     );
                 }
+                
+                return new CodexBootstrap.Core.BasicLLMResponse(
+                    Content: llmResponse.Response,
+                    Model: config.Model,
+                    CreatedAt: DateTime.UtcNow
+                );
             }
             catch (Exception ex)
             {
@@ -2171,38 +2238,25 @@ Please provide a thoughtful, spiritually-aware analysis that honors the sacred n
                 _logger.Info($"[LLM] Making real call to Ollama with model: {config.Model}");
                 _logger.Info($"[LLM] Prompt: {prompt.Substring(0, Math.Min(200, prompt.Length))}...");
                 
-                using var httpClient = new HttpClient();
+                // Use the new LLMClient for consistency
+                var llmResponse = await _llmClient.QueryAsync(prompt, config);
                 
-                var requestBody = new
+                if (!llmResponse.Success)
                 {
-                    model = config.Model,
-                    prompt = prompt,
-                    options = new
-                    {
-                        temperature = config.Temperature,
-                        top_p = config.TopP,
-                        num_predict = config.MaxTokens
-                    },
-                    stream = false
-                };
+                    _logger.Warn($"[LLM] LLM call failed: {llmResponse.Response}");
+                    return new AIConceptExtractionResponse(
+                        Content: $"LLM unavailable: {llmResponse.Response}. Concept extraction fallback for: {prompt.Substring(0, Math.Min(100, prompt.Length))}...",
+                        Confidence: 0.5,
+                        Reasoning: "Generated using fallback algorithms (LLM service unavailable)",
+                        Sources: new List<string> { "Fallback", "Basic Analysis" }
+                    );
+                }
 
-                _logger.Info($"[LLM] Request body: {JsonSerializer.Serialize(requestBody)}");
-
-                var content = new StringContent(JsonSerializer.Serialize(requestBody), System.Text.Encoding.UTF8, "application/json");
-                var response = await httpClient.PostAsync("http://localhost:11434/api/generate", content);
-                response.EnsureSuccessStatusCode();
-
-                var responseString = await response.Content.ReadAsStringAsync();
-                _logger.Info($"[LLM] Raw response: {responseString.Substring(0, Math.Min(500, responseString.Length))}...");
-                
-                var jsonResponse = JsonDocument.Parse(responseString);
-                var llmOutput = jsonResponse.RootElement.GetProperty("response").GetString();
-
-                _logger.Info($"[LLM] Extracted response: {llmOutput}");
+                _logger.Info($"[LLM] LLM response received: {llmResponse.Response.Substring(0, Math.Min(200, llmResponse.Response.Length))}...");
 
                 return new AIConceptExtractionResponse(
-                    Content: llmOutput ?? "No response from LLM",
-                    Confidence: 0.85,
+                    Content: llmResponse.Response,
+                    Confidence: llmResponse.Confidence,
                     Reasoning: "Generated using real LLM integration with Ollama",
                     Sources: new List<string> { "Real LLM", "Ollama API", "Advanced AI" }
                 );
