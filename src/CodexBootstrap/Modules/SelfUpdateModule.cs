@@ -113,7 +113,7 @@ namespace CodexBootstrap.Modules
             {
                 if (_stableCore == null)
                 {
-                    return new { success = false, error = "Self-update system not initialized" };
+                    return new { success = false, error = "Self-update system not initialized - dependencies not injected" };
                 }
 
                 var moduleStatus = _stableCore.GetModuleStatus();

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <AssemblyName>DynamicTestModule</AssemblyName>
+    <RootNamespace>DynamicTestModule</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="CodexBootstrap">
+      <HintPath>../src/CodexBootstrap/bin/Debug/net6.0/CodexBootstrap.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>
