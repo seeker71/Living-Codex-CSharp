@@ -11,7 +11,13 @@ namespace CodexBootstrap.Modules;
 /// </summary>
 public class UserModule : IModule
 {
-    
+    private readonly NodeRegistry _registry;
+
+    public UserModule(NodeRegistry registry)
+    {
+        _registry = registry;
+    }
+
     public string ModuleId => "codex.user";
     public string Version => "1.0.0";
     public string Description => "User Management Module - Self-contained fractal APIs";
@@ -30,28 +36,7 @@ public class UserModule : IModule
 
     public void Register(NodeRegistry registry)
     {
-        // Register module node
         registry.Upsert(GetModuleNode());
-
-        // Register API nodes for RouteDiscovery
-        var createApi = NodeStorage.CreateApiNode("codex.user", "create", "/user/create", "Create a new user account");
-        var authenticateApi = NodeStorage.CreateApiNode("codex.user", "authenticate", "/user/authenticate", "Authenticate user credentials");
-        var profileApi = NodeStorage.CreateApiNode("codex.user", "profile", "/user/profile/{id}", "Get or update user profile");
-        var permissionsApi = NodeStorage.CreateApiNode("codex.user", "permissions", "/user/permissions/{id}", "Manage user permissions");
-        var sessionsApi = NodeStorage.CreateApiNode("codex.user", "sessions", "/user/sessions/{id}", "Manage user sessions");
-
-        registry.Upsert(createApi);
-        registry.Upsert(authenticateApi);
-        registry.Upsert(profileApi);
-        registry.Upsert(permissionsApi);
-        registry.Upsert(sessionsApi);
-
-        // Register edges
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.user", "create"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.user", "authenticate"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.user", "profile"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.user", "permissions"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.user", "sessions"));
     }
 
     public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
@@ -265,6 +250,54 @@ public class UserModule : IModule
                 new { id = "session2", createdAt = DateTime.UtcNow.AddDays(-1), isActive = false }
             }
         ));
+    }
+
+    /// <summary>
+    /// Create a new user account
+    /// </summary>
+    [ApiRoute("POST", "/user/create", "create", "Create a new user account", "codex.user")]
+    public async Task<object> CreateUserAsync([ApiParameter("body", "User creation request")] UserCreateRequest request)
+    {
+        return await Task.FromResult(CreateUser(request, _registry));
+    }
+
+    /// <summary>
+    /// Authenticate user credentials
+    /// </summary>
+    [ApiRoute("POST", "/user/authenticate", "authenticate", "Authenticate user credentials", "codex.user")]
+    public async Task<object> AuthenticateUserAsync([ApiParameter("body", "User authentication request")] UserAuthRequest request)
+    {
+        return await Task.FromResult(AuthenticateUser(request));
+    }
+
+    /// <summary>
+    /// Get or update user profile
+    /// </summary>
+    [ApiRoute("GET", "/user/profile/{id}", "profile", "Get or update user profile", "codex.user")]
+    public async Task<object> GetUserProfileAsync([ApiParameter("path", "User ID")] string id)
+    {
+        var request = new UserProfileRequest(id);
+        return await Task.FromResult(GetUserProfile(request, _registry));
+    }
+
+    /// <summary>
+    /// Manage user permissions
+    /// </summary>
+    [ApiRoute("GET", "/user/permissions/{id}", "permissions", "Manage user permissions", "codex.user")]
+    public async Task<object> GetUserPermissionsAsync([ApiParameter("path", "User ID")] string id)
+    {
+        var request = new UserPermissionsRequest(id);
+        return await Task.FromResult(GetUserPermissions(request));
+    }
+
+    /// <summary>
+    /// Manage user sessions
+    /// </summary>
+    [ApiRoute("GET", "/user/sessions/{id}", "sessions", "Manage user sessions", "codex.user")]
+    public async Task<object> GetUserSessionsAsync([ApiParameter("path", "User ID")] string id)
+    {
+        var request = new UserSessionsRequest(id);
+        return await Task.FromResult(GetUserSessions(request));
     }
 }
 
