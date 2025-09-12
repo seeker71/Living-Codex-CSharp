@@ -39,7 +39,8 @@ public class ServiceDiscoveryModule : IModule
     {
         return NodeStorage.CreateModuleNode(ModuleId, Name, Version, Description,
             capabilities: new[] { "service-registration", "service-discovery", "health-monitoring" },
-            tags: new[] { "service-discovery", "microservices", "registration" });
+            tags: new[] { "service-discovery", "microservices", "registration" },
+            specReference: "codex.spec.service-discovery");
     }
 
     public void Register(NodeRegistry registry)

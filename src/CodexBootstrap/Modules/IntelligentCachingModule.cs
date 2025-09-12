@@ -33,7 +33,8 @@ public class IntelligentCachingModule : IModule
             version: "1.0.0",
             description: "Advanced caching system with predictive pre-loading and performance optimization",
             capabilities: new[] { "predictive-preloading", "usage-pattern-analysis", "cache-optimization", "performance-monitoring", "smart-invalidation" },
-            tags: new[] { "caching", "performance", "optimization", "intelligent" }
+            tags: new[] { "caching", "performance", "optimization", "intelligent" },
+            specReference: "codex.spec.intelligent-caching"
         );
     }
 

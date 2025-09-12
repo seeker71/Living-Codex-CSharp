@@ -137,7 +137,8 @@ public class ConceptImageModule : IModule
             version: Version,
             description: Description,
             capabilities: new[] { "image-generation", "concept-visualization", "ai-integration", "multi-provider-support" },
-            tags: new[] { "image", "concept", "ai", "visualization" }
+            tags: new[] { "image", "concept", "ai", "visualization" },
+            specReference: "codex.spec.concept-image"
         );
     }
 

@@ -16,7 +16,10 @@ public sealed class ComposerModule : IModule
             id: "codex.composer",
             name: "Spec Composer Module",
             version: "0.1.0",
-            description: "Self-contained module for composing module specifications from atoms using node-based storage"
+            description: "Self-contained module for composing module specifications from atoms using node-based storage",
+            capabilities: new[] { "compose", "atoms", "spec", "composition" },
+            tags: new[] { "compose", "atoms", "spec", "composition" },
+            specReference: "codex.spec.composer"
         );
     }
 

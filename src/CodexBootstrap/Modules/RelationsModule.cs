@@ -83,7 +83,10 @@ public sealed class RelationsModule : IModule
             id: "codex.relations",
             name: "Relations Module",
             version: "0.1.0",
-            description: "Module for modeling relations, constraints, and validation rules."
+            description: "Module for modeling relations, constraints, and validation rules.",
+            capabilities: new[] { "relations", "constraints", "validation", "modeling" },
+            tags: new[] { "relations", "constraints", "validation", "modeling" },
+            specReference: "codex.spec.relations"
         );
     }
 

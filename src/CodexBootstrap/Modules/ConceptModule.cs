@@ -28,7 +28,15 @@ public class ConceptModule : IModule
 
     public Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(ModuleId, Name, Version, Description);
+        return NodeStorage.CreateModuleNode(
+            ModuleId, 
+            Name, 
+            Version, 
+            Description,
+            capabilities: new[] { "concepts", "management", "ontology", "knowledge" },
+            tags: new[] { "concept", "manage", "ontology", "knowledge" },
+            specReference: "codex.spec.concept"
+        );
     }
 
     public void Register(NodeRegistry registry)

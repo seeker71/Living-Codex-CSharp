@@ -177,7 +177,10 @@ public sealed class AdapterModule : IModule
             id: "codex.adapters",
             name: "Adapter Module",
             version: "0.1.0",
-            description: "Module for managing content adapters and external resource linking."
+            description: "Module for managing content adapters and external resource linking.",
+            capabilities: new[] { "adapters", "content", "external-resources", "linking" },
+            tags: new[] { "adapter", "content", "external", "link" },
+            specReference: "codex.spec.adapters"
         );
     }
 

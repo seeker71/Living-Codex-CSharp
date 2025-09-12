@@ -44,7 +44,8 @@ public class SecurityModule : IModule
             version: "1.0.0",
             description: "JWT authentication, data encryption, and comprehensive access control for Living Codex",
             capabilities: new[] { "jwt-authentication", "data-encryption", "role-based-access", "audit-logging", "security-policies" },
-            tags: new[] { "security", "authentication", "encryption", "access-control" }
+            tags: new[] { "security", "authentication", "encryption", "access-control" },
+            specReference: "codex.spec.security"
         );
     }
 

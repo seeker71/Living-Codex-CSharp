@@ -35,7 +35,8 @@ public class SystemMetricsModule : IModule
     {
         return NodeStorage.CreateModuleNode(ModuleId, Name, Version, Description, 
             capabilities: new[] { "system-monitoring", "metrics-collection", "performance-tracking" },
-            tags: new[] { "metrics", "monitoring", "system" });
+            tags: new[] { "metrics", "monitoring", "system" },
+            specReference: "codex.spec.system-metrics");
     }
 
     public void Register(NodeRegistry registry)

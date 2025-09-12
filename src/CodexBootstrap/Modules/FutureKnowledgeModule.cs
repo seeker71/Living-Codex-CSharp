@@ -29,7 +29,8 @@ public class FutureKnowledgeModule : IModule
             version: "1.0.0",
             description: "Retrieves and applies knowledge from future states",
             capabilities: new[] { "future-knowledge", "pattern-recognition", "prediction" },
-            tags: new[] { "future", "knowledge", "prediction", "patterns" }
+            tags: new[] { "future", "knowledge", "prediction", "patterns" },
+            specReference: "codex.spec.future-knowledge"
         );
     }
 

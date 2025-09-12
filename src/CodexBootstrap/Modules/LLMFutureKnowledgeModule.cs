@@ -102,7 +102,8 @@ public class LLMFutureKnowledgeModule : IModule
             version: "1.0.0",
             description: "Uses configurable local and remote LLMs for future knowledge retrieval",
             capabilities: new[] { "FutureKnowledge", "LLMIntegration", "ConfigurableProviders", "LocalAndRemote" },
-            tags: new[] { "llm", "future-knowledge", "ai", "concepts" }
+            tags: new[] { "llm", "future-knowledge", "ai", "concepts" },
+            specReference: "codex.spec.llm-future-knowledge"
         );
     }
 

@@ -195,34 +195,14 @@ public class ImageAnalysisModule : IModule
 
     public Node GetModuleNode()
     {
-        return new Node(
-            Id: "codex.analysis.image",
-            TypeId: "codex.meta/module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Image Analysis Module",
-            Description: "Analyzes images to extract nodes and edges for the node-based system",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    ModuleId = "codex.analysis.image",
-                    Name = "Image Analysis Module",
-                    Description = "Configurable image analysis for extracting structured data",
-                    Version = "1.0.0",
-                    SupportedProviders = new[] { "OpenAI", "Anthropic", "Google", "Azure", "Custom", "Local" },
-                    Capabilities = new[] { "NodeExtraction", "EdgeDetection", "ComputerVision", "ConfigurableProviders", "LocalAndRemote" }
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.analysis.image",
-                ["version"] = "1.0.0",
-                ["createdAt"] = DateTime.UtcNow,
-                ["purpose"] = "AI-powered image analysis for node extraction"
-            }
+        return NodeStorage.CreateModuleNode(
+            id: "codex.analysis.image",
+            name: "Image Analysis Module",
+            version: "1.0.0",
+            description: "Analyzes images to extract nodes and edges for the node-based system",
+            capabilities: new[] { "image-analysis", "node-extraction", "edge-extraction", "ai-integration" },
+            tags: new[] { "image", "analysis", "extraction", "ai" },
+            specReference: "codex.spec.image-analysis"
         );
     }
 

@@ -28,7 +28,10 @@ public sealed class DistributedStorageModule : IModule
             id: "codex.distributed-storage",
             name: "Distributed Storage Management Module",
             version: "0.1.0",
-            description: "Module for managing distributed storage clusters and replication"
+            description: "Module for managing distributed storage clusters and replication",
+            capabilities: new[] { "distributed-storage", "clusters", "replication", "management" },
+            tags: new[] { "distributed", "storage", "cluster", "replication" },
+            specReference: "codex.spec.distributed-storage"
         );
     }
 

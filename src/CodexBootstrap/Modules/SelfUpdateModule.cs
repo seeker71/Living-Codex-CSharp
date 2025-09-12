@@ -57,7 +57,8 @@ namespace CodexBootstrap.Modules
                 version: "1.0.0",
                 description: "Provides self-updating functionality for dynamic modules",
                 capabilities: new[] { "Hot Reload", "Module Compilation", "Dynamic Loading", "Rollback" },
-                tags: new[] { "self-update", "hot-reload", "modules" }
+                tags: new[] { "self-update", "hot-reload", "modules" },
+                specReference: "codex.spec.self-update"
             );
         }
 

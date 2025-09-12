@@ -36,7 +36,10 @@ public sealed class SpecModule : IModule
             id: "codex.spec",
             name: "Spec Management Module",
             version: "0.1.0",
-            description: "Self-contained module for spec management operations (atoms, compose, export, import) using node-based storage"
+            description: "Self-contained module for spec management operations (atoms, compose, export, import) using node-based storage",
+            capabilities: new[] { "spec-management", "atoms", "compose", "export", "import" },
+            tags: new[] { "spec", "management", "atoms", "compose" },
+            specReference: "codex.spec.spec-management"
         );
     }
 

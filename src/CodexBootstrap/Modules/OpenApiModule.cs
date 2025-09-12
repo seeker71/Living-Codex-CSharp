@@ -103,7 +103,10 @@ public sealed class OpenApiModule : IModule
             id: "codex.openapi",
             name: "OpenAPI Module",
             version: "0.1.0",
-            description: "Module for generating deterministic OpenAPI specifications from module types and APIs."
+            description: "Module for generating deterministic OpenAPI specifications from module types and APIs.",
+            capabilities: new[] { "openapi", "specification", "generation", "documentation" },
+            tags: new[] { "openapi", "spec", "generation", "documentation" },
+            specReference: "codex.spec.openapi"
         );
     }
 

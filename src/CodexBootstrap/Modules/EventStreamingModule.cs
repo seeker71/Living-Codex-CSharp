@@ -35,7 +35,8 @@ public sealed class EventStreamingModule : IModule
             version: "0.1.0",
             description: "Provides event streaming for live updates on node/edge changes",
             capabilities: new[] { "event_streaming", "event_history", "event_subscription", "event_filtering", "event_aggregation", "event_replay" },
-            tags: new[] { "event-streaming", "real-time", "updates", "subscription" }
+            tags: new[] { "event-streaming", "real-time", "updates", "subscription" },
+            specReference: "codex.spec.event-streaming"
         );
     }
 

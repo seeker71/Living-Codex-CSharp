@@ -37,7 +37,8 @@ namespace CodexBootstrap.Modules
                 version: "1.0.0",
                 description: "Provides spec-driven architecture with ice/water/gas states",
                 capabilities: new[] { "Spec-Driven Architecture", "Ice/Water/Gas States", "Dynamic Generation" },
-                tags: new[] { "spec-driven", "architecture", "ice-water-gas" }
+                tags: new[] { "spec-driven", "architecture", "ice-water-gas" },
+                specReference: "codex.spec.spec-driven"
             );
         }
 

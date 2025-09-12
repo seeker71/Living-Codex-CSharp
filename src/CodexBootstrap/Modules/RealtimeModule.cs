@@ -33,7 +33,8 @@ public sealed class RealtimeModule : IModule
             version: "0.1.0",
             description: "Provides WebSocket and SignalR support for real-time bidirectional communication",
             capabilities: new[] { "websocket_connection", "signalr_hub", "event_streaming", "push_notifications", "collaborative_editing", "subscription_management", "session_management" },
-            tags: new[] { "realtime", "websocket", "signalr", "communication" }
+            tags: new[] { "realtime", "websocket", "signalr", "communication" },
+            specReference: "codex.spec.realtime"
         );
     }
 

@@ -38,7 +38,10 @@ public sealed class AuthenticationModule : IModule
             id: "codex.auth",
             name: "Authentication and Authorization Module",
             version: "0.1.0",
-            description: "Module for user authentication, authorization, and access control"
+            description: "Module for user authentication, authorization, and access control",
+            capabilities: new[] { "authentication", "authorization", "jwt", "security", "access-control" },
+            tags: new[] { "login", "logout", "register", "verify", "authorize", "permissions" },
+            specReference: "codex.spec.authentication"
         );
     }
 

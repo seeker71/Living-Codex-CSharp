@@ -41,7 +41,8 @@ public class LLMResponseHandlerModule : IModule
             version: "1.0.0",
             description: "Converts LLM responses into structured nodes and edges for bootstrap integration",
             capabilities: new[] { "ResponseParsing", "NodeGeneration", "EdgeCreation", "DiffPatch", "BootstrapIntegration" },
-            tags: new[] { "llm", "response-handler", "parsing", "bootstrap" }
+            tags: new[] { "llm", "response-handler", "parsing", "bootstrap" },
+            specReference: "codex.spec.llm-response-handler"
         );
     }
 

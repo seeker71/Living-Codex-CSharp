@@ -25,7 +25,10 @@ public sealed class OneShotModule : IModule
             id: "codex.oneshot",
             name: "One-Shot Operations Module",
             version: "0.1.0",
-            description: "Self-contained module for one-shot operations (apply, execute) using node-based storage"
+            description: "Self-contained module for one-shot operations (apply, execute) using node-based storage",
+            capabilities: new[] { "one-shot", "apply", "execute", "operations" },
+            tags: new[] { "oneshot", "apply", "execute", "operations" },
+            specReference: "codex.spec.oneshot"
         );
     }
 

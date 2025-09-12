@@ -27,7 +27,10 @@ public sealed class SpecReflectionModule : IModule
             id: "codex.reflect",
             name: "Spec Reflection Module",
             version: "0.1.0",
-            description: "Converts specs to meta-nodes and back, enabling self-describing system architecture"
+            description: "Converts specs to meta-nodes and back, enabling self-describing system architecture",
+            capabilities: new[] { "reflection", "spec-conversion", "meta-nodes", "self-describing" },
+            tags: new[] { "reflection", "spec", "meta-nodes", "self-describing" },
+            specReference: "codex.spec.reflection"
         );
     }
 

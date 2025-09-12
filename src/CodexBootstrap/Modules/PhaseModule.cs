@@ -41,7 +41,10 @@ public sealed class PhaseModule : IModule
             id: "codex.phase",
             name: "Phase Module",
             version: "0.1.0",
-            description: "Module for managing node phase transitions (melt, refreeze) and resonance checking."
+            description: "Module for managing node phase transitions (melt, refreeze) and resonance checking.",
+            capabilities: new[] { "phase-transitions", "melt", "refreeze", "resonance" },
+            tags: new[] { "phase", "transition", "melt", "refreeze", "resonance" },
+            specReference: "codex.spec.phase"
         );
     }
 

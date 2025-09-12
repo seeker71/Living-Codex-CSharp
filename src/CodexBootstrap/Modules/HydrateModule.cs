@@ -25,7 +25,10 @@ public sealed class HydrateModule : IModule
             id: "codex.hydrate",
             name: "Content Hydration Module",
             version: "0.1.0",
-            description: "Self-contained module for content hydration operations using node-based storage"
+            description: "Self-contained module for content hydration operations using node-based storage",
+            capabilities: new[] { "hydration", "content", "processing", "transformation" },
+            tags: new[] { "hydrate", "content", "process", "transform" },
+            specReference: "codex.spec.hydrate"
         );
     }
 

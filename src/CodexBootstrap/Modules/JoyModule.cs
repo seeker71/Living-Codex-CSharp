@@ -31,7 +31,15 @@ public class JoyModule : IModule
 
     public Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(ModuleId, Name, Version, Description);
+        return NodeStorage.CreateModuleNode(
+            ModuleId, 
+            Name, 
+            Version, 
+            Description,
+            capabilities: new[] { "joy", "amplification", "resonance", "energy" },
+            tags: new[] { "joy", "amplify", "resonance", "energy" },
+            specReference: "codex.spec.joy"
+        );
     }
 
     public void Register(NodeRegistry registry)

@@ -36,7 +36,8 @@ public sealed class PushNotificationModule : IModule
             version: "0.1.0",
             description: "Provides push notification system for client notifications",
             capabilities: new[] { "push_notifications", "notification_templates", "notification_subscriptions", "notification_history", "notification_scheduling", "notification_delivery" },
-            tags: new[] { "push-notifications", "notifications", "messaging", "client" }
+            tags: new[] { "push-notifications", "notifications", "messaging", "client" },
+            specReference: "codex.spec.push-notifications"
         );
     }
 

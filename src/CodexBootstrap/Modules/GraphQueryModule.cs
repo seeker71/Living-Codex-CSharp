@@ -41,7 +41,8 @@ public class GraphQueryModule : IModule
     {
         return NodeStorage.CreateModuleNode(ModuleId, Name, Version, Description,
             capabilities: new[] { "graph-querying", "node-discovery", "relationship-analysis" },
-            tags: new[] { "graph", "query", "discovery" });
+            tags: new[] { "graph", "query", "discovery" },
+            specReference: "codex.spec.graph-query");
     }
 
     public void Register(NodeRegistry registry)

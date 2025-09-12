@@ -42,7 +42,10 @@ public sealed class DeltaModule : IModule
             id: "codex.delta",
             name: "Delta Module",
             version: "0.1.0",
-            description: "Module for git-like patches and diffs on nodes and edges."
+            description: "Module for git-like patches and diffs on nodes and edges.",
+            capabilities: new[] { "delta", "patch", "diff", "versioning", "git-like" },
+            tags: new[] { "delta", "patch", "diff", "version", "change" },
+            specReference: "codex.spec.delta"
         );
     }
 

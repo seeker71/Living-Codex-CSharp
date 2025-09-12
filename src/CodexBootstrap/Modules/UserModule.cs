@@ -30,7 +30,8 @@ public class UserModule : IModule
             version: Version,
             description: Description,
             capabilities: new[] { "user-creation", "authentication", "profile-management", "permissions", "session-management" },
-            tags: new[] { "user", "management", "auth", "profile" }
+            tags: new[] { "user", "management", "auth", "profile" },
+            specReference: "codex.spec.user"
         );
     }
 

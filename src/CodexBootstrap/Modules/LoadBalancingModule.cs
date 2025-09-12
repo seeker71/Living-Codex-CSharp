@@ -34,7 +34,8 @@ public class LoadBalancingModule : IModule
             version: "1.0.0",
             description: "Advanced load balancing, performance monitoring, and auto-scaling for distributed services",
             capabilities: new[] { "load-balancing", "performance-monitoring", "auto-scaling", "resource-optimization", "health-monitoring" },
-            tags: new[] { "load-balancing", "performance", "scaling", "optimization" }
+            tags: new[] { "load-balancing", "performance", "scaling", "optimization" },
+            specReference: "codex.spec.load-balancing"
         );
     }
 

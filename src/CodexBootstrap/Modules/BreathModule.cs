@@ -52,7 +52,10 @@ public sealed class BreathModule : IModule
             id: "codex.breath",
             name: "Breath Engine Module",
             version: "0.1.0",
-            description: "Self-contained module for breath loop operations (expand, validate, contract) using node-based storage"
+            description: "Self-contained module for breath loop operations (expand, validate, contract) using node-based storage",
+            capabilities: new[] { "breath-loop", "expand", "validate", "contract", "lifecycle" },
+            tags: new[] { "breath", "loop", "expand", "validate", "contract" },
+            specReference: "codex.spec.breath"
         );
     }
 

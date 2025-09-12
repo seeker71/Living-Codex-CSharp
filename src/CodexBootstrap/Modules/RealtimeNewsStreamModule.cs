@@ -68,7 +68,8 @@ namespace CodexBootstrap.Modules
                 version: Version,
                 description: "Ingests external news sources and transforms them through fractal analysis",
                 capabilities: new[] { "rss-ingestion", "api-ingestion", "fractal-analysis", "real-time-streaming" },
-                tags: new[] { "news", "streaming", "realtime", "fractal" }
+                tags: new[] { "news", "streaming", "realtime", "fractal" },
+                specReference: "codex.spec.realtime-news-stream"
             );
         }
 

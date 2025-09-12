@@ -42,7 +42,15 @@ namespace CodexBootstrap.Modules;
 
     public Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(ModuleId, Name, Version, Description);
+        return NodeStorage.CreateModuleNode(
+            ModuleId, 
+            Name, 
+            Version, 
+            Description,
+            capabilities: new[] { "user-concepts", "concept-management", "user-specific" },
+            tags: new[] { "user", "concept", "management" },
+            specReference: "codex.spec.user-concept"
+        );
     }
 
     public void Register(NodeRegistry registry)

@@ -51,7 +51,8 @@ namespace CodexBootstrap.Modules
                 version: _version.ToString(),
                 description: $"A test module for demonstrating hot-reload functionality with real AI integration - Version {_version}",
                 capabilities: new[] { "Status endpoint", "Counter increment", "AI insights", "Metrics", "Real LLM integration" },
-                tags: new[] { "test", "dynamic", "hot-reload", "ai-enhanced" }
+                tags: new[] { "test", "dynamic", "hot-reload", "ai-enhanced" },
+                specReference: "codex.spec.test-dynamic"
             );
         }
 

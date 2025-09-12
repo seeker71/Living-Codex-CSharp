@@ -22,7 +22,10 @@ public sealed class PlanModule : IModule
             id: "codex.plan",
             name: "Plan Generation Module",
             version: "0.1.0",
-            description: "Self-contained module for generating topology plans using node-based storage"
+            description: "Self-contained module for generating topology plans using node-based storage",
+            capabilities: new[] { "plan-generation", "topology", "planning" },
+            tags: new[] { "plan", "generation", "topology" },
+            specReference: "codex.spec.plan"
         );
     }
 

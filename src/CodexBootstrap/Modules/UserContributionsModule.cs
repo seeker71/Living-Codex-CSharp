@@ -49,7 +49,8 @@ public sealed class UserContributionsModule : IModule
             version: "0.1.0",
             description: "Manages user contributions with ETH ledger, change tracking, attribution, and reward sharing",
             capabilities: new[] { "contribution_tracking", "eth_ledger", "attribution_system", "reward_sharing", "change_tracking", "contribution_validation", "reward_calculation", "attribution_verification" },
-            tags: new[] { "contributions", "eth", "ledger", "rewards", "attribution" }
+            tags: new[] { "contributions", "eth", "ledger", "rewards", "attribution" },
+            specReference: "codex.spec.user-contributions"
         );
     }
 
