@@ -1651,7 +1651,6 @@ Please provide a natural, culturally appropriate translation that maintains the 
 }
 
 // Data types
-public record LLMResponse(string Content, double Confidence, string Reasoning, List<string> Sources);
 public record LLMConfigValidation(bool IsValid, string ErrorMessage);
 
 

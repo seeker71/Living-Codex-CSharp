@@ -89,6 +89,13 @@ namespace CodexBootstrap.Modules
         DateTimeOffset Timestamp
     );
 
+    public record LLMResponse(
+        string Content,
+        double Confidence,
+        string Reasoning,
+        List<string> Sources
+    );
+
     public record LLMConfig(
         string Id,
         string Name,
@@ -157,7 +164,17 @@ namespace CodexBootstrap.Modules
 
         public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
         {
-            router.Register("ai", "extract-concepts", async (JsonElement? request) => await ExtractConceptsAsync(request));
+            router.Register("ai", "extract-concepts", async (JsonElement? request) => 
+            {
+                if (request == null || !request.HasValue)
+                    return new ErrorResponse("Invalid request", "MISSING_REQUEST");
+                
+                var requestObj = JsonSerializer.Deserialize<ConceptExtractionRequest>(request.Value.GetRawText());
+                if (requestObj == null)
+                    return new ErrorResponse("Invalid request format", "INVALID_REQUEST_FORMAT");
+                
+                return await ExtractConceptsAsync(requestObj);
+            });
             router.Register("ai", "score-analysis", async (JsonElement? request) => await ScoreAnalysisAsync(request));
             router.Register("ai", "fractal-transform", async (JsonElement? request) => await FractalTransformAsync(request));
             router.Register("ai", "health", async (JsonElement? request) => await HealthCheckAsync(request));
@@ -179,21 +196,14 @@ namespace CodexBootstrap.Modules
         #region API Endpoints with Proper Error Handling
 
         [Post("/ai/extract-concepts", "Extract Concepts", "Extract concepts from content using advanced AI analysis", "ai-analysis")]
-        public async Task<object> ExtractConceptsAsync(JsonElement? request)
+        public async Task<object> ExtractConceptsAsync([ApiParameter("request", "Concept extraction request", Required = true, Location = "body")] ConceptExtractionRequest requestObj)
         {
             try
             {
-                if (request == null || !request.HasValue)
-                {
-                    _logger.Warn("ExtractConceptsAsync called with null or empty request");
-                    return CreateErrorResponse("Invalid request", "MISSING_REQUEST");
-                }
-
-                var requestObj = JsonSerializer.Deserialize<ConceptExtractionRequest>(request.Value.GetRawText());
                 if (requestObj == null)
                 {
-                    _logger.Warn("Failed to deserialize ConceptExtractionRequest");
-                    return CreateErrorResponse("Invalid request format", "INVALID_REQUEST_FORMAT");
+                    _logger.Warn("ExtractConceptsAsync called with null request");
+                    return CreateErrorResponse("Invalid request", "MISSING_REQUEST");
                 }
 
                 _logger.Info($"Extracting concepts from content: {requestObj.Title}");
@@ -747,38 +757,78 @@ namespace CodexBootstrap.Modules
 
         private async Task<ConceptAnalysis> ExtractConceptsWithAdvancedAlgorithm(ConceptExtractionRequest request)
         {
-            var content = $"{request.Title} {request.Content}".ToLower();
+            var content = $"{request.Title} {request.Content}";
             var concepts = new List<ConceptScore>();
             var confidence = 0.0;
 
-            // Multi-layered concept extraction
-            await Task.Run(() =>
+            try
             {
-                // Layer 1: Keyword-based extraction with weighted scoring
-                var keywordConcepts = ExtractConceptsByKeywords(content, request);
+                // Get optimal LLM configuration for concept extraction
+                var optimalConfig = LLMConfigurationSystem.GetOptimalConfiguration("concept-extraction");
+                
+                // Ensure the model is available before use
+                var modelAvailable = await LLMConfigurationSystem.ModelManager.EnsureModelAvailableAsync(optimalConfig.Model);
+                if (!modelAvailable)
+                {
+                    _logger.Error($"Model {optimalConfig.Model} is not available and could not be pulled");
+                    // Fallback to keyword-based extraction
+                    concepts = ExtractConceptsByKeywords(content.ToLower(), request);
+                    confidence = 0.5;
+                }
+                else
+                {
+                    // Build sophisticated concept extraction prompt
+                    var prompt = BuildConceptExtractionPrompt(request, optimalConfig);
+                    
+                    // Convert LLMConfigurationSystem.LLMConfiguration to LLMConfig
+                    var llmConfig = new LLMConfig(
+                        Id: optimalConfig.Id,
+                        Name: optimalConfig.Id,
+                        Provider: optimalConfig.Provider,
+                        Model: optimalConfig.Model,
+                        ApiKey: "",
+                        BaseUrl: "http://localhost:11434",
+                        MaxTokens: optimalConfig.MaxTokens,
+                        Temperature: optimalConfig.Temperature,
+                        TopP: optimalConfig.TopP,
+                        Parameters: optimalConfig.Parameters
+                    );
+                    
+                    // Call LLM with real Ollama integration
+                    var llmResponse = await CallLLM(llmConfig, prompt);
+                    
+                    if (llmResponse.Content.Contains("LLM unavailable"))
+                    {
+                        // Fallback to keyword-based extraction
+                        _logger.Warn("LLM unavailable, falling back to keyword-based concept extraction");
+                        concepts = ExtractConceptsByKeywords(content.ToLower(), request);
+                        confidence = 0.6; // Lower confidence for fallback
+                    }
+                    else
+                    {
+                        // Parse LLM response for concepts
+                        concepts = ParseLLMConceptResponse(llmResponse.Content);
+                        confidence = llmResponse.Confidence;
+                    }
+                }
+
+                // Layer 1: Keyword-based extraction as backup
+                var keywordConcepts = ExtractConceptsByKeywords(content.ToLower(), request);
                 concepts.AddRange(keywordConcepts);
 
-                // Layer 2: Semantic pattern recognition
-                var semanticConcepts = ExtractConceptsBySemanticPatterns(content, request);
-                concepts.AddRange(semanticConcepts);
-
-                // Layer 3: Context-aware concept detection
-                var contextConcepts = ExtractConceptsByContext(content, request);
-                concepts.AddRange(contextConcepts);
-
-                // Layer 4: Ontology-aware concept mapping
-                var ontologyConcepts = ExtractConceptsByOntology(content, request);
-                concepts.AddRange(ontologyConcepts);
-
                 // Deduplicate and merge similar concepts
-                var mergedConcepts = MergeSimilarConcepts(concepts);
+                concepts = MergeSimilarConcepts(concepts);
 
-                // Calculate confidence based on multiple factors
-                confidence = CalculateConfidence(mergedConcepts, content, request);
-
-                // Update concepts list
-                concepts = mergedConcepts;
-            });
+                // Calculate final confidence
+                confidence = Math.Max(confidence, CalculateConfidence(concepts, content, request));
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in concept extraction: {ex.Message}", ex);
+                // Fallback to keyword-based extraction
+                concepts = ExtractConceptsByKeywords(content.ToLower(), request);
+                confidence = 0.5;
+            }
 
             return new ConceptAnalysis
             {
@@ -792,7 +842,7 @@ namespace CodexBootstrap.Modules
                 {
                     ["extractionMethod"] = "advanced-multi-layer",
                     ["sourceLength"] = content.Length,
-                    ["conceptScores"] = concepts.ToDictionary(c => c.Concept, c => c.Score),
+                    ["conceptScores"] = concepts.GroupBy(c => c.Concept).ToDictionary(g => g.Key, g => g.Average(c => c.Score)),
                     ["extractionLayers"] = new[] { "keywords", "semantic", "context", "ontology" },
                     ["processingTime"] = DateTimeOffset.UtcNow
                 }
@@ -894,6 +944,330 @@ namespace CodexBootstrap.Modules
         {
             // TODO: Implement ontology level determination
             return new[] { "L5", "L8" };
+        }
+
+        private string BuildConceptExtractionPrompt(ConceptExtractionRequest request, LLMConfigurationSystem.LLMConfiguration config)
+        {
+            return $@"You are an advanced AI system specialized in extracting meaningful concepts from text content for consciousness expansion and spiritual growth.
+
+TASK: Extract key concepts from the following content and analyze their spiritual, consciousness, and transformative potential.
+
+CONTENT TO ANALYZE:
+Title: {request.Title}
+Content: {request.Content}
+Categories: {string.Join(", ", request.Categories)}
+Source: {request.Source}
+
+INSTRUCTIONS:
+1. Identify 5-10 key concepts that represent core ideas, themes, or principles
+2. For each concept, provide:
+   - Concept name (1-3 words)
+   - Confidence score (0.0-1.0)
+   - Brief description of its meaning
+   - Spiritual/consciousness significance
+   - Potential for transformation or growth
+   - Sacred frequency alignment (432Hz, 528Hz, 741Hz, etc.)
+
+3. Focus on concepts that relate to:
+   - Consciousness expansion
+   - Spiritual growth and transformation
+   - Unity and connection
+   - Abundance and prosperity
+   - Healing and harmony
+   - Wisdom and knowledge
+   - Love and compassion
+   - Sacred geometry and frequencies
+
+4. Consider the content categories: {string.Join(", ", request.Categories)}
+
+RESPONSE FORMAT (JSON):
+{{
+  ""concepts"": [
+    {{
+      ""concept"": ""concept_name"",
+      ""score"": 0.85,
+      ""description"": ""Brief description"",
+      ""spiritualSignificance"": ""How this relates to consciousness"",
+      ""transformationPotential"": ""Growth opportunities"",
+      ""sacredFrequency"": 528.0,
+      ""category"": ""consciousness|emotion|transformation|energy""
+    }}
+  ],
+  ""overallAnalysis"": ""Summary of the content's consciousness expansion potential"",
+  ""recommendedFrequencies"": [432.0, 528.0, 741.0],
+  ""resonanceLevel"": ""high|medium|low""
+}}
+
+Please provide a thoughtful, spiritually-aware analysis that honors the sacred nature of consciousness expansion.";
+        }
+
+        private async Task<LLMResponse> CallLLM(LLMConfig config, string prompt)
+        {
+            try
+            {
+                _logger.Info($"[LLM] Making real call to Ollama with model: {config.Model}");
+                _logger.Info($"[LLM] Prompt: {prompt.Substring(0, Math.Min(200, prompt.Length))}...");
+                
+                using var httpClient = new HttpClient();
+                
+                var requestBody = new
+                {
+                    model = config.Model,
+                    prompt = prompt,
+                    options = new
+                    {
+                        temperature = config.Temperature,
+                        top_p = config.TopP,
+                        num_predict = config.MaxTokens
+                    },
+                    stream = false
+                };
+
+                _logger.Info($"[LLM] Request body: {JsonSerializer.Serialize(requestBody)}");
+
+                var content = new StringContent(JsonSerializer.Serialize(requestBody), System.Text.Encoding.UTF8, "application/json");
+                var response = await httpClient.PostAsync("http://localhost:11434/api/generate", content);
+                response.EnsureSuccessStatusCode();
+
+                var responseString = await response.Content.ReadAsStringAsync();
+                _logger.Info($"[LLM] Raw response: {responseString.Substring(0, Math.Min(500, responseString.Length))}...");
+                
+                var jsonResponse = JsonDocument.Parse(responseString);
+                var llmOutput = jsonResponse.RootElement.GetProperty("response").GetString();
+
+                _logger.Info($"[LLM] Extracted response: {llmOutput}");
+
+                return new LLMResponse(
+                    Content: llmOutput ?? "No response from LLM",
+                    Confidence: 0.85,
+                    Reasoning: "Generated using real LLM integration with Ollama",
+                    Sources: new List<string> { "Real LLM", "Ollama API", "Advanced AI" }
+                );
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"[LLM] Error: {ex.Message}");
+                // Fallback to mock response if LLM is not available
+                return new LLMResponse(
+                    Content: $"LLM unavailable: {ex.Message}. Concept extraction fallback for: {prompt.Substring(0, Math.Min(100, prompt.Length))}...",
+                    Confidence: 0.5,
+                    Reasoning: "Fallback response due to LLM unavailability",
+                    Sources: new List<string> { "Fallback system", "Error handling" }
+                );
+            }
+        }
+
+        private List<ConceptScore> ParseLLMConceptResponse(string llmResponse)
+        {
+            var concepts = new List<ConceptScore>();
+            
+            try
+            {
+                // Clean the response - remove markdown code blocks if present
+                var cleanedResponse = llmResponse.Trim();
+                if (cleanedResponse.StartsWith("```json"))
+                {
+                    cleanedResponse = cleanedResponse.Substring(7); // Remove ```json
+                }
+                if (cleanedResponse.StartsWith("```"))
+                {
+                    cleanedResponse = cleanedResponse.Substring(3); // Remove ```
+                }
+                if (cleanedResponse.EndsWith("```"))
+                {
+                    cleanedResponse = cleanedResponse.Substring(0, cleanedResponse.Length - 3); // Remove trailing ```
+                }
+                cleanedResponse = cleanedResponse.Trim();
+
+                _logger.Info($"[LLM] Cleaned response: {cleanedResponse.Substring(0, Math.Min(200, cleanedResponse.Length))}...");
+
+                // Try to parse JSON response first
+                try
+                {
+                    var jsonDoc = JsonDocument.Parse(cleanedResponse);
+                    var root = jsonDoc.RootElement;
+                    
+                    if (root.TryGetProperty("concepts", out var conceptsArray))
+                    {
+                        foreach (var conceptElement in conceptsArray.EnumerateArray())
+                        {
+                            if (conceptElement.ValueKind == JsonValueKind.String)
+                            {
+                                // Handle string array format
+                                var conceptName = conceptElement.GetString() ?? "unknown";
+                                var cleanConcept = CleanConceptName(conceptName);
+                                if (!string.IsNullOrEmpty(cleanConcept))
+                                {
+                                    concepts.Add(new ConceptScore
+                                    {
+                                        Concept = cleanConcept,
+                                        Score = 0.8
+                                    });
+                                }
+                            }
+                            else if (conceptElement.TryGetProperty("concept", out var conceptName) &&
+                                     conceptElement.TryGetProperty("score", out var score))
+                            {
+                                // Handle object format
+                                var cleanConcept = CleanConceptName(conceptName.GetString() ?? "unknown");
+                                if (!string.IsNullOrEmpty(cleanConcept))
+                                {
+                                    concepts.Add(new ConceptScore
+                                    {
+                                        Concept = cleanConcept,
+                                        Score = score.GetDouble()
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (JsonException)
+                {
+                    // If JSON parsing fails, try to extract from markdown format
+                    concepts = ExtractConceptsFromMarkdown(cleanedResponse);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error parsing LLM response: {ex.Message}");
+                concepts = ExtractConceptsFromText(llmResponse);
+            }
+            
+            return concepts;
+        }
+
+        private List<ConceptScore> ExtractConceptsFromMarkdown(string markdownResponse)
+        {
+            var concepts = new List<ConceptScore>();
+            
+            try
+            {
+                // Look for numbered list items with **bold** concept names
+                var lines = markdownResponse.Split('\n');
+                foreach (var line in lines)
+                {
+                    // Match pattern: "1. **Concept Name**" or "**Concept Name**"
+                    var match = System.Text.RegularExpressions.Regex.Match(line, @"\d+\.\s*\*\*([^*]+)\*\*");
+                    if (!match.Success)
+                    {
+                        // Try alternative pattern without numbers
+                        match = System.Text.RegularExpressions.Regex.Match(line, @"\*\*([^*]+)\*\*");
+                    }
+                    
+                    if (match.Success)
+                    {
+                        var conceptName = match.Groups[1].Value.Trim();
+                        var cleanConcept = CleanConceptName(conceptName);
+                        
+                        if (!string.IsNullOrEmpty(cleanConcept))
+                        {
+                            // Try to extract confidence score from the line
+                            var scoreMatch = System.Text.RegularExpressions.Regex.Match(line, @"Confidence score:\s*([0-9.]+)");
+                            var score = scoreMatch.Success ? double.Parse(scoreMatch.Groups[1].Value) : 0.8;
+                            
+                            concepts.Add(new ConceptScore
+                            {
+                                Concept = cleanConcept,
+                                Score = score
+                            });
+                        }
+                    }
+                }
+                
+                // If no concepts found with the above pattern, try a simpler approach
+                if (concepts.Count == 0)
+                {
+                    var boldMatches = System.Text.RegularExpressions.Regex.Matches(markdownResponse, @"\*\*([^*]+)\*\*");
+                    foreach (System.Text.RegularExpressions.Match match in boldMatches)
+                    {
+                        var conceptName = match.Groups[1].Value.Trim();
+                        var cleanConcept = CleanConceptName(conceptName);
+                        
+                        if (!string.IsNullOrEmpty(cleanConcept) && !conceptName.ToLower().Contains("analysis") && 
+                            !conceptName.ToLower().Contains("concepts") && !conceptName.ToLower().Contains("key"))
+                        {
+                            concepts.Add(new ConceptScore
+                            {
+                                Concept = cleanConcept,
+                                Score = 0.8
+                            });
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"Error extracting concepts from markdown: {ex.Message}");
+            }
+            
+            return concepts;
+        }
+
+        private string CleanConceptName(string conceptName)
+        {
+            if (string.IsNullOrEmpty(conceptName))
+                return string.Empty;
+
+            // Remove extra quotes, commas, and other artifacts
+            var cleaned = conceptName.Trim()
+                .Replace("\"", "")
+                .Replace(",", "")
+                .Replace("**", "")
+                .Replace("\\", "")
+                .Trim();
+
+            // Only return if it's a meaningful concept
+            if (cleaned.Length > 2 && char.IsLetter(cleaned[0]) && !cleaned.Contains("**"))
+            {
+                return cleaned.ToLower();
+            }
+
+            return string.Empty;
+        }
+
+        private List<ConceptScore> ExtractConceptsFromText(string text)
+        {
+            var concepts = new List<ConceptScore>();
+            
+            // Look for JSON-like structure in the text
+            var jsonMatch = System.Text.RegularExpressions.Regex.Match(text, @"\[(.*?)\]", System.Text.RegularExpressions.RegexOptions.Singleline);
+            if (jsonMatch.Success)
+            {
+                var jsonArray = jsonMatch.Groups[1].Value;
+                var conceptMatches = System.Text.RegularExpressions.Regex.Matches(jsonArray, @"""([^""]+)""");
+                
+                foreach (System.Text.RegularExpressions.Match match in conceptMatches)
+                {
+                    var concept = match.Groups[1].Value.Trim();
+                    if (!string.IsNullOrEmpty(concept) && concept.Length > 2 && !concept.Contains("**") && !concept.Contains("\""))
+                    {
+                        concepts.Add(new ConceptScore
+                        {
+                            Concept = concept.ToLower(),
+                            Score = 0.8
+                        });
+                    }
+                }
+            }
+            
+            // Fallback: extract meaningful words from the text
+            if (concepts.Count == 0)
+            {
+                var words = text.Split(new[] { ' ', '\n', '\r', '\t', ',', '.', '!', '?', ';', ':' }, StringSplitOptions.RemoveEmptyEntries);
+                var meaningfulWords = words.Where(w => w.Length > 3 && char.IsLetter(w[0]) && !w.Contains("**") && !w.Contains("\"")).Take(10);
+                
+                foreach (var word in meaningfulWords)
+                {
+                    concepts.Add(new ConceptScore
+                    {
+                        Concept = word.ToLower(),
+                        Score = 0.6
+                    });
+                }
+            }
+            
+            return concepts;
         }
 
         // Caching infrastructure

@@ -366,9 +366,9 @@ namespace CodexBootstrap.Core
     /// </summary>
     public class CoreModule
     {
-        public string Name { get; set; }
-        public Type Type { get; set; }
-        public string Version { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public Type Type { get; set; } = typeof(object);
+        public string Version { get; set; } = string.Empty;
         public bool IsStable { get; set; }
         public DateTime LoadedAt { get; set; }
     }
@@ -378,9 +378,9 @@ namespace CodexBootstrap.Core
     /// </summary>
     public class DynamicModule
     {
-        public string Name { get; set; }
-        public string DllPath { get; set; }
-        public string Version { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string DllPath { get; set; } = string.Empty;
+        public string Version { get; set; } = string.Empty;
         public DateTime LoadedAt { get; set; }
         public bool IsStable { get; set; }
     }
@@ -390,10 +390,10 @@ namespace CodexBootstrap.Core
     /// </summary>
     public class ModuleStatus
     {
-        public string CoreVersion { get; set; }
+        public string CoreVersion { get; set; } = string.Empty;
         public int TotalModules { get; set; }
-        public List<ModuleInfo> CoreModules { get; set; }
-        public List<ModuleInfo> DynamicModules { get; set; }
+        public List<ModuleInfo> CoreModules { get; set; } = new();
+        public List<ModuleInfo> DynamicModules { get; set; } = new();
         public DateTime LastUpdated { get; set; }
     }
 
@@ -402,12 +402,12 @@ namespace CodexBootstrap.Core
     /// </summary>
     public class ModuleInfo
     {
-        public string Name { get; set; }
-        public string Version { get; set; }
-        public string Type { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Version { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
         public bool IsStable { get; set; }
         public DateTime LoadedAt { get; set; }
-        public string Status { get; set; }
+        public string Status { get; set; } = string.Empty;
     }
 
     /// <summary>
@@ -415,13 +415,13 @@ namespace CodexBootstrap.Core
     /// </summary>
     public class SystemHealth
     {
-        public string CoreVersion { get; set; }
+        public string CoreVersion { get; set; } = string.Empty;
         public int TotalModules { get; set; }
         public int CoreModules { get; set; }
         public int DynamicModules { get; set; }
         public bool IsHealthy { get; set; }
         public DateTime LastChecked { get; set; }
-        public List<string> Issues { get; set; }
+        public List<string> Issues { get; set; } = new();
     }
 
     /// <summary>

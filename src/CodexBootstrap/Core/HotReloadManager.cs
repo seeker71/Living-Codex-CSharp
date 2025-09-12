@@ -528,9 +528,9 @@ namespace CodexBootstrap.Core
     /// </summary>
     public class ModuleBackup
     {
-        public string ModuleName { get; set; }
-        public string BackupPath { get; set; }
-        public string OriginalPath { get; set; }
+        public string ModuleName { get; set; } = string.Empty;
+        public string BackupPath { get; set; } = string.Empty;
+        public string OriginalPath { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public bool IsEmpty { get; set; }
     }

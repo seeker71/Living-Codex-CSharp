@@ -98,6 +98,21 @@ The Living Codex is a consciousness-expanding, fractal-based system that impleme
 - **Module Status**: Individual module health tracking
 - **Resource Monitoring**: Memory, CPU, disk usage
 
+### 11. Concept Discovery & Ontology Integration (85% Complete)
+- **Automatic Discovery**: AI-extracted concepts automatically registered in U-CORE ontology
+- **Relationship Mapping**: Automatic relationship discovery between concepts
+- **Frequency Assignment**: Sacred frequency assignment based on concept resonance
+- **Amplification Pipeline**: Concepts can be discovered, explored, and amplified
+- **Cross-Service Sync**: Concepts synchronized across all services in the mesh
+
+#### Implementation Status:
+- ✅ **U-CORE Ontology Integration**: Real implementation with sacred frequency mapping
+- ✅ **Concept Registration**: Real implementation with node storage
+- ✅ **Relationship Management**: Real implementation with edge-based relationships
+- ✅ **Amplification System**: Real implementation with resonance calculation
+- ⚠️ **AI Concept Extraction**: Currently mocked - needs real LLM integration
+- ⚠️ **Semantic Analysis**: Currently mocked - needs real AI implementation
+
 ## 🔧 Technical Implementation
 
 ### Technology Stack
@@ -235,6 +250,43 @@ curl -X POST http://localhost:5001/translation/translate \
 - [ ] Global resonance network
 - [ ] Advanced fractal analysis
 - [ ] Cross-service concept exchange
+- [x] **Automatic Concept Discovery & Ontology Integration** - Discovered concepts automatically registered in U-CORE ontology with relationships and amplification
+
+## 🚧 Mock/Simulation Code Tracking
+
+### Currently Mocked (Need Real Implementation):
+1. **AIModule Concept Extraction** - Lines 748-891 in AIModule.cs
+   - `ExtractConceptsBySemanticPatterns()` - TODO: Implement semantic pattern recognition
+   - `ExtractConceptsByContext()` - TODO: Implement context-aware concept detection  
+   - `ExtractConceptsByOntology()` - TODO: Implement ontology-aware concept mapping
+   - `MergeSimilarConcepts()` - TODO: Implement concept merging logic
+   - `CalculateConfidence()` - TODO: Implement confidence calculation
+
+2. **AIModule LLM Integration** - Lines 459-469 in AIModule.cs
+   - `LLMFutureQueryAsync()` - TODO: Implement actual LLM future query logic
+   - Placeholder responses instead of real LLM calls
+
+3. **Fractal Transformation** - Lines 819-837 in AIModule.cs
+   - `PerformFractalTransformation()` - TODO: Implement sophisticated fractal transformation
+
+### Recently Fixed Issues:
+1. **AI JSON Parsing** - Fixed LLM response parsing to handle markdown code blocks (```json)
+2. **Concept Discovery Integration** - Fixed HTTP integration between ConceptRegistryModule and AIModule
+3. **Model Management System** - Implemented automatic model availability checking and pulling
+4. **Task-Specific Model Configuration** - Added optimized configurations for different AI tasks
+5. **Concept Extraction Optimization** - Configured Llama 3.1 8B specifically for concept extraction with lower temperature and structured JSON output
+
+### Development Environment Issues:
+1. **Hot-Reloading Not Working** - Build errors not caught by hot-reloading, requiring manual restarts
+   - Status: CRITICAL - Development workflow is broken
+   - Impact: Slows development and allows broken code to run
+   - Solution Needed: Fix .NET hot-reload configuration
+
+### Real Implementation (Working):
+1. **LLMFutureKnowledgeModule** - Real Ollama integration with HTTP calls
+2. **DynamicAttributionSystem** - Real LLM integration with fallback handling
+3. **U-CORE Ontology System** - Real concept registration and relationship management
+4. **Concept Amplification** - Real resonance and frequency calculation
 
 ## 📚 API Reference
 
@@ -289,6 +341,14 @@ curl -X POST http://localhost:5001/translation/translate \
 - `GET /consciousness/map` - Get module consciousness map
 - `GET /consciousness/frequencies` - Get frequency-based module organization
 - `POST /consciousness/align` - Align module frequencies
+
+### Concept Discovery & Ontology Integration
+- `POST /concept/discover` - Discover and register concepts from content
+- `POST /concept/ontology/register` - Register concept in U-CORE ontology
+- `POST /concept/ontology/relate` - Create relationships between concepts
+- `GET /concept/ontology/explore/{id}` - Explore concept relationships
+- `POST /concept/ontology/amplify` - Amplify concept resonance
+- `GET /concept/ontology/frequencies` - Get concept frequency mappings
 
 ## 🤝 Contributing
 

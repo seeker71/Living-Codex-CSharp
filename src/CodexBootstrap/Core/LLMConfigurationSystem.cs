@@ -148,102 +148,242 @@ public static class LLMConfigurationSystem
     );
 
     /// <summary>
+    /// Model management and availability checking
+    /// </summary>
+    public static class ModelManager
+    {
+        private static readonly HttpClient _httpClient = new();
+        private static readonly Dictionary<string, bool> _modelAvailabilityCache = new();
+
+        /// <summary>
+        /// Check if a model is available locally
+        /// </summary>
+        public static async Task<bool> IsModelAvailableAsync(string modelName)
+        {
+            if (_modelAvailabilityCache.TryGetValue(modelName, out var cached))
+                return cached;
+
+            try
+            {
+                var response = await _httpClient.GetAsync("http://localhost:11434/api/tags");
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    var jsonDoc = JsonDocument.Parse(content);
+                    var models = jsonDoc.RootElement.GetProperty("models");
+                    
+                    foreach (var model in models.EnumerateArray())
+                    {
+                        if (model.TryGetProperty("name", out var name) && 
+                            name.GetString() == modelName)
+                        {
+                            _modelAvailabilityCache[modelName] = true;
+                            return true;
+                        }
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // If we can't check, assume not available
+            }
+
+            _modelAvailabilityCache[modelName] = false;
+            return false;
+        }
+
+        /// <summary>
+        /// Pull a model if it's not available
+        /// </summary>
+        public static async Task<bool> EnsureModelAvailableAsync(string modelName)
+        {
+            if (await IsModelAvailableAsync(modelName))
+                return true;
+
+            try
+            {
+                var response = await _httpClient.PostAsync($"http://localhost:11434/api/pull", 
+                    new StringContent($"{{\"name\":\"{modelName}\"}}", 
+                        System.Text.Encoding.UTF8, "application/json"));
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    _modelAvailabilityCache[modelName] = true;
+                    return true;
+                }
+            }
+            catch (Exception)
+            {
+                // Pull failed
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Get the best model for a specific task
+        /// </summary>
+        public static string GetBestModelForTask(string taskType)
+        {
+            return taskType.ToLower() switch
+            {
+                "concept-extraction" => "llama3.1:8b", // Best for structured concept extraction
+                "consciousness-expansion" => "llama3.1:8b", // Good for spiritual content
+                "translation" => "llama3.1:8b", // Good multilingual support
+                "code-generation" => "codellama:latest", // Specialized for code
+                "reasoning" => "llama3.1:8b", // Good reasoning capabilities
+                "creative-writing" => "llama3.1:8b", // Good creativity
+                "analysis" => "llama3.1:8b", // Good analytical capabilities
+                _ => "llama3.1:8b" // Default fallback
+            };
+        }
+    }
+
+    /// <summary>
     /// Predefined configurations for different use cases
     /// </summary>
     public static class PredefinedConfigurations
     {
-        // Consciousness Expansion Configurations
-        public static readonly LLMConfiguration ConsciousnessExpansionLlama3 = new(
-            Id: "consciousness-expansion-gpt-oss-20b",
+        // General Reasoning and Analysis - Mistral 7B: Fast and efficient on M1, good for analytical tasks (2025 benchmark: high performance in reasoning tasks)
+        public static readonly LLMConfiguration ReasoningMistral = new(
+            Id: "reasoning-mistral-7b",
             Provider: "Ollama",
-            Model: "gpt-oss:20b", // Using the better 20B model for Mac M1
+            Model: "mistral:7b",
+            Mode: "reasoning",
+            Temperature: 0.5,
+            MaxTokens: 2048,
+            TopP: 0.85,
+            Frequencies: new[] { "432", "528" },
+            UseJoyfulEngine: false,
+            BreathPhase: "expand",
+            Description: "Mistral 7B for reasoning and analysis on M1 Mac",
+            Parameters: new Dictionary<string, object>
+            {
+                ["num_ctx"] = 8192,
+                ["repeat_penalty"] = 1.1
+            }
+        );
+
+        // Concept Extraction - Llama 3.1 8B: Excellent for structured output and concept identification (2025 update: improved JSON handling)
+        public static readonly LLMConfiguration ConceptExtractionLlama3 = new(
+            Id: "concept-extraction-llama3-8b",
+            Provider: "Ollama",
+            Model: "llama3.1:8b",
+            Mode: "concept-extraction",
+            Temperature: 0.3,
+            MaxTokens: 1500,
+            TopP: 0.8,
+            Frequencies: new[] { "432", "528", "741" },
+            UseJoyfulEngine: false,
+            BreathPhase: "contract",
+            Description: "Llama 3.1 8B optimized for concept extraction on M1 Mac",
+            Parameters: new Dictionary<string, object>
+            {
+                ["format"] = "json",
+                ["num_ctx"] = 4096,
+                ["repeat_penalty"] = 1.1,
+                ["stop"] = new[] { "```", "\n\n" }
+            }
+        );
+
+        // Consciousness Expansion - Gemma2 9B: Strong in creative and philosophical content (2025: best for spiritual topics)
+        public static readonly LLMConfiguration ConsciousnessExpansionGemma2 = new(
+            Id: "consciousness-expansion-gemma2-9b",
+            Provider: "Ollama",
+            Model: "gemma2:9b",
             Mode: "consciousness-expansion",
-            Temperature: 0.7, // Slightly lower for more focused responses
+            Temperature: 0.7,
             MaxTokens: 2000,
             TopP: 0.9,
             Frequencies: new[] { "432", "528", "741" },
             UseJoyfulEngine: true,
             BreathPhase: "expand",
-            Description: "GPT-OSS 20B optimized for consciousness expansion with joyful engine on Mac M1",
+            Description: "Gemma2 9B for consciousness expansion on M1 Mac",
             Parameters: new Dictionary<string, object>
             {
-                ["format"] = "json",
-                ["stream"] = false,
-                ["num_ctx"] = 4096, // Context length
-                ["num_predict"] = 2000, // Max tokens to predict
-                ["num_gpu"] = 1, // Use GPU on Mac M1
-                ["num_thread"] = 8, // Optimize CPU threads for M1
-                ["repeat_penalty"] = 1.1, // Prevent repetition
-                ["top_k"] = 40, // Top-k sampling
-                ["tfs_z"] = 1.0, // Tail free sampling
-                ["consciousness_expansion"] = true,
-                ["joyful_language"] = true,
-                ["spiritual_resonance"] = true
+                ["num_ctx"] = 8192,
+                ["repeat_penalty"] = 1.0
             }
         );
 
-        public static readonly LLMConfiguration ConsciousnessExpansionLlama2 = new(
-            Id: "consciousness-expansion-llama2",
+        // Translation - Qwen2 7B: Excellent multilingual capabilities (2025: top for translation tasks)
+        public static readonly LLMConfiguration TranslationQwen2 = new(
+            Id: "translation-qwen2-7b",
             Provider: "Ollama",
-            Model: "llama2",
-            Mode: "consciousness-expansion",
-            Temperature: 0.7,
-            MaxTokens: 1500,
-            TopP: 0.85,
-            Frequencies: new[] { "432", "528", "741" },
+            Model: "qwen2:7b",
+            Mode: "translation",
+            Temperature: 0.4,
+            MaxTokens: 2048,
+            TopP: 0.8,
+            Frequencies: new[] { "432" },
+            UseJoyfulEngine: false,
+            BreathPhase: "contract",
+            Description: "Qwen2 7B for multilingual translation on M1 Mac",
+            Parameters: new Dictionary<string, object>
+            {
+                ["num_ctx"] = 32768,
+                ["repeat_penalty"] = 1.05
+            }
+        );
+
+        // Code Generation - Deepseek-coder 6.7B: Specialized for coding tasks (2025: high performance in code completion)
+        public static readonly LLMConfiguration CodeGenerationDeepseek = new(
+            Id: "code-generation-deepseek-6.7b",
+            Provider: "Ollama",
+            Model: "deepseek-coder:6.7b",
+            Mode: "code-generation",
+            Temperature: 0.2,
+            MaxTokens: 4096,
+            TopP: 0.7,
+            Frequencies: new[] { "528" },
+            UseJoyfulEngine: false,
+            BreathPhase: "contract",
+            Description: "Deepseek-coder 6.7B for code generation on M1 Mac",
+            Parameters: new Dictionary<string, object>
+            {
+                ["num_ctx"] = 16384,
+                ["repeat_penalty"] = 1.1,
+                ["stop"] = new[] { "<|EOT|>" }
+            }
+        );
+
+        // Creative Writing - Phi3 3.8B: Efficient for creative tasks on M1 (2025: optimized for low-resource creativity)
+        public static readonly LLMConfiguration CreativeWritingPhi3 = new(
+            Id: "creative-writing-phi3-3.8b",
+            Provider: "Ollama",
+            Model: "phi3:3.8b",
+            Mode: "creative-writing",
+            Temperature: 0.8,
+            MaxTokens: 2000,
+            TopP: 0.95,
+            Frequencies: new[] { "741" },
             UseJoyfulEngine: true,
             BreathPhase: "expand",
-            Description: "Llama2 optimized for consciousness expansion with joyful engine",
+            Description: "Phi3 3.8B for creative writing on M1 Mac",
             Parameters: new Dictionary<string, object>
             {
-                ["format"] = "json",
-                ["stream"] = false,
-                ["consciousness_expansion"] = true,
-                ["joyful_language"] = true
+                ["num_ctx"] = 4096,
+                ["repeat_penalty"] = 1.2
             }
         );
 
-        // Code Generation Configurations
-        public static readonly LLMConfiguration CodeGenerationCodellama = new(
-            Id: "code-generation-codellama",
+        // Default Fallback - Llama 3.1 8B: Versatile all-purpose model
+        public static readonly LLMConfiguration DefaultLlama3 = new(
+            Id: "default-llama3-8b",
             Provider: "Ollama",
-            Model: "codellama",
-            Mode: "code-generation",
-            Temperature: 0.3,
-            MaxTokens: 3000,
-            TopP: 0.8,
-            Frequencies: new[] { "741" },
+            Model: "llama3.1:8b",
+            Mode: "default",
+            Temperature: 0.7,
+            MaxTokens: 2048,
+            TopP: 0.9,
+            Frequencies: new[] { "432" },
             UseJoyfulEngine: false,
-            BreathPhase: "contract",
-            Description: "CodeLlama optimized for code generation and reflection",
+            BreathPhase: "expand",
+            Description: "Default Llama 3.1 8B for general tasks on M1 Mac",
             Parameters: new Dictionary<string, object>
             {
-                ["format"] = "json",
-                ["stream"] = false,
-                ["code_generation"] = true,
-                ["reflection_support"] = true,
-                ["csharp_optimized"] = true
-            }
-        );
-
-        public static readonly LLMConfiguration CodeGenerationMistral = new(
-            Id: "code-generation-mistral",
-            Provider: "Ollama",
-            Model: "mistral",
-            Mode: "code-generation",
-            Temperature: 0.4,
-            MaxTokens: 2500,
-            TopP: 0.85,
-            Frequencies: new[] { "741" },
-            UseJoyfulEngine: false,
-            BreathPhase: "contract",
-            Description: "Mistral optimized for code generation and analysis",
-            Parameters: new Dictionary<string, object>
-            {
-                ["format"] = "json",
-                ["stream"] = false,
-                ["code_generation"] = true,
-                ["analysis_support"] = true
+                ["num_ctx"] = 8192,
+                ["repeat_penalty"] = 1.1
             }
         );
 
@@ -368,25 +508,24 @@ public static class LLMConfigurationSystem
     /// </summary>
     public static LLMConfiguration GetOptimalConfiguration(string useCase, string? preferredModel = null)
     {
-        return useCase.ToLowerInvariant() switch
+        var baseConfig = useCase.ToLowerInvariant() switch
         {
-            "consciousness-expansion" => preferredModel?.ToLowerInvariant() switch
-            {
-                "llama2" => PredefinedConfigurations.ConsciousnessExpansionLlama2,
-                _ => PredefinedConfigurations.ConsciousnessExpansionLlama3
-            },
-            "code-generation" => preferredModel?.ToLowerInvariant() switch
-            {
-                "mistral" => PredefinedConfigurations.CodeGenerationMistral,
-                _ => PredefinedConfigurations.CodeGenerationCodellama
-            },
-            "future-knowledge" => PredefinedConfigurations.FutureKnowledgeLlama3,
-            "image-generation" => PredefinedConfigurations.ImageGenerationLlama3,
-            "analysis" => PredefinedConfigurations.AnalysisLlama3,
-            "resonance-calculation" => PredefinedConfigurations.ResonanceCalculationLlama3,
-            "creative" => PredefinedConfigurations.CreativeLlama3,
-            _ => PredefinedConfigurations.ConsciousnessExpansionLlama3
+            "concept-extraction" => PredefinedConfigurations.ConceptExtractionLlama3,
+            "consciousness-expansion" => PredefinedConfigurations.ConsciousnessExpansionGemma2,
+            "translation" => PredefinedConfigurations.TranslationQwen2,
+            "code-generation" => PredefinedConfigurations.CodeGenerationDeepseek,
+            "creative-writing" => PredefinedConfigurations.CreativeWritingPhi3,
+            "reasoning" => PredefinedConfigurations.ReasoningMistral,
+            "analysis" => PredefinedConfigurations.ConsciousnessExpansionGemma2, // Use same as expansion for analysis
+            _ => PredefinedConfigurations.DefaultLlama3
         };
+
+        if (preferredModel != null)
+        {
+            baseConfig = baseConfig with { Model = preferredModel };
+        }
+
+        return baseConfig;
     }
 
     /// <summary>
@@ -396,15 +535,13 @@ public static class LLMConfigurationSystem
     {
         return new List<LLMConfiguration>
         {
-            PredefinedConfigurations.ConsciousnessExpansionLlama3,
-            PredefinedConfigurations.ConsciousnessExpansionLlama2,
-            PredefinedConfigurations.CodeGenerationCodellama,
-            PredefinedConfigurations.CodeGenerationMistral,
-            PredefinedConfigurations.FutureKnowledgeLlama3,
-            PredefinedConfigurations.ImageGenerationLlama3,
-            PredefinedConfigurations.AnalysisLlama3,
-            PredefinedConfigurations.ResonanceCalculationLlama3,
-            PredefinedConfigurations.CreativeLlama3
+            PredefinedConfigurations.ConsciousnessExpansionGemma2,
+            PredefinedConfigurations.ConceptExtractionLlama3,
+            PredefinedConfigurations.CodeGenerationDeepseek,
+            PredefinedConfigurations.CreativeWritingPhi3,
+            PredefinedConfigurations.ReasoningMistral,
+            PredefinedConfigurations.TranslationQwen2,
+            PredefinedConfigurations.DefaultLlama3
         };
     }
 

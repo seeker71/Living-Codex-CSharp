@@ -395,11 +395,11 @@ namespace CodexBootstrap.Core
     /// </summary>
     public class ModuleVersion
     {
-        public string Name { get; set; }
-        public string Version { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Version { get; set; } = string.Empty;
         public DateTime CompiledAt { get; set; }
-        public string SourceHash { get; set; }
-        public string DllPath { get; set; }
+        public string SourceHash { get; set; } = string.Empty;
+        public string DllPath { get; set; } = string.Empty;
     }
 
     /// <summary>

@@ -480,8 +480,8 @@ namespace CodexBootstrap.Modules
     /// </summary>
     public class UpdateModuleRequest
     {
-        public string ModuleName { get; set; }
-        public string SourceCode { get; set; }
+        public string ModuleName { get; set; } = string.Empty;
+        public string SourceCode { get; set; } = string.Empty;
     }
 
     /// <summary>
@@ -489,8 +489,8 @@ namespace CodexBootstrap.Modules
     /// </summary>
     public class CompileModuleRequest
     {
-        public string ModuleName { get; set; }
-        public string SourceCode { get; set; }
+        public string ModuleName { get; set; } = string.Empty;
+        public string SourceCode { get; set; } = string.Empty;
     }
 
     /// <summary>
@@ -498,7 +498,7 @@ namespace CodexBootstrap.Modules
     /// </summary>
     public class ValidateModuleRequest
     {
-        public string DllPath { get; set; }
+        public string DllPath { get; set; } = string.Empty;
     }
 
     /// <summary>
@@ -506,7 +506,7 @@ namespace CodexBootstrap.Modules
     /// </summary>
     public class HotReloadRequest
     {
-        public string ModuleName { get; set; }
-        public string DllPath { get; set; }
+        public string ModuleName { get; set; } = string.Empty;
+        public string DllPath { get; set; } = string.Empty;
     }
 }

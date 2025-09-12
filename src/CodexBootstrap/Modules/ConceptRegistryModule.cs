@@ -16,10 +16,12 @@ public class ConceptRegistryModule : IModule
     private readonly Dictionary<string, ConceptVersion> _conceptVersions = new();
     private readonly Dictionary<string, List<ConceptRelationship>> _conceptRelationships = new();
     private CoreApiService? _coreApiService;
+    private readonly Core.ILogger _logger;
 
     public ConceptRegistryModule(NodeRegistry registry)
     {
         _registry = registry;
+        _logger = new Log4NetLogger(typeof(ConceptRegistryModule));
     }
 
     public ConceptRegistryModule() : this(new NodeRegistry()) { }
@@ -267,6 +269,515 @@ public class ConceptRegistryModule : IModule
             "QualityComparisonRequest" => "Used to request quality comparison between multiple concepts.",
             "QualityComparisonResponse" => "Returned when quality comparison is completed. Contains comparison results.",
             _ => "Quality Assessment data transfer object"
+        };
+    }
+
+    // Concept Discovery & Ontology Integration API Methods
+    [ApiRoute("POST", "/concept/discover", "concept-discover", "Discover and register concepts from content", "codex.concept-registry")]
+    public async Task<object> DiscoverConcepts([ApiParameter("request", "Concept discovery request", Required = true, Location = "body")] ConceptDiscoveryRequest request)
+    {
+        try
+        {
+            // Use AI module to extract concepts via HTTP call
+            try
+            {
+                using var httpClient = new HttpClient();
+                var extractionRequest = new
+                {
+                    title = request.Title,
+                    content = request.Content,
+                    categories = new[] { request.Domain },
+                    source = "concept-discovery",
+                    url = ""
+                };
+
+                var jsonContent = new StringContent(
+                    JsonSerializer.Serialize(extractionRequest),
+                    System.Text.Encoding.UTF8,
+                    "application/json"
+                );
+
+                var response = await httpClient.PostAsync("http://localhost:5001/ai/extract-concepts", jsonContent);
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    return new ErrorResponse($"AI module returned error: {response.StatusCode}");
+                }
+
+                var responseContent = await response.Content.ReadAsStringAsync();
+                var extractionResult = JsonSerializer.Deserialize<JsonElement>(responseContent);
+
+                // Parse extracted concepts and register them
+                var discoveredConcepts = new List<DiscoveredConcept>();
+                var registeredConcepts = new List<string>();
+
+                // Handle both old format (concept objects) and new format (concept strings)
+                if (extractionResult.TryGetProperty("concepts", out var conceptsArray))
+                {
+                    foreach (var conceptElement in conceptsArray.EnumerateArray())
+                    {
+                        string conceptNameStr;
+                        double score = 0.8; // Default confidence
+                        string description;
+                        string conceptType = "consciousness";
+
+                        if (conceptElement.ValueKind == JsonValueKind.String)
+                        {
+                            // New format: simple string array
+                            conceptNameStr = conceptElement.GetString() ?? "unknown";
+                            description = $"Discovered concept: {conceptNameStr}";
+                        }
+                        else
+                        {
+                            // Old format: concept objects
+                            conceptNameStr = conceptElement.TryGetProperty("concept", out var conceptName) 
+                                ? conceptName.GetString() ?? "unknown" 
+                                : "unknown";
+                            score = conceptElement.TryGetProperty("score", out var scoreProp) 
+                                ? scoreProp.GetDouble() 
+                                : 0.8;
+                            description = conceptElement.TryGetProperty("description", out var desc) 
+                                ? desc.GetString() ?? $"Discovered concept: {conceptNameStr}" 
+                                : $"Discovered concept: {conceptNameStr}";
+                            conceptType = conceptElement.TryGetProperty("category", out var cat) 
+                                ? cat.GetString() ?? "consciousness" 
+                                : "consciousness";
+                        }
+
+                        var conceptId = $"discovered-{conceptNameStr.ToLower().Replace(" ", "-").Replace("'", "")}";
+                        
+                        discoveredConcepts.Add(new DiscoveredConcept(
+                            conceptId,
+                            conceptNameStr,
+                            description,
+                            conceptType,
+                            score,
+                            new Dictionary<string, object>
+                            {
+                                ["discoveredAt"] = DateTime.UtcNow,
+                                ["source"] = "AI extraction",
+                                ["confidence"] = score
+                            }
+                        ));
+
+                        // Register concept in U-CORE ontology
+                        try
+                        {
+                            var ontologyRequest = new
+                            {
+                                conceptId = conceptId,
+                                name = conceptNameStr,
+                                description = description,
+                                conceptType = conceptType,
+                                properties = new Dictionary<string, object>
+                                {
+                                    ["discoveredAt"] = DateTime.UtcNow,
+                                    ["source"] = "AI extraction",
+                                    ["confidence"] = score
+                                }
+                            };
+
+                            var ontologyJson = new StringContent(
+                                JsonSerializer.Serialize(ontologyRequest),
+                                System.Text.Encoding.UTF8,
+                                "application/json"
+                            );
+
+                            var ontologyResponse = await httpClient.PostAsync("http://localhost:5001/concept/ontology/register", ontologyJson);
+                            if (ontologyResponse.IsSuccessStatusCode)
+                            {
+                                registeredConcepts.Add(conceptId);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger?.Error($"Failed to register concept {conceptId}: {ex.Message}");
+                        }
+                    }
+                }
+
+                return new ConceptDiscoveryResponse(
+                    Success: true,
+                    DiscoveredConcepts: discoveredConcepts,
+                    RegisteredConcepts: registeredConcepts,
+                    TotalDiscovered: discoveredConcepts.Count,
+                    TotalRegistered: registeredConcepts.Count,
+                    Message: "Concept discovery completed successfully"
+                );
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"AI module integration failed: {ex.Message}");
+                return new ErrorResponse($"AI module integration failed: {ex.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Concept discovery failed: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("POST", "/concept/ontology/register", "concept-ontology-register", "Register concept in U-CORE ontology", "codex.concept-registry")]
+    public async Task<object> RegisterConceptInOntology([ApiParameter("request", "Ontology registration request", Required = true, Location = "body")] OntologyRegistrationRequest request)
+    {
+        try
+        {
+            // Create U-CORE concept from discovered concept
+            var ucoreConcept = new UCoreConcept
+            {
+                Id = request.ConceptId,
+                Name = request.Name,
+                Description = request.Description,
+                Type = MapToConceptType(request.ConceptType),
+                Frequency = CalculateSacredFrequency(request.Name, request.Description),
+                Resonance = CalculateResonance(request.Name, request.Description),
+                Properties = request.Properties ?? new Dictionary<string, object>()
+            };
+
+            // Register in U-CORE ontology
+            var ontology = new UCoreOntology();
+            ontology.Concepts[request.ConceptId] = ucoreConcept;
+
+            // Store as node in registry
+            var conceptNode = new Node(
+                Id: $"ucore.concept.{request.ConceptId}",
+                TypeId: "ucore.concept",
+                State: ContentState.Ice,
+                Locale: "en",
+                Title: request.Name,
+                Description: request.Description,
+                Content: new ContentRef(
+                    MediaType: "application/json",
+                    InlineJson: JsonSerializer.Serialize(ucoreConcept),
+                    InlineBytes: null,
+                    ExternalUri: null
+                ),
+                Meta: new Dictionary<string, object>
+                {
+                    ["conceptId"] = request.ConceptId,
+                    ["name"] = request.Name,
+                    ["type"] = request.ConceptType,
+                    ["frequency"] = ucoreConcept.Frequency,
+                    ["resonance"] = ucoreConcept.Resonance,
+                    ["registeredAt"] = DateTime.UtcNow
+                }
+            );
+
+            _registry.Upsert(conceptNode);
+
+            return new OntologyRegistrationResponse(
+                Success: true,
+                ConceptId: request.ConceptId,
+                UCoreConcept: ucoreConcept,
+                Frequency: ucoreConcept.Frequency,
+                Resonance: ucoreConcept.Resonance,
+                Message: "Concept registered in U-CORE ontology successfully"
+            );
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Ontology registration failed: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("POST", "/concept/ontology/relate", "concept-ontology-relate", "Create relationships between concepts", "codex.concept-registry")]
+    public async Task<object> CreateConceptRelationships([ApiParameter("request", "Relationship creation request", Required = true, Location = "body")] ConceptRelationshipRequest request)
+    {
+        try
+        {
+            var relationships = new List<UCoreRelationship>();
+            var relationshipIds = new List<string>();
+
+            foreach (var relationship in request.Relationships)
+            {
+                var relationshipId = $"rel.{relationship.SourceConceptId}.{relationship.TargetConceptId}.{relationship.Type}";
+                
+                var ucoreRelationship = new UCoreRelationship
+                {
+                    Id = relationshipId,
+                    Source = relationship.SourceConceptId,
+                    Target = relationship.TargetConceptId,
+                    Type = MapToRelationshipType(relationship.Type),
+                    Strength = relationship.Strength,
+                    Description = relationship.Description,
+                    Properties = relationship.Properties ?? new Dictionary<string, object>()
+                };
+
+                relationships.Add(ucoreRelationship);
+                relationshipIds.Add(relationshipId);
+
+                // Store relationship as edge in registry
+                var relationshipEdge = new Edge(
+                    FromId: $"ucore.concept.{relationship.SourceConceptId}",
+                    ToId: $"ucore.concept.{relationship.TargetConceptId}",
+                    Role: "ucore.relationship",
+                    Weight: relationship.Strength,
+                    Meta: new Dictionary<string, object>
+                    {
+                        ["relationshipId"] = relationshipId,
+                        ["type"] = relationship.Type,
+                        ["strength"] = relationship.Strength,
+                        ["description"] = relationship.Description,
+                        ["createdAt"] = DateTime.UtcNow
+                    }
+                );
+
+                _registry.Upsert(relationshipEdge);
+            }
+
+            return new ConceptRelationshipResponse(
+                Success: true,
+                Relationships: relationships,
+                RelationshipIds: relationshipIds,
+                TotalCreated: relationships.Count,
+                Message: $"Created {relationships.Count} concept relationships successfully"
+            );
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Relationship creation failed: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("GET", "/concept/ontology/explore/{id}", "concept-ontology-explore", "Explore concept relationships", "codex.concept-registry")]
+    public async Task<object> ExploreConceptRelationships([ApiParameter("id", "Concept ID", Required = true, Location = "path")] string id)
+    {
+        try
+        {
+            var conceptId = $"ucore.concept.{id}";
+            var conceptNode = _registry.GetNode(conceptId);
+            
+            if (conceptNode == null)
+            {
+                return new ErrorResponse("Concept not found in ontology");
+            }
+
+            // Get all relationships for this concept
+            var outgoingEdges = _registry.GetEdgesFrom(conceptId)
+                .Where(e => e.Role == "ucore.relationship")
+                .ToList();
+
+            var incomingEdges = _registry.GetEdgesTo(conceptId)
+                .Where(e => e.Role == "ucore.relationship")
+                .ToList();
+
+            var relationships = new List<ConceptRelationshipInfo>();
+            
+            foreach (var edge in outgoingEdges)
+            {
+                relationships.Add(new ConceptRelationshipInfo(
+                    edge.ToId.Replace("ucore.concept.", ""),
+                    edge.Meta?.GetValueOrDefault("type")?.ToString() ?? "unknown",
+                    Convert.ToDouble(edge.Meta?.GetValueOrDefault("strength") ?? 0.0),
+                    edge.Meta?.GetValueOrDefault("description")?.ToString() ?? "",
+                    "outgoing"
+                ));
+            }
+
+            foreach (var edge in incomingEdges)
+            {
+                relationships.Add(new ConceptRelationshipInfo(
+                    edge.FromId.Replace("ucore.concept.", ""),
+                    edge.Meta?.GetValueOrDefault("type")?.ToString() ?? "unknown",
+                    Convert.ToDouble(edge.Meta?.GetValueOrDefault("strength") ?? 0.0),
+                    edge.Meta?.GetValueOrDefault("description")?.ToString() ?? "",
+                    "incoming"
+                ));
+            }
+
+            return new ConceptExplorationResponse(
+                Success: true,
+                ConceptId: id,
+                ConceptName: conceptNode.Title,
+                Relationships: relationships,
+                TotalRelationships: relationships.Count,
+                OutgoingCount: outgoingEdges.Count,
+                IncomingCount: incomingEdges.Count,
+                Message: "Concept exploration completed successfully"
+            );
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Concept exploration failed: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("POST", "/concept/ontology/amplify", "concept-ontology-amplify", "Amplify concept resonance", "codex.concept-registry")]
+    public async Task<object> AmplifyConceptResonance([ApiParameter("request", "Amplification request", Required = true, Location = "body")] ConceptAmplificationRequest request)
+    {
+        try
+        {
+            var conceptId = $"ucore.concept.{request.ConceptId}";
+            var conceptNode = _registry.GetNode(conceptId);
+            
+            if (conceptNode == null)
+            {
+                return new ErrorResponse("Concept not found in ontology");
+            }
+
+            // Calculate amplification based on resonance and frequency
+            var currentResonance = Convert.ToDouble(conceptNode.Meta?.GetValueOrDefault("resonance") ?? 0.0);
+            var currentFrequency = Convert.ToDouble(conceptNode.Meta?.GetValueOrDefault("frequency") ?? 432.0);
+            
+            var amplificationFactor = CalculateAmplificationFactor(request.AmplificationType, currentResonance, currentFrequency);
+            var newResonance = Math.Min(currentResonance * amplificationFactor, 1.0);
+            var newFrequency = currentFrequency * amplificationFactor;
+
+            // Update concept with amplified values
+            conceptNode.Meta["resonance"] = newResonance;
+            conceptNode.Meta["frequency"] = newFrequency;
+            conceptNode.Meta["amplifiedAt"] = DateTime.UtcNow;
+            conceptNode.Meta["amplificationType"] = request.AmplificationType;
+
+            _registry.Upsert(conceptNode);
+
+            return new ConceptAmplificationResponse(
+                Success: true,
+                ConceptId: request.ConceptId,
+                OriginalResonance: currentResonance,
+                AmplifiedResonance: newResonance,
+                OriginalFrequency: currentFrequency,
+                AmplifiedFrequency: newFrequency,
+                AmplificationFactor: amplificationFactor,
+                AmplificationType: request.AmplificationType,
+                Message: "Concept resonance amplified successfully"
+            );
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Concept amplification failed: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("GET", "/concept/ontology/frequencies", "concept-ontology-frequencies", "Get concept frequency mappings", "codex.concept-registry")]
+    public async Task<object> GetConceptFrequencies([ApiParameter("conceptType", "Concept type filter", Required = false, Location = "query")] string? conceptType = null)
+    {
+        try
+        {
+            var frequencyMappings = new List<ConceptFrequencyMapping>();
+            
+            // Get all U-CORE concepts from registry
+            var conceptNodes = _registry.GetNodesByType("ucore.concept");
+            
+            foreach (var node in conceptNodes)
+            {
+                if (conceptType != null && !node.Meta?.GetValueOrDefault("type")?.ToString()?.Equals(conceptType, StringComparison.OrdinalIgnoreCase) == true)
+                    continue;
+
+                var conceptId = node.Meta?.GetValueOrDefault("conceptId")?.ToString() ?? node.Id;
+                var name = node.Title;
+                var frequency = Convert.ToDouble(node.Meta?.GetValueOrDefault("frequency") ?? 432.0);
+                var resonance = Convert.ToDouble(node.Meta?.GetValueOrDefault("resonance") ?? 0.0);
+                var type = node.Meta?.GetValueOrDefault("type")?.ToString() ?? "unknown";
+
+                frequencyMappings.Add(new ConceptFrequencyMapping(
+                    conceptId,
+                    name,
+                    frequency,
+                    resonance,
+                    type,
+                    GetSacredFrequencyName(frequency)
+                ));
+            }
+
+            return new ConceptFrequencyResponse(
+                Success: true,
+                FrequencyMappings: frequencyMappings,
+                TotalConcepts: frequencyMappings.Count,
+                FilteredByType: conceptType,
+                Message: $"Retrieved frequency mappings for {frequencyMappings.Count} concepts"
+            );
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to retrieve concept frequencies: {ex.Message}");
+        }
+    }
+
+    // Helper methods for concept discovery and ontology integration
+    private ConceptType MapToConceptType(string conceptType)
+    {
+        return conceptType.ToLower() switch
+        {
+            "emotion" or "feeling" => ConceptType.Emotion,
+            "transformation" or "change" => ConceptType.Transformation,
+            "consciousness" or "awareness" => ConceptType.Consciousness,
+            "energy" or "power" => ConceptType.Energy,
+            "frequency" or "vibration" => ConceptType.Frequency,
+            _ => ConceptType.Core
+        };
+    }
+
+    private RelationshipType MapToRelationshipType(string relationshipType)
+    {
+        return relationshipType.ToLower() switch
+        {
+            "amplifies" or "enhances" => RelationshipType.Amplifies,
+            "transforms" or "changes" => RelationshipType.Transforms,
+            "unifies" or "connects" => RelationshipType.Unifies,
+            "resonates" or "harmonizes" => RelationshipType.Resonates,
+            "harmonizes" or "balances" => RelationshipType.Harmonizes,
+            "integrates" or "combines" => RelationshipType.Integrates,
+            _ => RelationshipType.Resonates
+        };
+    }
+
+    private double CalculateSacredFrequency(string name, string description)
+    {
+        var text = $"{name} {description}".ToLower();
+        
+        // Map to sacred frequencies based on content
+        if (text.Contains("love") || text.Contains("heart") || text.Contains("compassion"))
+            return 528.0; // Love frequency
+        if (text.Contains("healing") || text.Contains("harmony") || text.Contains("balance"))
+            return 432.0; // Natural frequency
+        if (text.Contains("consciousness") || text.Contains("intuition") || text.Contains("wisdom"))
+            return 741.0; // Expression frequency
+        if (text.Contains("pain") || text.Contains("suffering") || text.Contains("transformation"))
+            return 174.0; // Pain transformation frequency
+        
+        // Default to 432Hz
+        return 432.0;
+    }
+
+    private double CalculateResonance(string name, string description)
+    {
+        var text = $"{name} {description}".ToLower();
+        var resonance = 0.5; // Base resonance
+        
+        // Increase resonance based on positive keywords
+        if (text.Contains("love") || text.Contains("joy") || text.Contains("peace"))
+            resonance += 0.3;
+        if (text.Contains("consciousness") || text.Contains("awareness") || text.Contains("wisdom"))
+            resonance += 0.2;
+        if (text.Contains("healing") || text.Contains("harmony") || text.Contains("balance"))
+            resonance += 0.2;
+        
+        return Math.Min(resonance, 1.0);
+    }
+
+    private double CalculateAmplificationFactor(string amplificationType, double currentResonance, double currentFrequency)
+    {
+        return amplificationType.ToLower() switch
+        {
+            "gentle" => 1.1,
+            "moderate" => 1.3,
+            "strong" => 1.6,
+            "intense" => 2.0,
+            "sacred" => 2.5,
+            _ => 1.2
+        };
+    }
+
+    private string GetSacredFrequencyName(double frequency)
+    {
+        return frequency switch
+        {
+            174.0 => "174 Hz - Pain Transformation",
+            432.0 => "432 Hz - Natural Harmony",
+            528.0 => "528 Hz - Love Frequency",
+            741.0 => "741 Hz - Expression Frequency",
+            _ => $"{frequency} Hz - Custom Frequency"
         };
     }
 
@@ -935,3 +1446,121 @@ public class ConceptMetadata
     public string? Culture { get; set; }
     public string? Complexity { get; set; }
 }
+
+// Concept Discovery & Ontology Integration DTOs
+public record ConceptDiscoveryRequest(
+    string Title,
+    string Content,
+    string Domain,
+    string ExtractionLevel,
+    Dictionary<string, object>? Options
+);
+
+public record ConceptDiscoveryResponse(
+    bool Success,
+    List<DiscoveredConcept> DiscoveredConcepts,
+    List<string> RegisteredConcepts,
+    int TotalDiscovered,
+    int TotalRegistered,
+    string Message
+);
+
+public record DiscoveredConcept(
+    string ConceptId,
+    string Name,
+    string Description,
+    string Type,
+    double Confidence,
+    Dictionary<string, object> Properties
+);
+
+public record OntologyRegistrationRequest(
+    string ConceptId,
+    string Name,
+    string Description,
+    string ConceptType,
+    Dictionary<string, object>? Properties
+);
+
+public record OntologyRegistrationResponse(
+    bool Success,
+    string ConceptId,
+    UCoreConcept UCoreConcept,
+    double Frequency,
+    double Resonance,
+    string Message
+);
+
+public record ConceptRelationshipRequest(
+    List<ConceptRelationshipData> Relationships
+);
+
+public record ConceptRelationshipData(
+    string SourceConceptId,
+    string TargetConceptId,
+    string Type,
+    double Strength,
+    string Description,
+    Dictionary<string, object>? Properties
+);
+
+public record ConceptRelationshipResponse(
+    bool Success,
+    List<UCoreRelationship> Relationships,
+    List<string> RelationshipIds,
+    int TotalCreated,
+    string Message
+);
+
+public record ConceptExplorationResponse(
+    bool Success,
+    string ConceptId,
+    string ConceptName,
+    List<ConceptRelationshipInfo> Relationships,
+    int TotalRelationships,
+    int OutgoingCount,
+    int IncomingCount,
+    string Message
+);
+
+public record ConceptRelationshipInfo(
+    string TargetConceptId,
+    string Type,
+    double Strength,
+    string Description,
+    string Direction
+);
+
+public record ConceptAmplificationRequest(
+    string ConceptId,
+    string AmplificationType
+);
+
+public record ConceptAmplificationResponse(
+    bool Success,
+    string ConceptId,
+    double OriginalResonance,
+    double AmplifiedResonance,
+    double OriginalFrequency,
+    double AmplifiedFrequency,
+    double AmplificationFactor,
+    string AmplificationType,
+    string Message
+);
+
+public record ConceptFrequencyResponse(
+    bool Success,
+    List<ConceptFrequencyMapping> FrequencyMappings,
+    int TotalConcepts,
+    string? FilteredByType,
+    string Message
+);
+
+public record ConceptFrequencyMapping(
+    string ConceptId,
+    string Name,
+    double Frequency,
+    double Resonance,
+    string Type,
+    string SacredFrequency
+);
