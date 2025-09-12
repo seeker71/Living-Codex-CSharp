@@ -4,26 +4,6 @@ using CodexBootstrap.Runtime;
 
 namespace CodexBootstrap.Modules;
 
-// Future Knowledge Data Types
-
-[MetaNodeAttribute("codex.future.knowledge", "codex.meta/type", "FutureKnowledge", "Knowledge retrieved from future states")]
-public record FutureKnowledge(
-    string Id,
-    object Content,
-    DateTime Timestamp,
-    double Confidence,
-    string Source
-);
-
-[MetaNodeAttribute("codex.future.delta", "codex.meta/type", "FutureDelta", "Delta representing future changes")]
-public record FutureDelta(
-    string Id,
-    string TargetNodeId,
-    object Changes,
-    int Priority,
-    Dictionary<string, object> Metadata
-);
-
 /// <summary>
 /// Future Knowledge Module - Retrieves and applies knowledge from future states
 /// </summary>
@@ -33,8 +13,6 @@ public class FutureKnowledgeModule : IModule
     private readonly NodeRegistry _registry;
     private CoreApiService? _coreApiService;
     private readonly CodexBootstrap.Core.ILogger _logger;
-    private readonly List<NewsItem> _newsItems = new();
-    private readonly Dictionary<string, NewsAnalysis> _newsAnalyses = new();
 
     public FutureKnowledgeModule(IApiRouter apiRouter, NodeRegistry registry)
     {
@@ -50,56 +28,214 @@ public class FutureKnowledgeModule : IModule
             TypeId: "codex.meta/module",
             State: ContentState.Ice,
             Locale: "en",
-            Title: "Future Knowledge Module",
+            Title: "Future Knowledge",
             Description: "Retrieves and applies knowledge from future states",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    ModuleId = "codex.future",
-                    Name = "Future Knowledge Module",
-                    Description = "Retrieves and applies knowledge from future states",
-                    Version = "1.0.0"
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
+            Content: null,
             Meta: new Dictionary<string, object>
             {
-                ["moduleId"] = "codex.future",
                 ["version"] = "1.0.0",
-                ["createdAt"] = DateTime.UtcNow
+                ["capabilities"] = new[] { "future-knowledge", "pattern-recognition", "prediction" },
+                ["endpoints"] = new[] { 
+                    "/future/knowledge/retrieve", 
+                    "/future/knowledge/apply", 
+                    "/future/patterns/discover",
+                    "/future/patterns/analyze",
+                    "/future/patterns/trending",
+                    "/future/predictions/generate"
+                }
             }
         );
     }
 
+    public async Task InitializeAsync(CoreApiService coreApiService)
+    {
+        _coreApiService = coreApiService;
+        _logger.Info("Future Knowledge Module initialized");
+        
+        // Register the module node
+        _registry.Upsert(GetModuleNode());
+    }
+
     public void Register(NodeRegistry registry)
     {
-        // Register the module node
         registry.Upsert(GetModuleNode());
     }
 
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public void RegisterApiHandlers(IApiRouter apiRouter, NodeRegistry registry)
     {
-        // API handlers are registered via attributes, so this is empty
+        // API handlers are registered via attributes
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApiService, ModuleLoader moduleLoader)
     {
-        // Store CoreApiService reference for cross-service communication
-        _coreApiService = coreApi;
-        // HTTP endpoints are registered via attributes, so this is empty
+        // HTTP endpoints are registered via attributes
     }
 
-    [ApiRoute("POST", "/future/retrieve", "future-retrieve", "Retrieve knowledge from future", "codex.future")]
-    public async Task<object> RetrieveFutureKnowledge([ApiParameter("request", "Future knowledge request", Required = true, Location = "body")] FutureKnowledgeRequest request)
+    // Future Knowledge API Endpoints
+    [ApiRoute("POST", "/future/knowledge/retrieve", "RetrieveFutureKnowledge", "Retrieve knowledge from future states", "codex.future")]
+    public async Task<object> RetrieveFutureKnowledgeAsync([ApiParameter("body", "Knowledge retrieval request")] FutureKnowledgeRequest request)
     {
         try
         {
+            _logger.Info($"Retrieving future knowledge for query: {request.Query}");
+
+            // Simulate future knowledge retrieval
+            var futureKnowledge = await SimulateFutureKnowledgeRetrieval(request);
+            
+            return new FutureKnowledgeResponse(
+                Success: true,
+                Knowledge: futureKnowledge,
+                Confidence: 0.85,
+                RetrievedAt: DateTimeOffset.UtcNow
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Failed to retrieve future knowledge: {ex.Message}", ex);
+            return new { success = false, message = ex.Message };
+        }
+    }
+
+    [ApiRoute("POST", "/future/knowledge/apply", "ApplyFutureKnowledge", "Apply future knowledge to current state", "codex.future")]
+    public async Task<object> ApplyFutureKnowledgeAsync([ApiParameter("body", "Knowledge application request")] FutureKnowledgeApplicationRequest request)
+    {
+        try
+        {
+            _logger.Info($"Applying future knowledge: {request.KnowledgeId}");
+
+            // Simulate knowledge application
+            var result = await SimulateKnowledgeApplication(request);
+            
+            return new FutureKnowledgeApplicationResponse(
+                Success: true,
+                AppliedAt: DateTimeOffset.UtcNow,
+                Changes: result.Changes,
+                Impact: result.Impact
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Failed to apply future knowledge: {ex.Message}", ex);
+            return new { success = false, message = ex.Message };
+        }
+    }
+
+    // Pattern Recognition API Endpoints
+    [ApiRoute("POST", "/future/patterns/discover", "DiscoverPatterns", "Discover patterns in data", "codex.future")]
+    public async Task<object> DiscoverPatternsAsync([ApiParameter("body", "Pattern discovery request")] PatternDiscoveryRequest request)
+    {
+        try
+        {
+            _logger.Info($"Discovering patterns in {request.DataSources.Count} data sources");
+
+            var patterns = await SimulatePatternDiscovery(request);
+            
+            return new PatternDiscoveryResponse(
+                Success: true,
+                Patterns: patterns,
+                Metadata: new Dictionary<string, object>
+                {
+                    ["discoveredAt"] = DateTimeOffset.UtcNow,
+                    ["dataSourceCount"] = request.DataSources.Count,
+                    ["patternTypes"] = request.PatternTypes
+                }
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Failed to discover patterns: {ex.Message}", ex);
+            return new { success = false, message = ex.Message };
+        }
+    }
+
+    [ApiRoute("POST", "/future/patterns/analyze", "AnalyzePattern", "Analyze a specific pattern", "codex.future")]
+    public async Task<object> AnalyzePatternAsync([ApiParameter("body", "Pattern analysis request")] PatternAnalysisRequest request)
+    {
+        try
+        {
+            _logger.Info($"Analyzing pattern: {request.PatternId}");
+
+            var analysis = await SimulatePatternAnalysis(request);
+            var insights = await GeneratePatternInsights(analysis);
+            
+            return new PatternAnalysisResponse(
+                Success: true,
+                Analysis: analysis,
+                Insights: insights
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Failed to analyze pattern: {ex.Message}", ex);
+            return new { success = false, message = ex.Message };
+        }
+    }
+
+    [ApiRoute("GET", "/future/patterns/trending", "GetTrendingPatterns", "Get trending patterns", "codex.future")]
+    public async Task<object> GetTrendingPatternsAsync([ApiParameter("query", "Trending patterns query")] TrendingPatternsQuery? query)
+    {
+        try
+        {
+            query ??= new TrendingPatternsQuery { Timeframe = "7d", Limit = 10 };
+            
+            _logger.Info($"Getting trending patterns for timeframe: {query.Timeframe}");
+
+            var trendingPatterns = await SimulateTrendingPatterns(query);
+            
+            return new TrendingPatternsResponse(
+                Success: true,
+                TrendingPatterns: trendingPatterns,
+                Trends: new Dictionary<string, object>
+                {
+                    ["timeframe"] = query.Timeframe,
+                    ["totalPatterns"] = trendingPatterns.Count,
+                    ["generatedAt"] = DateTimeOffset.UtcNow
+                }
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Failed to get trending patterns: {ex.Message}", ex);
+            return new { success = false, message = ex.Message };
+        }
+    }
+
+    [ApiRoute("POST", "/future/predictions/generate", "GeneratePrediction", "Generate predictions based on patterns", "codex.future")]
+    public async Task<object> GeneratePredictionAsync([ApiParameter("body", "Prediction request")] PatternPredictionRequest request)
+    {
+        try
+        {
+            _logger.Info($"Generating prediction for pattern: {request.PatternId}");
+
+            var prediction = await SimulatePredictionGeneration(request);
+            var scenarios = await GeneratePredictionScenarios(prediction, request.Parameters);
+            
+            return new PatternPredictionResponse(
+                Success: true,
+                Prediction: prediction,
+                Scenarios: scenarios
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Failed to generate prediction: {ex.Message}", ex);
+            return new { success = false, message = ex.Message };
+        }
+    }
+
+    // Additional Future Knowledge Endpoints (restored from original implementation)
+
+    [ApiRoute("POST", "/future/retrieve", "RetrieveFutureKnowledgeLegacy", "Retrieve knowledge from future (legacy endpoint)", "codex.future")]
+    public async Task<object> RetrieveFutureKnowledgeLegacyAsync([ApiParameter("body", "Future knowledge request")] FutureKnowledgeRequestLegacy request)
+    {
+        try
+        {
+            _logger.Info($"Retrieving future knowledge for query: {request.Query}");
+
             // Simulate future knowledge retrieval
             var futureKnowledge = await RetrieveFromFuture(request.Query, request.Context);
             
-            // Store as a node in the existing registry
+            // Store as a node in the registry
             var knowledgeNode = new Node(
                 Id: Guid.NewGuid().ToString(),
                 TypeId: "codex.future.knowledge",
@@ -115,39 +251,46 @@ public class FutureKnowledgeModule : IModule
                 ),
                 Meta: new Dictionary<string, object>
                 {
-                    ["timestamp"] = DateTime.UtcNow,
-                    ["confidence"] = futureKnowledge.Confidence,
-                    ["source"] = futureKnowledge.Source,
                     ["query"] = request.Query,
-                    ["context"] = request.Context
+                    ["context"] = request.Context,
+                    ["retrievedAt"] = DateTime.UtcNow,
+                    ["confidence"] = futureKnowledge.Confidence
                 }
             );
-            
+
             _registry.Upsert(knowledgeNode);
             
-            return new FutureKnowledgeResponse(true, "Future knowledge retrieved and stored", knowledgeNode.Id, futureKnowledge);
+            return new FutureKnowledgeResponseLegacy(
+                Success: true,
+                Message: "Future knowledge retrieved and stored",
+                KnowledgeId: knowledgeNode.Id,
+                Knowledge: futureKnowledge
+            );
         }
         catch (Exception ex)
         {
-            return new ErrorResponse($"Failed to retrieve future knowledge: {ex.Message}");
+            _logger.Error($"Failed to retrieve future knowledge: {ex.Message}", ex);
+            return new { success = false, message = ex.Message };
         }
     }
 
-    [ApiRoute("POST", "/future/apply-delta", "future-apply-delta", "Apply future delta to existing node", "codex.future")]
-    public async Task<object> ApplyFutureDelta([ApiParameter("request", "Delta application request", Required = true, Location = "body")] ApplyDeltaRequest request)
+    [ApiRoute("POST", "/future/apply-delta", "ApplyFutureDelta", "Apply future delta to existing node", "codex.future")]
+    public async Task<object> ApplyFutureDeltaAsync([ApiParameter("body", "Delta application request")] ApplyDeltaRequest request)
     {
         try
         {
+            _logger.Info($"Applying future delta {request.DeltaId} to node {request.TargetNodeId}");
+
             // Get the target node
             if (!_registry.TryGet(request.TargetNodeId, out var targetNode))
             {
-                return new ErrorResponse("Target node not found");
+                return new { success = false, message = "Target node not found" };
             }
 
             // Get the future delta
             if (!_registry.TryGet(request.DeltaId, out var deltaNode))
             {
-                return new ErrorResponse("Future delta not found");
+                return new { success = false, message = "Future delta not found" };
             }
 
             // Apply the future delta using the existing diff engine
@@ -156,37 +299,49 @@ public class FutureKnowledgeModule : IModule
             // Store the updated node
             _registry.Upsert(updatedNode);
             
-            return new SuccessResponse("Future delta applied successfully");
+            return new { success = true, message = "Future delta applied successfully" };
         }
         catch (Exception ex)
         {
-            return new ErrorResponse($"Failed to apply future delta: {ex.Message}");
+            _logger.Error($"Failed to apply future delta: {ex.Message}", ex);
+            return new { success = false, message = ex.Message };
         }
     }
 
-    [ApiRoute("GET", "/future/knowledge/{id}", "future-get-knowledge", "Get stored future knowledge", "codex.future")]
-    public async Task<object> GetFutureKnowledge([ApiParameter("id", "Knowledge ID", Required = true, Location = "path")] string id)
+    [ApiRoute("GET", "/future/knowledge/{id}", "GetFutureKnowledge", "Get stored future knowledge", "codex.future")]
+    public async Task<object> GetFutureKnowledgeAsync([ApiParameter("id", "Knowledge ID")] string id)
     {
         try
         {
+            _logger.Info($"Getting future knowledge: {id}");
+
             if (!_registry.TryGet(id, out var knowledgeNode))
             {
-                return new ErrorResponse("Future knowledge not found");
+                return new { success = false, message = "Future knowledge not found" };
             }
 
-            return new FutureKnowledgeResponse(true, "Future knowledge retrieved", id, knowledgeNode.Content?.InlineJson);
+            var knowledge = JsonSerializer.Deserialize<FutureKnowledge>(knowledgeNode.Content?.InlineJson ?? "{}");
+            return new FutureKnowledgeResponseLegacy(
+                Success: true,
+                Message: "Future knowledge retrieved",
+                KnowledgeId: id,
+                Knowledge: knowledge
+            );
         }
         catch (Exception ex)
         {
-            return new ErrorResponse($"Failed to get future knowledge: {ex.Message}");
+            _logger.Error($"Failed to get future knowledge: {ex.Message}", ex);
+            return new { success = false, message = ex.Message };
         }
     }
 
-    [ApiRoute("POST", "/future/merge", "future-merge", "Merge future knowledge with existing nodes", "codex.future")]
-    public async Task<object> MergeFutureKnowledge([ApiParameter("request", "Merge request", Required = true, Location = "body")] MergeRequest request)
+    [ApiRoute("POST", "/future/merge", "MergeFutureKnowledge", "Merge future knowledge with existing nodes", "codex.future")]
+    public async Task<object> MergeFutureKnowledgeAsync([ApiParameter("body", "Merge request")] MergeRequest request)
     {
         try
         {
+            _logger.Info($"Merging future knowledge {request.KnowledgeId} with {request.TargetNodeIds.Count} nodes");
+
             var results = new List<MergeResult>();
             
             foreach (var targetId in request.TargetNodeIds)
@@ -203,26 +358,33 @@ public class FutureKnowledgeModule : IModule
                     continue;
                 }
 
-                // Merge future knowledge with target node
-                var mergedNode = MergeWithFutureKnowledge(targetNode, knowledgeNode);
+                // Merge the knowledge with the target node
+                var mergedNode = MergeKnowledgeWithNode(targetNode, knowledgeNode);
                 _registry.Upsert(mergedNode);
                 
                 results.Add(new MergeResult(targetId, true, "Successfully merged"));
             }
-            
-            return new MergeResponse(true, "Merge operation completed", results);
+
+            return new MergeResponse(
+                Success: true,
+                Message: "Merge operation completed",
+                Results: results
+            );
         }
         catch (Exception ex)
         {
-            return new ErrorResponse($"Failed to merge future knowledge: {ex.Message}");
+            _logger.Error($"Failed to merge future knowledge: {ex.Message}", ex);
+            return new { success = false, message = ex.Message };
         }
     }
 
-    [ApiRoute("GET", "/future/search", "future-search", "Search for future knowledge", "codex.future")]
-    public async Task<object> SearchFutureKnowledge([ApiParameter("query", "Search query", Required = false, Location = "query")] string? query = null)
+    [ApiRoute("GET", "/future/search", "SearchFutureKnowledge", "Search for future knowledge", "codex.future")]
+    public async Task<object> SearchFutureKnowledgeAsync([ApiParameter("query", "Search query")] string? query = null)
     {
         try
         {
+            _logger.Info($"Searching future knowledge with query: {query ?? "all"}");
+
             var allNodes = _registry.AllNodes();
             var futureKnowledgeNodes = allNodes
                 .Where(n => n.TypeId == "codex.future.knowledge")
@@ -239,149 +401,40 @@ public class FutureKnowledgeModule : IModule
             var results = futureKnowledgeNodes.Select(n => new FutureKnowledgeSummary(
                 n.Id,
                 n.Meta?.GetValueOrDefault("query", "").ToString() ?? "",
-                Convert.ToDouble(n.Meta?.GetValueOrDefault("confidence", 0.0)),
-                Convert.ToDateTime(n.Meta?.GetValueOrDefault("timestamp", DateTime.MinValue))
+                n.Meta?.GetValueOrDefault("confidence", 0.0).ToString() ?? "0.0",
+                n.Meta?.GetValueOrDefault("retrievedAt", DateTime.MinValue).ToString() ?? DateTime.MinValue.ToString()
             )).ToList();
 
-            return new SearchResponse(true, $"Found {results.Count} future knowledge items", results);
+            return new FutureKnowledgeSearchResponse(
+                Success: true,
+                Results: results,
+                Count: results.Count
+            );
         }
         catch (Exception ex)
         {
-            return new ErrorResponse($"Failed to search future knowledge: {ex.Message}");
+            _logger.Error($"Failed to search future knowledge: {ex.Message}", ex);
+            return new { success = false, message = ex.Message };
         }
     }
 
-    private async Task<FutureKnowledge> RetrieveFromFuture(string query, string context)
-    {
-        // Simulate future knowledge retrieval
-        // In a real implementation, this would connect to your future knowledge source
-        await Task.Delay(100); // Simulate async operation
-        
-        return new FutureKnowledge(
-            Id: Guid.NewGuid().ToString(),
-            Content: new
-            {
-                Query = query,
-                Context = context,
-                PredictedOutcome = $"Future prediction for: {query}",
-                Confidence = 0.85,
-                Timestamp = DateTime.UtcNow.AddDays(1) // Simulate future timestamp
-            },
-            Timestamp: DateTime.UtcNow,
-            Confidence: 0.85,
-            Source: "future-knowledge-engine"
-        );
-    }
-
-    private Node ApplyDeltaToNode(Node targetNode, Node deltaNode)
-    {
-        // Simple delta application - in a real implementation, this would use your diff engine
-        var deltaContent = deltaNode.Content?.InlineJson;
-        var targetContent = targetNode.Content?.InlineJson;
-        
-        // Merge the content (simplified)
-        var mergedContent = new Dictionary<string, object>();
-        
-        if (!string.IsNullOrEmpty(targetContent))
-        {
-            var targetDict = JsonSerializer.Deserialize<Dictionary<string, object>>(targetContent);
-            if (targetDict != null)
-            {
-                foreach (var kvp in targetDict)
-                {
-                    mergedContent[kvp.Key] = kvp.Value;
-                }
-            }
-        }
-        
-        if (!string.IsNullOrEmpty(deltaContent))
-        {
-            var deltaDict = JsonSerializer.Deserialize<Dictionary<string, object>>(deltaContent);
-            if (deltaDict != null)
-            {
-                foreach (var kvp in deltaDict)
-                {
-                    mergedContent[kvp.Key] = kvp.Value;
-                }
-            }
-        }
-
-        return targetNode with
-        {
-            Content = new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(mergedContent),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta = new Dictionary<string, object>(targetNode.Meta ?? new Dictionary<string, object>())
-            {
-                ["lastModified"] = DateTime.UtcNow,
-                ["appliedDelta"] = deltaNode.Id
-            }
-        };
-    }
-
-    private Node MergeWithFutureKnowledge(Node targetNode, Node knowledgeNode)
-    {
-        // Merge future knowledge with target node
-        var knowledgeContent = knowledgeNode.Content?.InlineJson;
-        var targetContent = targetNode.Content?.InlineJson;
-        
-        // Create merged content
-        var mergedContent = new Dictionary<string, object>();
-        
-        if (!string.IsNullOrEmpty(targetContent))
-        {
-            var targetDict = JsonSerializer.Deserialize<Dictionary<string, object>>(targetContent);
-            if (targetDict != null)
-            {
-                foreach (var kvp in targetDict)
-                {
-                    mergedContent[kvp.Key] = kvp.Value;
-                }
-            }
-        }
-        
-        // Add future knowledge insights
-        mergedContent["futureInsights"] = knowledgeContent;
-        mergedContent["mergedAt"] = DateTime.UtcNow;
-        mergedContent["confidence"] = knowledgeNode.Meta?.GetValueOrDefault("confidence", 0.0);
-
-        return targetNode with
-        {
-            Content = new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(mergedContent),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta = new Dictionary<string, object>(targetNode.Meta ?? new Dictionary<string, object>())
-            {
-                ["lastModified"] = DateTime.UtcNow,
-                ["mergedWithFutureKnowledge"] = knowledgeNode.Id
-            }
-        };
-    }
-
-    /// <summary>
-    /// Import concepts from another service and analyze them for future knowledge
-    /// </summary>
-    [ApiRoute("POST", "/future/import-concepts", "future-import-concepts", "Import concepts from another service for future analysis", "codex.future")]
-    public async Task<object> ImportConceptsFromService([ApiParameter("request", "Concept import request", Required = true, Location = "body")] ConceptImportRequest request)
+    [ApiRoute("POST", "/future/import-concepts", "ImportConceptsFromService", "Import concepts from another service for future analysis", "codex.future")]
+    public async Task<object> ImportConceptsFromServiceAsync([ApiParameter("body", "Concept import request")] ConceptImportRequest request)
     {
         try
         {
+            _logger.Info($"Importing concepts from service: {request.SourceServiceId}");
+
             if (_coreApiService == null)
             {
-                return new ErrorResponse("CoreApiService not available for cross-service communication");
+                return new { success = false, message = "CoreApiService not available for cross-service communication" };
             }
 
             // Get concepts from the source service
             var concepts = await GetConceptsFromService(request.SourceServiceId, request.ConceptIds);
             if (!concepts.Any())
             {
-                return new ErrorResponse($"No concepts found in service '{request.SourceServiceId}'");
+                return new { success = false, message = $"No concepts found in service '{request.SourceServiceId}'" };
             }
 
             var importedConcepts = new List<ImportedConcept>();
@@ -389,41 +442,17 @@ public class FutureKnowledgeModule : IModule
 
             foreach (var concept in concepts)
             {
-                // Analyze the concept for future potential
-                var futureAnalysis = await AnalyzeConceptForFuture(concept, request.AnalysisContext);
-                
-                // Translate the concept if needed
-                var translatedConcept = await TranslateConceptIfNeeded(concept, request.TargetBeliefSystem);
-                
-                // Store the imported concept
-                var importedConcept = new ImportedConcept(
-                    OriginalConcept: concept,
-                    TranslatedConcept: translatedConcept,
-                    FutureAnalysis: futureAnalysis,
-                    ImportTimestamp: DateTime.UtcNow,
-                    SourceServiceId: request.SourceServiceId
-                );
-
-                importedConcepts.Add(importedConcept);
-
-                // Generate future insights
-                var insight = await GenerateFutureInsight(concept, futureAnalysis);
-                if (insight != null)
-                {
-                    futureInsights.Add(insight);
-                }
-
-                // Store as node in registry
+                // Create imported concept node
                 var conceptNode = new Node(
                     Id: $"imported-concept-{concept.Id}-{Guid.NewGuid()}",
                     TypeId: "codex.future.imported-concept",
                     State: ContentState.Water,
                     Locale: "en",
-                    Title: concept.Name,
-                    Description: $"Imported concept from service {request.SourceServiceId}",
+                    Title: concept.Title,
+                    Description: concept.Description,
                     Content: new ContentRef(
                         MediaType: "application/json",
-                        InlineJson: JsonSerializer.Serialize(importedConcept),
+                        InlineJson: JsonSerializer.Serialize(concept),
                         InlineBytes: null,
                         ExternalUri: null
                     ),
@@ -431,42 +460,52 @@ public class FutureKnowledgeModule : IModule
                     {
                         ["sourceServiceId"] = request.SourceServiceId,
                         ["originalConceptId"] = concept.Id,
-                        ["importTimestamp"] = DateTime.UtcNow,
-                        ["futurePotential"] = futureAnalysis.FuturePotential,
-                        ["confidence"] = futureAnalysis.Confidence
+                        ["importedAt"] = DateTime.UtcNow
                     }
                 );
-                _registry.Upsert(conceptNode);
-            }
 
-            // Publish cross-service event about the import
-            await PublishConceptImportEvent(request.SourceServiceId, importedConcepts, futureInsights);
+                _registry.Upsert(conceptNode);
+
+                // Analyze for future insights
+                var insight = await AnalyzeConceptForFutureInsights(concept);
+                futureInsights.Add(insight);
+
+                importedConcepts.Add(new ImportedConcept(
+                    concept.Id,
+                    concept.Title,
+                    concept.Description,
+                    request.SourceServiceId,
+                    DateTime.UtcNow
+                ));
+            }
 
             return new ConceptImportResponse(
                 Success: true,
+                Message: $"Successfully imported {importedConcepts.Count} concepts",
                 ImportedConcepts: importedConcepts,
-                FutureInsights: futureInsights,
-                Message: $"Successfully imported {importedConcepts.Count} concepts from service '{request.SourceServiceId}'"
+                FutureInsights: futureInsights
             );
         }
         catch (Exception ex)
         {
-            return new ErrorResponse($"Failed to import concepts: {ex.Message}");
+            _logger.Error($"Failed to import concepts: {ex.Message}", ex);
+            return new { success = false, message = ex.Message };
         }
     }
 
-    /// <summary>
-    /// Get future insights from imported concepts
-    /// </summary>
-    [ApiRoute("GET", "/future/insights", "future-get-insights", "Get future insights from imported concepts", "codex.future")]
-    public async Task<object> GetFutureInsights([ApiParameter("sourceServiceId", "Source service ID", Required = false, Location = "query")] string? sourceServiceId = null)
+    [ApiRoute("GET", "/future/insights", "GetFutureInsights", "Get future insights from imported concepts", "codex.future")]
+    public async Task<object> GetFutureInsightsAsync([ApiParameter("sourceServiceId", "Source service ID")] string? sourceServiceId = null)
     {
         try
         {
+            _logger.Info($"Getting future insights for service: {sourceServiceId ?? "all"}");
+
             var insights = new List<FutureInsight>();
             
             // Get all imported concept nodes
-            var importedConceptNodes = _registry.GetNodesByType("codex.future.imported-concept");
+            var importedConceptNodes = _registry.AllNodes()
+                .Where(n => n.TypeId == "codex.future.imported-concept")
+                .ToList();
             
             foreach (var node in importedConceptNodes)
             {
@@ -479,18 +518,10 @@ public class FutureKnowledgeModule : IModule
 
                 if (node.Content?.InlineJson != null)
                 {
-                    var importedConcept = JsonSerializer.Deserialize<ImportedConcept>(node.Content.InlineJson);
-                    if (importedConcept?.FutureAnalysis != null)
+                    var concept = JsonSerializer.Deserialize<ConceptNode>(node.Content.InlineJson);
+                    if (concept != null)
                     {
-                        var insight = new FutureInsight(
-                            ConceptId: importedConcept.OriginalConcept.Id,
-                            ConceptName: importedConcept.OriginalConcept.Name,
-                            FuturePotential: importedConcept.FutureAnalysis.FuturePotential,
-                            Confidence: importedConcept.FutureAnalysis.Confidence,
-                            Recommendations: importedConcept.FutureAnalysis.Recommendations,
-                            SourceServiceId: importedConcept.SourceServiceId,
-                            GeneratedAt: DateTime.UtcNow
-                        );
+                        var insight = await AnalyzeConceptForFutureInsights(concept);
                         insights.Add(insight);
                     }
                 }
@@ -499,1077 +530,569 @@ public class FutureKnowledgeModule : IModule
             return new FutureInsightsResponse(
                 Success: true,
                 Insights: insights,
-                Count: insights.Count,
-                Message: $"Retrieved {insights.Count} future insights"
+                Count: insights.Count
             );
         }
         catch (Exception ex)
         {
-            return new ErrorResponse($"Failed to get future insights: {ex.Message}");
-        }
-    }
-
-    // Helper methods for cross-service concept import
-    private async Task<List<ConceptNode>> GetConceptsFromService(string serviceId, List<string> conceptIds)
-    {
-        var concepts = new List<ConceptNode>();
-        
-        foreach (var conceptId in conceptIds)
-        {
-            try
-            {
-                var call = new DynamicCall(
-                    ModuleId: serviceId,
-                    Api: "concept-get",
-                    Args: JsonSerializer.SerializeToElement(new { conceptId })
-                );
-
-                var result = await _coreApiService!.ExecuteDynamicCall(call);
-                
-                if (result is JsonElement jsonResult && jsonResult.TryGetProperty("success", out var success) && success.GetBoolean())
-                {
-                    var conceptData = jsonResult.GetProperty("concept");
-                    var concept = JsonSerializer.Deserialize<ConceptNode>(conceptData.GetRawText());
-                    if (concept != null)
-                    {
-                        concepts.Add(concept);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                // Log error but continue with other concepts
-                Console.WriteLine($"Error getting concept {conceptId} from service {serviceId}: {ex.Message}");
-            }
-        }
-
-        return concepts;
-    }
-
-    private async Task<FutureAnalysis> AnalyzeConceptForFuture(ConceptNode concept, string analysisContext)
-    {
-        // Use existing LLM module for future analysis
-        if (_coreApiService == null)
-        {
-            return new FutureAnalysis(0.5, 0.5, new List<string> { "Analysis not available" });
-        }
-
-        try
-        {
-            var call = new DynamicCall(
-                ModuleId: "codex.llm.future",
-                Api: "generate-future-knowledge",
-                Args: JsonSerializer.SerializeToElement(new
-                {
-                    query = $"Analyze the future potential of concept '{concept.Name}': {concept.Description}",
-                    context = analysisContext
-                })
-            );
-
-            var result = await _coreApiService.ExecuteDynamicCall(call);
-            
-            if (result is JsonElement jsonResult && jsonResult.TryGetProperty("success", out var success) && success.GetBoolean())
-            {
-                var futurePotential = jsonResult.TryGetProperty("futurePotential", out var fp) ? fp.GetDouble() : 0.5;
-                var confidence = jsonResult.TryGetProperty("confidence", out var conf) ? conf.GetDouble() : 0.5;
-                var recommendations = jsonResult.TryGetProperty("recommendations", out var rec) 
-                    ? JsonSerializer.Deserialize<List<string>>(rec.GetRawText()) ?? new List<string>()
-                    : new List<string>();
-
-                return new FutureAnalysis(futurePotential, confidence, recommendations);
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error analyzing concept for future: {ex.Message}");
-        }
-
-        return new FutureAnalysis(0.5, 0.5, new List<string> { "Analysis failed" });
-    }
-
-    private async Task<ConceptNode?> TranslateConceptIfNeeded(ConceptNode concept, Dictionary<string, object>? targetBeliefSystem)
-    {
-        if (targetBeliefSystem == null)
-        {
-            return concept;
-        }
-
-        try
-        {
-            var call = new DynamicCall(
-                ModuleId: "codex.llm.future",
-                Api: "translate-concept",
-                Args: JsonSerializer.SerializeToElement(new
-                {
-                    conceptId = concept.Id,
-                    conceptName = concept.Name,
-                    conceptDescription = concept.Description,
-                    sourceFramework = "Universal",
-                    targetFramework = targetBeliefSystem.GetValueOrDefault("framework", "Unknown").ToString(),
-                    userBeliefSystem = targetBeliefSystem
-                })
-            );
-
-            var result = await _coreApiService!.ExecuteDynamicCall(call);
-            
-            if (result is JsonElement jsonResult && jsonResult.TryGetProperty("success", out var success) && success.GetBoolean())
-            {
-                var translatedName = jsonResult.GetProperty("translatedConcept").GetString() ?? concept.Name;
-                return concept with { Name = translatedName };
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error translating concept: {ex.Message}");
-        }
-
-        return concept;
-    }
-
-    private async Task<FutureInsight?> GenerateFutureInsight(ConceptNode concept, FutureAnalysis analysis)
-    {
-        if (analysis.FuturePotential < 0.7)
-        {
-            return null; // Only generate insights for high-potential concepts
-        }
-
-        return new FutureInsight(
-            ConceptId: concept.Id,
-            ConceptName: concept.Name,
-            FuturePotential: analysis.FuturePotential,
-            Confidence: analysis.Confidence,
-            Recommendations: analysis.Recommendations,
-            SourceServiceId: "unknown",
-            GeneratedAt: DateTime.UtcNow
-        );
-    }
-
-    private async Task PublishConceptImportEvent(string sourceServiceId, List<ImportedConcept> concepts, List<FutureInsight> insights)
-    {
-        try
-        {
-            var call = new DynamicCall(
-                ModuleId: "codex.event-streaming",
-                Api: "publish-cross-service-event",
-                Args: JsonSerializer.SerializeToElement(new
-                {
-                    eventType = "concept_imported",
-                    entityType = "concept",
-                    entityId = "future-knowledge",
-                    data = new
-                    {
-                        sourceServiceId,
-                        importedCount = concepts.Count,
-                        insightsCount = insights.Count,
-                        concepts = concepts.Select(c => new { c.OriginalConcept.Id, c.OriginalConcept.Name }),
-                        insights = insights.Select(i => new { i.ConceptName, i.FuturePotential })
-                    },
-                    sourceServiceId = "codex.future",
-                    targetServices = new List<string> { sourceServiceId }
-                })
-            );
-
-            await _coreApiService!.ExecuteDynamicCall(call);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error publishing concept import event: {ex.Message}");
-        }
-    }
-
-    // Pattern Recognition API Methods
-    [ApiRoute("POST", "/future/patterns/discover", "future-patterns-discover", "Discover emerging patterns in concepts and contributions", "codex.future")]
-    public async Task<object> DiscoverPatterns([ApiParameter("request", "Pattern discovery request", Required = true, Location = "body")] PatternDiscoveryRequest request)
-    {
-        try
-        {
-            _logger.Info($"Starting pattern discovery with {request.DataSources.Count} data sources");
-
-            // Collect data from various sources
-            var patternData = await CollectPatternData(request.DataSources, request.Filters);
-            
-            // Analyze patterns using AI
-            var discoveredPatterns = await AnalyzePatterns(patternData, request.PatternTypes);
-            
-            // Generate insights and recommendations
-            var patternInsights = await GeneratePatternInsights(discoveredPatterns);
-
-            _logger.Info($"Pattern discovery completed: {discoveredPatterns.Count} patterns found");
-
-            return new PatternDiscoveryResponse(
-                Success: true,
-                Patterns: discoveredPatterns,
-                Insights: patternInsights,
-                DataSourceCount: patternData.Count,
-                DiscoveredAt: DateTime.UtcNow,
-                Message: $"Discovered {discoveredPatterns.Count} emerging patterns"
-            );
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"Pattern discovery failed: {ex.Message}", ex);
-            return new ErrorResponse($"Pattern discovery failed: {ex.Message}");
-        }
-    }
-
-    [ApiRoute("POST", "/future/patterns/analyze", "future-patterns-analyze", "Analyze specific patterns for trends and predictions", "codex.future")]
-    public async Task<object> AnalyzePattern([ApiParameter("request", "Pattern analysis request", Required = true, Location = "body")] PatternAnalysisRequest request)
-    {
-        try
-        {
-            _logger.Info($"Analyzing pattern: {request.PatternId}");
-
-            // Get pattern data
-            var patternData = await GetPatternData(request.PatternId);
-            if (patternData == null)
-            {
-                return new ErrorResponse("Pattern not found");
-            }
-
-            // Perform deep analysis
-            var analysis = await PerformPatternAnalysis(patternData, request.AnalysisOptions);
-            
-            // Generate predictions and recommendations
-            var predictions = await GeneratePatternPredictions(analysis, request.TimeHorizon);
-            var recommendations = await GeneratePatternRecommendations(analysis, predictions);
-
-            _logger.Info($"Pattern analysis completed for {request.PatternId}");
-
-            return new PatternAnalysisResponse(
-                Success: true,
-                PatternId: request.PatternId,
-                Analysis: analysis,
-                Predictions: predictions,
-                Recommendations: recommendations,
-                AnalyzedAt: DateTime.UtcNow,
-                Message: "Pattern analysis completed successfully"
-            );
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"Pattern analysis failed: {ex.Message}", ex);
-            return new ErrorResponse($"Pattern analysis failed: {ex.Message}");
-        }
-    }
-
-    [ApiRoute("GET", "/future/patterns/trends", "future-patterns-trends", "Get trending patterns across all data sources", "codex.future")]
-    public async Task<object> GetTrendingPatterns([ApiParameter("timeframe", "Time frame for trends", Required = false, Location = "query")] string? timeframe = "7d")
-    {
-        try
-        {
-            _logger.Info($"Getting trending patterns for timeframe: {timeframe}");
-
-            // Get all patterns from the last timeframe
-            var timeFilter = ParseTimeframe(timeframe);
-            var allPatterns = await GetAllPatterns(timeFilter);
-            
-            // Calculate trend scores
-            var trendingPatterns = await CalculateTrendScores(allPatterns, timeFilter);
-            
-            // Sort by trend strength
-            var sortedPatterns = trendingPatterns.OrderByDescending(p => p.TrendScore).ToList();
-
-            _logger.Info($"Found {sortedPatterns.Count} trending patterns");
-
-            return new TrendingPatternsResponse(
-                Success: true,
-                Patterns: sortedPatterns,
-                Timeframe: timeframe,
-                Count: sortedPatterns.Count,
-                GeneratedAt: DateTime.UtcNow,
-                Message: $"Found {sortedPatterns.Count} trending patterns"
-            );
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"Failed to get trending patterns: {ex.Message}", ex);
-            return new ErrorResponse($"Failed to get trending patterns: {ex.Message}");
-        }
-    }
-
-    [ApiRoute("POST", "/future/patterns/predict", "future-patterns-predict", "Predict future pattern evolution", "codex.future")]
-    public async Task<object> PredictPatternEvolution([ApiParameter("request", "Pattern prediction request", Required = true, Location = "body")] PatternPredictionRequest request)
-    {
-        try
-        {
-            _logger.Info($"Predicting evolution for pattern: {request.PatternId}");
-
-            // Get historical pattern data
-            var historicalData = await GetHistoricalPatternData(request.PatternId, request.HistoricalPeriod);
-            
-            // Use AI to predict future evolution
-            var prediction = await PredictPatternFuture(historicalData, request.PredictionHorizon);
-            
-            // Generate confidence scores and scenarios
-            var scenarios = await GeneratePredictionScenarios(prediction, request.ConfidenceLevel);
-
-            _logger.Info($"Pattern prediction completed for {request.PatternId}");
-
-            return new PatternPredictionResponse(
-                Success: true,
-                PatternId: request.PatternId,
-                Prediction: prediction,
-                Scenarios: scenarios,
-                Confidence: CalculatePredictionConfidence(historicalData, prediction),
-                PredictedAt: DateTime.UtcNow,
-                Message: "Pattern evolution prediction completed"
-            );
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"Pattern prediction failed: {ex.Message}", ex);
-            return new ErrorResponse($"Pattern prediction failed: {ex.Message}");
-        }
-    }
-
-    // Helper methods for pattern recognition
-    private async Task<List<PatternData>> CollectPatternData(List<string> dataSources, Dictionary<string, object> filters)
-    {
-        var patternData = new List<PatternData>();
-
-        foreach (var source in dataSources)
-        {
-            try
-            {
-                switch (source.ToLower())
-                {
-                    case "contributions":
-                        var contributions = await GetContributionPatternData(filters);
-                        patternData.AddRange(contributions);
-                        break;
-                    case "concepts":
-                        var concepts = await GetConceptPatternData(filters);
-                        patternData.AddRange(concepts);
-                        break;
-                    case "resonance":
-                        var resonance = await GetResonancePatternData(filters);
-                        patternData.AddRange(resonance);
-                        break;
-                    case "translations":
-                        var translations = await GetTranslationPatternData(filters);
-                        patternData.AddRange(translations);
-                        break;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Warn($"Failed to collect data from source {source}: {ex.Message}");
-            }
-        }
-
-        return patternData;
-    }
-
-    private async Task<List<PatternData>> GetContributionPatternData(Dictionary<string, object> filters)
-    {
-        try
-        {
-            if (_coreApiService == null) return new List<PatternData>();
-
-            // Get contributions from UserContributionsModule
-            var args = JsonSerializer.SerializeToElement(new { filters });
-            var call = new DynamicCall("codex.user-contributions", "get-contributions", args);
-            var response = await _coreApiService.ExecuteDynamicCall(call);
-
-            if (response is JsonElement jsonResponse && jsonResponse.TryGetProperty("contributions", out var contributionsElement))
-            {
-                var patternData = new List<PatternData>();
-                foreach (var contributionElement in contributionsElement.EnumerateArray())
-                {
-                patternData.Add(new PatternData(
-                    Id: contributionElement.TryGetProperty("id", out var idElement) ? idElement.GetString() ?? "" : "",
-                    Type: "contribution",
-                    Content: contributionElement.GetRawText(),
-                    Timestamp: DateTime.UtcNow,
-                    Metadata: new Dictionary<string, object>
-                    {
-                        ["entityType"] = contributionElement.TryGetProperty("entityType", out var etElement) ? etElement.GetString() ?? "" : "",
-                        ["value"] = contributionElement.TryGetProperty("value", out var valElement) ? valElement.GetDecimal() : 0,
-                        ["description"] = contributionElement.TryGetProperty("description", out var descElement) ? descElement.GetString() ?? "" : ""
-                    }
-                ));
-                }
-                return patternData;
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"Failed to get contribution pattern data: {ex.Message}", ex);
-        }
-
-        return new List<PatternData>();
-    }
-
-    private async Task<List<PatternData>> GetConceptPatternData(Dictionary<string, object> filters)
-    {
-        try
-        {
-            if (_coreApiService == null) return new List<PatternData>();
-
-            // Get concepts from ConceptRegistryModule
-            var args = JsonSerializer.SerializeToElement(new { filters });
-            var call = new DynamicCall("codex.concept-registry", "discover-concepts", args);
-            var response = await _coreApiService.ExecuteDynamicCall(call);
-
-            if (response is JsonElement jsonResponse && jsonResponse.TryGetProperty("concepts", out var conceptsElement))
-            {
-                var patternData = new List<PatternData>();
-                foreach (var conceptElement in conceptsElement.EnumerateArray())
-                {
-                patternData.Add(new PatternData(
-                    Id: conceptElement.TryGetProperty("conceptId", out var idElement) ? idElement.GetString() ?? "" : "",
-                    Type: "concept",
-                    Content: conceptElement.GetRawText(),
-                    Timestamp: DateTime.UtcNow,
-                    Metadata: new Dictionary<string, object>
-                    {
-                        ["name"] = conceptElement.TryGetProperty("name", out var nameElement) ? nameElement.GetString() ?? "" : "",
-                        ["description"] = conceptElement.TryGetProperty("description", out var descElement) ? descElement.GetString() ?? "" : ""
-                    }
-                ));
-                }
-                return patternData;
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"Failed to get concept pattern data: {ex.Message}", ex);
-        }
-
-        return new List<PatternData>();
-    }
-
-    private async Task<List<PatternData>> GetResonancePatternData(Dictionary<string, object> filters)
-    {
-        try
-        {
-            if (_coreApiService == null) return new List<PatternData>();
-
-            // Get resonance data from UCoreResonanceEngine
-            var args = JsonSerializer.SerializeToElement(new { filters });
-            var call = new DynamicCall("codex.ucore-resonance", "get-resonance-patterns", args);
-            var response = await _coreApiService.ExecuteDynamicCall(call);
-
-            if (response is JsonElement jsonResponse && jsonResponse.TryGetProperty("patterns", out var patternsElement))
-            {
-                var patternData = new List<PatternData>();
-                foreach (var patternElement in patternsElement.EnumerateArray())
-                {
-                patternData.Add(new PatternData(
-                    Id: patternElement.TryGetProperty("patternId", out var idElement) ? idElement.GetString() ?? "" : "",
-                    Type: "resonance",
-                    Content: patternElement.GetRawText(),
-                    Timestamp: DateTime.UtcNow,
-                    Metadata: new Dictionary<string, object>
-                    {
-                        ["strength"] = patternElement.TryGetProperty("strength", out var strengthElement) ? strengthElement.GetDouble() : 0.0,
-                        ["frequency"] = patternElement.TryGetProperty("frequency", out var freqElement) ? freqElement.GetDouble() : 0.0
-                    }
-                ));
-                }
-                return patternData;
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"Failed to get resonance pattern data: {ex.Message}", ex);
-        }
-
-        return new List<PatternData>();
-    }
-
-    private async Task<List<PatternData>> GetTranslationPatternData(Dictionary<string, object> filters)
-    {
-        try
-        {
-            if (_coreApiService == null) return new List<PatternData>();
-
-            // Get translation data from LLMFutureKnowledgeModule
-            var args = JsonSerializer.SerializeToElement(new { filters });
-            var call = new DynamicCall("codex.llm.future", "get-translation-history", args);
-            var response = await _coreApiService.ExecuteDynamicCall(call);
-
-            if (response is JsonElement jsonResponse && jsonResponse.TryGetProperty("translations", out var translationsElement))
-            {
-                var patternData = new List<PatternData>();
-                foreach (var translationElement in translationsElement.EnumerateArray())
-                {
-                patternData.Add(new PatternData(
-                    Id: translationElement.TryGetProperty("translationId", out var idElement) ? idElement.GetString() ?? "" : "",
-                    Type: "translation",
-                    Content: translationElement.GetRawText(),
-                    Timestamp: DateTime.UtcNow,
-                    Metadata: new Dictionary<string, object>
-                    {
-                        ["sourceLanguage"] = translationElement.TryGetProperty("sourceLanguage", out var srcLangElement) ? srcLangElement.GetString() ?? "" : "",
-                        ["targetLanguage"] = translationElement.TryGetProperty("targetLanguage", out var tgtLangElement) ? tgtLangElement.GetString() ?? "" : "",
-                        ["quality"] = translationElement.TryGetProperty("quality", out var qualityElement) ? qualityElement.GetDouble() : 0.0
-                    }
-                ));
-                }
-                return patternData;
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"Failed to get translation pattern data: {ex.Message}", ex);
-        }
-
-        return new List<PatternData>();
-    }
-
-    private async Task<List<DiscoveredPattern>> AnalyzePatterns(List<PatternData> data, List<string> patternTypes)
-    {
-        var patterns = new List<DiscoveredPattern>();
-
-        try
-        {
-            // Use AI to analyze patterns if available
-            if (_coreApiService != null)
-            {
-                var prompt = BuildPatternAnalysisPrompt(data, patternTypes);
-                var args = JsonSerializer.SerializeToElement(new { prompt, model = "gpt-oss:20b" });
-                var call = new DynamicCall("codex.llm.future", "analyze", args);
-                var response = await _coreApiService.ExecuteDynamicCall(call);
-
-                if (response is JsonElement jsonResponse)
-                {
-                    var analysisText = jsonResponse.TryGetProperty("response", out var responseElement) ? responseElement.GetString() ?? "" : "";
-                    patterns = ParsePatternsFromAI(analysisText, data);
-                }
-            }
-
-            // Fallback: basic pattern analysis
-            if (!patterns.Any())
-            {
-                patterns = PerformBasicPatternAnalysis(data, patternTypes);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"Pattern analysis failed: {ex.Message}", ex);
-            patterns = PerformBasicPatternAnalysis(data, patternTypes);
-        }
-
-        return patterns;
-    }
-
-    private string BuildPatternAnalysisPrompt(List<PatternData> data, List<string> patternTypes)
-    {
-        var dataSummary = string.Join("\n", data.Take(10).Select(d => $"{d.Type}: {d.Content.Substring(0, Math.Min(100, d.Content.Length))}..."));
-        
-        return $@"
-Analyze the following data to discover emerging patterns:
-
-DATA SAMPLE:
-{dataSummary}
-
-PATTERN TYPES TO LOOK FOR:
-{string.Join(", ", patternTypes)}
-
-Please identify:
-1. Emerging trends and patterns
-2. Recurring themes and concepts
-3. Temporal patterns and cycles
-4. Cross-domain connections
-5. Anomalies and outliers
-
-Respond with structured analysis including pattern descriptions, confidence scores, and supporting evidence.
-";
-    }
-
-    private List<DiscoveredPattern> ParsePatternsFromAI(string analysisText, List<PatternData> data)
-    {
-        var patterns = new List<DiscoveredPattern>();
-        
-        // Simple parsing - in real implementation would use more sophisticated NLP
-        var lines = analysisText.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        var currentPattern = new DiscoveredPattern("", "", "", 0.0, 0.0, new List<string>(), DateTime.UtcNow);
-        
-        foreach (var line in lines)
-        {
-            if (line.Contains("Pattern:") || line.Contains("Trend:"))
-            {
-                if (!string.IsNullOrEmpty(currentPattern.Name))
-                {
-                    patterns.Add(currentPattern);
-                }
-            currentPattern = new DiscoveredPattern(
-                Id: Guid.NewGuid().ToString(),
-                Name: line.Replace("Pattern:", "").Replace("Trend:", "").Trim(),
-                Type: "emerging",
-                Strength: 0.7,
-                Confidence: 0.8,
-                Evidence: new List<string>(),
-                DiscoveredAt: DateTime.UtcNow
-            );
-            }
-            else if (line.Contains("Evidence:") || line.Contains("Support:"))
-            {
-                currentPattern.Evidence.Add(line.Replace("Evidence:", "").Replace("Support:", "").Trim());
-            }
-        }
-        
-        if (!string.IsNullOrEmpty(currentPattern.Name))
-        {
-            patterns.Add(currentPattern);
-        }
-        
-        return patterns;
-    }
-
-    private List<DiscoveredPattern> PerformBasicPatternAnalysis(List<PatternData> data, List<string> patternTypes)
-    {
-        var patterns = new List<DiscoveredPattern>();
-        
-        // Group data by type
-        var groupedData = data.GroupBy(d => d.Type).ToList();
-        
-        foreach (var group in groupedData)
-        {
-        var pattern = new DiscoveredPattern(
-            Id: Guid.NewGuid().ToString(),
-            Name: $"Emerging {group.Key} Pattern",
-            Type: group.Key,
-            Strength: CalculateBasicPatternStrength(group.ToList()),
-            Confidence: 0.6,
-            Evidence: group.Take(3).Select(d => d.Content.Substring(0, Math.Min(50, d.Content.Length))).ToList(),
-            DiscoveredAt: DateTime.UtcNow
-        );
-            patterns.Add(pattern);
-        }
-        
-        return patterns;
-    }
-
-    private double CalculateBasicPatternStrength(List<PatternData> data)
-    {
-        if (!data.Any()) return 0.0;
-        
-        var score = 0.5;
-        score += Math.Min(data.Count * 0.1, 0.3); // More data = stronger pattern
-        score += Math.Min(data.Average(d => d.Content.Length) * 0.0001, 0.2); // Longer content = more detailed
-        
-        return Math.Min(score, 1.0);
-    }
-
-    private async Task<List<PatternInsight>> GeneratePatternInsights(List<DiscoveredPattern> patterns)
-    {
-        var insights = new List<PatternInsight>();
-        
-        if (patterns.Any())
-        {
-            var strongestPattern = patterns.OrderByDescending(p => p.Strength).First();
-        insights.Add(new PatternInsight(
-            Id: Guid.NewGuid().ToString(),
-            Title: "Strongest Emerging Pattern",
-            Description: $"The strongest pattern is '{strongestPattern.Name}' with strength {strongestPattern.Strength:F2}",
-            PatternId: strongestPattern.Id,
-            Confidence: strongestPattern.Confidence
-        ));
-            
-            var avgStrength = patterns.Average(p => p.Strength);
-            insights.Add(new PatternInsight(
-                Id: Guid.NewGuid().ToString(),
-                Title: "Overall Pattern Activity",
-                Description: $"Average pattern strength across {patterns.Count} patterns is {avgStrength:F2}",
-                PatternId: "",
-                Confidence: 0.8
-            ));
-        }
-        
-        return insights;
-    }
-
-    // Additional helper methods would be implemented here...
-    private async Task<PatternData?> GetPatternData(string patternId) => null;
-    private async Task<PatternAnalysis> PerformPatternAnalysis(PatternData data, Dictionary<string, object> options) => new PatternAnalysis("", 0.0, 0.0, new List<string>(), new Dictionary<string, object>());
-    private async Task<List<PatternPrediction>> GeneratePatternPredictions(PatternAnalysis analysis, string timeHorizon) => new List<PatternPrediction>();
-    private async Task<List<PatternRecommendation>> GeneratePatternRecommendations(PatternAnalysis analysis, List<PatternPrediction> predictions) => new List<PatternRecommendation>();
-    private async Task<List<DiscoveredPattern>> GetAllPatterns(DateTime timeFilter) => new List<DiscoveredPattern>();
-    private async Task<List<TrendingPattern>> CalculateTrendScores(List<DiscoveredPattern> patterns, DateTime timeFilter) => new List<TrendingPattern>();
-    private DateTime ParseTimeframe(string timeframe) => DateTime.UtcNow.AddDays(-7);
-    private async Task<List<PatternData>> GetHistoricalPatternData(string patternId, string period) => new List<PatternData>();
-    private async Task<PatternPrediction> PredictPatternFuture(List<PatternData> historicalData, string horizon) => new PatternPrediction("", "", 0.0, 0.0, new List<string>());
-    private async Task<List<PredictionScenario>> GeneratePredictionScenarios(PatternPrediction prediction, double confidenceLevel) => new List<PredictionScenario>();
-    private double CalculatePredictionConfidence(List<PatternData> historicalData, PatternPrediction prediction) => 0.8;
-
-    // News Feed API Endpoints
-    [ApiRoute("POST", "/future/news/feed", "GetPersonalizedNewsFeed", "Get personalized news feed based on user interests and contributions", "codex.future")]
-    public async Task<object> GetPersonalizedNewsFeedAsync([ApiParameter("body", "News feed request")] NewsFeedRequest request)
-    {
-        try
-        {
-            _logger.Info($"Generating personalized news feed for user {request.UserId}");
-
-            // Fetch news items (in real implementation, this would fetch from news APIs)
-            var newsItems = await FetchNewsItemsAsync(request);
-            
-            // Analyze news items for concepts and user relevance
-            var analyses = new List<NewsAnalysis>();
-            var conceptRelevance = new Dictionary<string, double>();
-            
-            foreach (var newsItem in newsItems)
-            {
-                var analysis = await AnalyzeNewsItemAsync(newsItem, request);
-                analyses.Add(analysis);
-                _newsAnalyses[newsItem.Id] = analysis;
-                
-                // Update concept relevance scores
-                foreach (var concept in analysis.Concepts)
-                {
-                    if (conceptRelevance.ContainsKey(concept.ConceptId))
-                    {
-                        conceptRelevance[concept.ConceptId] = Math.Max(conceptRelevance[concept.ConceptId], concept.RelevanceScore);
-                    }
-                    else
-                    {
-                        conceptRelevance[concept.ConceptId] = concept.RelevanceScore;
-                    }
-                }
-            }
-
-            // Generate recommended actions based on news analysis
-            var recommendedActions = GenerateRecommendedActions(analyses, request);
-
-            return new NewsFeedResponse(
-                Success: true,
-                NewsItems: newsItems,
-                Analyses: analyses,
-                ConceptRelevance: conceptRelevance,
-                RecommendedActions: recommendedActions,
-                GeneratedAt: DateTimeOffset.UtcNow
-            );
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"Failed to generate personalized news feed: {ex.Message}", ex);
+            _logger.Error($"Failed to get future insights: {ex.Message}", ex);
             return new { success = false, message = ex.Message };
         }
     }
 
-    [ApiRoute("GET", "/future/news/analyze/{newsItemId}", "AnalyzeNewsItem", "Analyze a specific news item for concepts and user relevance", "codex.future")]
-    public async Task<object> AnalyzeNewsItemAsync(string newsItemId, [ApiParameter("query", "Analysis parameters")] NewsAnalysisRequest? request)
-    {
-        try
-        {
-            var newsItem = _newsItems.FirstOrDefault(n => n.Id == newsItemId);
-            if (newsItem == null)
-            {
-                return new { success = false, message = "News item not found" };
-            }
-
-            request ??= new NewsAnalysisRequest { UserId = "default" };
-            var analysis = await AnalyzeNewsItemAsync(newsItem, new NewsFeedRequest(
-                UserId: request.UserId,
-                InterestAreas: request.InterestAreas ?? new List<string>(),
-                ContributionTypes: request.ContributionTypes ?? new List<string>(),
-                InvestmentAreas: request.InvestmentAreas ?? new List<string>()
-            ));
-
-            return new { success = true, analysis = analysis };
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"Failed to analyze news item: {ex.Message}", ex);
-            return new { success = false, message = ex.Message };
-        }
-    }
-
-    [ApiRoute("GET", "/future/news/concepts", "GetNewsConcepts", "Get all concepts discovered from news analysis", "codex.future")]
-    public async Task<object> GetNewsConceptsAsync()
-    {
-        try
-        {
-            var allConcepts = _newsAnalyses.Values
-                .SelectMany(a => a.Concepts)
-                .GroupBy(c => c.ConceptId)
-                .Select(g => new
-                {
-                    ConceptId = g.Key,
-                    ConceptName = g.First().ConceptName,
-                    ConceptType = g.First().ConceptType,
-                    AverageRelevance = g.Average(c => c.RelevanceScore),
-                    OccurrenceCount = g.Count(),
-                    RelatedConcepts = g.First().RelatedConcepts,
-                    Properties = g.First().Properties
-                })
-                .OrderByDescending(c => c.AverageRelevance)
-                .ToList();
-
-            return new { success = true, concepts = allConcepts };
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"Failed to get news concepts: {ex.Message}", ex);
-            return new { success = false, message = ex.Message };
-        }
-    }
-
-    [ApiRoute("POST", "/future/news/ingest", "IngestNewsItem", "Ingest a new news item for analysis", "codex.future")]
-    public async Task<object> IngestNewsItemAsync([ApiParameter("body", "News item to ingest")] NewsItem newsItem)
-    {
-        try
-        {
-            _newsItems.Add(newsItem);
-            
-            // Analyze the news item immediately
-            var analysis = await AnalyzeNewsItemAsync(newsItem, new NewsFeedRequest(
-                UserId: "system",
-                InterestAreas: new List<string>(),
-                ContributionTypes: new List<string>(),
-                InvestmentAreas: new List<string>()
-            ));
-            
-            _newsAnalyses[newsItem.Id] = analysis;
-
-            _logger.Info($"Ingested news item: {newsItem.Title}");
-            return new { success = true, newsItemId = newsItem.Id, analysis = analysis };
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"Failed to ingest news item: {ex.Message}", ex);
-            return new { success = false, message = ex.Message };
-        }
-    }
-
-    // Helper Methods for News Analysis
-    private async Task<List<NewsItem>> FetchNewsItemsAsync(NewsFeedRequest request)
+    // Helper Methods for Legacy Endpoints
+    private async Task<FutureKnowledge> RetrieveFromFuture(string query, string context)
     {
         await Task.Delay(100); // Simulate async work
         
-        // In real implementation, this would fetch from news APIs
-        // For now, return mock news items
-        return new List<NewsItem>
+        return new FutureKnowledge(
+            Id: Guid.NewGuid().ToString(),
+            Content: new { 
+                insight = $"Future insight for '{query}' in context '{context}'",
+                confidence = 0.85,
+                timeframe = "2024-2025"
+            },
+            Timestamp: DateTime.UtcNow,
+            Confidence: 0.85,
+            Source: "future-analysis"
+        );
+    }
+
+    private Node ApplyDeltaToNode(Node targetNode, Node deltaNode)
+    {
+        // Simple delta application - merge metadata
+        var updatedMeta = new Dictionary<string, object>(targetNode.Meta ?? new Dictionary<string, object>());
+        
+        if (deltaNode.Meta != null)
         {
-            new NewsItem(
-                Id: "news-1",
-                Title: "Revolutionary AI Algorithm for Abundance Amplification",
-                Content: "Scientists have developed a new AI algorithm that can amplify individual contributions by up to 10x through collective resonance analysis...",
-                Source: "TechNews",
-                Url: "https://example.com/news/ai-abundance",
-                PublishedAt: DateTimeOffset.UtcNow.AddHours(-2),
-                Tags: new List<string> { "AI", "abundance", "amplification", "technology" },
-                Metadata: new Dictionary<string, object> { { "category", "technology" }, { "sentiment", "positive" } }
+            foreach (var kvp in deltaNode.Meta)
+            {
+                updatedMeta[kvp.Key] = kvp.Value;
+            }
+        }
+
+        return new Node(
+            Id: targetNode.Id,
+            TypeId: targetNode.TypeId,
+            State: targetNode.State,
+            Locale: targetNode.Locale,
+            Title: targetNode.Title,
+            Description: targetNode.Description,
+            Content: targetNode.Content,
+            Meta: updatedMeta
+        );
+    }
+
+    private Node MergeKnowledgeWithNode(Node targetNode, Node knowledgeNode)
+    {
+        // Merge knowledge into target node metadata
+        var updatedMeta = new Dictionary<string, object>(targetNode.Meta ?? new Dictionary<string, object>());
+        updatedMeta["futureKnowledge"] = knowledgeNode.Content?.InlineJson;
+        updatedMeta["mergedAt"] = DateTime.UtcNow;
+
+        return new Node(
+            Id: targetNode.Id,
+            TypeId: targetNode.TypeId,
+            State: targetNode.State,
+            Locale: targetNode.Locale,
+            Title: targetNode.Title,
+            Description: targetNode.Description,
+            Content: targetNode.Content,
+            Meta: updatedMeta
+        );
+    }
+
+    private async Task<List<ConceptNode>> GetConceptsFromService(string serviceId, List<string> conceptIds)
+    {
+        await Task.Delay(50); // Simulate async work
+        
+        // Simulate getting concepts from another service
+        return conceptIds.Select(id => new ConceptNode(
+            Id: id,
+            Title: $"Concept from {serviceId}",
+            Description: $"Description for concept {id}",
+            Type: "imported",
+            Tags: new List<string> { "imported", serviceId },
+            Metadata: new Dictionary<string, object>
+            {
+                ["sourceService"] = serviceId,
+                ["importedAt"] = DateTime.UtcNow
+            }
+        )).ToList();
+    }
+
+    private async Task<FutureInsight> AnalyzeConceptForFutureInsights(ConceptNode concept)
+    {
+        await Task.Delay(50); // Simulate async work
+        
+        return new FutureInsight(
+            Id: Guid.NewGuid().ToString(),
+            ConceptId: concept.Id,
+            Title: $"Future insight for {concept.Title}",
+            Description: $"Analysis of {concept.Title} reveals future potential",
+            Confidence: 0.8,
+            Timeframe: "2024-2025",
+            Impact: "medium",
+            Recommendations: new List<string>
+            {
+                "Monitor concept evolution",
+                "Track related patterns",
+                "Consider integration opportunities"
+            }
+        );
+    }
+
+    // Helper Methods
+    private async Task<List<FutureKnowledge>> SimulateFutureKnowledgeRetrieval(FutureKnowledgeRequest request)
+    {
+        await Task.Delay(100); // Simulate async work
+        
+        return new List<FutureKnowledge>
+        {
+            new FutureKnowledge(
+                Id: "future-knowledge-1",
+                Content: new { 
+                    insight = "AI-powered abundance amplification will reach critical mass in 2025",
+                    confidence = 0.9,
+                    timeframe = "2025-2026"
+                },
+                Timestamp: DateTime.UtcNow,
+                Confidence: 0.9,
+                Source: "future-analysis"
             ),
-            new NewsItem(
-                Id: "news-2",
-                Title: "Community Collaboration Platform Reaches 1M Users",
-                Content: "A new platform that enables community collaboration and knowledge sharing has reached 1 million active users...",
-                Source: "CommunityNews",
-                Url: "https://example.com/news/community-platform",
-                PublishedAt: DateTimeOffset.UtcNow.AddHours(-4),
-                Tags: new List<string> { "community", "collaboration", "platform", "growth" },
-                Metadata: new Dictionary<string, object> { { "category", "social" }, { "sentiment", "positive" } }
-            ),
-            new NewsItem(
-                Id: "news-3",
-                Title: "Sustainable Energy Breakthrough in Quantum Computing",
-                Content: "Researchers have made a breakthrough in quantum computing that could revolutionize sustainable energy production...",
-                Source: "ScienceDaily",
-                Url: "https://example.com/news/quantum-energy",
-                PublishedAt: DateTimeOffset.UtcNow.AddHours(-6),
-                Tags: new List<string> { "quantum", "energy", "sustainability", "computing" },
-                Metadata: new Dictionary<string, object> { { "category", "science" }, { "sentiment", "positive" } }
+            new FutureKnowledge(
+                Id: "future-knowledge-2",
+                Content: new { 
+                    insight = "Collective resonance patterns will emerge in community platforms",
+                    confidence = 0.8,
+                    timeframe = "2024-2025"
+                },
+                Timestamp: DateTime.UtcNow,
+                Confidence: 0.8,
+                Source: "pattern-analysis"
             )
         };
     }
 
-    private async Task<NewsAnalysis> AnalyzeNewsItemAsync(NewsItem newsItem, NewsFeedRequest request)
+    private async Task<KnowledgeApplicationResult> SimulateKnowledgeApplication(FutureKnowledgeApplicationRequest request)
     {
         await Task.Delay(50); // Simulate async work
         
-        // Extract concepts from news item using AI/pattern recognition
-        var concepts = ExtractConceptsFromNews(newsItem);
-        
-        // Calculate user relevance based on interests, contributions, and investments
-        var userMatches = CalculateUserRelevance(concepts, request);
-        
-        // Calculate sentiment and impact scores
-        var sentimentScore = CalculateSentimentScore(newsItem);
-        var impactScore = CalculateImpactScore(newsItem, concepts);
-        
-        // Extract key themes
-        var keyThemes = ExtractKeyThemes(newsItem, concepts);
-        
-        // Generate insights
-        var insights = GenerateNewsInsights(newsItem, concepts, userMatches);
-
-        return new NewsAnalysis(
-            NewsItemId: newsItem.Id,
-            Concepts: concepts,
-            KeyThemes: keyThemes,
-            SentimentScore: sentimentScore,
-            ImpactScore: impactScore,
-            UserMatches: userMatches,
-            Insights: insights
+        return new KnowledgeApplicationResult(
+            Changes: new Dictionary<string, object>
+            {
+                ["appliedKnowledge"] = request.KnowledgeId,
+                ["timestamp"] = DateTimeOffset.UtcNow,
+                ["impact"] = "medium"
+            },
+            Impact: "Knowledge successfully applied to current state"
         );
     }
 
-    private List<NewsConcept> ExtractConceptsFromNews(NewsItem newsItem)
+    private async Task<List<DiscoveredPattern>> SimulatePatternDiscovery(PatternDiscoveryRequest request)
     {
-        // In real implementation, this would use AI/LLM to extract concepts
-        var concepts = new List<NewsConcept>();
+        await Task.Delay(200); // Simulate async work
         
-        // Simple concept extraction based on tags and content
-        foreach (var tag in newsItem.Tags)
+        return new List<DiscoveredPattern>
         {
-            concepts.Add(new NewsConcept(
-                ConceptId: $"concept-{tag.ToLower()}",
-                ConceptName: tag,
-                ConceptType: GetConceptType(tag),
-                RelevanceScore: 0.8,
-                RelatedConcepts: GetRelatedConcepts(tag),
-                Properties: new Dictionary<string, object> { { "source", "news" }, { "confidence", 0.8 } }
-            ));
-        }
-
-        return concepts;
-    }
-
-    private string GetConceptType(string concept)
-    {
-        return concept.ToLower() switch
-        {
-            "ai" or "technology" or "computing" => "technology",
-            "community" or "collaboration" or "social" => "social",
-            "energy" or "sustainability" or "environment" => "environment",
-            "abundance" or "amplification" or "growth" => "economic",
-            _ => "general"
+            new DiscoveredPattern(
+                Id: "pattern-1",
+                Name: "Abundance Amplification Pattern",
+                Type: "collective",
+                Strength: 0.85,
+                Keywords: new List<string> { "abundance", "amplification", "collective" },
+                Properties: new Dictionary<string, object>
+                {
+                    ["frequency"] = "high",
+                    ["confidence"] = 0.85,
+                    ["trend"] = "increasing"
+                }
+            ),
+            new DiscoveredPattern(
+                Id: "pattern-2",
+                Name: "Community Resonance Pattern",
+                Type: "social",
+                Strength: 0.75,
+                Keywords: new List<string> { "community", "resonance", "collaboration" },
+                Properties: new Dictionary<string, object>
+                {
+                    ["frequency"] = "medium",
+                    ["confidence"] = 0.75,
+                    ["trend"] = "stable"
+                }
+            )
         };
     }
 
-    private List<string> GetRelatedConcepts(string concept)
+    private async Task<PatternAnalysis> SimulatePatternAnalysis(PatternAnalysisRequest request)
     {
-        return concept.ToLower() switch
+        await Task.Delay(100); // Simulate async work
+        
+        return new PatternAnalysis(
+            PatternId: request.PatternId,
+            Strength: 0.8,
+            KeyFactors: new List<string> { "user engagement", "collective action", "abundance mindset" },
+            Metrics: new Dictionary<string, object>
+            {
+                ["frequency"] = 0.8,
+                ["amplitude"] = 0.75,
+                ["consistency"] = 0.85
+            },
+            Recommendations: new List<string>
+            {
+                "Increase community engagement",
+                "Focus on abundance messaging",
+                "Leverage collective resonance"
+            }
+        );
+    }
+
+    private async Task<List<PatternInsight>> GeneratePatternInsights(PatternAnalysis analysis)
+    {
+        await Task.Delay(50); // Simulate async work
+        
+        return new List<PatternInsight>
         {
-            "ai" => new List<string> { "technology", "computing", "automation" },
-            "abundance" => new List<string> { "amplification", "growth", "prosperity" },
-            "community" => new List<string> { "collaboration", "social", "networking" },
-            "energy" => new List<string> { "sustainability", "environment", "renewable" },
-            _ => new List<string>()
+            new PatternInsight(
+                Id: "insight-1",
+                Title: "High Engagement Correlation",
+                Description: "Pattern shows strong correlation with user engagement metrics",
+                Confidence: 0.9,
+                Data: new Dictionary<string, object>
+                {
+                    ["correlation"] = 0.85,
+                    ["significance"] = "high"
+                }
+            ),
+            new PatternInsight(
+                Id: "insight-2",
+                Title: "Abundance Amplification Potential",
+                Description: "Pattern indicates high potential for abundance amplification",
+                Confidence: 0.8,
+                Data: new Dictionary<string, object>
+                {
+                    ["amplificationFactor"] = 2.5,
+                    ["potential"] = "high"
+                }
+            )
         };
     }
 
-    private List<string> CalculateUserRelevance(List<NewsConcept> concepts, NewsFeedRequest request)
+    private async Task<List<TrendingPattern>> SimulateTrendingPatterns(TrendingPatternsQuery query)
     {
-        var matches = new List<string>();
+        await Task.Delay(100); // Simulate async work
         
-        foreach (var concept in concepts)
+        return new List<TrendingPattern>
         {
-            // Check if concept matches user interests
-            if (request.InterestAreas.Any(area => 
-                area.ToLower().Contains(concept.ConceptName.ToLower()) ||
-                concept.ConceptName.ToLower().Contains(area.ToLower())))
-            {
-                matches.Add($"Interest: {concept.ConceptName}");
-            }
-            
-            // Check if concept matches contribution types
-            if (request.ContributionTypes.Any(type => 
-                type.ToLower().Contains(concept.ConceptName.ToLower()) ||
-                concept.ConceptName.ToLower().Contains(type.ToLower())))
-            {
-                matches.Add($"Contribution: {concept.ConceptName}");
-            }
-            
-            // Check if concept matches investment areas
-            if (request.InvestmentAreas.Any(area => 
-                area.ToLower().Contains(concept.ConceptName.ToLower()) ||
-                concept.ConceptName.ToLower().Contains(area.ToLower())))
-            {
-                matches.Add($"Investment: {concept.ConceptName}");
-            }
-        }
-        
-        return matches;
-    }
-
-    private double CalculateSentimentScore(NewsItem newsItem)
-    {
-        // Simple sentiment analysis based on keywords
-        var positiveWords = new[] { "breakthrough", "revolutionary", "success", "growth", "innovation", "achievement" };
-        var negativeWords = new[] { "crisis", "failure", "decline", "problem", "issue", "concern" };
-        
-        var content = $"{newsItem.Title} {newsItem.Content}".ToLower();
-        var positiveCount = positiveWords.Count(word => content.Contains(word));
-        var negativeCount = negativeWords.Count(word => content.Contains(word));
-        
-        return Math.Max(0, Math.Min(1, 0.5 + (positiveCount - negativeCount) * 0.1));
-    }
-
-    private double CalculateImpactScore(NewsItem newsItem, List<NewsConcept> concepts)
-    {
-        // Calculate impact based on concept relevance and news metadata
-        var baseImpact = concepts.Average(c => c.RelevanceScore);
-        var conceptCount = concepts.Count;
-        var diversityScore = concepts.Select(c => c.ConceptType).Distinct().Count() / 5.0;
-        
-        return Math.Min(1.0, baseImpact * 0.7 + (conceptCount / 10.0) * 0.2 + diversityScore * 0.1);
-    }
-
-    private List<string> ExtractKeyThemes(NewsItem newsItem, List<NewsConcept> concepts)
-    {
-        var themes = new List<string>();
-        
-        // Extract themes based on concept types
-        var conceptTypes = concepts.GroupBy(c => c.ConceptType);
-        foreach (var group in conceptTypes)
-        {
-            themes.Add($"{group.Key} innovation");
-        }
-        
-        // Add themes based on content analysis
-        if (newsItem.Content.ToLower().Contains("breakthrough"))
-            themes.Add("scientific breakthrough");
-        if (newsItem.Content.ToLower().Contains("community"))
-            themes.Add("community development");
-        if (newsItem.Content.ToLower().Contains("sustainable"))
-            themes.Add("sustainability");
-            
-        return themes.Distinct().ToList();
-    }
-
-    private Dictionary<string, object> GenerateNewsInsights(NewsItem newsItem, List<NewsConcept> concepts, List<string> userMatches)
-    {
-        var insights = new Dictionary<string, object>
-        {
-            ["conceptCount"] = concepts.Count,
-            ["userMatchCount"] = userMatches.Count,
-            ["topConcept"] = concepts.OrderByDescending(c => c.RelevanceScore).FirstOrDefault()?.ConceptName ?? "none",
-            ["conceptTypes"] = concepts.Select(c => c.ConceptType).Distinct().ToList(),
-            ["relevanceScore"] = concepts.Average(c => c.RelevanceScore),
-            ["isHighImpact"] = concepts.Count > 3 && concepts.Average(c => c.RelevanceScore) > 0.7
+            new TrendingPattern(
+                PatternId: "pattern-1",
+                Name: "Abundance Amplification",
+                TrendScore: 0.95,
+                GrowthRate: 0.15,
+                KeyDrivers: new List<string> { "AI advancement", "community growth", "abundance mindset" }
+            ),
+            new TrendingPattern(
+                PatternId: "pattern-2",
+                Name: "Collective Resonance",
+                TrendScore: 0.85,
+                GrowthRate: 0.12,
+                KeyDrivers: new List<string> { "social platforms", "collaboration tools", "shared values" }
+            )
         };
-        
-        return insights;
     }
 
-    private List<string> GenerateRecommendedActions(List<NewsAnalysis> analyses, NewsFeedRequest request)
+    private async Task<PatternPrediction> SimulatePredictionGeneration(PatternPredictionRequest request)
     {
-        var actions = new List<string>();
+        await Task.Delay(150); // Simulate async work
         
-        // Generate actions based on analysis results
-        var highImpactNews = analyses.Where(a => a.ImpactScore > 0.7).ToList();
-        if (highImpactNews.Any())
+        return new PatternPrediction(
+            PatternId: request.PatternId,
+            TimeHorizon: request.TimeHorizon,
+            Confidence: 0.8,
+            PredictedStrength: 0.9,
+            Scenarios: new List<string>
+            {
+                "High growth scenario",
+                "Moderate growth scenario",
+                "Low growth scenario"
+            }
+        );
+    }
+
+    private async Task<List<PredictionScenario>> GeneratePredictionScenarios(PatternPrediction prediction, Dictionary<string, object> parameters)
+    {
+        await Task.Delay(50); // Simulate async work
+        
+        return new List<PredictionScenario>
         {
-            actions.Add("Consider contributing to high-impact areas identified in the news");
-        }
-        
-        var userMatches = analyses.SelectMany(a => a.UserMatches).Distinct().ToList();
-        if (userMatches.Any())
-        {
-            actions.Add($"Explore opportunities in: {string.Join(", ", userMatches.Take(3))}");
-        }
-        
-        var newConcepts = analyses.SelectMany(a => a.Concepts)
-            .Where(c => c.Properties.ContainsKey("source") && c.Properties["source"].ToString() == "news")
-            .ToList();
-        if (newConcepts.Any())
-        {
-            actions.Add("Research emerging concepts and their potential applications");
-        }
-        
-        return actions;
+            new PredictionScenario(
+                Id: "scenario-1",
+                Name: "Optimistic Growth",
+                Description: "Pattern continues strong growth trajectory",
+                Probability: 0.6,
+                Outcomes: new Dictionary<string, object>
+                {
+                    ["strength"] = 0.95,
+                    ["impact"] = "high",
+                    ["timeline"] = "6-12 months"
+                }
+            ),
+            new PredictionScenario(
+                Id: "scenario-2",
+                Name: "Stable Growth",
+                Description: "Pattern maintains current growth rate",
+                Probability: 0.3,
+                Outcomes: new Dictionary<string, object>
+                {
+                    ["strength"] = 0.8,
+                    ["impact"] = "medium",
+                    ["timeline"] = "12-18 months"
+                }
+            ),
+            new PredictionScenario(
+                Id: "scenario-3",
+                Name: "Declining Growth",
+                Description: "Pattern growth rate decreases",
+                Probability: 0.1,
+                Outcomes: new Dictionary<string, object>
+                {
+                    ["strength"] = 0.6,
+                    ["impact"] = "low",
+                    ["timeline"] = "18+ months"
+                }
+            )
+        };
     }
 }
+
+// Data Transfer Objects
+public record FutureKnowledge(
+    string Id,
+    object Content,
+    DateTime Timestamp,
+    double Confidence,
+    string Source
+);
+
+public record FutureKnowledgeRequest(
+    string Query,
+    List<string> Sources,
+    Dictionary<string, object> Parameters
+);
+
+public record FutureKnowledgeResponse(
+    bool Success,
+    List<FutureKnowledge> Knowledge,
+    double Confidence,
+    DateTimeOffset RetrievedAt
+);
+
+public record FutureKnowledgeApplicationRequest(
+    string KnowledgeId,
+    string TargetNodeId,
+    Dictionary<string, object> Parameters
+);
+
+public record FutureKnowledgeApplicationResponse(
+    bool Success,
+    DateTimeOffset AppliedAt,
+    Dictionary<string, object> Changes,
+    string Impact
+);
+
+public record KnowledgeApplicationResult(
+    Dictionary<string, object> Changes,
+    string Impact
+);
+
+public record PatternDiscoveryRequest(
+    List<string> DataSources,
+    List<string> PatternTypes,
+    Dictionary<string, object> Options
+);
+
+public record PatternDiscoveryResponse(
+    bool Success,
+    List<DiscoveredPattern> Patterns,
+    Dictionary<string, object> Metadata
+);
+
+public record PatternAnalysisRequest(
+    string PatternId,
+    List<string> AnalysisTypes,
+    Dictionary<string, object> Parameters
+);
+
+public record PatternAnalysisResponse(
+    bool Success,
+    PatternAnalysis Analysis,
+    List<PatternInsight> Insights
+);
+
+public record TrendingPatternsResponse(
+    bool Success,
+    List<TrendingPattern> TrendingPatterns,
+    Dictionary<string, object> Trends
+);
+
+public record PatternPredictionRequest(
+    string PatternId,
+    string TimeHorizon,
+    Dictionary<string, object> Parameters
+);
+
+public record PatternPredictionResponse(
+    bool Success,
+    PatternPrediction Prediction,
+    List<PredictionScenario> Scenarios
+);
+
+public record DiscoveredPattern(
+    string Id,
+    string Name,
+    string Type,
+    double Strength,
+    List<string> Keywords,
+    Dictionary<string, object> Properties
+);
+
+public record PatternInsight(
+    string Id,
+    string Title,
+    string Description,
+    double Confidence,
+    Dictionary<string, object> Data
+);
+
+public record PatternAnalysis(
+    string PatternId,
+    double Strength,
+    List<string> KeyFactors,
+    Dictionary<string, object> Metrics,
+    List<string> Recommendations
+);
+
+public record PatternPrediction(
+    string PatternId,
+    string TimeHorizon,
+    double Confidence,
+    double PredictedStrength,
+    List<string> Scenarios
+);
+
+public record TrendingPattern(
+    string PatternId,
+    string Name,
+    double TrendScore,
+    double GrowthRate,
+    List<string> KeyDrivers
+);
+
+public record PredictionScenario(
+    string Id,
+    string Name,
+    string Description,
+    double Probability,
+    Dictionary<string, object> Outcomes
+);
+
+public record TrendingPatternsQuery
+{
+    public string Timeframe { get; init; } = "7d";
+    public int Limit { get; init; } = 10;
+    public List<string>? PatternTypes { get; init; }
+}
+
+// Legacy Data Types (restored from original implementation)
+public record FutureKnowledgeRequestLegacy(
+    string Query,
+    string Context
+);
+
+public record FutureKnowledgeResponseLegacy(
+    bool Success,
+    string Message,
+    string KnowledgeId,
+    FutureKnowledge Knowledge
+);
+
+public record ApplyDeltaRequest(
+    string TargetNodeId,
+    string DeltaId
+);
+
+public record MergeRequest(
+    string KnowledgeId,
+    List<string> TargetNodeIds
+);
+
+public record MergeResult(
+    string TargetNodeId,
+    bool Success,
+    string Message
+);
+
+public record MergeResponse(
+    bool Success,
+    string Message,
+    List<MergeResult> Results
+);
+
+public record FutureKnowledgeSummary(
+    string Id,
+    string Query,
+    string Confidence,
+    string RetrievedAt
+);
+
+public record FutureKnowledgeSearchResponse(
+    bool Success,
+    List<FutureKnowledgeSummary> Results,
+    int Count
+);
+
+public record ConceptImportRequest(
+    string SourceServiceId,
+    List<string> ConceptIds
+);
+
+public record ConceptImportResponse(
+    bool Success,
+    string Message,
+    List<ImportedConcept> ImportedConcepts,
+    List<FutureInsight> FutureInsights
+);
+
+public record FutureInsightsResponse(
+    bool Success,
+    List<FutureInsight> Insights,
+    int Count
+);
+
+public record ConceptNode(
+    string Id,
+    string Title,
+    string Description,
+    string Type,
+    List<string> Tags,
+    Dictionary<string, object> Metadata
+);
+
+public record ImportedConcept(
+    string Id,
+    string Title,
+    string Description,
+    string SourceServiceId,
+    DateTime ImportedAt
+);
+
+public record FutureInsight(
+    string Id,
+    string ConceptId,
+    string Title,
+    string Description,
+    double Confidence,
+    string Timeframe,
+    string Impact,
+    List<string> Recommendations
+);

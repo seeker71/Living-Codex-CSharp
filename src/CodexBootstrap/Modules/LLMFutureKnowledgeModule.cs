@@ -739,13 +739,14 @@ Format your response as a structured analysis that can be used for decision-maki
         }
     }
 
-    private FutureAnalysis AnalyzePatterns(List<FutureResponse> responses, string analysisType)
+    private Dictionary<string, object> AnalyzePatterns(List<FutureResponse> responses, string analysisType)
     {
-        var analysis = new FutureAnalysis(
-            FuturePotential: responses.Average(r => r.Confidence),
-            Confidence: responses.Average(r => r.Confidence),
-            Recommendations: ExtractCommonThemes(responses)
-        );
+        var analysis = new Dictionary<string, object>
+        {
+            ["futurePotential"] = responses.Average(r => r.Confidence),
+            ["confidence"] = responses.Average(r => r.Confidence),
+            ["recommendations"] = ExtractCommonThemes(responses)
+        };
 
         return analysis;
     }
@@ -806,13 +807,13 @@ Format your response as a structured analysis that can be used for decision-maki
         };
     }
 
-    private List<string> GenerateAnalysisInsights(FutureAnalysis analysis)
+    private List<string> GenerateAnalysisInsights(Dictionary<string, object> analysis)
     {
         return new List<string>
         {
-            $"Future potential: {analysis.FuturePotential:P1}",
-            $"Confidence: {analysis.Confidence:P1}",
-            $"Recommendations: {string.Join(", ", analysis.Recommendations.Take(3))}"
+            $"Future potential: {analysis["futurePotential"]:P1}",
+            $"Confidence: {analysis["confidence"]:P1}",
+            $"Recommendations: {string.Join(", ", ((List<string>)analysis["recommendations"]).Take(3))}"
         };
     }
 
@@ -1556,7 +1557,7 @@ public record BatchFutureQueryResponse(
 public record FutureAnalysisResponse(
     bool Success,
     string Message,
-    FutureAnalysis Analysis,
+    Dictionary<string, object> Analysis,
     int ResponseCount,
     List<string> Insights
 );
