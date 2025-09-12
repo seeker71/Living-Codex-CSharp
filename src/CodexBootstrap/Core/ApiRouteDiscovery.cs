@@ -18,11 +18,13 @@ public static class ApiRouteDiscovery
 {
     private static readonly ILogger _logger = new Log4NetLogger(typeof(ApiRouteDiscovery));
     private static readonly Dictionary<Type, object> _moduleInstances = new();
+    private static IServiceProvider? ServiceProvider;
     /// <summary>
     /// Discovers and registers all API routes from attributes in the current assembly
     /// </summary>
     public static void DiscoverAndRegisterRoutes(WebApplication app, IApiRouter router, NodeRegistry registry)
     {
+        ServiceProvider = app.Services;
         var assembly = Assembly.GetExecutingAssembly();
         var routeMethods = GetRouteMethods(assembly);
         var registeredRoutes = new HashSet<string>();
@@ -314,6 +316,13 @@ public static class ApiRouteDiscovery
         else if ((constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(ICacheManager) })) != null)
         {
             instance = Activator.CreateInstance(moduleType, registry, (ICacheManager?)null)!;
+        }
+        // Try to find a constructor that takes NodeRegistry and optional HttpClient
+        else if ((constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(HttpClient) })) != null)
+        {
+            // Get HttpClient from service provider
+            var httpClient = ServiceProvider?.GetService<HttpClient>() ?? new HttpClient();
+            instance = Activator.CreateInstance(moduleType, registry, httpClient)!;
         }
         // Try to find a constructor that takes NodeRegistry and optional IDistributedStorageBackend
         else if ((constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(IDistributedStorageBackend) })) != null)

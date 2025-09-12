@@ -52,6 +52,7 @@ builder.Services.AddSingleton<ModuleLoader>(sp =>
 builder.Services.AddSingleton<RouteDiscovery>();
 builder.Services.AddSingleton<CoreApiService>();
 builder.Services.AddSingleton<HealthService>();
+builder.Services.AddSingleton<ConfigurationManager>();
 
 // HTTP client for adapters
 builder.Services.AddHttpClient();

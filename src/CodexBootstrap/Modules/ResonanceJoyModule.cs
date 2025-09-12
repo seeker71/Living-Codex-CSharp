@@ -18,7 +18,7 @@ public sealed class ResonanceJoyModule : IModule
     private readonly ConcurrentDictionary<string, JoyAmplifier> _joyAmplifiers = new();
     private readonly ConcurrentQueue<ResonanceEvent> _resonanceHistory = new();
     private readonly object _lock = new object();
-    private int _maxHistorySize = 1000;
+    private readonly int _maxHistorySize = 1000;
 
     // Mathematical constants for resonance calculations
     private const double PlanckConstant = 6.62607015e-34; // J⋅s
@@ -116,6 +116,20 @@ public sealed class ResonanceJoyModule : IModule
 
             _resonanceFields[field.Id] = field;
 
+            // Add to history
+            AddToHistory(new ResonanceEvent(
+                Id: Guid.NewGuid().ToString(),
+                EventType: "resonance_field_created",
+                Data: new Dictionary<string, object>
+                {
+                    ["fieldId"] = field.Id,
+                    ["fieldName"] = field.Name,
+                    ["frequency"] = field.Frequency,
+                    ["amplitude"] = field.Amplitude
+                },
+                Timestamp: DateTimeOffset.UtcNow
+            ));
+
             _logger.Info($"Resonance field created: {field.Id} - {field.Name}");
             return new { success = true, fieldId = field.Id, field = field };
         }
@@ -197,6 +211,22 @@ public sealed class ResonanceJoyModule : IModule
 
             _joyAmplifiers[amplifier.Id] = amplifier;
 
+            // Add to history
+            AddToHistory(new ResonanceEvent(
+                Id: Guid.NewGuid().ToString(),
+                EventType: "joy_amplified",
+                Data: new Dictionary<string, object>
+                {
+                    ["amplifierId"] = amplifier.Id,
+                    ["userId"] = request.UserId,
+                    ["baseJoy"] = joyInput.BaseJoy,
+                    ["amplifiedJoy"] = amplificationResult.AmplifiedJoy,
+                    ["amplificationFactor"] = amplificationResult.AmplificationFactor,
+                    ["method"] = amplifier.Method.ToString()
+                },
+                Timestamp: DateTimeOffset.UtcNow
+            ));
+
             _logger.Info($"Joy amplified for user {request.UserId}: {joyInput.BaseJoy:F4} -> {amplificationResult.AmplifiedJoy:F4}");
             return new { success = true, amplification = amplificationResult, amplifierId = amplifier.Id };
         }
@@ -241,31 +271,32 @@ public sealed class ResonanceJoyModule : IModule
     }
 
     [ApiRoute("GET", "/joy/amplifiers", "GetJoyAmplifiers", "Get joy amplification history", "codex.resonance-joy")]
-    public async Task<object> GetJoyAmplifiersAsync([ApiParameter("query", "Query parameters")] JoyQuery query)
+    public async Task<object> GetJoyAmplifiersAsync([ApiParameter("query", "Query parameters")] JoyQuery? query = null)
     {
         try
         {
             var amplifiers = _joyAmplifiers.Values.AsEnumerable();
+            var queryParams = query ?? new JoyQuery();
 
-            if (!string.IsNullOrEmpty(query.UserId))
+            if (!string.IsNullOrEmpty(queryParams.UserId))
             {
-                amplifiers = amplifiers.Where(a => a.UserId == query.UserId);
+                amplifiers = amplifiers.Where(a => a.UserId == queryParams.UserId);
             }
 
-            if (query.Since.HasValue)
+            if (queryParams.Since.HasValue)
             {
-                amplifiers = amplifiers.Where(a => a.CreatedAt >= query.Since.Value);
+                amplifiers = amplifiers.Where(a => a.CreatedAt >= queryParams.Since.Value);
             }
 
-            if (query.Until.HasValue)
+            if (queryParams.Until.HasValue)
             {
-                amplifiers = amplifiers.Where(a => a.CreatedAt <= query.Until.Value);
+                amplifiers = amplifiers.Where(a => a.CreatedAt <= queryParams.Until.Value);
             }
 
             var pagedAmplifiers = amplifiers
                 .OrderByDescending(a => a.CreatedAt)
-                .Skip(query.Skip ?? 0)
-                .Take(query.Take ?? 100)
+                .Skip(queryParams.Skip ?? 0)
+                .Take(queryParams.Take ?? 100)
                 .ToList();
 
             var totalCount = amplifiers.Count();
@@ -277,14 +308,29 @@ public sealed class ResonanceJoyModule : IModule
                 amplifiers = pagedAmplifiers, 
                 totalCount = totalCount,
                 averageAmplification = averageAmplification,
-                skip = query.Skip ?? 0,
-                take = query.Take ?? 100
+                skip = queryParams.Skip ?? 0,
+                take = queryParams.Take ?? 100
             };
         }
         catch (Exception ex)
         {
             _logger.Error($"Error getting joy amplifiers: {ex.Message}", ex);
             return new ErrorResponse($"Failed to get joy amplifiers: {ex.Message}");
+        }
+    }
+
+    // History Management
+    private void AddToHistory(ResonanceEvent resonanceEvent)
+    {
+        lock (_lock)
+        {
+            _resonanceHistory.Enqueue(resonanceEvent);
+            
+            // Maintain history size limit
+            while (_resonanceHistory.Count > _maxHistorySize)
+            {
+                _resonanceHistory.TryDequeue(out _);
+            }
         }
     }
 
