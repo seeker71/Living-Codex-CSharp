@@ -83,12 +83,12 @@ namespace CodexBootstrap.Modules;
                 FromId: request.UserId,
                 ToId: request.ConceptId,
                 Role: request.RelationshipType,
-                Weight: request.Weight,
+                Weight: request.Strength,
                 Meta: new Dictionary<string, object>
                 {
                     ["relationshipId"] = relationshipId,
                     ["relationshipType"] = request.RelationshipType,
-                    ["weight"] = request.Weight,
+                    ["weight"] = request.Strength,
                     ["createdAt"] = DateTime.UtcNow,
                     ["status"] = "active"
                 }
@@ -100,8 +100,6 @@ namespace CodexBootstrap.Modules;
             return new UserConceptLinkResponse(
                 Success: true,
                 RelationshipId: relationshipId,
-                RelationshipType: request.RelationshipType,
-                Weight: request.Weight,
                 Message: "User-concept linked successfully"
             );
         }
@@ -123,7 +121,6 @@ namespace CodexBootstrap.Modules;
         {
             return new UserConceptUnlinkResponse(
                 Success: true,
-                RelationshipId: Guid.NewGuid().ToString(),
                 Message: "User-concept unlinked successfully"
             );
         }
@@ -144,6 +141,7 @@ namespace CodexBootstrap.Modules;
         try
         {
             return new UserConceptsResponse(
+                Success: true,
                 UserId: userId,
                 Concepts: new object[0],
                 TotalCount: 0,
@@ -167,6 +165,7 @@ namespace CodexBootstrap.Modules;
         try
         {
             return new ConceptUsersResponse(
+                Success: true,
                 ConceptId: conceptId,
                 Users: new object[0],
                 TotalCount: 0,
@@ -192,12 +191,12 @@ namespace CodexBootstrap.Modules;
         try
         {
             return new UserConceptRelationshipResponse(
+                Success: true,
                 UserId: userId,
                 ConceptId: conceptId,
                 RelationshipType: "none",
-                Weight: 0.0,
-                CreatedAt: DateTime.UtcNow,
-                Status: "active",
+                Strength: "0.0",
+                CreatedAt: DateTime.UtcNow.ToString(),
                 Message: "Relationship retrieved successfully"
             );
         }
@@ -506,20 +505,7 @@ namespace CodexBootstrap.Modules;
 }
 
 // Request/Response DTOs for each API
-public record UserConceptLinkRequest(string UserId, string ConceptId, string RelationshipType, double Weight);
-public record UserConceptLinkResponse(bool Success, string RelationshipId, string RelationshipType, double Weight, string Message);
-
-public record UserConceptUnlinkRequest(string UserId, string ConceptId);
-public record UserConceptUnlinkResponse(bool Success, string RelationshipId, string Message);
-
-public record UserConceptsRequest(string UserId);
-public record UserConceptsResponse(string UserId, object[] Concepts, int TotalCount, string Message);
-
-public record ConceptUsersRequest(string ConceptId);
-public record ConceptUsersResponse(string ConceptId, object[] Users, int TotalCount, string Message);
-
-public record UserConceptRelationshipRequest(string UserId, string ConceptId);
-public record UserConceptRelationshipResponse(string UserId, string ConceptId, string RelationshipType, double Weight, DateTime CreatedAt, string Status, string Message);
+// UserConcept DTOs moved to ConceptModule
 
 // Belief System DTOs
 public record BeliefSystemRegistrationRequest(

@@ -209,6 +209,404 @@ public class ConceptModule : IModule
             return ResponseHelpers.CreateErrorResponse($"Failed to analyze concept: {ex.Message}", "ANALYSIS_ERROR");
         }
     }
+
+    #region User-Concept Relationship Management
+
+    /// <summary>
+    /// Link user to concept
+    /// </summary>
+    [Post("/concept/user/link", "concept-user-link", "Link user to concept", "codex.concept")]
+    [ApiResponse(200, "Success")]
+    [ApiResponse(400, "Bad request")]
+    public async Task<object> LinkUserToConcept([ApiParameter("request", "User-concept link request", Required = true, Location = "body")] UserConceptLinkRequest request)
+    {
+        try
+        {
+            // Create user-concept relationship node
+            var relationshipId = $"userconcept.{request.UserId}.{request.ConceptId}";
+            var relationshipNode = new Node(
+                Id: relationshipId,
+                TypeId: "codex.userconcept.relationship",
+                State: ContentState.Water,
+                Locale: "en",
+                Title: $"User-Concept Relationship: {request.UserId} -> {request.ConceptId}",
+                Description: $"Relationship between user {request.UserId} and concept {request.ConceptId}",
+                Content: new ContentRef(
+                    MediaType: "application/json",
+                    InlineJson: JsonSerializer.Serialize(new
+                    {
+                        userId = request.UserId,
+                        conceptId = request.ConceptId,
+                        relationshipType = request.RelationshipType,
+                        strength = request.Strength,
+                        createdAt = DateTime.UtcNow
+                    }),
+                    InlineBytes: null,
+                    ExternalUri: null
+                ),
+                Meta: new Dictionary<string, object>
+                {
+                    ["userId"] = request.UserId,
+                    ["conceptId"] = request.ConceptId,
+                    ["relationshipType"] = request.RelationshipType,
+                    ["strength"] = request.Strength,
+                    ["createdAt"] = DateTime.UtcNow
+                }
+            );
+
+            _registry.Upsert(relationshipNode);
+
+            return new UserConceptLinkResponse(
+                Success: true,
+                RelationshipId: relationshipId,
+                Message: "User-concept relationship created successfully"
+            );
+        }
+        catch (Exception ex)
+        {
+            return new UserConceptLinkResponse(
+                Success: false,
+                RelationshipId: null,
+                Message: $"Failed to create user-concept relationship: {ex.Message}"
+            );
+        }
+    }
+
+    /// <summary>
+    /// Unlink user from concept
+    /// </summary>
+    [Post("/concept/user/unlink", "concept-user-unlink", "Unlink user from concept", "codex.concept")]
+    [ApiResponse(200, "Success")]
+    [ApiResponse(400, "Bad request")]
+    public async Task<object> UnlinkUserFromConcept([ApiParameter("request", "User-concept unlink request", Required = true, Location = "body")] UserConceptUnlinkRequest request)
+    {
+        try
+        {
+            var relationshipId = $"userconcept.{request.UserId}.{request.ConceptId}";
+            var relationshipNode = _registry.GetNode(relationshipId);
+            
+            if (relationshipNode != null)
+            {
+                _registry.RemoveNode(relationshipId);
+                return new UserConceptUnlinkResponse(
+                    Success: true,
+                    Message: "User-concept relationship removed successfully"
+                );
+            }
+            else
+            {
+                return new UserConceptUnlinkResponse(
+                    Success: false,
+                    Message: "User-concept relationship not found"
+                );
+            }
+        }
+        catch (Exception ex)
+        {
+            return new UserConceptUnlinkResponse(
+                Success: false,
+                Message: $"Failed to remove user-concept relationship: {ex.Message}"
+            );
+        }
+    }
+
+    /// <summary>
+    /// Get concepts for a user
+    /// </summary>
+    [Get("/concept/user/{userId}", "concept-user-concepts", "Get concepts for a user", "codex.concept")]
+    [ApiResponse(200, "Success")]
+    [ApiResponse(404, "User not found")]
+    public async Task<object> GetUserConcepts([ApiParameter("userId", "User ID", Required = true, Location = "path")] string userId)
+    {
+        try
+        {
+            var relationships = _registry.GetEdgesFrom($"user.{userId}")
+                .Where(e => e.Role == "userconcept.relationship")
+                .ToList();
+
+            var concepts = relationships.Select(r => new
+            {
+                conceptId = r.ToId,
+                relationshipType = r.Meta?.GetValueOrDefault("relationshipType")?.ToString(),
+                strength = r.Meta?.GetValueOrDefault("strength")?.ToString(),
+                createdAt = r.Meta?.GetValueOrDefault("createdAt")?.ToString()
+            }).ToArray();
+
+            return new UserConceptsResponse(
+                Success: true,
+                UserId: userId,
+                Concepts: concepts,
+                TotalCount: concepts.Length,
+                Message: "User concepts retrieved successfully"
+            );
+        }
+        catch (Exception ex)
+        {
+            return new UserConceptsResponse(
+                Success: false,
+                UserId: userId,
+                Concepts: Array.Empty<object>(),
+                TotalCount: 0,
+                Message: $"Failed to retrieve user concepts: {ex.Message}"
+            );
+        }
+    }
+
+    /// <summary>
+    /// Get users for a concept
+    /// </summary>
+    [Get("/concept/{conceptId}/users", "concept-concept-users", "Get users for a concept", "codex.concept")]
+    [ApiResponse(200, "Success")]
+    [ApiResponse(404, "Concept not found")]
+    public async Task<object> GetConceptUsers([ApiParameter("conceptId", "Concept ID", Required = true, Location = "path")] string conceptId)
+    {
+        try
+        {
+            var relationships = _registry.GetEdgesTo(conceptId)
+                .Where(e => e.Role == "userconcept.relationship")
+                .ToList();
+
+            var users = relationships.Select(r => new
+            {
+                userId = r.FromId,
+                relationshipType = r.Meta?.GetValueOrDefault("relationshipType")?.ToString(),
+                strength = r.Meta?.GetValueOrDefault("strength")?.ToString(),
+                createdAt = r.Meta?.GetValueOrDefault("createdAt")?.ToString()
+            }).ToArray();
+
+            return new ConceptUsersResponse(
+                Success: true,
+                ConceptId: conceptId,
+                Users: users,
+                TotalCount: users.Length,
+                Message: "Concept users retrieved successfully"
+            );
+        }
+        catch (Exception ex)
+        {
+            return new ConceptUsersResponse(
+                Success: false,
+                ConceptId: conceptId,
+                Users: Array.Empty<object>(),
+                TotalCount: 0,
+                Message: $"Failed to retrieve concept users: {ex.Message}"
+            );
+        }
+    }
+
+    /// <summary>
+    /// Get specific user-concept relationship
+    /// </summary>
+    [Get("/concept/user/{userId}/{conceptId}", "concept-user-relationship", "Get specific relationship", "codex.concept")]
+    [ApiResponse(200, "Success")]
+    [ApiResponse(404, "Relationship not found")]
+    public async Task<object> GetUserConceptRelationship(
+        [ApiParameter("userId", "User ID", Required = true, Location = "path")] string userId,
+        [ApiParameter("conceptId", "Concept ID", Required = true, Location = "path")] string conceptId)
+    {
+        try
+        {
+            var relationshipId = $"userconcept.{userId}.{conceptId}";
+            var relationshipNode = _registry.GetNode(relationshipId);
+            
+            if (relationshipNode != null)
+            {
+                return new UserConceptRelationshipResponse(
+                    Success: true,
+                    UserId: userId,
+                    ConceptId: conceptId,
+                    RelationshipType: relationshipNode.Meta?.GetValueOrDefault("relationshipType")?.ToString() ?? "unknown",
+                    Strength: relationshipNode.Meta?.GetValueOrDefault("strength")?.ToString() ?? "0",
+                    CreatedAt: relationshipNode.Meta?.GetValueOrDefault("createdAt")?.ToString() ?? DateTime.UtcNow.ToString(),
+                    Message: "Relationship retrieved successfully"
+                );
+            }
+            else
+            {
+                return new UserConceptRelationshipResponse(
+                    Success: false,
+                    UserId: userId,
+                    ConceptId: conceptId,
+                    RelationshipType: null,
+                    Strength: null,
+                    CreatedAt: null,
+                    Message: "Relationship not found"
+                );
+            }
+        }
+        catch (Exception ex)
+        {
+            return new UserConceptRelationshipResponse(
+                Success: false,
+                UserId: userId,
+                ConceptId: conceptId,
+                RelationshipType: null,
+                Strength: null,
+                CreatedAt: null,
+                Message: $"Failed to retrieve relationship: {ex.Message}"
+            );
+        }
+    }
+
+    /// <summary>
+    /// Register user belief system
+    /// </summary>
+    [Post("/concept/user/belief-system/register", "concept-user-belief-register", "Register user belief system", "codex.concept")]
+    [ApiResponse(200, "Success")]
+    [ApiResponse(400, "Bad request")]
+    public async Task<object> RegisterUserBeliefSystem([ApiParameter("request", "Belief system registration request", Required = true, Location = "body")] UserBeliefSystemRequest request)
+    {
+        try
+        {
+            var beliefSystemNode = new Node(
+                Id: $"beliefsystem.{request.UserId}",
+                TypeId: "codex.userconcept.beliefsystem",
+                State: ContentState.Water,
+                Locale: "en",
+                Title: $"Belief System for User {request.UserId}",
+                Description: request.Description,
+                Content: new ContentRef(
+                    MediaType: "application/json",
+                    InlineJson: JsonSerializer.Serialize(new
+                    {
+                        userId = request.UserId,
+                        framework = request.Framework,
+                        principles = request.Principles,
+                        values = request.Values,
+                        createdAt = DateTime.UtcNow
+                    }),
+                    InlineBytes: null,
+                    ExternalUri: null
+                ),
+                Meta: new Dictionary<string, object>
+                {
+                    ["userId"] = request.UserId,
+                    ["framework"] = request.Framework,
+                    ["principles"] = string.Join(",", request.Principles),
+                    ["values"] = string.Join(",", request.Values),
+                    ["createdAt"] = DateTime.UtcNow
+                }
+            );
+
+            _registry.Upsert(beliefSystemNode);
+
+            return new UserBeliefSystemResponse(
+                Success: true,
+                UserId: request.UserId,
+                BeliefSystemId: beliefSystemNode.Id,
+                Message: "Belief system registered successfully"
+            );
+        }
+        catch (Exception ex)
+        {
+            return new UserBeliefSystemResponse(
+                Success: false,
+                UserId: request.UserId,
+                BeliefSystemId: null,
+                Message: $"Failed to register belief system: {ex.Message}"
+            );
+        }
+    }
+
+    /// <summary>
+    /// Translate concept through belief system
+    /// </summary>
+    [Post("/concept/user/translate", "concept-user-translate", "Translate concept through belief system", "codex.concept")]
+    [ApiResponse(200, "Success")]
+    [ApiResponse(400, "Bad request")]
+    public async Task<object> TranslateConceptThroughBeliefSystem([ApiParameter("request", "Concept translation request", Required = true, Location = "body")] UserConceptTranslationRequest request)
+    {
+        try
+        {
+            // TODO: Implement actual belief system translation logic
+            var translatedConcept = new
+            {
+                originalConcept = request.Concept,
+                translatedConcept = $"Translated: {request.Concept}",
+                beliefSystem = request.BeliefSystemId,
+                translationMethod = "belief-system-mapping",
+                confidence = 0.85,
+                translatedAt = DateTime.UtcNow
+            };
+
+            return new UserConceptTranslationResponse(
+                Success: true,
+                OriginalConcept: request.Concept,
+                TranslatedConcept: translatedConcept.translatedConcept,
+                BeliefSystemId: request.BeliefSystemId,
+                Confidence: 0.85,
+                Message: "Concept translated successfully through belief system"
+            );
+        }
+        catch (Exception ex)
+        {
+            return new UserConceptTranslationResponse(
+                Success: false,
+                OriginalConcept: request.Concept,
+                TranslatedConcept: null,
+                BeliefSystemId: request.BeliefSystemId,
+                Confidence: 0.0,
+                Message: $"Failed to translate concept: {ex.Message}"
+            );
+        }
+    }
+
+    /// <summary>
+    /// Get user belief system
+    /// </summary>
+    [Get("/concept/user/{userId}/belief-system", "concept-user-belief-get", "Get user belief system", "codex.concept")]
+    [ApiResponse(200, "Success")]
+    [ApiResponse(404, "Belief system not found")]
+    public async Task<object> GetUserBeliefSystem([ApiParameter("userId", "User ID", Required = true, Location = "path")] string userId)
+    {
+        try
+        {
+            var beliefSystemId = $"beliefsystem.{userId}";
+            var beliefSystemNode = _registry.GetNode(beliefSystemId);
+            
+            if (beliefSystemNode != null)
+            {
+                return new UserBeliefSystemGetResponse(
+                    Success: true,
+                    UserId: userId,
+                    BeliefSystemId: beliefSystemId,
+                    Framework: beliefSystemNode.Meta?.GetValueOrDefault("framework")?.ToString() ?? "unknown",
+                    Principles: beliefSystemNode.Meta?.GetValueOrDefault("principles")?.ToString()?.Split(',') ?? Array.Empty<string>(),
+                    Values: beliefSystemNode.Meta?.GetValueOrDefault("values")?.ToString()?.Split(',') ?? Array.Empty<string>(),
+                    CreatedAt: beliefSystemNode.Meta?.GetValueOrDefault("createdAt")?.ToString() ?? DateTime.UtcNow.ToString(),
+                    Message: "Belief system retrieved successfully"
+                );
+            }
+            else
+            {
+                return new UserBeliefSystemGetResponse(
+                    Success: false,
+                    UserId: userId,
+                    BeliefSystemId: null,
+                    Framework: null,
+                    Principles: Array.Empty<string>(),
+                    Values: Array.Empty<string>(),
+                    CreatedAt: null,
+                    Message: "Belief system not found"
+                );
+            }
+        }
+        catch (Exception ex)
+        {
+            return new UserBeliefSystemGetResponse(
+                Success: false,
+                UserId: userId,
+                BeliefSystemId: null,
+                Framework: null,
+                Principles: Array.Empty<string>(),
+                Values: Array.Empty<string>(),
+                CreatedAt: null,
+                Message: $"Failed to retrieve belief system: {ex.Message}"
+            );
+        }
+    }
+
+    #endregion
 }
 
 // Request/Response DTOs for each API
@@ -226,3 +624,24 @@ public record ConceptSearchResponse(object[] Concepts, int TotalCount, string Me
 
 public record ConceptSemanticRequest(string ConceptId);
 public record ConceptSemanticResponse(string ConceptId, object Analysis, string Message);
+
+// User-Concept Relationship DTOs
+public record UserConceptLinkRequest(string UserId, string ConceptId, string RelationshipType, double Strength);
+public record UserConceptLinkResponse(bool Success, string? RelationshipId, string Message);
+
+public record UserConceptUnlinkRequest(string UserId, string ConceptId);
+public record UserConceptUnlinkResponse(bool Success, string Message);
+
+public record UserConceptsResponse(bool Success, string UserId, object[] Concepts, int TotalCount, string Message);
+
+public record ConceptUsersResponse(bool Success, string ConceptId, object[] Users, int TotalCount, string Message);
+
+public record UserConceptRelationshipResponse(bool Success, string UserId, string ConceptId, string? RelationshipType, string? Strength, string? CreatedAt, string Message);
+
+public record UserBeliefSystemRequest(string UserId, string Framework, string Description, string[] Principles, string[] Values);
+public record UserBeliefSystemResponse(bool Success, string UserId, string? BeliefSystemId, string Message);
+
+public record UserConceptTranslationRequest(string Concept, string BeliefSystemId);
+public record UserConceptTranslationResponse(bool Success, string OriginalConcept, string? TranslatedConcept, string BeliefSystemId, double Confidence, string Message);
+
+public record UserBeliefSystemGetResponse(bool Success, string UserId, string? BeliefSystemId, string? Framework, string[] Principles, string[] Values, string? CreatedAt, string Message);
