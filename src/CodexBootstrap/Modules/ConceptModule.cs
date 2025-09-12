@@ -9,6 +9,7 @@ namespace CodexBootstrap.Modules;
 /// Concept Management Module (L8) - Modular Fractal API Design
 /// Each API is self-contained with its own OpenAPI specification
 /// </summary>
+[ApiModule(Name = "ConceptModule", Version = "1.0.0", Description = "Concept Management Module - Self-contained fractal APIs", Tags = new[] { "concept", "management", "fractal" })]
 public class ConceptModule : IModule
 {
     private readonly IApiRouter _apiRouter;
@@ -637,6 +638,23 @@ public record UserConceptsResponse(bool Success, string UserId, object[] Concept
 public record ConceptUsersResponse(bool Success, string ConceptId, object[] Users, int TotalCount, string Message);
 
 public record UserConceptRelationshipResponse(bool Success, string UserId, string ConceptId, string? RelationshipType, string? Strength, string? CreatedAt, string Message);
+
+public record UserBeliefSystem(
+    string Id,
+    string UserId,
+    string Framework,
+    string Description,
+    string[] Principles,
+    string[] Values,
+    string Language,
+    string CulturalContext,
+    string SpiritualTradition,
+    string ScientificBackground,
+    string[] CoreValues,
+    string[] TranslationPreferences,
+    double ResonanceThreshold,
+    DateTime CreatedAt
+);
 
 public record UserBeliefSystemRequest(string UserId, string Framework, string Description, string[] Principles, string[] Values);
 public record UserBeliefSystemResponse(bool Success, string UserId, string? BeliefSystemId, string Message);

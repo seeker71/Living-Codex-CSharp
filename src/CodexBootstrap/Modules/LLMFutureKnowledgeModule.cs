@@ -83,6 +83,8 @@ public class LLMFutureKnowledgeModule : IModule
     private readonly IApiRouter _apiRouter;
     private readonly NodeRegistry _registry;
     private readonly Dictionary<string, LLMConfig> _llmConfigs;
+    private readonly Dictionary<string, (SimpleTranslationResponse response, DateTime cachedAt)> _translationCache = new();
+    private readonly TimeSpan _cacheExpiry = TimeSpan.FromHours(24); // Cache translations for 24 hours
 
     public LLMFutureKnowledgeModule(IApiRouter apiRouter, NodeRegistry registry)
     {
@@ -1492,6 +1494,31 @@ Please provide a thoughtful translation that adapts the concept to the {request.
     {
         try
         {
+            // Create cache key based on request parameters
+            var cacheKey = $"{request.Text}|{request.SourceLanguage}|{request.TargetLanguage}|{request.Context}";
+            
+            // Check cache first
+            if (_translationCache.TryGetValue(cacheKey, out var cachedResult))
+            {
+                if (DateTime.UtcNow - cachedResult.cachedAt < _cacheExpiry)
+                {
+                    // Return cached result
+                    return new
+                    {
+                        success = true,
+                        data = cachedResult.response,
+                        timestamp = DateTimeOffset.UtcNow,
+                        cached = true,
+                        cacheAge = DateTime.UtcNow - cachedResult.cachedAt
+                    };
+                }
+                else
+                {
+                    // Remove expired cache entry
+                    _translationCache.Remove(cacheKey);
+                }
+            }
+
             // Get optimal LLM configuration for translation
             var optimalConfig = LLMConfigurationSystem.GetOptimalConfiguration("consciousness-expansion");
             
@@ -1522,7 +1549,7 @@ Please provide a natural, culturally appropriate translation that maintains the 
             
             if (llmResponse.Content.Contains("LLM unavailable"))
             {
-                return new SimpleTranslationResponse(
+                var errorResponse = new SimpleTranslationResponse(
                     Success: false,
                     OriginalText: request.Text,
                     TranslatedText: "",
@@ -1530,9 +1557,17 @@ Please provide a natural, culturally appropriate translation that maintains the 
                     TargetLanguage: request.TargetLanguage,
                     Message: "AI translation failed: " + llmResponse.Content
                 );
+
+                return new
+                {
+                    success = false,
+                    data = errorResponse,
+                    timestamp = DateTimeOffset.UtcNow,
+                    cached = false
+                };
             }
             
-            return new SimpleTranslationResponse(
+            var response = new SimpleTranslationResponse(
                 Success: true,
                 OriginalText: request.Text,
                 TranslatedText: llmResponse.Content,
@@ -1540,10 +1575,21 @@ Please provide a natural, culturally appropriate translation that maintains the 
                 TargetLanguage: request.TargetLanguage,
                 Message: "Translation completed successfully using real AI"
             );
+
+            // Cache the successful translation
+            _translationCache[cacheKey] = (response, DateTime.UtcNow);
+
+            return new
+            {
+                success = true,
+                data = response,
+                timestamp = DateTimeOffset.UtcNow,
+                cached = false
+            };
         }
         catch (Exception ex)
         {
-            return new SimpleTranslationResponse(
+            var errorResponse = new SimpleTranslationResponse(
                 Success: false,
                 OriginalText: request.Text,
                 TranslatedText: "",
@@ -1551,6 +1597,14 @@ Please provide a natural, culturally appropriate translation that maintains the 
                 TargetLanguage: request.TargetLanguage,
                 Message: $"Translation failed: {ex.Message}"
             );
+
+            return new
+            {
+                success = false,
+                data = errorResponse,
+                timestamp = DateTimeOffset.UtcNow,
+                cached = false
+            };
         }
     }
 

@@ -404,16 +404,65 @@ public class DynamicAttributionSystem
 
     private async Task<string> GenerateLLMResponse(string prompt, string contextType, bool useJoyfulEngine)
     {
-        // Simulate LLM call - in real implementation, this would call the actual LLM
-        await Task.Delay(100);
+        try
+        {
+            // Get optimal LLM configuration for dynamic attribution
+            var optimalConfig = LLMConfigurationSystem.GetOptimalConfiguration("consciousness-expansion");
+            
+            // Build enhanced prompt for dynamic attribution
+            var enhancedPrompt = useJoyfulEngine 
+                ? $@"{prompt}
 
-        if (useJoyfulEngine)
-        {
-            return GenerateJoyfulResponse(prompt, contextType);
+Please respond in a joyful, consciousness-expanding way that:
+- Uses sacred frequencies (432Hz, 528Hz, 741Hz) when relevant
+- Incorporates spiritual and consciousness-expanding language
+- Maintains a positive, uplifting tone
+- Connects to universal love and wisdom
+- Uses emojis and symbols to enhance the message
+
+Context Type: {contextType}
+LLM Provider: {_llmProvider}
+Joyful Engine: {_joyfulEngine}"
+                : $@"{prompt}
+
+Please provide a clear, informative response that explains the {contextType} in a professional manner.
+
+Context Type: {contextType}
+LLM Provider: {_llmProvider}";
+
+            // Convert LLMConfigurationSystem.LLMConfiguration to LLMConfig
+            var llmConfig = new LLMConfig(
+                Id: optimalConfig.Id,
+                Name: optimalConfig.Id,
+                Provider: optimalConfig.Provider,
+                Model: optimalConfig.Model,
+                ApiKey: "",
+                BaseUrl: "http://localhost:11434",
+                MaxTokens: optimalConfig.MaxTokens,
+                Temperature: optimalConfig.Temperature,
+                TopP: optimalConfig.TopP,
+                Parameters: optimalConfig.Parameters
+            );
+            
+            // Call LLM with real Ollama integration
+            var llmResponse = await CallLLM(llmConfig, enhancedPrompt);
+            
+            if (llmResponse.Content.Contains("LLM unavailable"))
+            {
+                // Fallback to simulated response
+                return useJoyfulEngine 
+                    ? GenerateJoyfulResponse(prompt, contextType)
+                    : GenerateStandardResponse(prompt, contextType);
+            }
+            
+            return llmResponse.Content;
         }
-        else
+        catch (Exception)
         {
-            return GenerateStandardResponse(prompt, contextType);
+            // Fallback to simulated response on error
+            return useJoyfulEngine 
+                ? GenerateJoyfulResponse(prompt, contextType)
+                : GenerateStandardResponse(prompt, contextType);
         }
     }
 
@@ -449,6 +498,60 @@ public class DynamicAttributionSystem
     private string GenerateStandardResponse(string prompt, string contextType)
     {
         return $"This is a dynamic {contextType} generated for: {prompt.Substring(0, Math.Min(100, prompt.Length))}...";
+    }
+
+    /// <summary>
+    /// Call LLM with the provided configuration and prompt
+    /// </summary>
+    private async Task<LLMResponse> CallLLM(LLMConfig config, string prompt)
+    {
+        try
+        {
+            using var httpClient = new HttpClient();
+            httpClient.Timeout = TimeSpan.FromMinutes(5);
+
+            var requestBody = new
+            {
+                model = config.Model,
+                prompt = prompt,
+                options = new
+                {
+                    temperature = config.Temperature,
+                    top_p = config.TopP,
+                    num_predict = config.MaxTokens
+                },
+                stream = false
+            };
+
+            var json = JsonSerializer.Serialize(requestBody);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+            var response = await httpClient.PostAsync($"{config.BaseUrl}/api/generate", content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                var llmResponse = JsonSerializer.Deserialize<LLMResponse>(responseContent);
+                if (llmResponse != null)
+                {
+                    return llmResponse;
+                }
+            }
+
+            return new LLMResponse(
+                Content: "LLM unavailable - service error",
+                Model: config.Model,
+                CreatedAt: DateTime.UtcNow
+            );
+        }
+        catch (Exception)
+        {
+            return new LLMResponse(
+                Content: "LLM unavailable - connection error",
+                Model: config.Model,
+                CreatedAt: DateTime.UtcNow
+            );
+        }
     }
 
     /// <summary>
@@ -555,3 +658,28 @@ public static class DynamicContentGenerator
         return await _attributionSystem.ReplaceStaticDescriptions(module, context);
     }
 }
+
+/// <summary>
+/// LLM Configuration for dynamic attribution
+/// </summary>
+public record LLMConfig(
+    string Id,
+    string Name,
+    string Provider,
+    string Model,
+    string ApiKey,
+    string BaseUrl,
+    int MaxTokens,
+    double Temperature,
+    double TopP,
+    Dictionary<string, object> Parameters
+);
+
+/// <summary>
+/// LLM Response for dynamic attribution
+/// </summary>
+public record LLMResponse(
+    string Content,
+    string Model,
+    DateTime CreatedAt
+);

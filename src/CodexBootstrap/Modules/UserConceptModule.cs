@@ -216,19 +216,22 @@ namespace CodexBootstrap.Modules;
     {
         try
         {
-            var beliefSystem = new UserBeliefSystem
-            {
-                UserId = request.UserId,
-                Framework = request.Framework,
-                Language = request.Language,
-                CulturalContext = request.CulturalContext,
-                SpiritualTradition = request.SpiritualTradition,
-                ScientificBackground = request.ScientificBackground,
-                CoreValues = request.CoreValues,
-                TranslationPreferences = request.TranslationPreferences,
-                ResonanceThreshold = request.ResonanceThreshold,
-                CreatedAt = DateTime.UtcNow
-            };
+            var beliefSystem = new UserBeliefSystem(
+                Id: Guid.NewGuid().ToString(),
+                UserId: request.UserId,
+                Framework: request.Framework,
+                Description: request.Framework, // Use Framework as Description
+                Principles: new string[0], // Empty array for now
+                Values: new string[0], // Empty array for now
+                Language: request.Language,
+                CulturalContext: request.CulturalContext,
+                SpiritualTradition: request.SpiritualTradition ?? "",
+                ScientificBackground: request.ScientificBackground ?? "",
+                CoreValues: request.CoreValues.Keys.ToArray(),
+                TranslationPreferences: request.TranslationPreferences.Keys.ToArray(),
+                ResonanceThreshold: request.ResonanceThreshold,
+                CreatedAt: DateTime.UtcNow
+            );
 
             _userBeliefSystems[request.UserId] = beliefSystem;
 
