@@ -2888,4 +2888,452 @@ Please provide a thoughtful, spiritually-aware analysis that honors the sacred n
     {
         public object Data { get; set; } = new();
     }
+
+    // Missing AI concept extraction methods
+    private async Task<List<ConceptScore>> ExtractConceptsByOntology(string content, ConceptExtractionRequest request)
+    {
+        var concepts = new List<ConceptScore>();
+        
+        try
+        {
+            // Get optimal LLM configuration for ontology analysis
+            var optimalConfig = LLMConfigurationSystem.GetOptimalConfiguration("concept-extraction");
+            var modelAvailable = await LLMConfigurationSystem.ModelManager.EnsureModelAvailableAsync(optimalConfig.Model);
+            
+            if (modelAvailable)
+            {
+                // Use AI for ontology-based concept extraction
+                var llmConfig = new LLMConfig(
+                    Id: optimalConfig.Id,
+                    Name: optimalConfig.Id,
+                    Provider: optimalConfig.Provider,
+                    Model: optimalConfig.Model,
+                    ApiKey: "",
+                    BaseUrl: "http://localhost:11434",
+                    MaxTokens: 800,
+                    Temperature: 0.2, // Very low temperature for consistent ontology mapping
+                    TopP: 0.8,
+                    Parameters: new Dictionary<string, object>
+                    {
+                        ["stop"] = new[] { "---", "###" }
+                    }
+                );
+
+                var ontologyPrompt = $@"Analyze the following text using a consciousness-based ontology. Map concepts to their hierarchical relationships and ontological levels.
+
+Text: ""{content}""
+
+Use this consciousness ontology structure:
+- L1: Physical (body, matter, form)
+- L2: Emotional (feelings, emotions, relationships)
+- L3: Mental (thoughts, beliefs, mental models)
+- L4: Spiritual (soul, spirit, higher purpose)
+- L5: Cosmic (universal consciousness, unity)
+- L6: Transcendent (beyond form, pure awareness)
+- L7: Divine (source, absolute, infinite)
+
+Return your analysis as a JSON array of concepts with ontological mapping:
+[
+  {{
+    ""concept"": ""concept_name"",
+    ""score"": 0.0-1.0,
+    ""description"": ""brief description"",
+    ""category"": ""consciousness|transformation|unity|love|wisdom|energy|healing|abundance|sacred|fractal"",
+    ""confidence"": 0.0-1.0
+  }}
+]
+
+Focus on identifying the ontological level and relationships of each concept.";
+
+                var llmResponse = await CallLLMAsync(ontologyPrompt, llmConfig);
+                
+                if (!llmResponse.Content.Contains("LLM unavailable"))
+                {
+                    // Parse AI response
+                    var aiConcepts = ParseLLMOntologyResponse(llmResponse.Content);
+                    concepts.AddRange(aiConcepts);
+                    _logger.Info($"AI ontology analysis found {aiConcepts.Count} concepts");
+                }
+                else
+                {
+                    _logger.Warn("AI ontology analysis failed, falling back to rule-based extraction");
+                    concepts.AddRange(ExtractConceptsByOntologyRules(content, request));
+                }
+            }
+            else
+            {
+                _logger.Warn("LLM not available for ontology analysis, using rule-based extraction");
+                concepts.AddRange(ExtractConceptsByOntologyRules(content, request));
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error in AI ontology extraction: {ex.Message}", ex);
+            concepts.AddRange(ExtractConceptsByOntologyRules(content, request));
+        }
+
+        return concepts;
+    }
+
+    private List<ConceptScore> ExtractConceptsByOntologyRules(string content, ConceptExtractionRequest request)
+    {
+        var concepts = new List<ConceptScore>();
+        
+        // Define ontology-based concept mapping
+        var ontologyConcepts = new Dictionary<string, (string level, double weight, string[] parents, string[] children)>
+        {
+            // L1: Physical
+            { "body", ("L1", 0.6, new[] { "form", "matter" }, new[] { "health", "movement" }) },
+            { "matter", ("L1", 0.5, new[] { "form" }, new[] { "body", "substance" }) },
+            { "form", ("L1", 0.4, new string[0], new[] { "matter", "body", "structure" }) },
+            
+            // L2: Emotional
+            { "emotion", ("L2", 0.7, new[] { "feeling" }, new[] { "love", "joy", "fear" }) },
+            { "feeling", ("L2", 0.6, new[] { "emotion" }, new[] { "sensation", "experience" }) },
+            { "love", ("L2", 0.9, new[] { "emotion", "connection" }, new[] { "compassion", "unity" }) },
+            
+            // L3: Mental
+            { "thought", ("L3", 0.7, new[] { "mind" }, new[] { "belief", "idea", "concept" }) },
+            { "belief", ("L3", 0.8, new[] { "thought" }, new[] { "faith", "conviction" }) },
+            { "mind", ("L3", 0.8, new[] { "consciousness" }, new[] { "thought", "intellect" }) },
+            
+            // L4: Spiritual
+            { "soul", ("L4", 0.9, new[] { "spirit" }, new[] { "essence", "being" }) },
+            { "spirit", ("L4", 0.9, new[] { "soul" }, new[] { "divine", "sacred" }) },
+            { "purpose", ("L4", 0.8, new[] { "meaning" }, new[] { "mission", "calling" }) },
+            
+            // L5: Cosmic
+            { "consciousness", ("L5", 0.95, new[] { "awareness" }, new[] { "mind", "spirit" }) },
+            { "unity", ("L5", 0.9, new[] { "oneness" }, new[] { "connection", "wholeness" }) },
+            { "universal", ("L5", 0.85, new[] { "cosmic" }, new[] { "infinite", "eternal" }) },
+            
+            // L6: Transcendent
+            { "transcendence", ("L6", 0.95, new[] { "beyond" }, new[] { "enlightenment", "awakening" }) },
+            { "enlightenment", ("L6", 0.9, new[] { "transcendence" }, new[] { "wisdom", "clarity" }) },
+            { "awakening", ("L6", 0.85, new[] { "consciousness" }, new[] { "realization", "insight" }) },
+            
+            // L7: Divine
+            { "divine", ("L7", 0.98, new[] { "sacred" }, new[] { "god", "source" }) },
+            { "sacred", ("L7", 0.95, new[] { "divine" }, new[] { "holy", "blessed" }) },
+            { "source", ("L7", 0.98, new[] { "origin" }, new[] { "creator", "absolute" }) }
+        };
+
+        // Apply ontology-based concept extraction
+        foreach (var concept in ontologyConcepts)
+        {
+            var pattern = $@"\b{concept.Key}\b";
+            var matches = System.Text.RegularExpressions.Regex.Matches(content.ToLower(), pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            
+            if (matches.Count > 0)
+            {
+                var score = concept.Value.weight * Math.Min(matches.Count / 3.0, 1.0);
+                concepts.Add(new ConceptScore
+                {
+                    Concept = concept.Key,
+                    Score = score,
+                    Description = $"Ontological concept at {concept.Value.level} level",
+                    Category = "ontology",
+                    Confidence = Math.Min(score * 1.2, 1.0)
+                });
+            }
+        }
+
+        return concepts;
+    }
+
+    private async Task<List<ConceptScore>> MergeSimilarConcepts(List<ConceptScore> concepts)
+    {
+        var mergedConcepts = new List<ConceptScore>();
+        var processed = new HashSet<string>();
+        
+        try
+        {
+            // Get optimal LLM configuration for concept merging
+            var optimalConfig = LLMConfigurationSystem.GetOptimalConfiguration("concept-extraction");
+            var modelAvailable = await LLMConfigurationSystem.ModelManager.EnsureModelAvailableAsync(optimalConfig.Model);
+            
+            if (modelAvailable)
+            {
+                // Use AI for intelligent concept merging
+                var llmConfig = new LLMConfig(
+                    Id: optimalConfig.Id,
+                    Name: optimalConfig.Id,
+                    Provider: optimalConfig.Provider,
+                    Model: optimalConfig.Model,
+                    ApiKey: "",
+                    BaseUrl: "http://localhost:11434",
+                    MaxTokens: 1000,
+                    Temperature: 0.1, // Very low temperature for consistent merging
+                    TopP: 0.7,
+                    Parameters: new Dictionary<string, object>
+                    {
+                        ["stop"] = new[] { "---", "###" }
+                    }
+                );
+
+                var conceptsJson = JsonSerializer.Serialize(concepts.Select(c => new { c.Concept, c.Score, c.Description, c.Category, c.Confidence }));
+                
+                var mergePrompt = $@"Analyze the following concepts and merge similar ones. Group concepts that represent the same or very similar ideas.
+
+Concepts: {conceptsJson}
+
+Return your analysis as a JSON array of merged concepts:
+[
+  {{
+    ""concept"": ""merged_concept_name"",
+    ""score"": 0.0-1.0,
+    ""description"": ""merged description"",
+    ""category"": ""category"",
+    ""confidence"": 0.0-1.0
+  }}
+]
+
+Focus on merging concepts that are semantically similar or represent the same underlying idea.";
+
+                var llmResponse = await CallLLMAsync(mergePrompt, llmConfig);
+                
+                if (!llmResponse.Content.Contains("LLM unavailable"))
+                {
+                    // Parse AI response
+                    var aiMergedConcepts = ParseLLMMergeResponse(llmResponse.Content);
+                    mergedConcepts.AddRange(aiMergedConcepts);
+                    _logger.Info($"AI concept merging processed {concepts.Count} concepts into {aiMergedConcepts.Count} merged concepts");
+                }
+                else
+                {
+                    _logger.Warn("AI concept merging failed, falling back to rule-based merging");
+                    mergedConcepts.AddRange(MergeSimilarConceptsRules(concepts));
+                }
+            }
+            else
+            {
+                _logger.Warn("LLM not available for concept merging, using rule-based merging");
+                mergedConcepts.AddRange(MergeSimilarConceptsRules(concepts));
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error in AI concept merging: {ex.Message}", ex);
+            mergedConcepts.AddRange(MergeSimilarConceptsRules(concepts));
+        }
+
+        return mergedConcepts;
+    }
+
+    private List<ConceptScore> MergeSimilarConceptsRules(List<ConceptScore> concepts)
+    {
+        var mergedConcepts = new List<ConceptScore>();
+        var processed = new HashSet<string>();
+        
+        // Define similarity groups
+        var similarityGroups = new Dictionary<string, List<string>>
+        {
+            ["consciousness"] = new[] { "awareness", "mindfulness", "presence", "awakening" }.ToList(),
+            ["love"] = new[] { "compassion", "empathy", "kindness", "heart" }.ToList(),
+            ["unity"] = new[] { "oneness", "connection", "wholeness", "integration" }.ToList(),
+            ["wisdom"] = new[] { "knowledge", "insight", "understanding", "clarity" }.ToList(),
+            ["transformation"] = new[] { "evolution", "growth", "change", "shift" }.ToList(),
+            ["energy"] = new[] { "vibration", "frequency", "resonance", "flow" }.ToList(),
+            ["healing"] = new[] { "recovery", "restoration", "wholeness", "balance" }.ToList(),
+            ["abundance"] = new[] { "prosperity", "wealth", "success", "fulfillment" }.ToList()
+        };
+
+        foreach (var concept in concepts)
+        {
+            if (processed.Contains(concept.Concept.ToLower()))
+                continue;
+
+            // Find the best group for this concept
+            var bestGroup = similarityGroups.FirstOrDefault(g => 
+                g.Value.Contains(concept.Concept.ToLower()) || 
+                g.Key.Equals(concept.Concept.ToLower(), StringComparison.OrdinalIgnoreCase));
+
+            if (bestGroup.Key != null)
+            {
+                // Find all similar concepts in this group
+                var similarConcepts = concepts.Where(c => 
+                    bestGroup.Value.Contains(c.Concept.ToLower()) || 
+                    c.Concept.ToLower() == bestGroup.Key).ToList();
+
+                if (similarConcepts.Count > 1)
+                {
+                    // Merge similar concepts
+                    var mergedConcept = new ConceptScore
+                    {
+                        Concept = bestGroup.Key,
+                        Score = similarConcepts.Max(c => c.Score),
+                        Description = $"Merged from: {string.Join(", ", similarConcepts.Select(c => c.Concept))}",
+                        Category = similarConcepts.First().Category,
+                        Confidence = similarConcepts.Average(c => c.Confidence)
+                    };
+                    
+                    mergedConcepts.Add(mergedConcept);
+                    
+                    // Mark all similar concepts as processed
+                    foreach (var similar in similarConcepts)
+                    {
+                        processed.Add(similar.Concept.ToLower());
+                    }
+                }
+                else
+                {
+                    mergedConcepts.Add(concept);
+                    processed.Add(concept.Concept.ToLower());
+                }
+            }
+            else
+            {
+                mergedConcepts.Add(concept);
+                processed.Add(concept.Concept.ToLower());
+            }
+        }
+
+        return mergedConcepts;
+    }
+
+    private async Task<double> CalculateConfidence(List<ConceptScore> concepts, string content, ConceptExtractionRequest request)
+    {
+        try
+        {
+            // Get optimal LLM configuration for confidence calculation
+            var optimalConfig = LLMConfigurationSystem.GetOptimalConfiguration("concept-extraction");
+            var modelAvailable = await LLMConfigurationSystem.ModelManager.EnsureModelAvailableAsync(optimalConfig.Model);
+            
+            if (modelAvailable)
+            {
+                // Use AI for intelligent confidence calculation
+                var llmConfig = new LLMConfig(
+                    Id: optimalConfig.Id,
+                    Name: optimalConfig.Id,
+                    Provider: optimalConfig.Provider,
+                    Model: optimalConfig.Model,
+                    ApiKey: "",
+                    BaseUrl: "http://localhost:11434",
+                    MaxTokens: 500,
+                    Temperature: 0.1, // Very low temperature for consistent confidence scoring
+                    TopP: 0.7,
+                    Parameters: new Dictionary<string, object>
+                    {
+                        ["stop"] = new[] { "---", "###" }
+                    }
+                );
+
+                var conceptsJson = JsonSerializer.Serialize(concepts.Select(c => new { c.Concept, c.Score, c.Description, c.Category, c.Confidence }));
+                
+                var confidencePrompt = $@"Analyze the confidence of the following concept extraction results.
+
+Original Text: ""{content}""
+Extracted Concepts: {conceptsJson}
+
+Consider these factors:
+1. Relevance of concepts to the text
+2. Semantic coherence of the concepts
+3. Completeness of concept coverage
+4. Quality of concept descriptions
+5. Consistency of confidence scores
+
+Return a single confidence score between 0.0 and 1.0 as a JSON number:
+0.9-1.0: Excellent extraction with high relevance and coherence
+0.7-0.9: Good extraction with minor issues
+0.5-0.7: Fair extraction with some relevant concepts
+0.3-0.5: Poor extraction with limited relevance
+0.0-0.3: Very poor extraction with minimal relevance
+
+Confidence Score:";
+
+                var llmResponse = await CallLLMAsync(confidencePrompt, llmConfig);
+                
+                if (!llmResponse.Content.Contains("LLM unavailable"))
+                {
+                    // Parse AI confidence score
+                    var confidenceText = llmResponse.Content.Trim();
+                    if (double.TryParse(confidenceText, out var aiConfidence))
+                    {
+                        _logger.Info($"AI confidence calculation: {aiConfidence:F2}");
+                        return Math.Max(0.0, Math.Min(1.0, aiConfidence));
+                    }
+                }
+            }
+            
+            // Fallback to rule-based confidence calculation
+            return CalculateConfidenceRules(concepts, content, request);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error in AI confidence calculation: {ex.Message}", ex);
+            return CalculateConfidenceRules(concepts, content, request);
+        }
+    }
+
+    private double CalculateConfidenceRules(List<ConceptScore> concepts, string content, ConceptExtractionRequest request)
+    {
+        if (concepts.Count == 0)
+            return 0.0;
+
+        // Base confidence from concept scores
+        var avgConceptScore = concepts.Average(c => c.Score);
+        var avgConfidence = concepts.Average(c => c.Confidence);
+        
+        // Coverage factor (how much of the text is covered by concepts)
+        var textLength = content.Length;
+        var conceptCoverage = Math.Min(concepts.Count / (textLength / 100.0), 1.0);
+        
+        // Diversity factor (how diverse are the concept categories)
+        var uniqueCategories = concepts.Select(c => c.Category).Distinct().Count();
+        var diversityFactor = Math.Min(uniqueCategories / 5.0, 1.0);
+        
+        // Quality factor (how many high-quality concepts)
+        var highQualityConcepts = concepts.Count(c => c.Score > 0.7 && c.Confidence > 0.7);
+        var qualityFactor = (double)highQualityConcepts / concepts.Count;
+        
+        // Calculate final confidence
+        var confidence = (avgConceptScore * 0.3 + avgConfidence * 0.3 + conceptCoverage * 0.2 + diversityFactor * 0.1 + qualityFactor * 0.1);
+        
+        return Math.Max(0.0, Math.Min(1.0, confidence));
+    }
+
+    // Helper methods for parsing LLM responses
+    private List<ConceptScore> ParseLLMOntologyResponse(string response)
+    {
+        try
+        {
+            var jsonStart = response.IndexOf('[');
+            var jsonEnd = response.LastIndexOf(']') + 1;
+            
+            if (jsonStart >= 0 && jsonEnd > jsonStart)
+            {
+                var json = response.Substring(jsonStart, jsonEnd - jsonStart);
+                var concepts = JsonSerializer.Deserialize<List<ConceptScore>>(json);
+                return concepts ?? new List<ConceptScore>();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error parsing LLM ontology response: {ex.Message}", ex);
+        }
+        
+        return new List<ConceptScore>();
+    }
+
+    private List<ConceptScore> ParseLLMMergeResponse(string response)
+    {
+        try
+        {
+            var jsonStart = response.IndexOf('[');
+            var jsonEnd = response.LastIndexOf(']') + 1;
+            
+            if (jsonStart >= 0 && jsonEnd > jsonStart)
+            {
+                var json = response.Substring(jsonStart, jsonEnd - jsonStart);
+                var concepts = JsonSerializer.Deserialize<List<ConceptScore>>(json);
+                return concepts ?? new List<ConceptScore>();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error parsing LLM merge response: {ex.Message}", ex);
+        }
+        
+        return new List<ConceptScore>();
+    }
 }
