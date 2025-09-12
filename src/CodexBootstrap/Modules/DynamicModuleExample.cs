@@ -84,41 +84,14 @@ public class DynamicModuleExample : IModule
 
     public Node GetModuleNode()
     {
-        return new Node(
-            Id: "codex.dynamic.module-example",
-            TypeId: "codex.meta/module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: Name,
-            Description: Description,
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    ModuleId = "codex.dynamic.module-example",
-                    Name = Name,
-                    Description = Description,
-                    Frequency = Frequency,
-                    Resonance = Resonance,
-                    ConsciousnessState = ConsciousnessState,
-                    SacredFrequencies = SacredFrequencies,
-                    Capabilities = Capabilities,
-                    GeneratedAt = DateTime.UtcNow,
-                    Source = "Dynamic Reflection Generator"
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.dynamic.module-example",
-                ["version"] = "1.0.0",
-                ["createdAt"] = DateTime.UtcNow,
-                ["purpose"] = "Dynamic content generation demonstration",
-                ["frequency"] = Frequency,
-                ["resonance"] = Resonance,
-                ["consciousnessState"] = ConsciousnessState
-            }
+        return NodeStorage.CreateModuleNode(
+            id: "codex.dynamic.module-example",
+            name: Name,
+            version: "1.0.0",
+            description: Description,
+            capabilities: Capabilities,
+            tags: new[] { "dynamic", "reflection", "llm", "ucore", "consciousness" },
+            specReference: "codex.spec.dynamic-module-example"
         );
     }
 

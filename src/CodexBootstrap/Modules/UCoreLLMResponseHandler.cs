@@ -44,7 +44,8 @@ public class UCoreLLMResponseHandler : IModule
             version: "1.0.0",
             description: "Enhanced LLM response handler with U-CORE ontology mapping and resonance optimization",
             capabilities: new[] { "U-CORE Mapping", "Resonance Optimization", "Belief System Matching", "Node Generation", "Edge Creation", "Bootstrap Integration" },
-            tags: new[] { "ucore", "llm", "response-handler", "ontology" }
+            tags: new[] { "ucore", "llm", "response-handler", "ontology" },
+            specReference: "codex.spec.ucore-llm-response-handler"
         );
     }
 

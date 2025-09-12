@@ -3,6 +3,57 @@ using System;
 namespace CodexBootstrap.Core;
 
 /// <summary>
+/// Represents the integration status of an API route
+/// </summary>
+public enum RouteStatus
+{
+    /// <summary>
+    /// Route is a placeholder stub with no implementation
+    /// </summary>
+    Stub,
+    
+    /// <summary>
+    /// Route has basic implementation but limited functionality
+    /// </summary>
+    Simple,
+    
+    /// <summary>
+    /// Route uses simulated/mocked data instead of real implementation
+    /// </summary>
+    Simulated,
+    
+    /// <summary>
+    /// Route is a fallback implementation when primary service is unavailable
+    /// </summary>
+    Fallback,
+    
+    /// <summary>
+    /// Route is enhanced with AI capabilities
+    /// </summary>
+    AiEnabled,
+    
+    /// <summary>
+    /// Route depends on external information/services
+    /// </summary>
+    ExternalInfo,
+    
+    /// <summary>
+    /// Route has not been tested yet
+    /// </summary>
+    Untested,
+    
+    /// <summary>
+    /// Route has been partially tested
+    /// </summary>
+    PartiallyTested,
+    
+    /// <summary>
+    /// Route has been fully tested and verified
+    /// </summary>
+    FullyTested
+}
+
+/// <summary>
 /// Attribute to declare an API endpoint for automatic route registration
 /// </summary>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
@@ -77,6 +128,11 @@ public class ApiRouteAttribute : Attribute
     /// The version of this endpoint
     /// </summary>
     public string Version { get; set; } = "1.0.0";
+
+    /// <summary>
+    /// The integration status of this endpoint
+    /// </summary>
+    public RouteStatus Status { get; set; } = RouteStatus.Untested;
 
     /// <summary>
     /// Initializes a new instance of the ApiRouteAttribute

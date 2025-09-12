@@ -129,6 +129,7 @@ public static class ApiRouteDiscovery
             operationId = attribute.OperationId,
             deprecated = attribute.Deprecated,
             version = attribute.Version,
+            status = attribute.Status.ToString(),
             parameters = parameters.Select(p => new
             {
                 name = p.Name,
@@ -147,6 +148,7 @@ public static class ApiRouteDiscovery
             ["isApi"] = true,
             ["requiresAuth"] = attribute.RequiresAuth,
             ["deprecated"] = attribute.Deprecated,
+            ["status"] = attribute.Status.ToString(),
             ["version"] = attribute.Version
         };
 

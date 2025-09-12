@@ -419,12 +419,12 @@ public sealed class SpecModule : IModule
                 
                 atomsData = JsonSerializer.Deserialize<AtomsData>(atoms.GetRawText(), jsonOptions);
                 if (atomsData == null) 
-                {
-                    _logger.Warn("AtomsData is null after deserialization");
-                    return Task.CompletedTask;
-                }
-                
-                _logger.Info($"Parsed {atomsData.Nodes?.Count ?? 0} nodes and {atomsData.Edges?.Count ?? 0} edges");
+            {
+                _logger.Warn("AtomsData is null after deserialization");
+                return Task.CompletedTask;
+            }
+            
+            _logger.Info($"Parsed {atomsData.Nodes?.Count ?? 0} nodes and {atomsData.Edges?.Count ?? 0} edges");
                 
                 if (atomsData.Nodes == null || atomsData.Nodes.Count == 0)
                 {
@@ -673,6 +673,7 @@ public sealed class SpecModule : IModule
                     Parameters = ExtractRouteParameters(apiNode),
                     ResponseTypes = ExtractResponseTypes(apiNode),
                     IsSpecDriven = apiNode.Meta?.GetValueOrDefault("spec-driven")?.ToString() == "true",
+                    Status = ExtractRouteStatus(apiNode),
                     LastUpdated = apiNode.Meta?.GetValueOrDefault("lastUpdated")?.ToString() ?? DateTime.UtcNow.ToString("O")
                 };
                 
@@ -810,7 +811,8 @@ public sealed class SpecModule : IModule
                 Path = apiNode.Meta?.GetValueOrDefault("route")?.ToString() ?? "",
                 Method = ExtractHttpMethod(apiNode),
                 Description = apiNode.Description ?? "No description available",
-                ModuleId = moduleId
+                ModuleId = moduleId,
+                Status = ExtractRouteStatus(apiNode)
             })
             .ToList();
     }
@@ -852,6 +854,52 @@ public sealed class SpecModule : IModule
         // This would need to be enhanced to parse actual response type information
         // For now, return empty list
         return new List<string>();
+    }
+
+    private RouteStatus ExtractRouteStatus(Node apiNode)
+    {
+        // Get status from meta data, default to Untested if not specified
+        var statusString = apiNode.Meta?.GetValueOrDefault("status")?.ToString();
+        
+        if (string.IsNullOrEmpty(statusString))
+        {
+            // Try to infer status from description or other metadata
+            var description = apiNode.Description ?? "";
+            var route = apiNode.Meta?.GetValueOrDefault("route")?.ToString() ?? "";
+            
+            if (description.Contains("stub", StringComparison.OrdinalIgnoreCase) || 
+                description.Contains("placeholder", StringComparison.OrdinalIgnoreCase))
+                return RouteStatus.Stub;
+            
+            if (description.Contains("simulated", StringComparison.OrdinalIgnoreCase) || 
+                description.Contains("mock", StringComparison.OrdinalIgnoreCase))
+                return RouteStatus.Simulated;
+            
+            if (description.Contains("fallback", StringComparison.OrdinalIgnoreCase) || 
+                description.Contains("backup", StringComparison.OrdinalIgnoreCase))
+                return RouteStatus.Fallback;
+            
+            if (description.Contains("ai", StringComparison.OrdinalIgnoreCase) || 
+                description.Contains("llm", StringComparison.OrdinalIgnoreCase) ||
+                description.Contains("artificial intelligence", StringComparison.OrdinalIgnoreCase))
+                return RouteStatus.AiEnabled;
+            
+            if (description.Contains("external", StringComparison.OrdinalIgnoreCase) || 
+                description.Contains("api", StringComparison.OrdinalIgnoreCase))
+                return RouteStatus.ExternalInfo;
+            
+            if (description.Contains("test", StringComparison.OrdinalIgnoreCase) || 
+                route.Contains("test", StringComparison.OrdinalIgnoreCase))
+                return RouteStatus.Simple;
+            
+            return RouteStatus.Untested;
+        }
+        
+        // Parse the status string
+        if (Enum.TryParse<RouteStatus>(statusString, true, out var status))
+            return status;
+        
+        return RouteStatus.Untested;
     }
 
     private int CalculateFeaturePriority(string category, List<ModuleInfo> modules)
@@ -906,6 +954,7 @@ public class RouteInfo
     public List<string> Parameters { get; set; } = new();
     public List<string> ResponseTypes { get; set; } = new();
     public bool IsSpecDriven { get; set; }
+    public RouteStatus Status { get; set; } = RouteStatus.Untested;
     public string LastUpdated { get; set; } = "";
 }
 

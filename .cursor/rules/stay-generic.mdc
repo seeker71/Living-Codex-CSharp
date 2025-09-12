@@ -1,5 +1,5 @@
 ---
-description:
+description: Core architectural principles for Living Codex development
 globs:
 alwaysApply: true
 ---
@@ -22,5 +22,40 @@ Adapters Over Features. External I/O (web, files, DB, AI) is adapterized; the co
 Deterministic Projections. OpenAPI/JSON‑Schema/codegen derive deterministically from meta‑nodes.
 
 One‑Shot First. Each coil should be runnable from atoms via a single call (prove minimal sufficiency).
+
+## Core Code Purity
+Keep core code (Program.cs, ModuleLoader, NodeRegistry, etc.) free of module-specific logic. Core should only contain:
+- Generic infrastructure and abstractions
+- Module discovery and loading mechanisms
+- Node storage and retrieval operations
+- API routing and discovery systems
+- Health and monitoring infrastructure
+
+## Module Organization
+- Start with spec first, then find the right existing module to add features
+- Do not create new modules unless no high-level module can host the new feature
+- Use [ApiRoute] attributes to declare new endpoints
+- Use generic template-based helpers for module-to-module communication
+- Prefer external resources and libraries over new code
+
+## Data and Algorithm Quality
+- Avoid mock, simulation, and stub data and code
+- Always prefer real data (node-based) and real algorithms
+- Write thoughtful, production-ready code
+- Use helper methods to avoid repeating patterns
+- Create templates for each common task
+
+## Development Workflow
+- Before testing: ensure the system builds
+- Before building: ensure it is not running
+- Always examine system output for exceptions and errors before calling success
+- Use RouteStatus enum to track integration state (Stub, Simple, Simulated, Fallback, AiEnabled, ExternalInfo, Untested, PartiallyTested, FullyTested)
+
+## Common Templates
+- Module registration: Use NodeStorage.CreateModuleNode() with spec references
+- API endpoints: Use [ApiRoute] attributes with proper status tracking
+- Module communication: Use generic ModuleCommunicationWrapper
+- Error handling: Use consistent ErrorResponse patterns
+- Logging: Use Log4NetLogger with structured logging
 
 Do not overstate success, only after validation has completed without any warnings or errors.

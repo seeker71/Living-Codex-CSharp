@@ -41,33 +41,14 @@ public class EndpointGenerationDemo : IModule
 
     public Node GetModuleNode()
     {
-        return new Node(
-            Id: "codex.endpoint.generation-demo",
-            TypeId: "codex.meta/module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Endpoint Generation Demo",
-            Description: "Demonstrates missing endpoint generation with U-CORE delta diffs",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    ModuleId = "codex.endpoint.generation-demo",
-                    Name = "Endpoint Generation Demo",
-                    Description = "Demonstrates missing endpoint generation with breath framework integration",
-                    Version = "1.0.0",
-                    Capabilities = new[] { "EndpointGeneration", "DeltaDiffs", "BreathFramework", "U-CORE Integration" }
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.endpoint.generation-demo",
-                ["version"] = "1.0.0",
-                ["createdAt"] = DateTime.UtcNow,
-                ["purpose"] = "Endpoint generation demonstration"
-            }
+        return NodeStorage.CreateModuleNode(
+            id: "codex.endpoint.generation-demo",
+            name: "Endpoint Generation Demo",
+            version: "1.0.0",
+            description: "Demonstrates missing endpoint generation with U-CORE delta diffs",
+            capabilities: new[] { "EndpointGeneration", "DeltaDiffs", "BreathFramework", "U-CORE Integration" },
+            tags: new[] { "endpoint", "generation", "demo", "ucore", "breath", "delta" },
+            specReference: "codex.spec.endpoint-generation-demo"
         );
     }
 
