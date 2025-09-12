@@ -49,6 +49,10 @@ public sealed class SpecModule : IModule
         var importApi = NodeStorage.CreateApiNode("codex.spec", "import", "/spec/import", "Import module atoms");
         var getAtomsApi = NodeStorage.CreateApiNode("codex.spec", "get-atoms", "/spec/atoms/{id}", "Get module atoms");
         var getSpecApi = NodeStorage.CreateApiNode("codex.spec", "get-spec", "/spec/{id}", "Get module spec");
+        var getAllModulesApi = NodeStorage.CreateApiNode("codex.spec", "get-all-modules", "/spec/modules/all", "Get all modules catalog");
+        var getAllRoutesApi = NodeStorage.CreateApiNode("codex.spec", "get-all-routes", "/spec/routes/all", "Get all routes catalog");
+        var getFeaturesMapApi = NodeStorage.CreateApiNode("codex.spec", "get-features-map", "/spec/features/map", "Get modules mapped to features");
+        var getStatusOverviewApi = NodeStorage.CreateApiNode("codex.spec", "get-status-overview", "/spec/status/overview", "Get comprehensive system status overview");
         
         registry.Upsert(atomsApi);
         registry.Upsert(composeApi);
@@ -56,6 +60,10 @@ public sealed class SpecModule : IModule
         registry.Upsert(importApi);
         registry.Upsert(getAtomsApi);
         registry.Upsert(getSpecApi);
+        registry.Upsert(getAllModulesApi);
+        registry.Upsert(getAllRoutesApi);
+        registry.Upsert(getFeaturesMapApi);
+        registry.Upsert(getStatusOverviewApi);
         
         // Register edges
         registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.spec", "atoms"));
@@ -64,6 +72,10 @@ public sealed class SpecModule : IModule
         registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.spec", "import"));
         registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.spec", "get-atoms"));
         registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.spec", "get-spec"));
+        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.spec", "get-all-modules"));
+        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.spec", "get-all-routes"));
+        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.spec", "get-features-map"));
+        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.spec", "get-status-overview"));
     }
 
     public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
@@ -205,6 +217,103 @@ public sealed class SpecModule : IModule
         catch (Exception ex)
         {
             return new ErrorResponse($"Failed to get spec: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("GET", "/spec/modules/all", "spec-get-all-modules", "Get all modules catalog", "codex.spec")]
+    public async Task<object> GetAllModules()
+    {
+        try
+        {
+            var modules = await DiscoverAllModules();
+            return new
+            {
+                success = true,
+                message = "All modules discovered successfully",
+                timestamp = DateTime.UtcNow,
+                totalModules = modules.Count,
+                modules = modules
+            };
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to discover modules: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("GET", "/spec/routes/all", "spec-get-all-routes", "Get all routes catalog", "codex.spec")]
+    public async Task<object> GetAllRoutes()
+    {
+        try
+        {
+            var routes = await DiscoverAllRoutes();
+            return new
+            {
+                success = true,
+                message = "All routes discovered successfully",
+                timestamp = DateTime.UtcNow,
+                totalRoutes = routes.Count,
+                routes = routes
+            };
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to discover routes: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("GET", "/spec/features/map", "spec-get-features-map", "Get modules mapped to features", "codex.spec")]
+    public async Task<object> GetFeaturesMap()
+    {
+        try
+        {
+            var featuresMap = await MapModulesToFeatures();
+            return new
+            {
+                success = true,
+                message = "Features map generated successfully",
+                timestamp = DateTime.UtcNow,
+                totalFeatures = featuresMap.Count,
+                features = featuresMap
+            };
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to generate features map: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("GET", "/spec/status/overview", "spec-get-status-overview", "Get comprehensive system status overview", "codex.spec")]
+    public async Task<object> GetStatusOverview()
+    {
+        try
+        {
+            var modules = await DiscoverAllModules();
+            var routes = await DiscoverAllRoutes();
+            var featuresMap = await MapModulesToFeatures();
+            
+            return new
+            {
+                success = true,
+                message = "System status overview generated successfully",
+                timestamp = DateTime.UtcNow,
+                system = new
+                {
+                    totalModules = modules.Count,
+                    totalRoutes = routes.Count,
+                    totalFeatures = featuresMap.Count,
+                    specDrivenModules = modules.Count(m => m.IsSpecDriven),
+                    hotReloadableModules = modules.Count(m => m.IsHotReloadable),
+                    stableModules = modules.Count(m => m.IsStable)
+                },
+                modules = modules,
+                routes = routes,
+                features = featuresMap
+            };
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to generate status overview: {ex.Message}");
         }
     }
 
@@ -414,6 +523,325 @@ public sealed class SpecModule : IModule
         public string? ToId { get; set; }
         public string? Role { get; set; }
     }
+
+    // Discovery methods for comprehensive module and route tracking
+    private async Task<List<ModuleInfo>> DiscoverAllModules()
+    {
+        var modules = new List<ModuleInfo>();
+        
+        try
+        {
+            // Get all module nodes from registry
+            var moduleNodes = _registry.AllNodes()
+                .Where(node => node.TypeId == "module")
+                .ToList();
+
+            foreach (var moduleNode in moduleNodes)
+            {
+                var moduleInfo = new ModuleInfo
+                {
+                    Id = moduleNode.Id,
+                    Name = moduleNode.Title ?? moduleNode.Id,
+                    Version = moduleNode.Meta?.GetValueOrDefault("version")?.ToString() ?? "1.0.0",
+                    Description = moduleNode.Description ?? "No description available",
+                    State = moduleNode.State.ToString(),
+                    IsSpecDriven = moduleNode.Meta?.GetValueOrDefault("spec-driven")?.ToString() == "true",
+                    IsHotReloadable = IsModuleHotReloadable(moduleNode),
+                    IsStable = IsModuleStable(moduleNode),
+                    Features = ExtractModuleFeatures(moduleNode),
+                    Dependencies = GetModuleDependencies(moduleNode.Id),
+                    Routes = await GetModuleRoutes(moduleNode.Id),
+                    LastUpdated = moduleNode.Meta?.GetValueOrDefault("lastUpdated")?.ToString() ?? DateTime.UtcNow.ToString("O")
+                };
+                
+                modules.Add(moduleInfo);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error discovering modules: {ex.Message}");
+        }
+        
+        return modules;
+    }
+
+    private async Task<List<RouteInfo>> DiscoverAllRoutes()
+    {
+        var routes = new List<RouteInfo>();
+        
+        try
+        {
+            // Get all API nodes from registry
+            var apiNodes = _registry.AllNodes()
+                .Where(node => node.TypeId == "api")
+                .ToList();
+
+            foreach (var apiNode in apiNodes)
+            {
+                var routeInfo = new RouteInfo
+                {
+                    Id = apiNode.Id,
+                    Name = apiNode.Meta?.GetValueOrDefault("apiName")?.ToString() ?? "unknown",
+                    Path = apiNode.Meta?.GetValueOrDefault("route")?.ToString() ?? "",
+                    Method = ExtractHttpMethod(apiNode),
+                    Description = apiNode.Description ?? "No description available",
+                    ModuleId = apiNode.Meta?.GetValueOrDefault("moduleId")?.ToString() ?? "unknown",
+                    Tags = ExtractRouteTags(apiNode),
+                    Parameters = ExtractRouteParameters(apiNode),
+                    ResponseTypes = ExtractResponseTypes(apiNode),
+                    IsSpecDriven = apiNode.Meta?.GetValueOrDefault("spec-driven")?.ToString() == "true",
+                    LastUpdated = apiNode.Meta?.GetValueOrDefault("lastUpdated")?.ToString() ?? DateTime.UtcNow.ToString("O")
+                };
+                
+                routes.Add(routeInfo);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error discovering routes: {ex.Message}");
+        }
+        
+        return routes;
+    }
+
+    private async Task<List<FeatureInfo>> MapModulesToFeatures()
+    {
+        var features = new List<FeatureInfo>();
+        
+        try
+        {
+            // Define feature categories based on the Living Codex specification
+            var featureCategories = new Dictionary<string, List<string>>
+            {
+                ["Core Framework"] = new() { "Core", "Spec", "Storage", "ModuleLoader", "NodeRegistry" },
+                ["Abundance & Amplification"] = new() { "UserContributions", "Abundance", "Amplification", "Rewards" },
+                ["Future Knowledge"] = new() { "FutureKnowledge", "PatternDiscovery", "Prediction", "LLM" },
+                ["Resonance Engine"] = new() { "Resonance", "Joy", "Frequency", "U-CORE", "Sacred" },
+                ["Translation & Communication"] = new() { "Translation", "Language", "Communication" },
+                ["Real-time Systems"] = new() { "Realtime", "News", "Streaming", "Events" },
+                ["Graph & Query"] = new() { "Graph", "Query", "MetaNode", "Exploration" },
+                ["Security & Access"] = new() { "Security", "Authentication", "Authorization", "Access" },
+                ["Monitoring & Health"] = new() { "Health", "Metrics", "Monitoring", "Status" },
+                ["AI & Machine Learning"] = new() { "AI", "ML", "Concept", "Ontology", "Intelligence" }
+            };
+
+            var modules = await DiscoverAllModules();
+            
+            foreach (var category in featureCategories)
+            {
+                var categoryModules = modules.Where(m => 
+                    category.Value.Any(keyword => 
+                        m.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
+                        m.Description.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
+                        m.Features.Any(f => f.Contains(keyword, StringComparison.OrdinalIgnoreCase))
+                    )).ToList();
+
+                if (categoryModules.Any())
+                {
+                    features.Add(new FeatureInfo
+                    {
+                        Category = category.Key,
+                        ModuleCount = categoryModules.Count,
+                        Modules = categoryModules.Select(m => new ModuleReference
+                        {
+                            Id = m.Id,
+                            Name = m.Name,
+                            Version = m.Version,
+                            IsSpecDriven = m.IsSpecDriven,
+                            IsHotReloadable = m.IsHotReloadable
+                        }).ToList(),
+                        Routes = categoryModules.SelectMany(m => m.Routes).ToList(),
+                        Priority = CalculateFeaturePriority(category.Key, categoryModules)
+                    });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error mapping modules to features: {ex.Message}");
+        }
+        
+        return features;
+    }
+
+    // Helper methods
+    private bool IsModuleHotReloadable(Node moduleNode)
+    {
+        var moduleName = moduleNode.Meta?.GetValueOrDefault("name")?.ToString() ?? "";
+        var hotReloadableModules = new[] { "TestDynamicModule", "ExampleModule", "HelloModule" };
+        return hotReloadableModules.Any(name => moduleName.Contains(name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private bool IsModuleStable(Node moduleNode)
+    {
+        var moduleId = moduleNode.Id;
+        var stableModules = new[] { "codex.core", "codex.spec", "codex.storage" };
+        return stableModules.Contains(moduleId);
+    }
+
+    private List<string> ExtractModuleFeatures(Node moduleNode)
+    {
+        var features = new List<string>();
+        
+        // Extract from description
+        var description = moduleNode.Description ?? "";
+        if (description.Contains("AI", StringComparison.OrdinalIgnoreCase)) features.Add("AI");
+        if (description.Contains("LLM", StringComparison.OrdinalIgnoreCase)) features.Add("LLM");
+        if (description.Contains("Real-time", StringComparison.OrdinalIgnoreCase)) features.Add("Real-time");
+        if (description.Contains("Translation", StringComparison.OrdinalIgnoreCase)) features.Add("Translation");
+        if (description.Contains("Security", StringComparison.OrdinalIgnoreCase)) features.Add("Security");
+        if (description.Contains("Graph", StringComparison.OrdinalIgnoreCase)) features.Add("Graph");
+        if (description.Contains("Resonance", StringComparison.OrdinalIgnoreCase)) features.Add("Resonance");
+        if (description.Contains("Future", StringComparison.OrdinalIgnoreCase)) features.Add("Future Knowledge");
+        
+        // Extract from tags
+        if (moduleNode.Meta?.ContainsKey("tags") == true)
+        {
+            var tags = moduleNode.Meta["tags"];
+            if (tags is string[] tagArray)
+            {
+                features.AddRange(tagArray);
+            }
+        }
+        
+        return features.Distinct().ToList();
+    }
+
+    private List<string> GetModuleDependencies(string moduleId)
+    {
+        return _registry.AllEdges()
+            .Where(edge => edge.FromId == moduleId)
+            .Select(edge => edge.ToId)
+            .ToList();
+    }
+
+    private async Task<List<RouteInfo>> GetModuleRoutes(string moduleId)
+    {
+        return _registry.AllNodes()
+            .Where(node => node.TypeId == "api" && 
+                          node.Meta?.GetValueOrDefault("moduleId")?.ToString() == moduleId)
+            .Select(apiNode => new RouteInfo
+            {
+                Id = apiNode.Id,
+                Name = apiNode.Meta?.GetValueOrDefault("apiName")?.ToString() ?? "unknown",
+                Path = apiNode.Meta?.GetValueOrDefault("route")?.ToString() ?? "",
+                Method = ExtractHttpMethod(apiNode),
+                Description = apiNode.Description ?? "No description available",
+                ModuleId = moduleId
+            })
+            .ToList();
+    }
+
+    private string ExtractHttpMethod(Node apiNode)
+    {
+        var route = apiNode.Meta?.GetValueOrDefault("route")?.ToString() ?? "";
+        if (route.StartsWith("GET", StringComparison.OrdinalIgnoreCase)) return "GET";
+        if (route.StartsWith("POST", StringComparison.OrdinalIgnoreCase)) return "POST";
+        if (route.StartsWith("PUT", StringComparison.OrdinalIgnoreCase)) return "PUT";
+        if (route.StartsWith("DELETE", StringComparison.OrdinalIgnoreCase)) return "DELETE";
+        if (route.StartsWith("PATCH", StringComparison.OrdinalIgnoreCase)) return "PATCH";
+        return "GET"; // Default
+    }
+
+    private List<string> ExtractRouteTags(Node apiNode)
+    {
+        var tags = new List<string>();
+        var description = apiNode.Description ?? "";
+        
+        if (description.Contains("health", StringComparison.OrdinalIgnoreCase)) tags.Add("health");
+        if (description.Contains("metrics", StringComparison.OrdinalIgnoreCase)) tags.Add("metrics");
+        if (description.Contains("status", StringComparison.OrdinalIgnoreCase)) tags.Add("status");
+        if (description.Contains("test", StringComparison.OrdinalIgnoreCase)) tags.Add("test");
+        if (description.Contains("admin", StringComparison.OrdinalIgnoreCase)) tags.Add("admin");
+        
+        return tags;
+    }
+
+    private List<string> ExtractRouteParameters(Node apiNode)
+    {
+        // This would need to be enhanced to parse actual parameter information
+        // For now, return empty list
+        return new List<string>();
+    }
+
+    private List<string> ExtractResponseTypes(Node apiNode)
+    {
+        // This would need to be enhanced to parse actual response type information
+        // For now, return empty list
+        return new List<string>();
+    }
+
+    private int CalculateFeaturePriority(string category, List<ModuleInfo> modules)
+    {
+        // Priority based on category importance and module count
+        var categoryPriority = category switch
+        {
+            "Core Framework" => 10,
+            "Security & Access" => 9,
+            "AI & Machine Learning" => 8,
+            "Future Knowledge" => 7,
+            "Resonance Engine" => 6,
+            "Abundance & Amplification" => 5,
+            "Real-time Systems" => 4,
+            "Graph & Query" => 3,
+            "Translation & Communication" => 2,
+            "Monitoring & Health" => 1,
+            _ => 0
+        };
+        
+        var moduleCountBonus = Math.Min(modules.Count * 2, 10);
+        return categoryPriority + moduleCountBonus;
+    }
+}
+
+// Data classes for comprehensive tracking
+public class ModuleInfo
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Version { get; set; } = "";
+    public string Description { get; set; } = "";
+    public string State { get; set; } = "";
+    public bool IsSpecDriven { get; set; }
+    public bool IsHotReloadable { get; set; }
+    public bool IsStable { get; set; }
+    public List<string> Features { get; set; } = new();
+    public List<string> Dependencies { get; set; } = new();
+    public List<RouteInfo> Routes { get; set; } = new();
+    public string LastUpdated { get; set; } = "";
+}
+
+public class RouteInfo
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Path { get; set; } = "";
+    public string Method { get; set; } = "";
+    public string Description { get; set; } = "";
+    public string ModuleId { get; set; } = "";
+    public List<string> Tags { get; set; } = new();
+    public List<string> Parameters { get; set; } = new();
+    public List<string> ResponseTypes { get; set; } = new();
+    public bool IsSpecDriven { get; set; }
+    public string LastUpdated { get; set; } = "";
+}
+
+public class FeatureInfo
+{
+    public string Category { get; set; } = "";
+    public int ModuleCount { get; set; }
+    public List<ModuleReference> Modules { get; set; } = new();
+    public List<RouteInfo> Routes { get; set; } = new();
+    public int Priority { get; set; }
+}
+
+public class ModuleReference
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Version { get; set; } = "";
+    public bool IsSpecDriven { get; set; }
+    public bool IsHotReloadable { get; set; }
 }
 
 // Request types for the spec module
