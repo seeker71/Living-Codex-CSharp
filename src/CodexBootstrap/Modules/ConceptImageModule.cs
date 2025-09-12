@@ -131,7 +131,14 @@ public class ConceptImageModule : IModule
 
     public Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(ModuleId, Name, Version, Description);
+        return NodeStorage.CreateModuleNode(
+            id: ModuleId,
+            name: Name,
+            version: Version,
+            description: Description,
+            capabilities: new[] { "image-generation", "concept-visualization", "ai-integration", "multi-provider-support" },
+            tags: new[] { "image", "concept", "ai", "visualization" }
+        );
     }
 
     public void Register(NodeRegistry registry)

@@ -62,25 +62,13 @@ namespace CodexBootstrap.Modules
 
         public Node GetModuleNode()
         {
-            return new Node(
-                Id: "realtime-news-stream-module",
-                TypeId: "codex.module.news.stream",
-                State: ContentState.Ice,
-                Locale: "en-US",
-                Title: "Real-Time News Stream Module",
-                Description: "Ingests external news sources and transforms them through fractal analysis",
-                Content: new ContentRef(
-                    MediaType: "application/json",
-                    InlineJson: JsonSerializer.Serialize(new { Name, Description, Version }),
-                    InlineBytes: null,
-                    ExternalUri: null
-                ),
-                Meta: new Dictionary<string, object>
-                {
-                    ["version"] = Version,
-                    ["moduleType"] = "news-streaming",
-                    ["capabilities"] = new[] { "rss-ingestion", "api-ingestion", "fractal-analysis", "real-time-streaming" }
-                }
+            return NodeStorage.CreateModuleNode(
+                id: "realtime-news-stream-module",
+                name: "Real-Time News Stream Module",
+                version: Version,
+                description: "Ingests external news sources and transforms them through fractal analysis",
+                capabilities: new[] { "rss-ingestion", "api-ingestion", "fractal-analysis", "real-time-streaming" },
+                tags: new[] { "news", "streaming", "realtime", "fractal" }
             );
         }
 

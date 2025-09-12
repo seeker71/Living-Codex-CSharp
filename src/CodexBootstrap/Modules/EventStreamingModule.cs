@@ -29,37 +29,13 @@ public sealed class EventStreamingModule : IModule
 
     public Node GetModuleNode()
     {
-        return new Node(
-            Id: "codex.event-streaming",
-            TypeId: "codex.module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Event Streaming Module",
-            Description: "Provides event streaming for live updates on node/edge changes",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    version = "0.1.0",
-                    capabilities = new[]
-                    {
-                        "event_streaming",
-                        "event_history",
-                        "event_subscription",
-                        "event_filtering",
-                        "event_aggregation",
-                        "event_replay"
-                    }
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["name"] = "Event Streaming Module",
-                ["version"] = "0.1.0",
-                ["description"] = "Provides event streaming for live updates on node/edge changes"
-            }
+        return NodeStorage.CreateModuleNode(
+            id: "codex.event-streaming",
+            name: "Event Streaming Module",
+            version: "0.1.0",
+            description: "Provides event streaming for live updates on node/edge changes",
+            capabilities: new[] { "event_streaming", "event_history", "event_subscription", "event_filtering", "event_aggregation", "event_replay" },
+            tags: new[] { "event-streaming", "real-time", "updates", "subscription" }
         );
     }
 

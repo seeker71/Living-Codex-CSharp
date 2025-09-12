@@ -28,31 +28,13 @@ public class LoadBalancingModule : IModule
 
     public Node GetModuleNode()
     {
-        return new Node(
-            Id: "codex.load-balancing",
-            TypeId: "codex.module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Load Balancing and Performance Optimization Module",
-            Description: "Advanced load balancing, performance monitoring, and auto-scaling for distributed services",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    version = "1.0.0",
-                    capabilities = new[] { "load-balancing", "performance-monitoring", "auto-scaling", "resource-optimization", "health-monitoring" },
-                    endpoints = new[] { "balance-load", "get-metrics", "get-recommendations", "scale-service", "optimize-performance" }
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["name"] = "Load Balancing and Performance Optimization Module",
-                ["version"] = "1.0.0",
-                ["type"] = "load-balancing",
-                ["capabilities"] = new[] { "load-balancing", "performance-monitoring", "auto-scaling", "resource-optimization" }
-            }
+        return NodeStorage.CreateModuleNode(
+            id: "codex.load-balancing",
+            name: "Load Balancing and Performance Optimization Module",
+            version: "1.0.0",
+            description: "Advanced load balancing, performance monitoring, and auto-scaling for distributed services",
+            capabilities: new[] { "load-balancing", "performance-monitoring", "auto-scaling", "resource-optimization", "health-monitoring" },
+            tags: new[] { "load-balancing", "performance", "scaling", "optimization" }
         );
     }
 

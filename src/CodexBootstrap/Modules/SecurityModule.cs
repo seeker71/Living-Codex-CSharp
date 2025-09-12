@@ -38,31 +38,13 @@ public class SecurityModule : IModule
 
     public Node GetModuleNode()
     {
-        return new Node(
-            Id: "codex.security",
-            TypeId: "codex.module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Security Module",
-            Description: "JWT authentication, data encryption, and comprehensive access control for Living Codex",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    version = "1.0.0",
-                    capabilities = new[] { "jwt-authentication", "data-encryption", "role-based-access", "audit-logging", "security-policies" },
-                    endpoints = new[] { "authenticate", "authorize", "encrypt", "decrypt", "audit-log", "manage-roles" }
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["name"] = "Security Module",
-                ["version"] = "1.0.0",
-                ["type"] = "security",
-                ["capabilities"] = new[] { "jwt-authentication", "data-encryption", "role-based-access", "audit-logging" }
-            }
+        return NodeStorage.CreateModuleNode(
+            id: "codex.security",
+            name: "Security Module",
+            version: "1.0.0",
+            description: "JWT authentication, data encryption, and comprehensive access control for Living Codex",
+            capabilities: new[] { "jwt-authentication", "data-encryption", "role-based-access", "audit-logging", "security-policies" },
+            tags: new[] { "security", "authentication", "encryption", "access-control" }
         );
     }
 
