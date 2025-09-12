@@ -37,7 +37,9 @@ public class ServiceDiscoveryModule : IModule
 
     public Node GetModuleNode()
     {
-        return ModuleHelpers.CreateModuleNode(ModuleId, Name, Version, Description);
+        return NodeStorage.CreateModuleNode(ModuleId, Name, Version, Description,
+            capabilities: new[] { "service-registration", "service-discovery", "health-monitoring" },
+            tags: new[] { "service-discovery", "microservices", "registration" });
     }
 
     public void Register(NodeRegistry registry)

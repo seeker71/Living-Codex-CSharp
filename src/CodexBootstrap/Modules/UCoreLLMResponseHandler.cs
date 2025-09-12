@@ -38,33 +38,13 @@ public class UCoreLLMResponseHandler : IModule
 
     public Node GetModuleNode()
     {
-        return new Node(
-            Id: "codex.ucore.llm-response-handler",
-            TypeId: "codex.meta/module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "U-CORE LLM Response Handler",
-            Description: "Enhanced LLM response handler with U-CORE ontology mapping and resonance optimization",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    ModuleId = "codex.ucore.llm-response-handler",
-                    Name = "U-CORE LLM Response Handler",
-                    Description = "Enhanced LLM response handler with U-CORE ontology integration",
-                    Version = "1.0.0",
-                    Capabilities = new[] { "U-CORE Mapping", "Resonance Optimization", "Belief System Matching", "Node Generation", "Edge Creation", "Bootstrap Integration" }
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.ucore.llm-response-handler",
-                ["version"] = "1.0.0",
-                ["createdAt"] = DateTime.UtcNow,
-                ["purpose"] = "U-CORE enhanced LLM response processing"
-            }
+        return NodeStorage.CreateModuleNode(
+            id: "codex.ucore.llm-response-handler",
+            name: "U-CORE LLM Response Handler",
+            version: "1.0.0",
+            description: "Enhanced LLM response handler with U-CORE ontology mapping and resonance optimization",
+            capabilities: new[] { "U-CORE Mapping", "Resonance Optimization", "Belief System Matching", "Node Generation", "Edge Creation", "Bootstrap Integration" },
+            tags: new[] { "ucore", "llm", "response-handler", "ontology" }
         );
     }
 

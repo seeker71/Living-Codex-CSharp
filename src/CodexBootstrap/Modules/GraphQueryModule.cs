@@ -39,7 +39,9 @@ public class GraphQueryModule : IModule
 
     public Node GetModuleNode()
     {
-        return ModuleHelpers.CreateModuleNode(ModuleId, Name, Version, Description);
+        return NodeStorage.CreateModuleNode(ModuleId, Name, Version, Description,
+            capabilities: new[] { "graph-querying", "node-discovery", "relationship-analysis" },
+            tags: new[] { "graph", "query", "discovery" });
     }
 
     public void Register(NodeRegistry registry)

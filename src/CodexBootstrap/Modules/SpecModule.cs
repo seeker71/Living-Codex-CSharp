@@ -531,9 +531,9 @@ public sealed class SpecModule : IModule
         
         try
         {
-            // Get all module nodes from registry
+            // Get all module nodes from registry (both standard and meta module types)
             var moduleNodes = _registry.AllNodes()
-                .Where(node => node.TypeId == "module")
+                .Where(node => node.TypeId == "module" || node.TypeId == "codex.meta/module")
                 .ToList();
 
             foreach (var moduleNode in moduleNodes)

@@ -145,9 +145,14 @@ public sealed class ModuleLoader
             _logger.Info($"Loading module: {module.GetType().Name}");
             var moduleNode = module.GetModuleNode();
             _logger.Info($"Module node ID: {moduleNode.Id}");
+            
+            // Use standardized module registration
             _registry.Upsert(moduleNode);
             module.Register(_registry);
             module.RegisterApiHandlers(_router, _registry);
+            
+            // Register record types as meta nodes if the module supports it
+            RegisterModuleRecordTypes(module, moduleNode);
             
             // Track loaded modules
             _loadedModules.Add(module);
@@ -160,6 +165,79 @@ public sealed class ModuleLoader
         {
             _logger.Error($"Error loading module {module.GetType().Name}: {ex.Message}", ex);
             throw;
+        }
+    }
+
+    private void RegisterModuleRecordTypes(IModule module, Node moduleNode)
+    {
+        try
+        {
+            // Extract record types from the module's assembly
+            var moduleType = module.GetType();
+            var assembly = moduleType.Assembly;
+            
+            // Find all record types in the same namespace as the module
+            var recordTypes = assembly.GetTypes()
+                .Where(t => t.IsClass && !t.IsAbstract && t.Namespace == moduleType.Namespace)
+                .Where(t => t.Name.EndsWith("Request") || t.Name.EndsWith("Response") || t.Name.EndsWith("Record") || t.Name.EndsWith("Data"))
+                .Select(t => t.Name)
+                .ToArray();
+
+            if (recordTypes.Length > 0)
+            {
+                _logger.Info($"Registering {recordTypes.Length} record types for module {moduleNode.Id}");
+                
+                foreach (var recordType in recordTypes)
+                {
+                    var metaNode = new Node(
+                        Id: $"{moduleNode.Id}.meta.{recordType.ToLower()}",
+                        TypeId: "codex.meta/type",
+                        State: ContentState.Ice,
+                        Locale: "en",
+                        Title: $"{recordType} Record Type",
+                        Description: $"Meta-node definition for {recordType} record type used by {moduleNode.Title}",
+                        Content: new ContentRef(
+                            MediaType: "application/json",
+                            InlineJson: JsonSerializer.Serialize(new
+                            {
+                                recordType = recordType,
+                                moduleId = moduleNode.Id,
+                                moduleName = moduleNode.Title,
+                                definedAt = DateTime.UtcNow
+                            }),
+                            InlineBytes: null,
+                            ExternalUri: null
+                        ),
+                        Meta: new Dictionary<string, object>
+                        {
+                            ["recordType"] = recordType,
+                            ["moduleId"] = moduleNode.Id,
+                            ["moduleName"] = moduleNode.Title,
+                            ["parentModule"] = moduleNode.Id,
+                            ["definedAt"] = DateTime.UtcNow
+                        }
+                    );
+                    _registry.Upsert(metaNode);
+                    
+                    // Create edge from module to meta node
+                    var edge = new Edge(
+                        FromId: moduleNode.Id,
+                        ToId: metaNode.Id,
+                        Role: "defines",
+                        Weight: 1.0,
+                        Meta: new Dictionary<string, object>
+                        {
+                            ["relationship"] = "module-defines-record-type",
+                            ["recordType"] = recordType
+                        }
+                    );
+                    _registry.Upsert(edge);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"Failed to register record types for module {moduleNode.Id}: {ex.Message}");
         }
     }
 

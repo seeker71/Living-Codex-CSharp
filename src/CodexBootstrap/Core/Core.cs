@@ -67,7 +67,7 @@ public sealed class ApiRouter : IApiRouter
 // Node-based storage for everything
 public static class NodeStorage
 {
-    public static Node CreateModuleNode(string id, string name, string version, string? description = null)
+    public static Node CreateModuleNode(string id, string name, string version, string? description = null, string[]? capabilities = null, string[]? tags = null)
     {
         return new Node(
             Id: id,
@@ -78,7 +78,15 @@ public static class NodeStorage
             Description: description,
             Content: new ContentRef(
                 MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new { id, name, version, description }),
+                InlineJson: JsonSerializer.Serialize(new { 
+                    id, 
+                    name, 
+                    version, 
+                    description,
+                    capabilities = capabilities ?? new string[0],
+                    tags = tags ?? new string[0],
+                    createdAt = DateTime.UtcNow
+                }),
                 InlineBytes: null,
                 ExternalUri: null
             ),
@@ -86,7 +94,12 @@ public static class NodeStorage
             {
                 ["moduleId"] = id,
                 ["version"] = version,
-                ["name"] = name
+                ["name"] = name,
+                ["description"] = description,
+                ["capabilities"] = capabilities ?? new string[0],
+                ["tags"] = tags ?? new string[0],
+                ["createdAt"] = DateTime.UtcNow,
+                ["type"] = "module"
             }
         );
     }
@@ -113,6 +126,67 @@ public static class NodeStorage
                 ["route"] = route
             }
         );
+    }
+
+    /// <summary>
+    /// Register a module with all its records as meta nodes
+    /// </summary>
+    public static void RegisterModuleWithMetaNodes(NodeRegistry registry, IModule module, string[]? recordTypes = null)
+    {
+        // Register the main module node
+        var moduleNode = module.GetModuleNode();
+        registry.Upsert(moduleNode);
+        
+        // Register record types as meta nodes if provided
+        if (recordTypes != null)
+        {
+            foreach (var recordType in recordTypes)
+            {
+                var metaNode = new Node(
+                    Id: $"{moduleNode.Id}.meta.{recordType.ToLower()}",
+                    TypeId: "codex.meta/type",
+                    State: ContentState.Ice,
+                    Locale: "en",
+                    Title: $"{recordType} Record Type",
+                    Description: $"Meta-node definition for {recordType} record type used by {moduleNode.Title}",
+                    Content: new ContentRef(
+                        MediaType: "application/json",
+                        InlineJson: JsonSerializer.Serialize(new
+                        {
+                            recordType = recordType,
+                            moduleId = moduleNode.Id,
+                            moduleName = moduleNode.Title,
+                            definedAt = DateTime.UtcNow
+                        }),
+                        InlineBytes: null,
+                        ExternalUri: null
+                    ),
+                    Meta: new Dictionary<string, object>
+                    {
+                        ["recordType"] = recordType,
+                        ["moduleId"] = moduleNode.Id,
+                        ["moduleName"] = moduleNode.Title,
+                        ["parentModule"] = moduleNode.Id,
+                        ["definedAt"] = DateTime.UtcNow
+                    }
+                );
+                registry.Upsert(metaNode);
+                
+                // Create edge from module to meta node
+                var edge = new Edge(
+                    FromId: moduleNode.Id,
+                    ToId: metaNode.Id,
+                    Role: "defines",
+                    Weight: 1.0,
+                    Meta: new Dictionary<string, object>
+                    {
+                        ["relationship"] = "module-defines-record-type",
+                        ["recordType"] = recordType
+                    }
+                );
+                registry.Upsert(edge);
+            }
+        }
     }
 
     public static Node CreateSpecNode(string id, string name, string version, object spec)

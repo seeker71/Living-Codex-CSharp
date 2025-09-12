@@ -33,7 +33,9 @@ public class SystemMetricsModule : IModule
 
     public Node GetModuleNode()
     {
-        return ModuleHelpers.CreateModuleNode(ModuleId, Name, Version, Description);
+        return NodeStorage.CreateModuleNode(ModuleId, Name, Version, Description, 
+            capabilities: new[] { "system-monitoring", "metrics-collection", "performance-tracking" },
+            tags: new[] { "metrics", "monitoring", "system" });
     }
 
     public void Register(NodeRegistry registry)

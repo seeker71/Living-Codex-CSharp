@@ -82,6 +82,11 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
         
         // Register spec-driven architecture services
         builder.Services.AddSingleton<SpecDrivenArchitecture>();
+        
+        // Register missing services for modules
+        builder.Services.AddSingleton<DynamicAttributionSystem>();
+        builder.Services.AddSingleton<EndpointGenerator>();
+        builder.Services.AddSingleton<object>(sp => new object()); // Placeholder for UCoreResonanceEngine
 
 // HTTP client for adapters
 builder.Services.AddHttpClient();
