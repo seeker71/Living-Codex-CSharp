@@ -1003,7 +1003,13 @@ Translation:";
                     ["fractalPatterns"] = fractalPatterns,
                     ["originalConcepts"] = conceptAnalysis.Concepts,
                     ["confidence"] = conceptAnalysis.Confidence,
-                    ["scoring"] = scoringAnalysis.Scores,
+                    ["scoring"] = new Dictionary<string, double>
+                    {
+                        ["abundance"] = scoringAnalysis.AbundanceScore,
+                        ["consciousness"] = scoringAnalysis.ConsciousnessScore,
+                        ["unity"] = scoringAnalysis.UnityScore,
+                        ["overall"] = scoringAnalysis.OverallScore
+                    },
                     ["transformationComplexity"] = CalculateTransformationComplexity(fractalPatterns)
                 }
             };
@@ -1113,7 +1119,7 @@ Translation:";
             factors["unity"] = (double)fractalPatterns["recursiveDepth"] / 10.0;
             
             // Love amplification
-            factors["love"] = scoringAnalysis.Scores.GetValueOrDefault("love", 0.0);
+            factors["love"] = scoringAnalysis.UnityScore;
             
             return factors;
         }
