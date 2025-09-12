@@ -1,0 +1,415 @@
+{
+  "modules": [
+    {
+      "id": "codex.access-control",
+      "name": "Access Control Module",
+      "version": "0.1.0",
+      "topic": "Security",
+      "consolidation_target": "SecurityModule"
+    },
+    {
+      "id": "codex.adapters",
+      "name": "Adapter Module",
+      "version": "0.1.0",
+      "topic": "Other",
+      "consolidation_target": "Keep Separate"
+    },
+    {
+      "id": "ai-module",
+      "name": "AI Module",
+      "version": "1.0.0",
+      "topic": "AI/LLM",
+      "consolidation_target": "AIModule"
+    },
+    {
+      "id": "codex.auth",
+      "name": "Authentication and Authorization Module",
+      "version": "0.1.0",
+      "topic": "Security",
+      "consolidation_target": "SecurityModule"
+    },
+    {
+      "id": "codex.breath",
+      "name": "Breath Engine Module",
+      "version": "0.1.0",
+      "topic": "Core System",
+      "consolidation_target": "Keep Separate"
+    },
+    {
+      "id": "codex.composer",
+      "name": "Spec Composer Module",
+      "version": "0.1.0",
+      "topic": "Core System",
+      "consolidation_target": "Keep Separate"
+    },
+    {
+      "id": "codex.image.concept",
+      "name": "Concept Image Generation Module",
+      "version": "1.0.0",
+      "topic": "Concept",
+      "consolidation_target": "ConceptModule"
+    },
+    {
+      "id": "codex.concept",
+      "name": "Concept Management Module",
+      "version": "1.0.0",
+      "topic": "Concept",
+      "consolidation_target": "ConceptModule"
+    },
+    {
+      "id": "codex.concept-registry",
+      "name": "Concept Registry Module",
+      "version": "1.0.0",
+      "topic": "Concept",
+      "consolidation_target": "ConceptModule"
+    },
+    {
+      "id": "codex.core",
+      "name": "Core System Module",
+      "version": "0.1.0",
+      "topic": "Core System",
+      "consolidation_target": "Keep Separate"
+    },
+    {
+      "id": "codex.delta",
+      "name": "Delta Module",
+      "version": "0.1.0",
+      "topic": "Core System",
+      "consolidation_target": "Keep Separate"
+    },
+    {
+      "id": "codex.digital-signature",
+      "name": "Digital Signature Module",
+      "version": "0.1.0",
+      "topic": "Security",
+      "consolidation_target": "SecurityModule"
+    },
+    {
+      "id": "codex.distributed-storage",
+      "name": "Distributed Storage Management Module",
+      "version": "0.1.0",
+      "topic": "Storage",
+      "consolidation_target": "StorageModule"
+    },
+    {
+      "id": "codex.event-streaming",
+      "name": "Event Streaming Module",
+      "version": "0.1.0",
+      "topic": "Communication",
+      "consolidation_target": "CommunicationModule"
+    },
+    {
+      "id": "codex.example",
+      "name": "Example Module",
+      "version": "1.0.0",
+      "topic": "Other",
+      "consolidation_target": "Keep Separate"
+    },
+    {
+      "id": "codex.future",
+      "name": "Future Knowledge",
+      "version": "1.0.0",
+      "topic": "Future/Knowledge",
+      "consolidation_target": "KnowledgeModule"
+    },
+    {
+      "id": "codex.graph.query",
+      "name": "Graph Query Module",
+      "version": "1.0.0",
+      "topic": "Other",
+      "consolidation_target": "Keep Separate"
+    },
+    {
+      "id": "codex.hello",
+      "name": "Hello Demo Module",
+      "version": "0.1.0",
+      "topic": "Other",
+      "consolidation_target": "Keep Separate"
+    },
+    {
+      "id": "codex.hydrate",
+      "name": "Content Hydration Module",
+      "version": "0.1.0",
+      "topic": "Other",
+      "consolidation_target": "Keep Separate"
+    },
+    {
+      "id": "codex.identity-management",
+      "name": "Identity Management Module",
+      "version": "0.1.0",
+      "topic": "Security",
+      "consolidation_target": "SecurityModule"
+    },
+    {
+      "id": "codex.analysis.image",
+      "name": "Image Analysis Module",
+      "version": "1.0.0",
+      "topic": "Analysis/Intelligence",
+      "consolidation_target": "IntelligenceModule"
+    },
+    {
+      "id": "codex.intelligent-caching",
+      "name": "Intelligent Caching Module",
+      "version": "1.0.0",
+      "topic": "Analysis/Intelligence",
+      "consolidation_target": "IntelligenceModule"
+    },
+    {
+      "id": "codex.joy.calculator",
+      "name": "Joy Calculator Module",
+      "version": "1.0.0",
+      "topic": "Joy/Resonance",
+      "consolidation_target": "JoyModule"
+    },
+    {
+      "id": "codex.llm.future",
+      "name": "LLM-Enhanced Future Knowledge Module",
+      "version": "1.0.0",
+      "topic": "AI/LLM",
+      "consolidation_target": "AIModule"
+    },
+    {
+      "id": "codex.llm.response-handler",
+      "name": "LLM Response Handler Module",
+      "version": "1.0.0",
+      "topic": "AI/LLM",
+      "consolidation_target": "AIModule"
+    },
+    {
+      "id": "codex.load-balancing",
+      "name": "Load Balancing and Performance Optimization Module",
+      "version": "1.0.0",
+      "topic": "Analysis/Intelligence",
+      "consolidation_target": "IntelligenceModule"
+    },
+    {
+      "id": "codex.oneshot",
+      "name": "One-Shot Operations Module",
+      "version": "0.1.0",
+      "topic": "API/Documentation",
+      "consolidation_target": "APIModule"
+    },
+    {
+      "id": "codex.openapi",
+      "name": "OpenAPI Module",
+      "version": "0.1.0",
+      "topic": "API/Documentation",
+      "consolidation_target": "APIModule"
+    },
+    {
+      "id": "codex.phase",
+      "name": "Phase Module",
+      "version": "0.1.0",
+      "topic": "Core System",
+      "consolidation_target": "Keep Separate"
+    },
+    {
+      "id": "codex.plan",
+      "name": "Plan Generation Module",
+      "version": "0.1.0",
+      "topic": "Core System",
+      "consolidation_target": "Keep Separate"
+    },
+    {
+      "id": "codex.push-notifications",
+      "name": "Push Notification Module",
+      "version": "0.1.0",
+      "topic": "Communication",
+      "consolidation_target": "CommunicationModule"
+    },
+    {
+      "id": "codex.realtime",
+      "name": "Real-time Communication Module",
+      "version": "0.1.0",
+      "topic": "Communication",
+      "consolidation_target": "CommunicationModule"
+    },
+    {
+      "id": "codex.relations",
+      "name": "Relations Module",
+      "version": "0.1.0",
+      "topic": "Core System",
+      "consolidation_target": "Keep Separate"
+    },
+    {
+      "id": "codex.resonance-joy",
+      "name": "Resonance and Joy Amplification Module",
+      "version": "0.1.0",
+      "topic": "Joy/Resonance",
+      "consolidation_target": "JoyModule"
+    },
+    {
+      "id": "codex.security",
+      "name": "Security Module",
+      "version": "1.0.0",
+      "topic": "Security",
+      "consolidation_target": "SecurityModule"
+    },
+    {
+      "id": "codex.service.discovery",
+      "name": "Service Discovery Module",
+      "version": "1.0.0",
+      "topic": "Other",
+      "consolidation_target": "Keep Separate"
+    },
+    {
+      "id": "codex.spec",
+      "name": "Spec Management Module",
+      "version": "0.1.0",
+      "topic": "API/Documentation",
+      "consolidation_target": "APIModule"
+    },
+    {
+      "id": "codex.reflect",
+      "name": "Spec Reflection Module",
+      "version": "0.1.0",
+      "topic": "API/Documentation",
+      "consolidation_target": "APIModule"
+    },
+    {
+      "id": "codex.storage-endpoints",
+      "name": "Storage Endpoints Module",
+      "version": "0.1.0",
+      "topic": "Storage",
+      "consolidation_target": "StorageModule"
+    },
+    {
+      "id": "codex.storage",
+      "name": "Storage Management Module",
+      "version": "0.1.0",
+      "topic": "Storage",
+      "consolidation_target": "StorageModule"
+    },
+    {
+      "id": "codex.ucore.joy",
+      "name": "U-CORE Joy Amplification Module",
+      "version": "1.0.0",
+      "topic": "Joy/Resonance",
+      "consolidation_target": "JoyModule"
+    },
+    {
+      "id": "ucore-resonance-engine",
+      "name": "U-CORE Resonance Engine",
+      "version": "1.0.0",
+      "topic": "Joy/Resonance",
+      "consolidation_target": "JoyModule"
+    },
+    {
+      "id": "codex.userconcept",
+      "name": "User-Concept Relationship Module",
+      "version": "1.0.0",
+      "topic": "Concept",
+      "consolidation_target": "ConceptModule"
+    },
+    {
+      "id": "codex.user-contributions",
+      "name": "User Contributions Module",
+      "version": "0.1.0",
+      "topic": "User Management",
+      "consolidation_target": "UserModule"
+    },
+    {
+      "id": "codex.user",
+      "name": "User Management Module",
+      "version": "1.0.0",
+      "topic": "User Management",
+      "consolidation_target": "UserModule"
+    }
+  ],
+  "routes": [],
+  "topic_groups": {
+    "Security": [
+      "codex.access-control",
+      "codex.auth",
+      "codex.digital-signature",
+      "codex.identity-management",
+      "codex.security"
+    ],
+    "Other": [
+      "codex.adapters",
+      "codex.example",
+      "codex.graph.query",
+      "codex.hello",
+      "codex.hydrate",
+      "codex.service.discovery"
+    ],
+    "AI/LLM": [
+      "ai-module",
+      "codex.llm.future",
+      "codex.llm.response-handler"
+    ],
+    "Core System": [
+      "codex.breath",
+      "codex.composer",
+      "codex.core",
+      "codex.delta",
+      "codex.phase",
+      "codex.plan",
+      "codex.relations"
+    ],
+    "Concept": [
+      "codex.image.concept",
+      "codex.concept",
+      "codex.concept-registry",
+      "codex.userconcept"
+    ],
+    "Storage": [
+      "codex.distributed-storage",
+      "codex.storage-endpoints",
+      "codex.storage"
+    ],
+    "Communication": [
+      "codex.event-streaming",
+      "codex.push-notifications",
+      "codex.realtime"
+    ],
+    "Future/Knowledge": [
+      "codex.future"
+    ],
+    "Analysis/Intelligence": [
+      "codex.analysis.image",
+      "codex.intelligent-caching",
+      "codex.load-balancing"
+    ],
+    "Joy/Resonance": [
+      "codex.joy.calculator",
+      "codex.resonance-joy",
+      "codex.ucore.joy",
+      "ucore-resonance-engine"
+    ],
+    "API/Documentation": [
+      "codex.oneshot",
+      "codex.openapi",
+      "codex.spec",
+      "codex.reflect"
+    ],
+    "User Management": [
+      "codex.user-contributions",
+      "codex.user"
+    ]
+  },
+  "priority_consolidations": {
+    "AI/LLM": [
+      "ai-module",
+      "codex.llm.future",
+      "codex.llm.response-handler"
+    ],
+    "Translation": [],
+    "Concept": [
+      "codex.concept",
+      "codex.concept-registry",
+      "codex.userconcept"
+    ],
+    "Joy/Resonance": [
+      "codex.joy.calculator",
+      "codex.resonance-joy",
+      "codex.ucore.joy",
+      "ucore-resonance-engine"
+    ],
+    "Storage": [
+      "codex.storage",
+      "codex.distributed-storage",
+      "codex.storage-endpoints"
+    ]
+  }
+}

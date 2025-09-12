@@ -9,35 +9,7 @@ namespace CodexBootstrap.Modules;
 
 // LLM Configuration Data Types
 
-[MetaNodeAttribute("codex.llm.config", "codex.meta/type", "LLMConfig", "Configuration for LLM integration")]
-[ApiType(
-    Name = "LLM Configuration",
-    Type = "object",
-    Description = "Configuration settings for LLM providers (OpenAI, Anthropic, Ollama, Custom)",
-    Example = @"{
-      ""id"": ""openai-gpt4"",
-      ""name"": ""OpenAI GPT-4"",
-      ""provider"": ""OpenAI"",
-      ""model"": ""gpt-4"",
-      ""apiKey"": ""sk-..."",
-      ""baseUrl"": ""https://api.openai.com/v1"",
-      ""maxTokens"": 2000,
-      ""temperature"": 0.7,
-      ""topP"": 0.9
-    }"
-)]
-public record LLMConfig(
-    string Id,
-    string Name,
-    string Provider,
-    string Model,
-    string ApiKey,
-    string BaseUrl,
-    int MaxTokens,
-    double Temperature,
-    double TopP,
-    Dictionary<string, object> Parameters
-);
+// LLMConfig moved to AIModule
 
 [MetaNodeAttribute("codex.llm.future-query", "codex.meta/type", "FutureQuery", "Query for future knowledge using LLM")]
 [ApiType(
@@ -308,16 +280,16 @@ public class LLMFutureKnowledgeModule : IModule
         try
         {
             var config = new LLMConfig(
-                Id: request.Id ?? Guid.NewGuid().ToString(),
-                Name: request.Name,
-                Provider: request.Provider,
-                Model: request.Model,
-                ApiKey: request.ApiKey ?? "",
-                BaseUrl: request.BaseUrl ?? GetDefaultBaseUrl(request.Provider),
-                MaxTokens: request.MaxTokens ?? 2000,
-                Temperature: request.Temperature ?? 0.7,
-                TopP: request.TopP ?? 0.9,
-                Parameters: request.Parameters ?? new Dictionary<string, object>()
+                Id: request.Config.Id,
+                Name: request.Config.Name,
+                Provider: request.Config.Provider,
+                Model: request.Config.Model,
+                ApiKey: request.Config.ApiKey,
+                BaseUrl: request.Config.BaseUrl,
+                MaxTokens: request.Config.MaxTokens,
+                Temperature: request.Config.Temperature,
+                TopP: request.Config.TopP,
+                Parameters: request.Config.Parameters
             );
 
             // Validate configuration
@@ -334,9 +306,9 @@ public class LLMFutureKnowledgeModule : IModule
 
             return new LLMConfigResponse(
                 Success: true,
-                Message: "LLM configuration created successfully",
                 Config: config,
-                Validation: validation
+                Message: "LLM configuration created successfully",
+                Timestamp: DateTimeOffset.UtcNow
             );
         }
         catch (Exception ex)
@@ -1640,13 +1612,7 @@ public record FutureQueryResponse(
     List<string> NextSteps
 );
 
-[ResponseType("codex.llm.config-response", "LLMConfigResponse", "LLM config response")]
-public record LLMConfigResponse(
-    bool Success,
-    string Message,
-    LLMConfig Config,
-    LLMConfigValidation Validation
-);
+// LLMConfigResponse moved to AIModule
 
 [ResponseType("codex.llm.configs-response", "LLMConfigsResponse", "LLM configs response")]
 public record LLMConfigsResponse(
@@ -1740,19 +1706,7 @@ public record FutureQueryRequest(
     Dictionary<string, object>? Metadata = null
 );
 
-[RequestType("codex.llm.config-request", "LLMConfigRequest", "LLM config request")]
-public record LLMConfigRequest(
-    string Name,
-    string Provider,
-    string Model,
-    string? Id = null,
-    string? ApiKey = null,
-    string? BaseUrl = null,
-    int? MaxTokens = null,
-    double? Temperature = null,
-    double? TopP = null,
-    Dictionary<string, object>? Parameters = null
-);
+// LLMConfigRequest moved to AIModule
 
 [RequestType("codex.llm.batch-future-query-request", "BatchFutureQueryRequest", "Batch future query request")]
 public record BatchFutureQueryRequest(

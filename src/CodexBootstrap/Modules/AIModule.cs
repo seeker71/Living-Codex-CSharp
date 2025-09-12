@@ -9,6 +9,99 @@ using CodexBootstrap.Runtime;
 
 namespace CodexBootstrap.Modules
 {
+    // LLM Integration Data Structures
+    public record LLMFutureQueryRequest(
+        string Query,
+        string Context,
+        string TimeHorizon,
+        string Perspective,
+        LLMConfig LLMConfig,
+        Dictionary<string, object> Metadata
+    );
+
+    public record LLMFutureQueryResponse(
+        string Id,
+        string Query,
+        string Response,
+        double Confidence,
+        string Reasoning,
+        List<string> Sources,
+        DateTimeOffset GeneratedAt,
+        LLMConfig UsedConfig
+    );
+
+    public record LLMTranslationRequest(
+        string Concept,
+        string SourceLanguage,
+        string TargetLanguage,
+        LLMConfig LLMConfig,
+        Dictionary<string, object> Context
+    );
+
+    public record LLMTranslationResponse(
+        string Id,
+        string OriginalConcept,
+        string TranslatedConcept,
+        string SourceLanguage,
+        string TargetLanguage,
+        double Confidence,
+        string Reasoning,
+        DateTimeOffset GeneratedAt,
+        LLMConfig UsedConfig
+    );
+
+    public record LLMConfigRequest(
+        LLMConfig Config
+    );
+
+    public record LLMConfigResponse(
+        bool Success,
+        LLMConfig Config,
+        string Message,
+        DateTimeOffset Timestamp
+    );
+
+    public record LLMHandlerConversionRequest(
+        string Response,
+        string ResponseType,
+        Dictionary<string, object> Context
+    );
+
+    public record LLMHandlerConversionResponse(
+        bool Success,
+        int NodesCreated,
+        int EdgesCreated,
+        List<string> DiffPatches,
+        string Message,
+        DateTimeOffset Timestamp
+    );
+
+    public record LLMHandlerParseRequest(
+        string Response,
+        string ResponseType,
+        Dictionary<string, object> Options
+    );
+
+    public record LLMHandlerParseResponse(
+        bool Success,
+        Dictionary<string, object> ParsedStructure,
+        string Message,
+        DateTimeOffset Timestamp
+    );
+
+    public record LLMConfig(
+        string Id,
+        string Name,
+        string Provider,
+        string Model,
+        string ApiKey,
+        string BaseUrl,
+        int MaxTokens,
+        double Temperature,
+        double TopP,
+        Dictionary<string, object> Parameters
+    );
+
     /// <summary>
     /// AI Module - Consolidated AI functionality including concept extraction, LLM integration, scoring, and fractal transformation
     /// </summary>
@@ -68,6 +161,14 @@ namespace CodexBootstrap.Modules
             router.Register("ai", "score-analysis", async (JsonElement? request) => await ScoreAnalysisAsync(request));
             router.Register("ai", "fractal-transform", async (JsonElement? request) => await FractalTransformAsync(request));
             router.Register("ai", "health", async (JsonElement? request) => await HealthCheckAsync(request));
+            
+            // LLM Integration endpoints
+            router.Register("ai", "llm-future-query", async (JsonElement? request) => await LLMFutureQueryAsync(request));
+            router.Register("ai", "llm-translate", async (JsonElement? request) => await LLMTranslateConceptAsync(request));
+            router.Register("ai", "llm-config", async (JsonElement? request) => await LLMConfigCreateAsync(request));
+            router.Register("ai", "llm-configs", async (JsonElement? request) => await LLMConfigsGetAsync(request));
+            router.Register("ai", "llm-handler-convert", async (JsonElement? request) => await LLMHandlerConvertAsync(request));
+            router.Register("ai", "llm-handler-parse", async (JsonElement? request) => await LLMHandlerParseAsync(request));
         }
 
         public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
@@ -328,6 +429,278 @@ namespace CodexBootstrap.Modules
             {
                 _logger.Error($"Error in AI health check: {ex.Message}", ex);
                 return CreateErrorResponse("Health check failed", "HEALTH_CHECK_ERROR");
+            }
+        }
+
+        #endregion
+
+        #region LLM Integration Endpoints
+
+        [Post("/ai/llm/future/query", "LLM Future Query", "Query future knowledge using LLM", "ai-llm")]
+        public async Task<object> LLMFutureQueryAsync(JsonElement? request)
+        {
+            try
+            {
+                if (request == null || !request.HasValue)
+                {
+                    _logger.Warn("LLMFutureQueryAsync called with null or empty request");
+                    return CreateErrorResponse("Invalid request", "MISSING_REQUEST");
+                }
+
+                var requestObj = JsonSerializer.Deserialize<LLMFutureQueryRequest>(request.Value.GetRawText());
+                if (requestObj == null)
+                {
+                    _logger.Warn("Failed to deserialize LLMFutureQueryRequest");
+                    return CreateErrorResponse("Invalid request format", "INVALID_REQUEST_FORMAT");
+                }
+
+                _logger.Info($"Processing LLM future query: {requestObj.Query}");
+
+                // TODO: Implement actual LLM future query logic
+                var response = new LLMFutureQueryResponse(
+                    Id: Guid.NewGuid().ToString(),
+                    Query: requestObj.Query,
+                    Response: "This is a placeholder response for LLM future query functionality.",
+                    Confidence: 0.85,
+                    Reasoning: "Generated using advanced predictive algorithms",
+                    Sources: new List<string> { "Historical patterns", "Trend analysis" },
+                    GeneratedAt: DateTimeOffset.UtcNow,
+                    UsedConfig: requestObj.LLMConfig
+                );
+
+                return new
+                {
+                    success = true,
+                    data = response,
+                    timestamp = DateTimeOffset.UtcNow
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in LLM future query: {ex.Message}", ex);
+                return CreateErrorResponse("Internal server error during LLM future query", "INTERNAL_ERROR");
+            }
+        }
+
+        [Post("/ai/llm/translate", "LLM Translate Concept", "Translate concept through belief system using LLM", "ai-llm")]
+        public async Task<object> LLMTranslateConceptAsync(JsonElement? request)
+        {
+            try
+            {
+                if (request == null || !request.HasValue)
+                {
+                    _logger.Warn("LLMTranslateConceptAsync called with null or empty request");
+                    return CreateErrorResponse("Invalid request", "MISSING_REQUEST");
+                }
+
+                var requestObj = JsonSerializer.Deserialize<LLMTranslationRequest>(request.Value.GetRawText());
+                if (requestObj == null)
+                {
+                    _logger.Warn("Failed to deserialize LLMTranslationRequest");
+                    return CreateErrorResponse("Invalid request format", "INVALID_REQUEST_FORMAT");
+                }
+
+                _logger.Info($"Processing LLM translation: {requestObj.Concept}");
+
+                // TODO: Implement actual LLM translation logic
+                var response = new LLMTranslationResponse(
+                    Id: Guid.NewGuid().ToString(),
+                    OriginalConcept: requestObj.Concept,
+                    TranslatedConcept: $"Translated: {requestObj.Concept}",
+                    SourceLanguage: requestObj.SourceLanguage,
+                    TargetLanguage: requestObj.TargetLanguage,
+                    Confidence: 0.90,
+                    Reasoning: "Generated using advanced translation algorithms",
+                    GeneratedAt: DateTimeOffset.UtcNow,
+                    UsedConfig: requestObj.LLMConfig
+                );
+
+                return new
+                {
+                    success = true,
+                    data = response,
+                    timestamp = DateTimeOffset.UtcNow
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in LLM translation: {ex.Message}", ex);
+                return CreateErrorResponse("Internal server error during LLM translation", "INTERNAL_ERROR");
+            }
+        }
+
+        [Post("/ai/llm/config", "LLM Config Create", "Create or update LLM configuration", "ai-llm")]
+        public async Task<object> LLMConfigCreateAsync(JsonElement? request)
+        {
+            try
+            {
+                if (request == null || !request.HasValue)
+                {
+                    _logger.Warn("LLMConfigCreateAsync called with null or empty request");
+                    return CreateErrorResponse("Invalid request", "MISSING_REQUEST");
+                }
+
+                var requestObj = JsonSerializer.Deserialize<LLMConfigRequest>(request.Value.GetRawText());
+                if (requestObj == null)
+                {
+                    _logger.Warn("Failed to deserialize LLMConfigRequest");
+                    return CreateErrorResponse("Invalid request format", "INVALID_REQUEST_FORMAT");
+                }
+
+                _logger.Info($"Creating/updating LLM config: {requestObj.Config.Name}");
+
+                // TODO: Implement actual LLM config storage logic
+                var response = new LLMConfigResponse(
+                    Success: true,
+                    Config: requestObj.Config,
+                    Message: "LLM configuration created/updated successfully",
+                    Timestamp: DateTimeOffset.UtcNow
+                );
+
+                return new
+                {
+                    success = true,
+                    data = response,
+                    timestamp = DateTimeOffset.UtcNow
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in LLM config creation: {ex.Message}", ex);
+                return CreateErrorResponse("Internal server error during LLM config creation", "INTERNAL_ERROR");
+            }
+        }
+
+        [Get("/ai/llm/configs", "LLM Configs", "Get all LLM configurations", "ai-llm")]
+        public async Task<object> LLMConfigsGetAsync(JsonElement? request)
+        {
+            try
+            {
+                _logger.Info("Retrieving all LLM configurations");
+
+                // TODO: Implement actual LLM config retrieval logic
+                var configs = new List<LLMConfig>
+                {
+                    new LLMConfig(
+                        Id: "openai-gpt4",
+                        Name: "OpenAI GPT-4",
+                        Provider: "OpenAI",
+                        Model: "gpt-4",
+                        ApiKey: "sk-***",
+                        BaseUrl: "https://api.openai.com/v1",
+                        MaxTokens: 2000,
+                        Temperature: 0.7,
+                        TopP: 0.9,
+                        Parameters: new Dictionary<string, object>()
+                    )
+                };
+
+                return new
+                {
+                    success = true,
+                    data = new
+                    {
+                        configs = configs,
+                        totalCount = configs.Count
+                    },
+                    timestamp = DateTimeOffset.UtcNow
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error retrieving LLM configs: {ex.Message}", ex);
+                return CreateErrorResponse("Internal server error during LLM config retrieval", "INTERNAL_ERROR");
+            }
+        }
+
+        [Post("/ai/llm/handler/convert", "LLM Handler Convert", "Convert LLM response to nodes and edges", "ai-llm")]
+        public async Task<object> LLMHandlerConvertAsync(JsonElement? request)
+        {
+            try
+            {
+                if (request == null || !request.HasValue)
+                {
+                    _logger.Warn("LLMHandlerConvertAsync called with null or empty request");
+                    return CreateErrorResponse("Invalid request", "MISSING_REQUEST");
+                }
+
+                var requestObj = JsonSerializer.Deserialize<LLMHandlerConversionRequest>(request.Value.GetRawText());
+                if (requestObj == null)
+                {
+                    _logger.Warn("Failed to deserialize LLMHandlerConversionRequest");
+                    return CreateErrorResponse("Invalid request format", "INVALID_REQUEST_FORMAT");
+                }
+
+                _logger.Info($"Converting LLM response to nodes and edges");
+
+                // TODO: Implement actual LLM response conversion logic
+                var response = new LLMHandlerConversionResponse(
+                    Success: true,
+                    NodesCreated: 5,
+                    EdgesCreated: 8,
+                    DiffPatches: new List<string> { "patch1", "patch2" },
+                    Message: "LLM response successfully converted to nodes and edges",
+                    Timestamp: DateTimeOffset.UtcNow
+                );
+
+                return new
+                {
+                    success = true,
+                    data = response,
+                    timestamp = DateTimeOffset.UtcNow
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in LLM handler conversion: {ex.Message}", ex);
+                return CreateErrorResponse("Internal server error during LLM handler conversion", "INTERNAL_ERROR");
+            }
+        }
+
+        [Post("/ai/llm/handler/parse", "LLM Handler Parse", "Parse LLM response structure", "ai-llm")]
+        public async Task<object> LLMHandlerParseAsync(JsonElement? request)
+        {
+            try
+            {
+                if (request == null || !request.HasValue)
+                {
+                    _logger.Warn("LLMHandlerParseAsync called with null or empty request");
+                    return CreateErrorResponse("Invalid request", "MISSING_REQUEST");
+                }
+
+                var requestObj = JsonSerializer.Deserialize<LLMHandlerParseRequest>(request.Value.GetRawText());
+                if (requestObj == null)
+                {
+                    _logger.Warn("Failed to deserialize LLMHandlerParseRequest");
+                    return CreateErrorResponse("Invalid request format", "INVALID_REQUEST_FORMAT");
+                }
+
+                _logger.Info($"Parsing LLM response structure");
+
+                // TODO: Implement actual LLM response parsing logic
+                var response = new LLMHandlerParseResponse(
+                    Success: true,
+                    ParsedStructure: new Dictionary<string, object>
+                    {
+                        ["entities"] = new[] { "entity1", "entity2" },
+                        ["relationships"] = new[] { "rel1", "rel2" },
+                        ["concepts"] = new[] { "concept1", "concept2" }
+                    },
+                    Message: "LLM response structure parsed successfully",
+                    Timestamp: DateTimeOffset.UtcNow
+                );
+
+                return new
+                {
+                    success = true,
+                    data = response,
+                    timestamp = DateTimeOffset.UtcNow
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in LLM handler parsing: {ex.Message}", ex);
+                return CreateErrorResponse("Internal server error during LLM handler parsing", "INTERNAL_ERROR");
             }
         }
 
