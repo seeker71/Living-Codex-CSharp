@@ -68,33 +68,14 @@ public class ConceptRegistryModule : IModule
     private void RegisterConceptRegistryNodes(NodeRegistry registry)
     {
         // Register Concept Registry module node
-        var conceptRegistryNode = new Node(
-            Id: "codex.concept-registry",
-            TypeId: "codex.module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Concept Registry Module",
-            Description: "Central registry for all concepts across services with version management and cross-service synchronization",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    version = "1.0.0",
-                    capabilities = new[] { "concept-registration", "concept-discovery", "version-management", "cross-service-sync", "relationship-management", "quality-assessment" },
-                    endpoints = new[] { "register-concept", "discover-concepts", "get-concept", "update-concept", "sync-concepts", "assess-quality" },
-                    integration = "cross-service-concept-management"
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["name"] = "Concept Registry Module",
-                ["version"] = "1.0.0",
-                ["type"] = "registry",
-                ["parentModule"] = "codex.concept-registry",
-                ["capabilities"] = new[] { "concept-registration", "concept-discovery", "version-management", "cross-service-sync", "quality-assessment" }
-            }
+        var conceptRegistryNode = NodeStorage.CreateModuleNode(
+            id: "codex.concept-registry",
+            name: "Concept Registry Module",
+            version: "1.0.0",
+            description: "Central registry for all concepts across services with version management and cross-service synchronization",
+            capabilities: new[] { "concept-registration", "concept-discovery", "version-management", "cross-service-sync", "relationship-management", "quality-assessment" },
+            tags: new[] { "concept", "registry", "cross-service", "version-management", "quality-assessment" },
+            specReference: "codex.spec.concept-registry"
         );
         registry.Upsert(conceptRegistryNode);
 

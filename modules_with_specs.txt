@@ -5,6 +5,7 @@
 "codex.auth"
 "codex.breath"
 "codex.composer"
+"codex.concept-registry"
 "codex.concept"
 "codex.core"
 "codex.delta"

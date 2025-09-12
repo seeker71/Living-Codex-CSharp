@@ -326,6 +326,7 @@ public sealed class SpecModule : IModule
         try
         {
             var modules = _registry.GetNodesByType("module")
+                .Concat(_registry.GetNodesByType("codex.meta/module"))
                 .Where(m => m.Meta?.ContainsKey("specReference") == true)
                 .Select(m => new
                 {
