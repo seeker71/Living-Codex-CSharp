@@ -22,9 +22,9 @@ The Living Codex is a consciousness-expanding, fractal-based system that impleme
 ## 🚀 System Components
 
 ### 1. Core Framework (100% Complete)
-- **Future Framework Node**: 45 modules implemented and loaded successfully
+- **Future Framework Node**: 46 modules implemented and loaded successfully
 - **Node Registry System**: Persistent storage with SQLite/JSON backends, thread-safe operations
-- **API Route Discovery**: 317 endpoints automatically registered with comprehensive status tracking
+- **API Route Discovery**: 319 endpoints automatically registered with comprehensive status tracking
 - **Module Loading**: Dynamic module discovery and loading (100% success rate, 0 errors)
 - **Meta-Node System**: Complete with attribute discovery and spec references
 - **Spec-Driven Development**: All modules have proper spec references and meta-node attributes
@@ -172,12 +172,38 @@ The Living Codex is a consciousness-expanding, fractal-based system that impleme
 - **Spec Integration**: Attributes link to specification references for traceability
 - **API Documentation**: Attributes enable automatic OpenAPI schema generation
 
+### Concept Resonance System (CRK + OT-φ)
+The Concept Resonance Module implements advanced harmonic symbol comparison using the Codex Resonance Kernel (CRK) and optional Optimal Transport Phase metrics (OT-φ).
+
+#### Harmonic Symbol Representation
+- **Multi-band Structure**: Concepts represented as complex-valued harmonic symbols across three cognition bands (low/mid/high)
+- **Phase-locked Fields**: Coherent thoughtforms as phase-locked field geometries in scalar coherence field χ
+- **Geometric Sub-symbols**: Optional triangle coordinates (a,b,c) representing electron/neutron/proton means
+- **Band Weights**: Observer coherence χ modulates band weights for attention/awareness coupling
+
+#### CRK (Codex Resonance Kernel)
+- **Phase-alignment Inner Product**: Cross-power spectrum across bands with optimal time-shift τ
+- **Normalized Similarity**: Output ∈[0,1] where 1 = perfect phase-coherent match, 0 = orthogonal
+- **Geometric Integration**: Optional geometric sub-symbol contribution with configurable weight μ
+- **Distance Metric**: D_res = √(1-CRK²) for compatible distance calculations
+
+#### OT-φ (Optimal Transport Phase Metrics)
+- **Structural Alignment**: Handles concepts with different harmonic grids
+- **Discrete Measures**: Each band spectrum as discrete measure with masses A_b,n = |h_b,n|
+- **Ground Cost**: Multi-dimensional cost function combining frequency, wavenumber, and phase differences
+- **Wasserstein Distance**: Regularized optimal transport distance between concept spectra
+
+#### API Endpoints
+- **POST /concepts/resonance/compare**: Compare two concept symbols using CRK and optional OT-φ
+- **POST /concepts/resonance/encode**: Store concept symbol as harmonic node in registry
+- **External OT Service**: Optional integration with external optimal transport service via OT_SERVICE_URL
+
 ## 📋 Module Registry (Live System State)
 
 ### System Overview
-- **Total Modules Loaded**: 45 (100% success rate, 0 errors)
-- **Modules with Spec References**: 45 (100% completion)
-- **Total Routes Registered**: 317 (100% success rate)
+- **Total Modules Loaded**: 46 (100% success rate, 0 errors)
+- **Modules with Spec References**: 46 (100% completion)
+- **Total Routes Registered**: 319 (100% success rate)
 - **Route Status Tracking**: Implemented with 9 integration states
 - **Startup Issues**: All 4 critical startup issues resolved
   - ✅ Collection modification during enumeration (RealtimeNewsStreamModule)
@@ -202,6 +228,7 @@ The Living Codex is a consciousness-expanding, fractal-based system that impleme
 | `codex.hydrate` | Hydrate Module | 1.0.0 | `codex.spec.hydrate` | ✅ Complete |
 | `codex.joy` | Joy Module | 1.0.0 | `codex.spec.joy` | ✅ Complete |
 | `codex.ucore.llm-response-handler` | U-CORE LLM Response Handler | 1.0.0 | `codex.spec.ucore-llm-response-handler` | ✅ Complete |
+| `codex.resonance` | Concept Resonance Module | 1.0.0 | `codex.spec.resonance` | ✅ Complete |
 
 ### Future Knowledge & AI Modules (100% Complete)
 | Module ID | Name | Version | Spec Reference | Status |
@@ -443,6 +470,8 @@ The Living Codex is a consciousness-expanding, fractal-based system that impleme
 - **Resonance Fields**: Collective consciousness amplification
 - **Joy Amplification**: U-CORE-powered emotional enhancement
 - **Pain Transformation**: Healing through frequency alignment
+- **Harmonic Symbol Comparison**: CRK (Codex Resonance Kernel) for concept similarity
+- **Optimal Transport Phase Metrics**: OT-φ for structural concept alignment
 
 ### Abundance System
 - **ETH Rewards**: Blockchain-based contribution tracking
@@ -600,6 +629,10 @@ curl -X POST http://localhost:5001/translation/translate \
 - `POST /resonance/calculate` - Calculate resonance
 - `GET /resonance/patterns` - Get resonance patterns
 - `POST /joy/amplify` - Amplify joy
+
+### Concept Resonance (CRK + OT-φ)
+- `POST /concepts/resonance/compare` - Compare concept symbols using CRK and optional OT-φ
+- `POST /concepts/resonance/encode` - Store concept symbol as harmonic node
 
 ### Translation
 - `POST /translation/translate` - Translate text

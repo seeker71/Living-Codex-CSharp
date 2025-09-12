@@ -128,6 +128,40 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
                 c.IncludeXmlComments(xmlPath);
             }
         });
+
+        // Add OAuth Authentication (only if configured)
+        var googleClientId = Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID");
+        var microsoftClientId = Environment.GetEnvironmentVariable("MICROSOFT_CLIENT_ID");
+        
+        if (!string.IsNullOrEmpty(googleClientId) || !string.IsNullOrEmpty(microsoftClientId))
+        {
+            builder.Services.AddAuthentication(options =>
+            {
+                options.DefaultScheme = "Cookies";
+                options.DefaultChallengeScheme = !string.IsNullOrEmpty(googleClientId) ? "Google" : "Microsoft";
+            })
+            .AddCookie("Cookies");
+            
+            if (!string.IsNullOrEmpty(googleClientId))
+            {
+                builder.Services.AddAuthentication().AddGoogle(options =>
+                {
+                    options.ClientId = googleClientId;
+                    options.ClientSecret = Environment.GetEnvironmentVariable("GOOGLE_CLIENT_SECRET") ?? "";
+                    options.CallbackPath = "/oauth/callback/google";
+                });
+            }
+            
+            if (!string.IsNullOrEmpty(microsoftClientId))
+            {
+                builder.Services.AddAuthentication().AddMicrosoftAccount(options =>
+                {
+                    options.ClientId = microsoftClientId;
+                    options.ClientSecret = Environment.GetEnvironmentVariable("MICROSOFT_CLIENT_SECRET") ?? "";
+                    options.CallbackPath = "/oauth/callback/microsoft";
+                });
+            }
+        }
         
         // Register custom logger interface
         builder.Services.AddSingleton<CodexBootstrap.Core.ILogger, Log4NetLogger>(sp => 
@@ -185,6 +219,10 @@ app.UseExceptionHandler(errorApp =>
         }
     });
 });
+
+// Add Authentication middleware
+app.UseAuthentication();
+app.UseAuthorization();
 
 // Add Swagger middleware
 if (app.Environment.IsDevelopment())
