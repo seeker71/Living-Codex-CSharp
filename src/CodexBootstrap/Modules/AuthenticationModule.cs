@@ -44,49 +44,7 @@ public sealed class AuthenticationModule : IModule
 
     public void Register(NodeRegistry registry)
     {
-        // Register API nodes
-        var loginApi = NodeStorage.CreateApiNode("codex.auth", "auth-login", "/auth/login", "Authenticate user");
-        var registerApi = NodeStorage.CreateApiNode("codex.auth", "auth-register", "/auth/register", "Register new user");
-        var refreshApi = NodeStorage.CreateApiNode("codex.auth", "auth-refresh", "/auth/refresh", "Refresh token");
-        var logoutApi = NodeStorage.CreateApiNode("codex.auth", "auth-logout", "/auth/logout", "Logout user");
-        var profileApi = NodeStorage.CreateApiNode("codex.auth", "auth-profile", "/auth/profile", "Get user profile");
-        var changePasswordApi = NodeStorage.CreateApiNode("codex.auth", "auth-change-password", "/auth/change-password", "Change password");
-        var resetPasswordApi = NodeStorage.CreateApiNode("codex.auth", "auth-reset-password", "/auth/reset-password", "Reset password");
-        var permissionsApi = NodeStorage.CreateApiNode("codex.auth", "auth-permissions", "/auth/permissions", "Get user permissions");
-        var rolesApi = NodeStorage.CreateApiNode("codex.auth", "auth-roles", "/auth/roles", "Get user roles");
-        var grantPermissionApi = NodeStorage.CreateApiNode("codex.auth", "auth-grant-permission", "/auth/grant-permission", "Grant permission");
-        var revokePermissionApi = NodeStorage.CreateApiNode("codex.auth", "auth-revoke-permission", "/auth/revoke-permission", "Revoke permission");
-        var assignRoleApi = NodeStorage.CreateApiNode("codex.auth", "auth-assign-role", "/auth/assign-role", "Assign role");
-        var removeRoleApi = NodeStorage.CreateApiNode("codex.auth", "auth-remove-role", "/auth/remove-role", "Remove role");
-        
-        registry.Upsert(loginApi);
-        registry.Upsert(registerApi);
-        registry.Upsert(refreshApi);
-        registry.Upsert(logoutApi);
-        registry.Upsert(profileApi);
-        registry.Upsert(changePasswordApi);
-        registry.Upsert(resetPasswordApi);
-        registry.Upsert(permissionsApi);
-        registry.Upsert(rolesApi);
-        registry.Upsert(grantPermissionApi);
-        registry.Upsert(revokePermissionApi);
-        registry.Upsert(assignRoleApi);
-        registry.Upsert(removeRoleApi);
-        
-        // Register edges
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.auth", "auth-login"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.auth", "auth-register"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.auth", "auth-refresh"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.auth", "auth-logout"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.auth", "auth-profile"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.auth", "auth-change-password"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.auth", "auth-reset-password"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.auth", "auth-permissions"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.auth", "auth-roles"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.auth", "auth-grant-permission"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.auth", "auth-revoke-permission"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.auth", "auth-assign-role"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.auth", "auth-remove-role"));
+        registry.Upsert(GetModuleNode());
     }
 
     public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)

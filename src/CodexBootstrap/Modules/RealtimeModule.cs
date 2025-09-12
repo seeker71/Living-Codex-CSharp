@@ -27,38 +27,13 @@ public sealed class RealtimeModule : IModule
 
     public Node GetModuleNode()
     {
-        return new Node(
-            Id: "codex.realtime",
-            TypeId: "codex.module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Real-time Communication Module",
-            Description: "Provides WebSocket and SignalR support for real-time bidirectional communication",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    version = "0.1.0",
-                    capabilities = new[]
-                    {
-                        "websocket_connection",
-                        "signalr_hub",
-                        "event_streaming",
-                        "push_notifications",
-                        "collaborative_editing",
-                        "subscription_management",
-                        "session_management"
-                    }
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["name"] = "Real-time Communication Module",
-                ["version"] = "0.1.0",
-                ["description"] = "Provides WebSocket and SignalR support for real-time bidirectional communication"
-            }
+        return NodeStorage.CreateModuleNode(
+            id: "codex.realtime",
+            name: "Real-time Communication Module",
+            version: "0.1.0",
+            description: "Provides WebSocket and SignalR support for real-time bidirectional communication",
+            capabilities: new[] { "websocket_connection", "signalr_hub", "event_streaming", "push_notifications", "collaborative_editing", "subscription_management", "session_management" },
+            tags: new[] { "realtime", "websocket", "signalr", "communication" }
         );
     }
 

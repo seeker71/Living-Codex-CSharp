@@ -84,22 +84,7 @@ public sealed class StorageModule : IModule
 
     public void Register(NodeRegistry registry)
     {
-        // Register API nodes
-        var statsApi = NodeStorage.CreateApiNode("codex.storage", "storage-stats", "/storage/stats", "Get storage statistics");
-        var syncApi = NodeStorage.CreateApiNode("codex.storage", "storage-sync", "/storage/sync", "Sync cache with storage");
-        var healthApi = NodeStorage.CreateApiNode("codex.storage", "storage-health", "/storage/health", "Check storage health");
-        var cacheApi = NodeStorage.CreateApiNode("codex.storage", "storage-cache", "/storage/cache", "Get cache statistics");
-        
-        registry.Upsert(statsApi);
-        registry.Upsert(syncApi);
-        registry.Upsert(healthApi);
-        registry.Upsert(cacheApi);
-        
-        // Register edges
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.storage", "storage-stats"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.storage", "storage-sync"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.storage", "storage-health"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.storage", "storage-cache"));
+        registry.Upsert(GetModuleNode());
     }
 
     public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)

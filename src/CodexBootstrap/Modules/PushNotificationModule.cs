@@ -30,37 +30,13 @@ public sealed class PushNotificationModule : IModule
 
     public Node GetModuleNode()
     {
-        return new Node(
-            Id: "codex.push-notifications",
-            TypeId: "codex.module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Push Notification Module",
-            Description: "Provides push notification system for client notifications",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    version = "0.1.0",
-                    capabilities = new[]
-                    {
-                        "push_notifications",
-                        "notification_templates",
-                        "notification_subscriptions",
-                        "notification_history",
-                        "notification_scheduling",
-                        "notification_delivery"
-                    }
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["name"] = "Push Notification Module",
-                ["version"] = "0.1.0",
-                ["description"] = "Provides push notification system for client notifications"
-            }
+        return NodeStorage.CreateModuleNode(
+            id: "codex.push-notifications",
+            name: "Push Notification Module",
+            version: "0.1.0",
+            description: "Provides push notification system for client notifications",
+            capabilities: new[] { "push_notifications", "notification_templates", "notification_subscriptions", "notification_history", "notification_scheduling", "notification_delivery" },
+            tags: new[] { "push-notifications", "notifications", "messaging", "client" }
         );
     }
 
