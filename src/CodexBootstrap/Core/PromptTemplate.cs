@@ -6,6 +6,7 @@ namespace CodexBootstrap.Core
     /// <summary>
     /// Configurable prompt template system for LLM interactions
     /// </summary>
+    [MetaNodeAttribute("codex.core.prompt-template", "codex.meta/type", "PromptTemplate", "Configurable prompt template for LLM interactions")]
     public record PromptTemplate(
         string Id,
         string Name,
@@ -41,6 +42,7 @@ namespace CodexBootstrap.Core
     /// <summary>
     /// Repository for managing prompt templates as nodes
     /// </summary>
+    [MetaNodeAttribute("codex.core.prompt-template-repository", "codex.meta/type", "PromptTemplateRepository", "Repository for managing prompt templates as nodes")]
     public class PromptTemplateRepository
     {
         private readonly NodeRegistry _registry;

@@ -8,10 +8,16 @@ using CodexBootstrap.Runtime;
 
 namespace CodexBootstrap.Modules
 {
+    [RequestType("codex.ai.concept-extraction-request", "ConceptExtractionRequest", "Request for concept extraction")]
     public record ConceptExtractionRequest(string Content, string? Model = null, string? Provider = null);
+    
+    [RequestType("codex.ai.fractal-transform-request", "FractalTransformRequest", "Request for fractal transformation")]
     public record FractalTransformRequest(string Content, string? Model = null, string? Provider = null);
+    
+    [RequestType("codex.ai.future-query-request", "AIFutureQueryRequest", "Request for future knowledge query")]
     public record AIFutureQueryRequest(string Query, string? Model = null, string? Provider = null);
 
+    [MetaNodeAttribute("codex.ai.llm-configurations", "codex.meta/type", "LLMConfigurations", "LLM configuration management")]
     public static class LLMConfigurations
     {
         private static LLMConfig CreateConfig(string id, string name, string provider, string model, 
@@ -132,6 +138,7 @@ namespace CodexBootstrap.Modules
     /// <summary>
     /// Refactored AI Module - Concise, configurable, and pattern-driven
     /// </summary>
+    [MetaNodeAttribute("codex.ai.module", "codex.meta/module", "AIModule", "AI Module for concept extraction, fractal transformation, and future queries")]
     public class AIModule : IModule
     {
         private readonly NodeRegistry _registry;
@@ -578,6 +585,7 @@ Response:",
 
     #region Data Structures
 
+    [MetaNodeAttribute("codex.ai.concept-score", "codex.meta/type", "ConceptScore", "Score for a concept")]
     public record ConceptScore(
         string Concept,
         double Score,
@@ -586,6 +594,7 @@ Response:",
         double Confidence
     );
 
+    [ResponseType("codex.ai.fractal-transformation-result", "FractalTransformationResult", "Result of fractal transformation")]
     public record FractalTransformationResult(
         string TransformedContent,
         string[] FractalPatterns,
@@ -595,6 +604,7 @@ Response:",
     );
 
     // Legacy data structures for compatibility
+    [MetaNodeAttribute("codex.ai.fractal-transformation", "codex.meta/type", "FractalTransformation", "Fractal transformation algorithm")]
     public class FractalTransformation
     {
         public string Id { get; set; } = "";
@@ -611,14 +621,17 @@ Response:",
         public Dictionary<string, object> Metadata { get; set; } = new();
     }
 
+    [MetaNodeAttribute("codex.ai.cached-analysis", "codex.meta/type", "CachedAnalysis", "Cached analysis result")]
     public class CachedAnalysis
     {
         public object Data { get; set; } = new();
     }
 
     // Legacy record types for compatibility with other modules
+    [RequestType("codex.ai.llm-config-request", "LLMConfigRequest", "Request for LLM configuration")]
     public record LLMConfigRequest(LLMConfig Config);
 
+    [ResponseType("codex.ai.concept-extraction-response", "AIConceptExtractionResponse", "Response from concept extraction")]
     public record AIConceptExtractionResponse(
         string Content,
         double Confidence,
@@ -626,6 +639,7 @@ Response:",
         List<string> Sources
     );
 
+    [MetaNodeAttribute("codex.ai.llm-config", "codex.meta/type", "LLMConfig", "LLM configuration record")]
     public record LLMConfig(
         string Id,
         string Name,
@@ -639,6 +653,7 @@ Response:",
         Dictionary<string, object> Parameters
     );
 
+    [MetaNodeAttribute("codex.ai.scoring-analysis", "codex.meta/type", "ScoringAnalysis", "Analysis scoring system")]
     public class ScoringAnalysis
     {
         public string Id { get; set; } = "";
@@ -653,6 +668,7 @@ Response:",
     }
 
     // Additional missing record types
+    [ResponseType("codex.ai.llm-config-response", "LLMConfigResponse", "Response with LLM configuration")]
     public record LLMConfigResponse(
         bool Success,
         LLMConfig Config,

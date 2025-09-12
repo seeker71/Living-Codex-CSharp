@@ -8,6 +8,7 @@ namespace CodexBootstrap.Core
     /// <summary>
     /// High-level orchestrator for LLM operations with configurable prompts and patterns
     /// </summary>
+    [MetaNodeAttribute("codex.core.llm-orchestrator", "codex.meta/type", "LLMOrchestrator", "Orchestrates LLM operations with configurable prompts")]
     public class LLMOrchestrator
     {
         private readonly LLMClient _llmClient;
@@ -127,6 +128,7 @@ namespace CodexBootstrap.Core
     /// <summary>
     /// Result of an LLM operation
     /// </summary>
+    [ResponseType("codex.core.llm-operation-result", "LLMOperationResult", "Result of an LLM operation")]
     public record LLMOperationResult(
         bool Success,
         string Content,

@@ -1661,6 +1661,7 @@ namespace CodexBootstrap.Modules
     }
 
     // Data Transfer Objects
+    [MetaNodeAttribute("codex.news.news-source", "codex.meta/type", "NewsSource", "News source configuration")]
     public class NewsSource
     {
         public string Id { get; set; } = "";
@@ -1672,6 +1673,7 @@ namespace CodexBootstrap.Modules
         public int UpdateIntervalMinutes { get; set; }
     }
 
+    [MetaNodeAttribute("codex.news.news-item", "codex.meta/type", "NewsItem", "News item data structure")]
     public class NewsItem
     {
         public string Id { get; set; } = "";
@@ -1686,6 +1688,7 @@ namespace CodexBootstrap.Modules
 
     // AI Analysis Data Structures are now defined in AIModule.cs
 
+    [MetaNodeAttribute("codex.news.fractal-news-item", "codex.meta/type", "FractalNewsItem", "Fractal analysis of news item")]
     public class FractalNewsItem
     {
         public string Id { get; set; } = "";
@@ -1700,6 +1703,7 @@ namespace CodexBootstrap.Modules
         public Dictionary<string, object> Metadata { get; set; } = new();
     }
 
+    [MetaNodeAttribute("codex.news.resonance-data", "codex.meta/type", "ResonanceData", "Resonance analysis data")]
     public class ResonanceData
     {
         public double ResonanceScore { get; set; }
@@ -1708,6 +1712,7 @@ namespace CodexBootstrap.Modules
         public List<string> ResonanceFactors { get; set; } = new();
     }
 
+    [MetaNodeAttribute("codex.news.news-subscription", "codex.meta/type", "NewsSubscription", "News subscription configuration")]
     public class NewsSubscription
     {
         public string Id { get; set; } = "";
@@ -1718,12 +1723,14 @@ namespace CodexBootstrap.Modules
         public DateTimeOffset UpdatedAt { get; set; }
     }
 
+    [RequestType("codex.news.news-subscription-request", "NewsSubscriptionRequest", "Request for news subscription")]
     public class NewsSubscriptionRequest
     {
         public string UserId { get; set; } = "";
         public string[] InterestAreas { get; set; } = Array.Empty<string>();
     }
 
+    [MetaNodeAttribute("codex.news.hacker-news-story", "codex.meta/type", "HackerNewsStory", "Hacker News story data")]
     public class HackerNewsStory
     {
         public int Id { get; set; }

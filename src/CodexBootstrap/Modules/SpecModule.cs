@@ -5,18 +5,19 @@ using CodexBootstrap.Runtime;
 namespace CodexBootstrap.Modules;
 
 // Spec module specific response types
-[ResponseType("codex.spec.atoms-response", "SpecAtomsResponse", "Spec atoms response")]
+[ResponseType("codex.spec.atoms-response", "SpecAtomsResponse", "Response for spec atoms processing")]
 public record SpecAtomsResponse(string ModuleId, bool Success, string Message = "Atoms processed successfully");
 
-[ResponseType("codex.spec.compose-response", "SpecComposeResponse", "Spec compose response")]
+[ResponseType("codex.spec.compose-response", "SpecComposeResponse", "Response for spec composition")]
 public record SpecComposeResponse(object Spec, bool Success, string Message = "Spec composed successfully");
 
-[ResponseType("codex.spec.export-response", "SpecExportResponse", "Spec export response")]
+[ResponseType("codex.spec.export-response", "SpecExportResponse", "Response for spec export")]
 public record SpecExportResponse(string ModuleId, object Atoms, bool Success, string Message = "Atoms exported successfully");
 
-[ResponseType("codex.spec.import-response", "SpecImportResponse", "Spec import response")]
+[ResponseType("codex.spec.import-response", "SpecImportResponse", "Response for spec import")]
 public record SpecImportResponse(string ModuleId, bool Success, string Message = "Atoms imported successfully");
 
+[MetaNodeAttribute("codex.spec.module", "codex.meta/module", "SpecModule", "Specification management module")]
 public sealed class SpecModule : IModule
 {
     private readonly IApiRouter _apiRouter;

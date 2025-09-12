@@ -10,6 +10,7 @@ namespace CodexBootstrap.Core;
 /// <summary>
 /// Simple LLM client for Ollama integration
 /// </summary>
+[MetaNodeAttribute("codex.core.llm-client", "codex.meta/type", "LLMClient", "LLM client for Ollama integration")]
 public class LLMClient
 {
     private readonly HttpClient _httpClient;
@@ -122,6 +123,7 @@ public class LLMClient
 /// <summary>
 /// LLM response structure
 /// </summary>
+[ResponseType("codex.core.llm-response", "LLMResponse", "Response from LLM client")]
 public class LLMResponse
 {
     public bool Success { get; set; }
@@ -135,6 +137,7 @@ public class LLMResponse
 /// <summary>
 /// Ollama API response structure
 /// </summary>
+[ResponseType("codex.core.ollama-response", "OllamaResponse", "Response from Ollama API")]
 public class OllamaResponse
 {
     public string Response { get; set; } = "";
