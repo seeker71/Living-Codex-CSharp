@@ -32,7 +32,7 @@ public sealed class HealthService
             var uptime = DateTime.UtcNow - _startTime;
             var nodeCount = _registry.AllNodes().Count();
             var edgeCount = _registry.AllEdges().Count();
-            var moduleCount = _registry.GetNodesByType("codex.meta/module").Count();
+            var moduleCount = _registry.GetNodesByType("module").Count();
 
             return new HealthStatus(
                 Status: "healthy",
