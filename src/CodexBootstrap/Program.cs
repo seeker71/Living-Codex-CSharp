@@ -72,6 +72,9 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
         builder.Services.AddSingleton<HotReloadManager>();
         builder.Services.AddSingleton<SelfUpdateSystem>();
         builder.Services.AddSingleton<StableCore>();
+        
+        // Register spec-driven architecture services
+        builder.Services.AddSingleton<SpecDrivenArchitecture>();
 
 // HTTP client for adapters
 builder.Services.AddHttpClient();

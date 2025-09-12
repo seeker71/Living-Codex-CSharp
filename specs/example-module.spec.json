@@ -1,0 +1,31 @@
+{
+  "id": "example-generated-module",
+  "name": "Example Generated Module",
+  "className": "ExampleGeneratedModule",
+  "version": "1.0.0",
+  "title": "Example Generated Module",
+  "description": "A module generated from spec to demonstrate the ice-water-gas architecture",
+  "endpoints": [
+    {
+      "name": "Get Status",
+      "path": "/example-generated/status",
+      "httpMethod": "GET",
+      "methodName": "GetStatus",
+      "description": "Get the status of the generated module"
+    },
+    {
+      "name": "Get Info",
+      "path": "/example-generated/info",
+      "httpMethod": "GET",
+      "methodName": "GetInfo",
+      "description": "Get detailed information about the generated module"
+    },
+    {
+      "name": "Execute Action",
+      "path": "/example-generated/action",
+      "httpMethod": "POST",
+      "methodName": "ExecuteAction",
+      "description": "Execute an action in the generated module"
+    }
+  ]
+}
