@@ -26,34 +26,14 @@ public class ConceptRegistryModule : IModule
 
     public ConceptRegistryModule() : this(new NodeRegistry()) { }
 
+    public string ModuleId => "codex.concept-registry";
+    public string Name => "Concept Registry Module";
+    public string Version => "1.0.0";
+    public string Description => "Central registry for all concepts across services with version management and cross-service synchronization";
+
     public Node GetModuleNode()
     {
-        return new Node(
-            Id: "codex.concept-registry",
-            TypeId: "codex.module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Concept Registry Module",
-            Description: "Central registry for all concepts across services with version management and cross-service synchronization",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    version = "1.0.0",
-                    capabilities = new[] { "concept-registration", "concept-discovery", "version-management", "cross-service-sync", "relationship-management", "quality-assessment" },
-                    endpoints = new[] { "register-concept", "discover-concepts", "get-concept", "update-concept", "sync-concepts", "assess-quality" }
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["name"] = "Concept Registry Module",
-                ["version"] = "1.0.0",
-                ["type"] = "registry",
-                ["capabilities"] = new[] { "concept-registration", "concept-discovery", "version-management", "cross-service-sync", "quality-assessment" }
-            }
-        );
+        return NodeStorage.CreateModuleNode(ModuleId, Name, Version, Description);
     }
 
     public void Register(NodeRegistry registry)

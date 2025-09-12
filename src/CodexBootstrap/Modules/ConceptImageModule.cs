@@ -124,37 +124,14 @@ public class ConceptImageModule : IModule
         InitializeDefaultConfigs();
     }
 
+    public string ModuleId => "codex.image.concept";
+    public string Name => "Concept Image Generation Module";
+    public string Version => "1.0.0";
+    public string Description => "Configurable image generation for visualizing concepts";
+
     public Node GetModuleNode()
     {
-        return new Node(
-            Id: "codex.image.concept",
-            TypeId: "codex.meta/module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Concept Image Generation Module",
-            Description: "Renders concepts into images using configurable image generation models",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    ModuleId = "codex.image.concept",
-                    Name = "Concept Image Generation Module",
-                    Description = "Configurable image generation for visualizing concepts",
-                    Version = "1.0.0",
-                    SupportedProviders = new[] { "OpenAI", "StabilityAI", "Midjourney", "Custom", "Local" },
-                    Capabilities = new[] { "ImageGeneration", "ConceptVisualization", "ConfigurableProviders", "LocalAndRemote" }
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.image.concept",
-                ["version"] = "1.0.0",
-                ["createdAt"] = DateTime.UtcNow,
-                ["purpose"] = "AI-powered concept visualization"
-            }
-        );
+        return NodeStorage.CreateModuleNode(ModuleId, Name, Version, Description);
     }
 
     public void Register(NodeRegistry registry)

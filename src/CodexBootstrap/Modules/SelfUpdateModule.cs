@@ -24,6 +24,7 @@ namespace CodexBootstrap.Modules
         public SelfUpdateModule()
         {
             // Parameterless constructor for module loading
+            // Dependencies will be injected by the service provider
             _logger = null!;
             _stableCore = null!;
             _selfUpdateSystem = null!;
@@ -111,9 +112,9 @@ namespace CodexBootstrap.Modules
         {
             try
             {
-                if (_stableCore == null)
+                if (_stableCore == null || _logger == null)
                 {
-                    return new { success = false, error = "Self-update system not initialized - dependencies not injected" };
+                    return new { success = false, error = "Self-update system not initialized - dependencies not injected. Please check dependency injection configuration." };
                 }
 
                 var moduleStatus = _stableCore.GetModuleStatus();
@@ -160,6 +161,11 @@ namespace CodexBootstrap.Modules
         {
             try
             {
+                if (_stableCore == null || _logger == null)
+                {
+                    return new { success = false, error = "Self-update system not initialized - dependencies not injected" };
+                }
+
                 if (string.IsNullOrEmpty(request.ModuleName))
                 {
                     return new { success = false, error = "Module name is required" };
@@ -318,6 +324,11 @@ namespace CodexBootstrap.Modules
         {
             try
             {
+                if (_stableCore == null || _logger == null || _hotReloadManager == null)
+                {
+                    return new { success = false, error = "Self-update system not initialized - dependencies not injected" };
+                }
+
                 if (string.IsNullOrEmpty(request.ModuleName))
                 {
                     return new { success = false, error = "Module name is required" };
@@ -380,6 +391,11 @@ namespace CodexBootstrap.Modules
         {
             try
             {
+                if (_hotReloadManager == null)
+                {
+                    return new { success = false, error = "Self-update system not initialized - dependencies not injected" };
+                }
+
                 var backups = _hotReloadManager.GetAllBackups();
                 var backupList = backups.Values.Select(b => new
                 {
@@ -414,6 +430,11 @@ namespace CodexBootstrap.Modules
         {
             try
             {
+                if (_stableCore == null)
+                {
+                    return new { success = false, error = "Self-update system not initialized - dependencies not injected" };
+                }
+
                 var coreModules = _stableCore.GetCoreModules();
                 var moduleList = coreModules.Values.Select(m => new
                 {

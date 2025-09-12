@@ -216,14 +216,36 @@ public sealed class SpecModule : IModule
             _logger.Debug($"Atoms JSON: {atoms.GetRawText()}");
             
             // Parse atoms JSON
-            var atomsData = JsonSerializer.Deserialize<AtomsData>(atoms.GetRawText());
-            if (atomsData == null) 
+            AtomsData atomsData;
+            try
             {
-                _logger.Warn("AtomsData is null after deserialization");
+                var jsonOptions = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                };
+                
+                atomsData = JsonSerializer.Deserialize<AtomsData>(atoms.GetRawText(), jsonOptions);
+                if (atomsData == null) 
+                {
+                    _logger.Warn("AtomsData is null after deserialization");
+                    return Task.CompletedTask;
+                }
+                
+                _logger.Info($"Parsed {atomsData.Nodes?.Count ?? 0} nodes and {atomsData.Edges?.Count ?? 0} edges");
+                
+                if (atomsData.Nodes == null || atomsData.Nodes.Count == 0)
+                {
+                    _logger.Warn("No nodes found in atoms data");
+                    return Task.CompletedTask;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Failed to deserialize atoms JSON: {ex.Message}");
+                _logger.Error($"JSON content: {atoms.GetRawText()}");
                 return Task.CompletedTask;
             }
-            
-            _logger.Info($"Parsed {atomsData.Nodes?.Count ?? 0} nodes and {atomsData.Edges?.Count ?? 0} edges");
 
             // Store nodes
             foreach (var nodeData in atomsData.Nodes ?? new List<NodeData>())

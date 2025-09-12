@@ -503,7 +503,7 @@ LLM Provider: {_llmProvider}";
     /// <summary>
     /// Call LLM with the provided configuration and prompt
     /// </summary>
-    private async Task<LLMResponse> CallLLM(LLMConfig config, string prompt)
+    private async Task<BasicLLMResponse> CallLLM(LLMConfig config, string prompt)
     {
         try
         {
@@ -531,14 +531,14 @@ LLM Provider: {_llmProvider}";
 
             if (response.IsSuccessStatusCode)
             {
-                var llmResponse = JsonSerializer.Deserialize<LLMResponse>(responseContent);
+                var llmResponse = JsonSerializer.Deserialize<BasicLLMResponse>(responseContent);
                 if (llmResponse != null)
                 {
                     return llmResponse;
                 }
             }
 
-            return new LLMResponse(
+            return new BasicLLMResponse(
                 Content: "LLM unavailable - service error",
                 Model: config.Model,
                 CreatedAt: DateTime.UtcNow
@@ -546,7 +546,7 @@ LLM Provider: {_llmProvider}";
         }
         catch (Exception)
         {
-            return new LLMResponse(
+            return new BasicLLMResponse(
                 Content: "LLM unavailable - connection error",
                 Model: config.Model,
                 CreatedAt: DateTime.UtcNow
@@ -676,9 +676,9 @@ public record LLMConfig(
 );
 
 /// <summary>
-/// LLM Response for dynamic attribution
+/// Basic LLM API Response for dynamic attribution
 /// </summary>
-public record LLMResponse(
+public record BasicLLMResponse(
     string Content,
     string Model,
     DateTime CreatedAt

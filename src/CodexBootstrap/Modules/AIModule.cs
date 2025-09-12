@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using CodexBootstrap.Core;
@@ -89,7 +90,7 @@ namespace CodexBootstrap.Modules
         DateTimeOffset Timestamp
     );
 
-    public record LLMResponse(
+    public record AIConceptExtractionResponse(
         string Content,
         double Confidence,
         string Reasoning,
@@ -120,6 +121,7 @@ namespace CodexBootstrap.Modules
         private readonly ConcurrentDictionary<string, DateTimeOffset> _cacheTimestamps;
         private readonly TimeSpan _cacheExpiration = TimeSpan.FromHours(24);
         private readonly SemaphoreSlim _analysisSemaphore = new(10, 10);
+        private readonly ModuleCommunicationWrapper _moduleComm;
 
         public AIModule(NodeRegistry registry)
         {
@@ -127,6 +129,7 @@ namespace CodexBootstrap.Modules
             _logger = new Log4NetLogger(typeof(AIModule));
             _analysisCache = new ConcurrentDictionary<string, CachedAnalysis>();
             _cacheTimestamps = new ConcurrentDictionary<string, DateTimeOffset>();
+            _moduleComm = new ModuleCommunicationWrapper(_logger);
         }
 
         public string Name => "AI Module";
@@ -812,15 +815,27 @@ namespace CodexBootstrap.Modules
                     }
                 }
 
-                // Layer 1: Keyword-based extraction as backup
+                // Layer 1: AI-powered semantic pattern extraction
+                var semanticConcepts = await ExtractConceptsBySemanticPatterns(content, request);
+                concepts.AddRange(semanticConcepts);
+
+                // Layer 2: Context-aware extraction
+                var contextConcepts = await ExtractConceptsByContext(content, request);
+                concepts.AddRange(contextConcepts);
+
+                // Layer 3: Ontology-based extraction
+                var ontologyConcepts = await ExtractConceptsByOntology(content, request);
+                concepts.AddRange(ontologyConcepts);
+
+                // Layer 4: Keyword-based extraction as backup
                 var keywordConcepts = ExtractConceptsByKeywords(content.ToLower(), request);
                 concepts.AddRange(keywordConcepts);
 
                 // Deduplicate and merge similar concepts
-                concepts = MergeSimilarConcepts(concepts);
+                concepts = await MergeSimilarConcepts(concepts);
 
                 // Calculate final confidence
-                confidence = Math.Max(confidence, CalculateConfidence(concepts, content, request));
+                confidence = Math.Max(confidence, await CalculateConfidence(concepts, content, request));
             }
             catch (Exception ex)
             {
@@ -910,34 +925,1193 @@ namespace CodexBootstrap.Modules
             return concepts;
         }
 
-        private List<ConceptScore> ExtractConceptsBySemanticPatterns(string content, ConceptExtractionRequest request)
+        private async Task<List<ConceptScore>> ExtractConceptsBySemanticPatterns(string content, ConceptExtractionRequest request)
         {
-            // TODO: Implement semantic pattern recognition
-            return new List<ConceptScore>();
-        }
+            var concepts = new List<ConceptScore>();
+            
+            try
+            {
+                // Get optimal LLM configuration for semantic analysis
+                var optimalConfig = LLMConfigurationSystem.GetOptimalConfiguration("concept-extraction");
+                var modelAvailable = await LLMConfigurationSystem.ModelManager.EnsureModelAvailableAsync(optimalConfig.Model);
+                
+                if (modelAvailable)
+                {
+                    // Use AI for advanced semantic pattern recognition
+                    var llmConfig = new LLMConfig(
+                        Id: optimalConfig.Id,
+                        Name: optimalConfig.Id,
+                        Provider: optimalConfig.Provider,
+                        Model: optimalConfig.Model,
+                        ApiKey: "",
+                        BaseUrl: "http://localhost:11434",
+                        MaxTokens: 1000,
+                        Temperature: 0.3, // Lower temperature for more consistent results
+                        TopP: 0.9,
+                        Parameters: new Dictionary<string, object>
+                        {
+                            ["stop"] = new[] { "---", "###" }
+                        }
+                    );
 
-        private List<ConceptScore> ExtractConceptsByContext(string content, ConceptExtractionRequest request)
-        {
-            // TODO: Implement context-aware concept detection
-            return new List<ConceptScore>();
-        }
+                    var semanticPrompt = $@"Analyze the following text for consciousness-related concepts and semantic patterns. 
+Focus on identifying concepts related to: consciousness, transformation, unity, love, wisdom, energy, healing, abundance, sacred geometry, and fractal patterns.
 
-        private List<ConceptScore> ExtractConceptsByOntology(string content, ConceptExtractionRequest request)
-        {
-            // TODO: Implement ontology-aware concept mapping
-            return new List<ConceptScore>();
-        }
+Text: ""{content}""
 
-        private List<ConceptScore> MergeSimilarConcepts(List<ConceptScore> concepts)
-        {
-            // TODO: Implement concept merging logic
+Return your analysis as a JSON array of concepts with the following structure:
+[
+  {{
+    ""concept"": ""concept_name"",
+    ""score"": 0.0-1.0,
+    ""description"": ""brief description"",
+    ""category"": ""consciousness|transformation|unity|love|wisdom|energy|healing|abundance|sacred|fractal"",
+    ""confidence"": 0.0-1.0,
+    ""semanticPatterns"": [""pattern1"", ""pattern2""]
+  }}
+]
+
+Be thorough but concise. Focus on the most significant concepts with high confidence scores.";
+
+                    var llmResponse = await CallLLMAsync(semanticPrompt, llmConfig);
+                    
+                    if (!llmResponse.Content.Contains("LLM unavailable"))
+                    {
+                        // Parse AI response
+                        var aiConcepts = ParseLLMConceptResponse(llmResponse.Content);
+                        concepts.AddRange(aiConcepts);
+                        _logger.Info($"AI semantic analysis found {aiConcepts.Count} concepts");
+                    }
+                    else
+                    {
+                        _logger.Warn("AI semantic analysis failed, falling back to pattern matching");
+                        concepts.AddRange(ExtractConceptsByPatternMatching(content));
+                    }
+                }
+                else
+                {
+                    _logger.Warn("LLM not available for semantic analysis, using pattern matching");
+                    concepts.AddRange(ExtractConceptsByPatternMatching(content));
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in AI semantic pattern extraction: {ex.Message}", ex);
+                concepts.AddRange(ExtractConceptsByPatternMatching(content));
+            }
+
             return concepts;
         }
 
-        private double CalculateConfidence(List<ConceptScore> concepts, string content, ConceptExtractionRequest request)
+        private List<ConceptScore> ExtractConceptsByPatternMatching(string content)
         {
-            // TODO: Implement confidence calculation
-            return 0.8;
+            var concepts = new List<ConceptScore>();
+            
+            // Define semantic patterns for consciousness-related concepts
+            var semanticPatterns = new Dictionary<string, (string pattern, double weight, string category)>
+            {
+                // Consciousness and awareness patterns
+                { "consciousness", (@"\b(consciousness|awareness|mindfulness|presence|awakening)\b", 0.9, "consciousness") },
+                { "transformation", (@"\b(transformation|evolution|growth|change|shift|breakthrough)\b", 0.85, "transformation") },
+                { "unity", (@"\b(unity|oneness|connection|wholeness|integration|harmony)\b", 0.8, "unity") },
+                { "love", (@"\b(love|compassion|empathy|kindness|heart|unconditional)\b", 0.8, "love") },
+                { "wisdom", (@"\b(wisdom|knowledge|insight|understanding|clarity|enlightenment)\b", 0.75, "wisdom") },
+                { "energy", (@"\b(energy|vibration|frequency|resonance|flow|chi|prana)\b", 0.7, "energy") },
+                { "healing", (@"\b(healing|recovery|restoration|wholeness|wellness|balance)\b", 0.7, "healing") },
+                { "abundance", (@"\b(abundance|prosperity|wealth|success|fulfillment|manifestation)\b", 0.65, "abundance") },
+                { "sacred", (@"\b(sacred|divine|holy|spiritual|transcendent|mystical)\b", 0.8, "sacred") },
+                { "fractal", (@"\b(fractal|pattern|geometry|structure|design|blueprint)\b", 0.6, "fractal") }
+            };
+
+            // Apply semantic pattern matching
+            foreach (var pattern in semanticPatterns)
+            {
+                var matches = System.Text.RegularExpressions.Regex.Matches(content, pattern.Value.pattern, 
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                
+                if (matches.Count > 0)
+                {
+                    var concept = new ConceptScore
+                    {
+                        Concept = pattern.Key,
+                        Score = pattern.Value.weight * Math.Min(matches.Count / 3.0, 1.0), // Scale by frequency
+                        Description = $"Semantic pattern match for {pattern.Key}",
+                        Category = pattern.Value.category,
+                        Confidence = Math.Min(matches.Count * 0.1, 0.9)
+                    };
+                    concepts.Add(concept);
+                }
+            }
+
+            // Extract compound concepts using n-grams
+            var words = content.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 0; i < words.Length - 1; i++)
+            {
+                var bigram = $"{words[i]} {words[i + 1]}".ToLower();
+                var trigram = i < words.Length - 2 ? $"{words[i]} {words[i + 1]} {words[i + 2]}".ToLower() : "";
+                
+                // Check for compound consciousness concepts
+                var compoundPatterns = new Dictionary<string, (double weight, string category)>
+                {
+                    { "consciousness expansion", (0.9, "consciousness") },
+                    { "spiritual growth", (0.85, "transformation") },
+                    { "inner wisdom", (0.8, "wisdom") },
+                    { "divine love", (0.85, "love") },
+                    { "sacred geometry", (0.8, "sacred") },
+                    { "energy healing", (0.75, "healing") },
+                    { "abundance consciousness", (0.8, "abundance") },
+                    { "fractal patterns", (0.7, "fractal") }
+                };
+
+                foreach (var compound in compoundPatterns)
+                {
+                    if (bigram.Contains(compound.Key) || trigram.Contains(compound.Key))
+                    {
+                        var concept = new ConceptScore
+                        {
+                            Concept = compound.Key,
+                            Score = compound.Value.weight,
+                            Description = $"Compound concept: {compound.Key}",
+                            Category = compound.Value.category,
+                            Confidence = 0.8
+                        };
+                        concepts.Add(concept);
+                    }
+                }
+            }
+
+            return concepts;
+        }
+
+        private async Task<List<ConceptScore>> ExtractConceptsByContext(string content, ConceptExtractionRequest request)
+        {
+            var concepts = new List<ConceptScore>();
+            
+            try
+            {
+                // Get optimal LLM configuration for context analysis
+                var optimalConfig = LLMConfigurationSystem.GetOptimalConfiguration("concept-extraction");
+                var modelAvailable = await LLMConfigurationSystem.ModelManager.EnsureModelAvailableAsync(optimalConfig.Model);
+                
+                if (modelAvailable)
+                {
+                    // Use AI for context-aware concept extraction
+                    var llmConfig = new LLMConfig(
+                        Id: optimalConfig.Id,
+                        Name: optimalConfig.Id,
+                        Provider: optimalConfig.Provider,
+                        Model: optimalConfig.Model,
+                        ApiKey: "",
+                        BaseUrl: "http://localhost:11434",
+                        MaxTokens: 800,
+                        Temperature: 0.4, // Slightly higher for context creativity
+                        TopP: 0.9,
+                        Parameters: new Dictionary<string, object>
+                        {
+                            ["stop"] = new[] { "---", "###" }
+                        }
+                    );
+
+                    var contextInfo = new StringBuilder();
+                    contextInfo.AppendLine($"Categories: {string.Join(", ", request.Categories ?? new string[0])}");
+                    contextInfo.AppendLine($"Source: {request.Source ?? "unknown"}");
+                    contextInfo.AppendLine($"URL: {request.Url ?? "none"}");
+
+                    var contextPrompt = $@"Analyze the following text for consciousness-related concepts, taking into account the specific context and domain.
+
+Context Information:
+{contextInfo}
+
+Text: ""{content}""
+
+Based on the context, identify concepts that are most relevant and meaningful. Consider how the domain, language, time horizon, and perspective affect the interpretation of consciousness-related concepts.
+
+Return your analysis as a JSON array of concepts with the following structure:
+[
+  {{
+    ""concept"": ""concept_name"",
+    ""score"": 0.0-1.0,
+    ""description"": ""brief description"",
+    ""category"": ""consciousness|transformation|unity|love|wisdom|energy|healing|abundance|sacred|fractal"",
+    ""confidence"": 0.0-1.0,
+    ""contextRelevance"": 0.0-1.0,
+    ""domainSpecific"": ""domain_name""
+  }}
+]
+
+Focus on concepts that are most relevant to the given context and domain.";
+
+                    var llmResponse = await CallLLMAsync(contextPrompt, llmConfig);
+                    
+                    if (!llmResponse.Content.Contains("LLM unavailable"))
+                    {
+                        // Parse AI response
+                        var aiConcepts = ParseLLMConceptResponse(llmResponse.Content);
+                        concepts.AddRange(aiConcepts);
+                        _logger.Info($"AI context analysis found {aiConcepts.Count} concepts");
+                    }
+                    else
+                    {
+                        _logger.Warn("AI context analysis failed, falling back to rule-based context extraction");
+                        concepts.AddRange(ExtractConceptsByContextRules(content, request));
+                    }
+                }
+                else
+                {
+                    _logger.Warn("LLM not available for context analysis, using rule-based extraction");
+                    concepts.AddRange(ExtractConceptsByContextRules(content, request));
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in AI context extraction: {ex.Message}", ex);
+                concepts.AddRange(ExtractConceptsByContextRules(content, request));
+            }
+
+            return concepts;
+        }
+
+        private List<ConceptScore> ExtractConceptsByContextRules(string content, ConceptExtractionRequest request)
+        {
+            var concepts = new List<ConceptScore>();
+            
+            // Analyze context from request metadata
+            var contextFactors = new Dictionary<string, double>();
+            
+            // Domain-based context weighting
+            if (request.Categories != null && request.Categories.Length > 0)
+            {
+                foreach (var category in request.Categories)
+                {
+                    var trimmedCategory = category.Trim().ToLower();
+                    switch (trimmedCategory)
+                    {
+                    case "technology":
+                        case "ai":
+                        case "artificial intelligence":
+                            contextFactors["consciousness"] = 0.8;
+                            contextFactors["transformation"] = 0.7;
+                            contextFactors["wisdom"] = 0.6;
+                        break;
+                        case "spirituality":
+                    case "consciousness":
+                        case "meditation":
+                            contextFactors["consciousness"] = 0.9;
+                            contextFactors["sacred"] = 0.8;
+                            contextFactors["unity"] = 0.8;
+                        break;
+                        case "health":
+                        case "wellness":
+                        case "healing":
+                            contextFactors["healing"] = 0.9;
+                            contextFactors["energy"] = 0.7;
+                            contextFactors["balance"] = 0.8;
+                        break;
+                        case "business":
+                        case "success":
+                        case "wealth":
+                            contextFactors["abundance"] = 0.8;
+                            contextFactors["transformation"] = 0.6;
+                            contextFactors["wisdom"] = 0.5;
+                        break;
+                        case "science":
+                        case "research":
+                            contextFactors["wisdom"] = 0.8;
+                            contextFactors["fractal"] = 0.7;
+                            contextFactors["consciousness"] = 0.6;
+                        break;
+                }
+            }
+            }
+
+            // Source-based context weighting
+            if (!string.IsNullOrEmpty(request.Source))
+            {
+                var source = request.Source.ToLower();
+                if (source.Contains("news") || source.Contains("article"))
+                {
+                    contextFactors["transformation"] += 0.1;
+                    contextFactors["consciousness"] += 0.1;
+                }
+                else if (source.Contains("research") || source.Contains("study"))
+                {
+                    contextFactors["wisdom"] += 0.2;
+                    contextFactors["fractal"] += 0.1;
+                }
+                else if (source.Contains("spiritual") || source.Contains("meditation"))
+                {
+                    contextFactors["sacred"] += 0.2;
+                    contextFactors["unity"] += 0.2;
+                }
+            }
+
+            // Title-based context analysis
+            if (!string.IsNullOrEmpty(request.Title))
+            {
+                var title = request.Title.ToLower();
+                
+                // Look for consciousness-related keywords in title
+                var titleKeywords = new Dictionary<string, double>
+                {
+                    { "breakthrough", 0.8 },
+                    { "discovery", 0.7 },
+                    { "revolution", 0.8 },
+                    { "evolution", 0.7 },
+                    { "awakening", 0.9 },
+                    { "consciousness", 0.9 },
+                    { "spiritual", 0.8 },
+                    { "healing", 0.8 },
+                    { "abundance", 0.7 },
+                    { "wisdom", 0.7 }
+                };
+
+                foreach (var keyword in titleKeywords)
+                {
+                    if (title.Contains(keyword.Key))
+                    {
+                        // Boost related concepts based on title keywords
+                        switch (keyword.Key)
+                        {
+                            case "breakthrough":
+                            case "discovery":
+                            case "revolution":
+                                contextFactors["transformation"] = Math.Max(contextFactors.GetValueOrDefault("transformation", 0), keyword.Value);
+                                break;
+                            case "consciousness":
+                            case "awakening":
+                                contextFactors["consciousness"] = Math.Max(contextFactors.GetValueOrDefault("consciousness", 0), keyword.Value);
+                                break;
+                            case "spiritual":
+                                contextFactors["sacred"] = Math.Max(contextFactors.GetValueOrDefault("sacred", 0), keyword.Value);
+                                contextFactors["unity"] = Math.Max(contextFactors.GetValueOrDefault("unity", 0), keyword.Value);
+                                break;
+                            case "healing":
+                                contextFactors["healing"] = Math.Max(contextFactors.GetValueOrDefault("healing", 0), keyword.Value);
+                                break;
+                            case "abundance":
+                                contextFactors["abundance"] = Math.Max(contextFactors.GetValueOrDefault("abundance", 0), keyword.Value);
+                                break;
+                            case "wisdom":
+                                contextFactors["wisdom"] = Math.Max(contextFactors.GetValueOrDefault("wisdom", 0), keyword.Value);
+                                break;
+                        }
+                    }
+                }
+            }
+
+            // Content length and complexity analysis
+            var wordCount = content.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+            var sentenceCount = content.Split('.', '!', '?').Length;
+            var avgWordsPerSentence = wordCount / Math.Max(sentenceCount, 1);
+
+            // Adjust context factors based on content complexity
+            if (avgWordsPerSentence > 20) // Complex, academic content
+            {
+                contextFactors["wisdom"] = Math.Max(contextFactors.GetValueOrDefault("wisdom", 0), 0.7);
+                contextFactors["fractal"] = Math.Max(contextFactors.GetValueOrDefault("fractal", 0), 0.6);
+            }
+            else if (avgWordsPerSentence < 10) // Simple, accessible content
+            {
+                contextFactors["consciousness"] = Math.Max(contextFactors.GetValueOrDefault("consciousness", 0), 0.6);
+                contextFactors["love"] = Math.Max(contextFactors.GetValueOrDefault("love", 0), 0.6);
+            }
+
+            // Generate context-aware concepts
+            foreach (var factor in contextFactors)
+            {
+                if (factor.Value > 0.5) // Only include significant context factors
+                {
+                    var concept = new ConceptScore
+                    {
+                        Concept = factor.Key,
+                        Score = factor.Value,
+                        Description = $"Context-aware concept based on {factor.Key} domain",
+                        Category = factor.Key,
+                        Confidence = Math.Min(factor.Value + 0.2, 1.0)
+                    };
+                    concepts.Add(concept);
+                }
+            }
+
+            return concepts;
+        }
+
+        private async Task<List<ConceptScore>> ExtractConceptsByOntology(string content, ConceptExtractionRequest request)
+        {
+            var concepts = new List<ConceptScore>();
+            
+            try
+            {
+                // Get optimal LLM configuration for ontology analysis
+                var optimalConfig = LLMConfigurationSystem.GetOptimalConfiguration("concept-extraction");
+                var modelAvailable = await LLMConfigurationSystem.ModelManager.EnsureModelAvailableAsync(optimalConfig.Model);
+                
+                if (modelAvailable)
+                {
+                    // Use AI for ontology-aware concept extraction
+                    var llmConfig = new LLMConfig(
+                        Id: optimalConfig.Id,
+                        Name: optimalConfig.Id,
+                        Provider: optimalConfig.Provider,
+                        Model: optimalConfig.Model,
+                        ApiKey: "",
+                        BaseUrl: "http://localhost:11434",
+                        MaxTokens: 1000,
+                        Temperature: 0.2, // Very low temperature for consistent ontology matching
+                        TopP: 0.8,
+                        Parameters: new Dictionary<string, object>
+                        {
+                            ["stop"] = new[] { "---", "###" }
+                        }
+                    );
+
+                    // Get existing ontology concepts for context
+                    var ontologyContext = await GetOntologyContext();
+                    
+                    var ontologyPrompt = $@"Analyze the following text for concepts that match or relate to the existing U-CORE ontology.
+
+Existing Ontology Concepts:
+{ontologyContext}
+
+Text: ""{content}""
+
+Identify concepts that:
+1. Exactly match existing ontology concepts
+2. Are semantically related to existing concepts
+3. Represent new concepts that should be added to the ontology
+4. Follow the U-CORE framework principles (consciousness, unity, resonance, fractal patterns, sacred geometry)
+
+Return your analysis as a JSON array of concepts with the following structure:
+[
+  {{
+    ""concept"": ""concept_name"",
+    ""score"": 0.0-1.0,
+    ""description"": ""brief description"",
+    ""category"": ""consciousness|transformation|unity|love|wisdom|energy|healing|abundance|sacred|fractal|u-core"",
+    ""confidence"": 0.0-1.0,
+    ""ontologyMatch"": ""exact|semantic|new"",
+    ""relatedConcepts"": [""concept1"", ""concept2""],
+    ""frequency"": ""432hz|528hz|741hz|custom""
+  }}
+]
+
+Focus on high-confidence matches and meaningful relationships to the U-CORE ontology.";
+
+                    var llmResponse = await CallLLMAsync(ontologyPrompt, llmConfig);
+                    
+                    if (!llmResponse.Content.Contains("LLM unavailable"))
+                    {
+                        // Parse AI response
+                        var aiConcepts = ParseLLMConceptResponse(llmResponse.Content);
+                        concepts.AddRange(aiConcepts);
+                        _logger.Info($"AI ontology analysis found {aiConcepts.Count} concepts");
+                    }
+                    else
+                    {
+                        _logger.Warn("AI ontology analysis failed, falling back to rule-based ontology extraction");
+                        concepts.AddRange(await ExtractConceptsByOntologyRules(content, request));
+                    }
+                }
+                else
+                {
+                    _logger.Warn("LLM not available for ontology analysis, using rule-based extraction");
+                    concepts.AddRange(await ExtractConceptsByOntologyRules(content, request));
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in AI ontology extraction: {ex.Message}", ex);
+                concepts.AddRange(await ExtractConceptsByOntologyRules(content, request));
+            }
+
+            return concepts;
+        }
+
+        private async Task<List<ConceptScore>> ExtractConceptsByOntologyRules(string content, ConceptExtractionRequest request)
+        {
+            var concepts = new List<ConceptScore>();
+            
+            try
+            {
+                // Use existing concept registry to get ontology concepts
+                var httpClient = new HttpClient();
+                var baseUrl = "http://localhost:5000"; // Use current service
+                
+                // Get all existing concepts from the ontology
+                var response = await httpClient.GetAsync($"{baseUrl}/concept/ontology/frequencies");
+                if (response.IsSuccessStatusCode)
+                {
+                    var jsonContent = await response.Content.ReadAsStringAsync();
+                    var frequencyData = System.Text.Json.JsonSerializer.Deserialize<dynamic>(jsonContent);
+                    
+                    // Extract concept names from the frequency mapping
+                    var existingConcepts = new List<string>();
+                    if (frequencyData != null)
+                    {
+                        // Parse the JSON to extract concept names
+                        var jsonDoc = System.Text.Json.JsonDocument.Parse(jsonContent);
+                        if (jsonDoc.RootElement.TryGetProperty("frequencyMappings", out var mappings))
+                        {
+                            foreach (var mapping in mappings.EnumerateArray())
+                            {
+                                if (mapping.TryGetProperty("name", out var name))
+                                {
+                                    existingConcepts.Add(name.GetString() ?? "");
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Match content against existing ontology concepts
+                    var contentLower = content.ToLower();
+                    foreach (var existingConcept in existingConcepts.Where(c => !string.IsNullOrEmpty(c)))
+                    {
+                        var conceptLower = existingConcept.ToLower();
+                        
+                        // Check for exact matches
+                        if (contentLower.Contains(conceptLower))
+                        {
+                            var concept = new ConceptScore
+                            {
+                                Concept = existingConcept,
+                                Score = 0.9, // High score for ontology matches
+                                Description = $"Ontology match: {existingConcept}",
+                                Category = "ontology",
+                                Confidence = 0.9
+                            };
+                            concepts.Add(concept);
+                        }
+                        // Check for partial matches (substring)
+                        else if (conceptLower.Length > 3 && contentLower.Contains(conceptLower.Substring(0, Math.Min(conceptLower.Length, 8))))
+                        {
+                            var concept = new ConceptScore
+                            {
+                                Concept = existingConcept,
+                                Score = 0.6, // Medium score for partial matches
+                                Description = $"Partial ontology match: {existingConcept}",
+                                Category = "ontology",
+                                Confidence = 0.6
+                            };
+                            concepts.Add(concept);
+                        }
+                    }
+                }
+                
+                // Also check for U-CORE specific concepts
+                var uCoreConcepts = new Dictionary<string, (string pattern, double weight, string category)>
+                {
+                    { "U-CORE", (@"\b(u-?core|universal consciousness resonance engine)\b", 0.95, "u-core") },
+                    { "Sacred Frequencies", (@"\b(432hz|528hz|741hz|sacred frequency|healing frequency)\b", 0.9, "frequencies") },
+                    { "Chakra System", (@"\b(chakra|root|sacral|solar plexus|heart|throat|third eye|crown)\b", 0.8, "chakras") },
+                    { "Resonance", (@"\b(resonance|vibration|frequency|harmony|alignment)\b", 0.8, "resonance") },
+                    { "Fractal Consciousness", (@"\b(fractal consciousness|living codex|node|edge|graph)\b", 0.9, "fractal") },
+                    { "Abundance Amplification", (@"\b(abundance|amplification|collective energy|contribution)\b", 0.8, "abundance") }
+                };
+                
+                foreach (var uCoreConcept in uCoreConcepts)
+                {
+                    var matches = System.Text.RegularExpressions.Regex.Matches(content, uCoreConcept.Value.pattern, 
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    
+                    if (matches.Count > 0)
+                    {
+                        var concept = new ConceptScore
+                        {
+                            Concept = uCoreConcept.Key,
+                            Score = uCoreConcept.Value.weight,
+                            Description = $"U-CORE ontology concept: {uCoreConcept.Key}",
+                            Category = uCoreConcept.Value.category,
+                            Confidence = 0.9
+                        };
+                        concepts.Add(concept);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in ontology-aware concept extraction: {ex.Message}", ex);
+                // Fallback to basic ontology concepts
+                    concepts.Add(new ConceptScore
+                    {
+                    Concept = "consciousness",
+                    Score = 0.7,
+                    Description = "Fallback ontology concept",
+                    Category = "consciousness",
+                    Confidence = 0.5
+                });
+            }
+
+            return concepts;
+        }
+
+        private async Task<CodexBootstrap.Core.BasicLLMResponse> CallLLMAsync(string prompt, LLMConfig config)
+        {
+            try
+            {
+                var httpClient = new HttpClient();
+                var baseUrl = "http://localhost:11434"; // Ollama default URL
+                
+                var requestBody = new
+                {
+                    model = config.Model,
+                    prompt = prompt,
+                    stream = false,
+                    options = new
+                    {
+                        temperature = config.Temperature,
+                        top_p = config.TopP,
+                        max_tokens = config.MaxTokens,
+                        stop = config.Parameters.ContainsKey("stop") ? config.Parameters["stop"] : new[] { "---", "###" }
+                    }
+                };
+
+                var jsonContent = JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+                
+                var response = await httpClient.PostAsync($"{baseUrl}/api/generate", content);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    var llmResponse = JsonSerializer.Deserialize<OllamaResponse>(responseContent);
+                    
+                    return new CodexBootstrap.Core.BasicLLMResponse(
+                        Content: llmResponse?.Response ?? "No response generated",
+                        Model: config.Model,
+                        CreatedAt: DateTime.UtcNow
+                    );
+                }
+                else
+                {
+                    return new CodexBootstrap.Core.BasicLLMResponse(
+                        Content: "LLM unavailable - service error",
+                        Model: config.Model,
+                        CreatedAt: DateTime.UtcNow
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"LLM call failed: {ex.Message}", ex);
+                return new CodexBootstrap.Core.BasicLLMResponse(
+                    Content: "LLM unavailable - connection error",
+                    Model: config.Model,
+                    CreatedAt: DateTime.UtcNow
+                );
+            }
+        }
+
+        private async Task<string> GetOntologyContext()
+        {
+            try
+            {
+                var httpClient = new HttpClient();
+                var baseUrl = "http://localhost:5000";
+                
+                // Get ontology concepts
+                var response = await httpClient.GetAsync($"{baseUrl}/concept/ontology/frequencies");
+                if (response.IsSuccessStatusCode)
+                {
+                    var jsonContent = await response.Content.ReadAsStringAsync();
+                    return jsonContent;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"Failed to get ontology context: {ex.Message}");
+            }
+            
+            // Fallback to basic U-CORE concepts
+            return @"{
+                ""frequencyMappings"": [
+                    {""name"": ""consciousness"", ""frequency"": ""432hz""},
+                    {""name"": ""unity"", ""frequency"": ""528hz""},
+                    {""name"": ""transformation"", ""frequency"": ""741hz""},
+                    {""name"": ""love"", ""frequency"": ""528hz""},
+                    {""name"": ""wisdom"", ""frequency"": ""432hz""},
+                    {""name"": ""energy"", ""frequency"": ""741hz""},
+                    {""name"": ""healing"", ""frequency"": ""528hz""},
+                    {""name"": ""abundance"", ""frequency"": ""741hz""},
+                    {""name"": ""sacred geometry"", ""frequency"": ""432hz""},
+                    {""name"": ""fractal patterns"", ""frequency"": ""528hz""}
+                ]
+            }";
+        }
+
+        private async Task<List<ConceptScore>> MergeSimilarConcepts(List<ConceptScore> concepts)
+        {
+            if (concepts == null || concepts.Count <= 1)
+            return concepts;
+
+            try
+            {
+                // Get optimal LLM configuration for concept merging
+                var optimalConfig = LLMConfigurationSystem.GetOptimalConfiguration("concept-extraction");
+                var modelAvailable = await LLMConfigurationSystem.ModelManager.EnsureModelAvailableAsync(optimalConfig.Model);
+                
+                if (modelAvailable && concepts.Count > 5) // Use AI for larger sets
+                {
+                    return await MergeSimilarConceptsWithAI(concepts, optimalConfig);
+                }
+                else
+                {
+                    return MergeSimilarConceptsWithRules(concepts);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in AI concept merging: {ex.Message}", ex);
+                return MergeSimilarConceptsWithRules(concepts);
+            }
+        }
+
+        private async Task<List<ConceptScore>> MergeSimilarConceptsWithAI(List<ConceptScore> concepts, LLMConfigurationSystem.LLMConfiguration config)
+        {
+            var llmConfig = new LLMConfig(
+                Id: config.Id,
+                Name: config.Id,
+                Provider: config.Provider,
+                Model: config.Model,
+                ApiKey: "",
+                BaseUrl: "http://localhost:11434",
+                MaxTokens: 1500,
+                Temperature: 0.1, // Very low temperature for consistent merging
+                TopP: 0.8,
+                Parameters: new Dictionary<string, object>
+                {
+                    ["stop"] = new[] { "---", "###" }
+                }
+            );
+
+            var conceptsJson = System.Text.Json.JsonSerializer.Serialize(concepts.Select(c => new {
+                concept = c.Concept,
+                score = c.Score,
+                description = c.Description,
+                category = c.Category,
+                confidence = c.Confidence
+            }));
+
+            var mergePrompt = $@"Analyze the following list of concepts and identify which ones are similar or should be merged together.
+
+Concepts:
+{conceptsJson}
+
+Identify concepts that:
+1. Have the same or very similar names (e.g., ""consciousness"" and ""conscious awareness"")
+2. Are semantically equivalent (e.g., ""love"" and ""unconditional love"")
+3. Represent the same concept with different wording
+4. Are closely related and should be grouped together
+
+For each group of similar concepts, create a merged concept that:
+- Uses the most descriptive name
+- Combines the highest scores
+- Merges descriptions meaningfully
+- Uses the most specific category
+- Takes the highest confidence
+
+Return your analysis as a JSON array of merged concepts with the following structure:
+[
+  {{
+    ""concept"": ""merged_concept_name"",
+    ""score"": 0.0-1.0,
+    ""description"": ""merged description"",
+    ""category"": ""most_specific_category"",
+    ""confidence"": 0.0-1.0,
+    ""mergedFrom"": [""original_concept1"", ""original_concept2""]
+  }}
+]
+
+Only merge concepts that are truly similar. Keep distinct concepts separate.";
+
+            var llmResponse = await CallLLMAsync(mergePrompt, llmConfig);
+            
+            if (!llmResponse.Content.Contains("LLM unavailable"))
+            {
+                var mergedConcepts = ParseLLMConceptResponse(llmResponse.Content);
+                _logger.Info($"AI concept merging reduced {concepts.Count} concepts to {mergedConcepts.Count}");
+                return mergedConcepts;
+            }
+            else
+            {
+                _logger.Warn("AI concept merging failed, falling back to rule-based merging");
+                return MergeSimilarConceptsWithRules(concepts);
+            }
+        }
+
+        private List<ConceptScore> MergeSimilarConceptsWithRules(List<ConceptScore> concepts)
+        {
+            var mergedConcepts = new List<ConceptScore>();
+            var processedIndices = new HashSet<int>();
+
+            for (int i = 0; i < concepts.Count; i++)
+            {
+                if (processedIndices.Contains(i))
+                    continue;
+
+                var currentConcept = concepts[i];
+                var similarConcepts = new List<ConceptScore> { currentConcept };
+                processedIndices.Add(i);
+
+                // Find similar concepts
+                for (int j = i + 1; j < concepts.Count; j++)
+                {
+                    if (processedIndices.Contains(j))
+                        continue;
+
+                    var otherConcept = concepts[j];
+                    if (AreConceptsSimilar(currentConcept, otherConcept))
+                    {
+                        similarConcepts.Add(otherConcept);
+                        processedIndices.Add(j);
+                    }
+                }
+
+                // Merge similar concepts
+                if (similarConcepts.Count > 1)
+                {
+                    var mergedConcept = MergeConceptGroup(similarConcepts);
+                    mergedConcepts.Add(mergedConcept);
+                }
+                else
+                {
+                    mergedConcepts.Add(currentConcept);
+                }
+            }
+
+            return mergedConcepts;
+        }
+
+        private bool AreConceptsSimilar(ConceptScore concept1, ConceptScore concept2)
+        {
+            // Check for exact name matches
+            if (string.Equals(concept1.Concept, concept2.Concept, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            // Check for substring matches
+            var name1 = concept1.Concept.ToLower();
+            var name2 = concept2.Concept.ToLower();
+            
+            if (name1.Contains(name2) || name2.Contains(name1))
+                return true;
+
+            // Check for semantic similarity using word overlap
+            var words1 = name1.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var words2 = name2.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            
+            var commonWords = words1.Intersect(words2, StringComparer.OrdinalIgnoreCase).Count();
+            var totalWords = Math.Max(words1.Length, words2.Length);
+            
+            if (totalWords > 0 && (double)commonWords / totalWords > 0.5)
+                return true;
+
+            // Check for category similarity
+            if (string.Equals(concept1.Category, concept2.Category, StringComparison.OrdinalIgnoreCase))
+            {
+                // Additional check for similar concepts in same category
+                var categorySimilarity = CalculateCategorySimilarity(concept1.Concept, concept2.Concept);
+                if (categorySimilarity > 0.6)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private double CalculateCategorySimilarity(string concept1, string concept2)
+        {
+            // Define concept families within categories
+            var conceptFamilies = new Dictionary<string, string[]>
+            {
+                { "consciousness", new[] { "awareness", "mindfulness", "presence", "awakening", "conscious" } },
+                { "transformation", new[] { "evolution", "growth", "change", "shift", "breakthrough", "transform" } },
+                { "unity", new[] { "oneness", "connection", "wholeness", "integration", "harmony", "unite" } },
+                { "love", new[] { "compassion", "empathy", "kindness", "heart", "unconditional", "loving" } },
+                { "wisdom", new[] { "knowledge", "insight", "understanding", "clarity", "enlightenment", "wise" } },
+                { "energy", new[] { "vibration", "frequency", "resonance", "flow", "chi", "prana", "energetic" } },
+                { "healing", new[] { "recovery", "restoration", "wholeness", "wellness", "balance", "heal" } },
+                { "abundance", new[] { "prosperity", "wealth", "success", "fulfillment", "manifestation", "abundant" } },
+                { "sacred", new[] { "divine", "holy", "spiritual", "transcendent", "mystical", "sacred" } },
+                { "fractal", new[] { "pattern", "geometry", "structure", "design", "blueprint", "fractal" } }
+            };
+
+            var name1 = concept1.ToLower();
+            var name2 = concept2.ToLower();
+
+            foreach (var family in conceptFamilies.Values)
+            {
+                var match1 = family.Any(word => name1.Contains(word));
+                var match2 = family.Any(word => name2.Contains(word));
+                
+                if (match1 && match2)
+                    return 0.8; // High similarity within concept family
+            }
+
+            return 0.0;
+        }
+
+        private ConceptScore MergeConceptGroup(List<ConceptScore> concepts)
+        {
+            if (concepts.Count == 1)
+                return concepts[0];
+
+            // Use the concept with the highest score as the base
+            var baseConcept = concepts.OrderByDescending(c => c.Score).First();
+            
+            // Calculate weighted averages for scores
+            var totalWeight = concepts.Sum(c => c.Score);
+            var weightedConfidence = concepts.Sum(c => c.Confidence * c.Score) / totalWeight;
+            
+            // Combine descriptions
+            var descriptions = concepts.Select(c => c.Description).Distinct();
+            var combinedDescription = string.Join("; ", descriptions);
+            
+            // Determine the best category (most common or highest scoring)
+            var categoryGroups = concepts.GroupBy(c => c.Category)
+                .OrderByDescending(g => g.Sum(c => c.Score))
+                .First();
+            var bestCategory = categoryGroups.Key;
+
+            return new ConceptScore
+            {
+                Concept = baseConcept.Concept,
+                Score = baseConcept.Score, // Keep the highest score
+                Description = combinedDescription,
+                Category = bestCategory,
+                Confidence = Math.Min(weightedConfidence, 1.0)
+            };
+        }
+
+        private async Task<double> CalculateConfidence(List<ConceptScore> concepts, string content, ConceptExtractionRequest request)
+        {
+            if (concepts == null || concepts.Count == 0)
+                return 0.0;
+
+            try
+            {
+                // Get optimal LLM configuration for confidence analysis
+                var optimalConfig = LLMConfigurationSystem.GetOptimalConfiguration("concept-extraction");
+                var modelAvailable = await LLMConfigurationSystem.ModelManager.EnsureModelAvailableAsync(optimalConfig.Model);
+                
+                if (modelAvailable && concepts.Count > 3) // Use AI for larger sets
+                {
+                    return await CalculateConfidenceWithAI(concepts, content, request, optimalConfig);
+                }
+                else
+                {
+                    return CalculateConfidenceWithRules(concepts, content, request);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in AI confidence calculation: {ex.Message}", ex);
+                return CalculateConfidenceWithRules(concepts, content, request);
+            }
+        }
+
+        private async Task<double> CalculateConfidenceWithAI(List<ConceptScore> concepts, string content, ConceptExtractionRequest request, LLMConfigurationSystem.LLMConfiguration config)
+        {
+            var llmConfig = new LLMConfig(
+                Id: config.Id,
+                Name: config.Id,
+                Provider: config.Provider,
+                Model: config.Model,
+                ApiKey: "",
+                BaseUrl: "http://localhost:11434",
+                MaxTokens: 500,
+                Temperature: 0.1, // Very low temperature for consistent scoring
+                TopP: 0.8,
+                Parameters: new Dictionary<string, object>
+                {
+                    ["stop"] = new[] { "---", "###" }
+                }
+            );
+
+            var conceptsJson = System.Text.Json.JsonSerializer.Serialize(concepts.Select(c => new {
+                concept = c.Concept,
+                score = c.Score,
+                description = c.Description,
+                category = c.Category,
+                confidence = c.Confidence
+            }));
+
+            var confidencePrompt = $@"Analyze the quality and confidence of the following concept extraction results.
+
+Content: ""{content}""
+Request Context: Categories={string.Join(", ", request.Categories ?? new string[0])}, Source={request.Source ?? "unknown"}
+
+Extracted Concepts:
+{conceptsJson}
+
+Evaluate the overall confidence of this concept extraction based on:
+1. Relevance of concepts to the content
+2. Semantic coherence between concepts
+3. Appropriateness of concept categories
+4. Quality of concept descriptions
+5. Overall extraction completeness
+
+Return a confidence score between 0.0 and 1.0 as a JSON object:
+{{
+  ""confidence"": 0.0-1.0,
+  ""reasoning"": ""brief explanation of the confidence score"",
+  ""strengths"": [""strength1"", ""strength2""],
+  ""weaknesses"": [""weakness1"", ""weakness2""]
+}}
+
+Be conservative but fair in your assessment.";
+
+            var llmResponse = await CallLLMAsync(confidencePrompt, llmConfig);
+            
+            if (!llmResponse.Content.Contains("LLM unavailable"))
+            {
+                try
+                {
+                    var responseJson = System.Text.Json.JsonDocument.Parse(llmResponse.Content);
+                    if (responseJson.RootElement.TryGetProperty("confidence", out var confidenceElement))
+                    {
+                        var aiConfidence = confidenceElement.GetDouble();
+                        _logger.Info($"AI confidence calculation: {aiConfidence:F2}");
+                        return Math.Max(0.0, Math.Min(1.0, aiConfidence));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.Warn($"Failed to parse AI confidence response: {ex.Message}");
+                }
+            }
+            
+            _logger.Warn("AI confidence calculation failed, falling back to rule-based calculation");
+            return CalculateConfidenceWithRules(concepts, content, request);
+        }
+
+        private double CalculateConfidenceWithRules(List<ConceptScore> concepts, string content, ConceptExtractionRequest request)
+        {
+            // Base confidence factors
+            var confidenceFactors = new List<double>();
+
+            // 1. Concept count factor (more concepts = higher confidence, but with diminishing returns)
+            var conceptCountFactor = Math.Min(concepts.Count / 10.0, 1.0);
+            confidenceFactors.Add(conceptCountFactor * 0.2);
+
+            // 2. Average concept confidence
+            var avgConceptConfidence = concepts.Average(c => c.Confidence);
+            confidenceFactors.Add(avgConceptConfidence * 0.3);
+
+            // 3. Content quality factors
+            var contentQuality = CalculateContentQuality(content, request);
+            confidenceFactors.Add(contentQuality * 0.2);
+
+            // 4. Concept diversity factor
+            var diversityFactor = CalculateConceptDiversity(concepts);
+            confidenceFactors.Add(diversityFactor * 0.15);
+
+            // 5. Semantic coherence factor
+            var coherenceFactor = CalculateSemanticCoherence(concepts, content);
+            confidenceFactors.Add(coherenceFactor * 0.15);
+
+            // Calculate weighted average
+            var totalConfidence = confidenceFactors.Sum();
+            
+            // Apply bonus for high-quality extractions
+            if (concepts.Any(c => c.Score > 0.8))
+                totalConfidence += 0.1;
+
+            // Apply penalty for very low scores
+            if (concepts.All(c => c.Score < 0.3))
+                totalConfidence *= 0.7;
+
+            return Math.Min(Math.Max(totalConfidence, 0.0), 1.0);
+        }
+
+        private double CalculateContentQuality(string content, ConceptExtractionRequest request)
+        {
+            var qualityScore = 0.0;
+
+            // Length factor (optimal length range)
+            var wordCount = content.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+            if (wordCount >= 50 && wordCount <= 1000)
+                qualityScore += 0.3;
+            else if (wordCount >= 20 && wordCount <= 2000)
+                qualityScore += 0.2;
+
+            // Title presence factor
+            if (!string.IsNullOrEmpty(request.Title) && request.Title.Length > 5)
+                qualityScore += 0.2;
+
+            // Category presence factor
+            if (request.Categories != null && request.Categories.Length > 0)
+                qualityScore += 0.1;
+
+            // Source presence factor
+            if (!string.IsNullOrEmpty(request.Source))
+                qualityScore += 0.1;
+
+            // Content structure factor (sentences, paragraphs)
+            var sentenceCount = content.Split('.', '!', '?').Length;
+            if (sentenceCount >= 3)
+                qualityScore += 0.2;
+            else if (sentenceCount >= 1)
+                qualityScore += 0.1;
+
+            // URL factor (if present, indicates external validation)
+            if (!string.IsNullOrEmpty(request.Url))
+                qualityScore += 0.1;
+
+            return Math.Min(qualityScore, 1.0);
+        }
+
+        private double CalculateConceptDiversity(List<ConceptScore> concepts)
+        {
+            if (concepts.Count <= 1)
+                return concepts.Count == 1 ? 0.5 : 0.0;
+
+            // Count unique categories
+            var uniqueCategories = concepts.Select(c => c.Category).Distinct().Count();
+            var categoryDiversity = (double)uniqueCategories / concepts.Count;
+
+            // Count unique concept names (excluding exact duplicates)
+            var uniqueConcepts = concepts.Select(c => c.Concept.ToLower()).Distinct().Count();
+            var conceptDiversity = (double)uniqueConcepts / concepts.Count;
+
+            // Calculate average diversity
+            return (categoryDiversity + conceptDiversity) / 2.0;
+        }
+
+        private double CalculateSemanticCoherence(List<ConceptScore> concepts, string content)
+        {
+            if (concepts.Count <= 1)
+                return 0.5;
+
+            var coherenceScore = 0.0;
+
+            // Check for concept relationships within the same category
+            var categoryGroups = concepts.GroupBy(c => c.Category);
+            foreach (var group in categoryGroups)
+            {
+                if (group.Count() > 1)
+                {
+                    // Concepts in the same category are more coherent
+                    coherenceScore += 0.3 * (group.Count() - 1) / concepts.Count;
+                }
+            }
+
+            // Check for concept frequency in content
+            var contentLower = content.ToLower();
+            var conceptFrequency = 0.0;
+            foreach (var concept in concepts)
+            {
+                var conceptLower = concept.Concept.ToLower();
+                var frequency = contentLower.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                    .Count(word => word.Contains(conceptLower) || conceptLower.Contains(word));
+                
+                if (frequency > 0)
+                    conceptFrequency += 1.0;
+            }
+            coherenceScore += (conceptFrequency / concepts.Count) * 0.4;
+
+            // Check for high-confidence concepts (indicates better extraction)
+            var highConfidenceCount = concepts.Count(c => c.Confidence > 0.7);
+            coherenceScore += (double)highConfidenceCount / concepts.Count * 0.3;
+
+            return Math.Min(coherenceScore, 1.0);
         }
 
         private string[] DetermineOntologyLevels(List<string> concepts)
@@ -1001,7 +2175,7 @@ RESPONSE FORMAT (JSON):
 Please provide a thoughtful, spiritually-aware analysis that honors the sacred nature of consciousness expansion.";
         }
 
-        private async Task<LLMResponse> CallLLM(LLMConfig config, string prompt)
+        private async Task<AIConceptExtractionResponse> CallLLM(LLMConfig config, string prompt)
         {
             try
             {
@@ -1037,7 +2211,7 @@ Please provide a thoughtful, spiritually-aware analysis that honors the sacred n
 
                 _logger.Info($"[LLM] Extracted response: {llmOutput}");
 
-                return new LLMResponse(
+                return new AIConceptExtractionResponse(
                     Content: llmOutput ?? "No response from LLM",
                     Confidence: 0.85,
                     Reasoning: "Generated using real LLM integration with Ollama",
@@ -1048,7 +2222,7 @@ Please provide a thoughtful, spiritually-aware analysis that honors the sacred n
             {
                 _logger.Error($"[LLM] Error: {ex.Message}");
                 // Fallback to mock response if LLM is not available
-                return new LLMResponse(
+                return new AIConceptExtractionResponse(
                     Content: $"LLM unavailable: {ex.Message}. Concept extraction fallback for: {prompt.Substring(0, Math.Min(100, prompt.Length))}...",
                     Confidence: 0.5,
                     Reasoning: "Fallback response due to LLM unavailability",
@@ -1098,8 +2272,8 @@ Please provide a thoughtful, spiritually-aware analysis that honors the sacred n
                                 var cleanConcept = CleanConceptName(conceptName);
                                 if (!string.IsNullOrEmpty(cleanConcept))
                                 {
-                                    concepts.Add(new ConceptScore
-                                    {
+                    concepts.Add(new ConceptScore
+                    {
                                         Concept = cleanConcept,
                                         Score = 0.8
                                     });
@@ -1133,7 +2307,7 @@ Please provide a thoughtful, spiritually-aware analysis that honors the sacred n
                 _logger.Error($"Error parsing LLM response: {ex.Message}");
                 concepts = ExtractConceptsFromText(llmResponse);
             }
-            
+
             return concepts;
         }
 
@@ -1274,7 +2448,7 @@ Please provide a thoughtful, spiritually-aware analysis that honors the sacred n
         private bool TryGetCachedAnalysis<T>(string cacheKey, out T analysis) where T : class
         {
             analysis = null;
-            if (_analysisCache.TryGetValue(cacheKey, out var cached) && 
+            if (_analysisCache.TryGetValue(cacheKey, out var cached) &&
                 _cacheTimestamps.TryGetValue(cacheKey, out var timestamp) &&
                 DateTimeOffset.UtcNow - timestamp < _cacheExpiration)
             {
@@ -1305,6 +2479,14 @@ Please provide a thoughtful, spiritually-aware analysis that honors the sacred n
     }
 
     // Data structures for the AI module
+
+    public class OllamaResponse
+    {
+        public string Response { get; set; } = "";
+        public string Model { get; set; } = "";
+        public DateTime CreatedAt { get; set; }
+    }
+
     public class ConceptExtractionRequest
     {
         public string Title { get; set; } = "";
@@ -1371,6 +2553,9 @@ Please provide a thoughtful, spiritually-aware analysis that honors the sacred n
     {
         public string Concept { get; set; } = "";
         public double Score { get; set; }
+        public string Description { get; set; } = "";
+        public string Category { get; set; } = "";
+        public double Confidence { get; set; }
     }
 
     public class CachedAnalysis

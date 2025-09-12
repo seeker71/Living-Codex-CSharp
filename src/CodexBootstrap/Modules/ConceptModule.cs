@@ -28,7 +28,7 @@ public class ConceptModule : IModule
 
     public Node GetModuleNode()
     {
-        return ModuleHelpers.CreateModuleNode(ModuleId, Name, Version, Description);
+        return NodeStorage.CreateModuleNode(ModuleId, Name, Version, Description);
     }
 
     public void Register(NodeRegistry registry)

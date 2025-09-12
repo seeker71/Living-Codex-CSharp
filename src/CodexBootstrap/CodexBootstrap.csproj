@@ -5,6 +5,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <InvariantGlobalization>true</InvariantGlobalization>
     <NoWarn>$(NoWarn);CS1998;CS8625;CS8603;CS8604;CS8601;CS8602;CS0114</NoWarn>
+    <UseAppHost>true</UseAppHost>
+    <EnableHotReload>true</EnableHotReload>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="FluentValidation" Version="11.8.0" />
@@ -24,5 +26,6 @@
     <PackageReference Include="System.Text.Json" Version="6.0.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="6.0.0" />
   </ItemGroup>
 </Project>

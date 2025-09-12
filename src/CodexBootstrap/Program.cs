@@ -26,6 +26,13 @@ else
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Enable hot reload in development
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddRazorPages().AddRazorRuntimeCompilation();
+    builder.Services.AddControllersWithViews().AddRazorRuntimeCompilation();
+}
+
 // Add configuration sources
 builder.Configuration
     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)

@@ -50,7 +50,7 @@ namespace CodexBootstrap.Modules
                 TypeId: "module",
                 State: ContentState.Ice,
                 Locale: "en",
-                Title: $"Test Dynamic Module v{_version} - AI Enhanced",
+                Title: $"Test Dynamic Module v{_version} - AI Enhanced - HOT RELOAD TEST",
                 Description: $"A test module for demonstrating hot-reload functionality with real AI integration - Version {_version}",
                 Content: new ContentRef(
                     MediaType: "application/json",

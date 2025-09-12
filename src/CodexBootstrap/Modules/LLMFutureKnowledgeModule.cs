@@ -602,7 +602,7 @@ Format your response as a structured analysis that can be used for decision-maki
 ";
     }
 
-    private async Task<LLMResponse> CallLLM(LLMConfig config, string prompt)
+    private async Task<AIConceptExtractionResponse> CallLLM(LLMConfig config, string prompt)
     {
         try
         {
@@ -641,7 +641,7 @@ Format your response as a structured analysis that can be used for decision-maki
 
             Console.WriteLine($"[LLM] Extracted response: {llmOutput}");
 
-            return new LLMResponse(
+            return new AIConceptExtractionResponse(
                 Content: llmOutput ?? "No response generated",
                 Confidence: 0.85,
                 Reasoning: "Generated using real LLM integration with Ollama",
@@ -652,7 +652,7 @@ Format your response as a structured analysis that can be used for decision-maki
         {
             Console.WriteLine($"[LLM] Error: {ex.Message}");
             // Fallback to mock response if LLM is not available
-            return new LLMResponse(
+            return new AIConceptExtractionResponse(
                 Content: $"LLM unavailable: {ex.Message}. Future knowledge response for: {prompt.Substring(0, Math.Min(100, prompt.Length))}...",
                 Confidence: 0.5,
                 Reasoning: "Fallback response due to LLM unavailability",
