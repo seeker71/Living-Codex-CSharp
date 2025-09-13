@@ -140,16 +140,57 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
                 options.DefaultScheme = "Cookies";
                 options.DefaultChallengeScheme = !string.IsNullOrEmpty(googleClientId) ? "Google" : "Microsoft";
             })
-            .AddCookie("Cookies");
+            .AddCookie("Cookies", options =>
+            {
+                options.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Lax;
+                options.Cookie.SecurePolicy = Microsoft.AspNetCore.Http.CookieSecurePolicy.None; // Allow HTTP in development
+                options.Cookie.HttpOnly = true;
+                options.LoginPath = "/oauth/google";
+                options.LogoutPath = "/oauth/logout";
+                options.ExpireTimeSpan = TimeSpan.FromHours(24);
+                options.SlidingExpiration = true;
+                options.Cookie.Name = "LivingCodex.Auth";
+                options.Cookie.Path = "/";
+                options.Cookie.Domain = "localhost";
+            });
             
             if (!string.IsNullOrEmpty(googleClientId))
             {
-                builder.Services.AddAuthentication().AddGoogle(options =>
-                {
-                    options.ClientId = googleClientId;
-                    options.ClientSecret = Environment.GetEnvironmentVariable("GOOGLE_CLIENT_SECRET") ?? "";
-                    options.CallbackPath = "/oauth/callback/google";
-                });
+                builder.Services.AddAuthentication()
+                    .AddGoogle(options =>
+                    {
+                        options.ClientId = googleClientId;
+                        options.ClientSecret = Environment.GetEnvironmentVariable("GOOGLE_CLIENT_SECRET") ?? "";
+                        options.CallbackPath = "/oauth/callback/google";
+                        options.SaveTokens = true;
+                        options.CorrelationCookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Lax;
+                        options.CorrelationCookie.SecurePolicy = Microsoft.AspNetCore.Http.CookieSecurePolicy.None;
+                        options.CorrelationCookie.Name = "LivingCodex.Correlation.Google";
+                        options.CorrelationCookie.HttpOnly = true;
+                        options.CorrelationCookie.IsEssential = true;
+                        options.CorrelationCookie.Path = "/";
+                        options.CorrelationCookie.Domain = "localhost";
+                        options.CorrelationCookie.Expiration = TimeSpan.FromMinutes(10);
+                        options.Events.OnCreatingTicket = context =>
+                        {
+                            // Store user information in claims
+                            var identity = context.Principal?.Identity as System.Security.Claims.ClaimsIdentity;
+                            if (identity != null)
+                            {
+                                var email = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
+                                var name = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
+                                var picture = context.Principal?.FindFirst("picture")?.Value;
+                                
+                                if (!string.IsNullOrEmpty(email))
+                                    identity.AddClaim(new System.Security.Claims.Claim("email", email));
+                                if (!string.IsNullOrEmpty(name))
+                                    identity.AddClaim(new System.Security.Claims.Claim("name", name));
+                                if (!string.IsNullOrEmpty(picture))
+                                    identity.AddClaim(new System.Security.Claims.Claim("picture", picture));
+                            }
+                            return Task.CompletedTask;
+                        };
+                    });
             }
             
             if (!string.IsNullOrEmpty(microsoftClientId))
@@ -159,6 +200,14 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
                     options.ClientId = microsoftClientId;
                     options.ClientSecret = Environment.GetEnvironmentVariable("MICROSOFT_CLIENT_SECRET") ?? "";
                     options.CallbackPath = "/oauth/callback/microsoft";
+                    options.CorrelationCookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Lax;
+                    options.CorrelationCookie.SecurePolicy = Microsoft.AspNetCore.Http.CookieSecurePolicy.None;
+                    options.CorrelationCookie.Name = "LivingCodex.Correlation.Microsoft";
+                    options.CorrelationCookie.HttpOnly = true;
+                    options.CorrelationCookie.IsEssential = true;
+                    options.CorrelationCookie.Path = "/";
+                    options.CorrelationCookie.Domain = "localhost";
+                    options.CorrelationCookie.Expiration = TimeSpan.FromMinutes(10);
                 });
             }
         }

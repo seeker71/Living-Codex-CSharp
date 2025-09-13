@@ -16,14 +16,22 @@ using CodexBootstrap.Runtime;
 namespace CodexBootstrap.Modules;
 
 // OAuth and User Discovery response types
+[MetaNode(Id = "codex.oauth.provider-info", Name = "OAuth Provider Info", Description = "Information about an OAuth provider")]
 public record OAuthProviderInfo(string Provider, string DisplayName, string ClientId, bool IsEnabled);
+
+[MetaNode(Id = "codex.oauth.providers-response", Name = "OAuth Providers Response", Description = "Response containing available OAuth providers")]
 public record OAuthProvidersResponse(List<OAuthProviderInfo> Providers, int Count);
+
+[MetaNode(Id = "codex.oauth.login-response", Name = "OAuth Login Response", Description = "Response for OAuth login initiation")]
 public record OAuthLoginResponse(string Provider, string RedirectUrl, string State);
+
+[MetaNode(Id = "codex.oauth.callback-response", Name = "OAuth Callback Response", Description = "Response for OAuth callback processing")]
 public record OAuthCallbackResponse(string Provider, bool Success, string? UserId = null, string? Error = null);
 
+[MetaNode(Id = "codex.oauth.user-discovery-request", Name = "User Discovery Request", Description = "Request for discovering users by various criteria")]
 public record UserDiscoveryRequest(
-    string? Interests = null,
-    string? Contributions = null,
+    List<string>? Interests = null,
+    List<string>? Contributions = null,
     string? Location = null,
     double? RadiusKm = null,
     string? ConceptId = null,
@@ -31,6 +39,7 @@ public record UserDiscoveryRequest(
     int? Limit = 50
 );
 
+[MetaNode(Id = "codex.oauth.user-profile", Name = "User Profile", Description = "User profile information")]
 public record UserProfile(
     string UserId,
     string DisplayName,
@@ -44,6 +53,25 @@ public record UserProfile(
     Dictionary<string, object>? Metadata
 );
 
+[MetaNode(Id = "codex.oauth.validation-request", Name = "OAuth Validation Request", Description = "Request for OAuth validation with secret")]
+public record OAuthValidationRequest(
+    string Provider,
+    string Secret,
+    string UserId,
+    string Email,
+    string Name
+);
+
+[MetaNode(Id = "codex.oauth.session-data", Name = "Session Data", Description = "Session data stored in cookie")]
+public record SessionData(
+    string UserId,
+    string Provider,
+    string Email,
+    string Name,
+    DateTimeOffset ExpiresAt
+);
+
+[MetaNode(Id = "codex.oauth.user-discovery-result", Name = "User Discovery Result", Description = "Result of user discovery operation")]
 public record UserDiscoveryResult(
     List<UserProfile> Users,
     int TotalCount,
@@ -51,6 +79,7 @@ public record UserDiscoveryResult(
     Dictionary<string, object> SearchMetadata = null
 );
 
+[MetaNode(Id = "codex.oauth.concept-contributor", Name = "Concept Contributor", Description = "Information about a concept contributor")]
 public record ConceptContributor(
     string UserId,
     string DisplayName,
@@ -62,6 +91,7 @@ public record ConceptContributor(
     List<string>? RelevantInterests
 );
 
+[MetaNode(Id = "codex.oauth.concept-contributors-response", Name = "Concept Contributors Response", Description = "Response containing concept contributors")]
 public record ConceptContributorsResponse(
     string ConceptId,
     List<ConceptContributor> Contributors,
@@ -83,6 +113,11 @@ public sealed class OAuthUserDiscoveryModule : IModule
         _httpClient = httpClient;
     }
 
+    // Parameterless constructor for module loader
+    public OAuthUserDiscoveryModule() : this(new NodeRegistry(), new Log4NetLogger(typeof(OAuthUserDiscoveryModule)), new HttpClient())
+    {
+    }
+
     public Node GetModuleNode()
     {
         return NodeStorage.CreateModuleNode(
@@ -97,6 +132,7 @@ public sealed class OAuthUserDiscoveryModule : IModule
     }
 
     // OAuth Provider Management
+    [ApiRoute("GET", "/oauth/providers", "Get OAuth Providers", "Get available OAuth providers", "codex.oauth-discovery")]
     public OAuthProvidersResponse GetOAuthProviders()
     {
         var providers = new List<OAuthProviderInfo>
@@ -112,11 +148,33 @@ public sealed class OAuthUserDiscoveryModule : IModule
     }
 
     // User Discovery by Interests
-    public async Task<UserDiscoveryResult> DiscoverUsersByInterests(string interests, int limit = 50)
+    [ApiRoute("POST", "/users/discover", "Discover Users", "Discover users by interests, location, or contributions", "codex.oauth-discovery")]
+    public async Task<object> DiscoverUsers([ApiParameter("request", "User discovery request", Required = true, Location = "body")] UserDiscoveryRequest request)
     {
         try
         {
-            var interestList = interests.Split(',', StringSplitOptions.RemoveEmptyEntries)
+            UserDiscoveryResult result = request switch
+            {
+                { Interests: not null } => await DiscoverUsersByInterests(request.Interests, request.Limit ?? 50),
+                { Location: not null } => await DiscoverUsersByLocation(request.Location, request.RadiusKm ?? 50, request.Limit ?? 50),
+                _ => new UserDiscoveryResult(new List<UserProfile>(), 0, "invalid")
+            };
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error discovering users: {ex.Message}");
+            return new ErrorResponse($"Error discovering users: {ex.Message}");
+        }
+    }
+
+    // User Discovery by Interests (helper method)
+    public async Task<UserDiscoveryResult> DiscoverUsersByInterests(List<string> interests, int limit = 50)
+    {
+        try
+        {
+            var interestList = interests
                 .Select(i => i.Trim().ToLowerInvariant())
                 .ToList();
 
@@ -195,7 +253,8 @@ public sealed class OAuthUserDiscoveryModule : IModule
     }
 
     // Find Contributors for Concepts
-    public async Task<ConceptContributorsResponse> FindConceptContributors(string conceptId, string? ontologyLevel = null, int limit = 100)
+    [ApiRoute("GET", "/concepts/{conceptId}/contributors", "Find Concept Contributors", "Find contributors, subscribers, and investors for a concept", "codex.oauth-discovery")]
+    public async Task<ConceptContributorsResponse> FindConceptContributors([ApiParameter("conceptId", "ID of the concept to find contributors for", Required = true, Location = "path")] string conceptId, [ApiParameter("ontologyLevel", "Ontology level to search within", Required = false, Location = "query")] string? ontologyLevel = null, [ApiParameter("limit", "Maximum number of contributors to return", Required = false, Location = "query")] int limit = 100)
     {
         try
         {
@@ -344,11 +403,49 @@ public sealed class OAuthUserDiscoveryModule : IModule
 
     private List<string> GetRelatedConcepts(string conceptId, string? ontologyLevel)
     {
-        // Get concepts related through edges - simplified for now
+        // Get concepts related through edges
         var relatedConcepts = new List<string> { conceptId };
         
-        // TODO: Implement proper edge traversal when GetEdges is available
-        // For now, return just the concept itself
+        try
+        {
+            // Find edges from this concept
+            var outgoingEdges = _registry.GetEdges(fromId: conceptId);
+            foreach (var edge in outgoingEdges)
+            {
+                if (!relatedConcepts.Contains(edge.ToId))
+                {
+                    relatedConcepts.Add(edge.ToId);
+                }
+            }
+            
+            // Find edges to this concept
+            var incomingEdges = _registry.GetEdges(toId: conceptId);
+            foreach (var edge in incomingEdges)
+            {
+                if (!relatedConcepts.Contains(edge.FromId))
+                {
+                    relatedConcepts.Add(edge.FromId);
+                }
+            }
+            
+            // Filter by ontology level if specified
+            if (!string.IsNullOrEmpty(ontologyLevel))
+            {
+                relatedConcepts = relatedConcepts.Where(conceptId => 
+                {
+                    if (_registry.TryGet(conceptId, out var node))
+                    {
+                        return node.Meta?.GetValueOrDefault("ontologyLevel")?.ToString() == ontologyLevel;
+                    }
+                    return false;
+                }).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error getting related concepts for {conceptId}: {ex.Message}", ex);
+        }
+        
         return relatedConcepts;
     }
 
@@ -356,16 +453,89 @@ public sealed class OAuthUserDiscoveryModule : IModule
     {
         var userIds = new HashSet<string>();
         
-        // TODO: Implement proper edge traversal when GetEdges is available
-        // For now, return empty list
+        try
+        {
+            foreach (var conceptId in conceptIds)
+            {
+                // Find users who have contributed to this concept
+                var contributionEdges = _registry.GetEdges(toId: conceptId, edgeType: "contribution");
+                foreach (var edge in contributionEdges)
+                {
+                    if (_registry.TryGet(edge.FromId, out var userNode) && 
+                        userNode.TypeId == "user")
+                    {
+                        userIds.Add(edge.FromId);
+                    }
+                }
+                
+                // Find users who are subscribed to this concept
+                var subscriptionEdges = _registry.GetEdges(toId: conceptId, edgeType: "subscription");
+                foreach (var edge in subscriptionEdges)
+                {
+                    if (_registry.TryGet(edge.FromId, out var userNode) && 
+                        userNode.TypeId == "user")
+                    {
+                        userIds.Add(edge.FromId);
+                    }
+                }
+                
+                // Find users who have invested in this concept
+                var investmentEdges = _registry.GetEdges(toId: conceptId, edgeType: "investment");
+                foreach (var edge in investmentEdges)
+                {
+                    if (_registry.TryGet(edge.FromId, out var userNode) && 
+                        userNode.TypeId == "user")
+                    {
+                        userIds.Add(edge.FromId);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error getting users with contributions: {ex.Message}", ex);
+        }
+        
         return userIds.ToList();
     }
 
     private double CalculateContributionScore(string userId, string conceptId, List<string> relatedConcepts)
     {
-        // TODO: Implement proper edge traversal when GetEdges is available
-        // For now, return basic score
-        return 0.1; // Basic scoring
+        double score = 0.0;
+        
+        try
+        {
+            foreach (var relatedConceptId in relatedConcepts)
+            {
+                // Check for direct contributions
+                var contributionEdges = _registry.GetEdges(fromId: userId, toId: relatedConceptId, edgeType: "contribution");
+                score += contributionEdges.Count() * 1.0;
+                
+                // Check for subscriptions (lower weight)
+                var subscriptionEdges = _registry.GetEdges(fromId: userId, toId: relatedConceptId, edgeType: "subscription");
+                score += subscriptionEdges.Count() * 0.3;
+                
+                // Check for investments (higher weight)
+                var investmentEdges = _registry.GetEdges(fromId: userId, toId: relatedConceptId, edgeType: "investment");
+                score += investmentEdges.Count() * 2.0;
+                
+                // Check for comments/feedback (medium weight)
+                var feedbackEdges = _registry.GetEdges(fromId: userId, toId: relatedConceptId, edgeType: "feedback");
+                score += feedbackEdges.Count() * 0.5;
+            }
+            
+            // Normalize by number of related concepts
+            if (relatedConcepts.Count > 0)
+            {
+                score = score / relatedConcepts.Count;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error calculating contribution score for user {userId}: {ex.Message}", ex);
+        }
+        
+        return Math.Max(score, 0.1); // Minimum score
     }
 
     private string DetermineContributionType(double score)
@@ -405,95 +575,46 @@ public sealed class OAuthUserDiscoveryModule : IModule
             return Task.FromResult<object>(result);
         });
 
-        router.Register("codex.oauth-discovery", "discover-users", args =>
+        router.Register("codex.oauth-discovery", "discover-users", async args =>
         {
             try
             {
-                if (args == null || !args.HasValue) return Task.FromResult<object>(new ErrorResponse("Missing request parameters"));
-
+                if (!args.HasValue) return new ErrorResponse("Missing request body");
                 var request = JsonSerializer.Deserialize<UserDiscoveryRequest>(args.Value.GetRawText());
-                if (request == null) return Task.FromResult<object>(new ErrorResponse("Invalid request format"));
+                if (request == null) return new ErrorResponse("Invalid request");
 
-                Task<UserDiscoveryResult> discoveryTask = request switch
-                {
-                    { Interests: not null } => DiscoverUsersByInterests(request.Interests, request.Limit ?? 50),
-                    { Location: not null } => DiscoverUsersByLocation(request.Location, request.RadiusKm ?? 50, request.Limit ?? 50),
-                    _ => Task.FromResult(new UserDiscoveryResult(new List<UserProfile>(), 0, "invalid"))
-                };
-
-                return discoveryTask.ContinueWith(t => (object)t.Result);
+                return await DiscoverUsers(request);
             }
             catch (Exception ex)
             {
-                return Task.FromResult<object>(new ErrorResponse($"Error discovering users: {ex.Message}"));
+                return new ErrorResponse($"Error discovering users: {ex.Message}");
             }
         });
 
-        router.Register("codex.oauth-discovery", "concept-contributors", args =>
+        router.Register("codex.oauth-discovery", "concept-contributors", async args =>
         {
             try
             {
-                if (args == null || !args.HasValue) return Task.FromResult<object>(new ErrorResponse("Missing request parameters"));
+                if (!args.HasValue) return new ErrorResponse("Missing request parameters");
 
                 var conceptId = args.Value.TryGetProperty("conceptId", out var idElement) ? idElement.GetString() : null;
                 var ontologyLevel = args.Value.TryGetProperty("ontologyLevel", out var levelElement) ? levelElement.GetString() : null;
                 var limit = args.Value.TryGetProperty("limit", out var limitElement) ? limitElement.GetInt32() : 100;
 
-                if (string.IsNullOrEmpty(conceptId)) return Task.FromResult<object>(new ErrorResponse("Concept ID is required"));
+                if (string.IsNullOrEmpty(conceptId)) return new ErrorResponse("Concept ID is required");
 
-                var result = FindConceptContributors(conceptId, ontologyLevel, limit);
-                return Task.FromResult<object>(result);
+                var result = await FindConceptContributors(conceptId, ontologyLevel, limit);
+                return result;
             }
             catch (Exception ex)
             {
-                return Task.FromResult<object>(new ErrorResponse($"Error finding concept contributors: {ex.Message}"));
+                return new ErrorResponse($"Error finding concept contributors: {ex.Message}");
             }
         });
     }
 
     public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
-        // OAuth providers endpoint
-        app.MapGet("/oauth/providers", () =>
-        {
-            var result = GetOAuthProviders();
-            return Results.Ok(result);
-        });
-
-        // User discovery endpoint
-        app.MapPost("/users/discover", async (UserDiscoveryRequest request) =>
-        {
-            try
-            {
-                UserDiscoveryResult result = request switch
-                {
-                    { Interests: not null } => await DiscoverUsersByInterests(request.Interests, request.Limit ?? 50),
-                    { Location: not null } => await DiscoverUsersByLocation(request.Location, request.RadiusKm ?? 50, request.Limit ?? 50),
-                    _ => new UserDiscoveryResult(new List<UserProfile>(), 0, "invalid")
-                };
-
-                return Results.Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return Results.Problem($"Error discovering users: {ex.Message}");
-            }
-        });
-
-        // Concept contributors endpoint
-        app.MapGet("/concepts/{conceptId}/contributors", async (string conceptId, string? ontologyLevel, int? limit) =>
-        {
-            try
-            {
-                var result = await FindConceptContributors(conceptId, ontologyLevel, limit ?? 100);
-                return Results.Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return Results.Problem($"Error finding concept contributors: {ex.Message}");
-            }
-        });
-
         // OAuth challenge endpoints
         app.MapGet("/oauth/challenge/{provider}", (string provider) =>
         {
@@ -501,28 +622,146 @@ public sealed class OAuthUserDiscoveryModule : IModule
             return Results.Redirect(challengeUrl);
         });
 
-        // OAuth callback endpoints
-        app.MapGet("/oauth/callback/{provider}", async (string provider, HttpContext context) =>
+        // OAuth test endpoints (for development)
+        app.MapGet("/oauth/test", async (HttpContext context) =>
         {
-            var result = await context.AuthenticateAsync(provider);
-            if (result.Succeeded)
+            var providers = new List<OAuthProviderInfo>();
+            
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID")))
             {
-                var user = result.Principal;
-                var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? user.FindFirst("sub")?.Value;
-                
-                if (!string.IsNullOrEmpty(userId))
-                {
-                    // Store user in node registry
-                    await StoreOAuthUser(userId, user, provider);
-                    return Results.Ok(new OAuthCallbackResponse(provider, true, userId));
-                }
+                providers.Add(new OAuthProviderInfo("google", "Google", Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID")!, true));
             }
             
-            return Results.BadRequest(new OAuthCallbackResponse(provider, false, Error: "Authentication failed"));
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MICROSOFT_CLIENT_ID")))
+            {
+                providers.Add(new OAuthProviderInfo("microsoft", "Microsoft", Environment.GetEnvironmentVariable("MICROSOFT_CLIENT_ID")!, true));
+            }
+            
+            return Results.Ok(new OAuthProvidersResponse(providers, providers.Count));
+        });
+
+        // Debug endpoint to check environment variables
+        app.MapGet("/oauth/debug", async (HttpContext context) =>
+        {
+            var debugInfo = new
+            {
+                GoogleClientId = Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID"),
+                GoogleClientSecret = Environment.GetEnvironmentVariable("GOOGLE_CLIENT_SECRET"),
+                MicrosoftClientId = Environment.GetEnvironmentVariable("MICROSOFT_CLIENT_ID"),
+                MicrosoftClientSecret = Environment.GetEnvironmentVariable("MICROSOFT_CLIENT_SECRET")
+            };
+            
+            return Results.Ok(debugInfo);
+        });
+
+        // User profile endpoint
+        app.MapGet("/oauth/profile", async (HttpContext context) =>
+        {
+            if (!context.User.Identity?.IsAuthenticated ?? true)
+            {
+                return Results.Unauthorized();
+            }
+
+            var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? 
+                        context.User.FindFirst("sub")?.Value;
+            var email = context.User.FindFirst(ClaimTypes.Email)?.Value;
+            var name = context.User.FindFirst(ClaimTypes.Name)?.Value;
+            var picture = context.User.FindFirst("picture")?.Value;
+
+            return Results.Ok(new
+            {
+                userId,
+                email,
+                name,
+                picture,
+                isAuthenticated = true
+            });
+        });
+
+        // Simplified OAuth validation endpoint
+        app.MapPost("/oauth/validate", async (HttpContext context, OAuthValidationRequest request) =>
+        {
+            try
+            {
+                // Validate the OAuth secret (in production, this would be more secure)
+                var expectedSecret = Environment.GetEnvironmentVariable($"{request.Provider.ToUpper()}_CLIENT_SECRET");
+                if (string.IsNullOrEmpty(expectedSecret) || request.Secret != expectedSecret)
+                {
+                    return Results.Unauthorized();
+                }
+
+                // Create session cookie with user info
+                var sessionData = new
+                {
+                    UserId = request.UserId,
+                    Provider = request.Provider,
+                    Email = request.Email,
+                    Name = request.Name,
+                    ExpiresAt = DateTimeOffset.UtcNow.AddHours(24)
+                };
+
+                var sessionJson = JsonSerializer.Serialize(sessionData);
+                var sessionBytes = System.Text.Encoding.UTF8.GetBytes(sessionJson);
+                var sessionBase64 = Convert.ToBase64String(sessionBytes);
+
+                // Set secure session cookie
+                context.Response.Cookies.Append("session", sessionBase64, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = false, // Set to true in production with HTTPS
+                    SameSite = SameSiteMode.Lax,
+                    Expires = DateTimeOffset.UtcNow.AddHours(24),
+                    Path = "/"
+                });
+
+                // Store user in node registry
+                await StoreOAuthUser(request.UserId, request.Provider, request.Email, request.Name);
+
+                return Results.Ok(new OAuthCallbackResponse(request.Provider, true, request.UserId));
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"OAuth validation error: {ex.Message}", ex);
+                return Results.BadRequest(new OAuthCallbackResponse(request.Provider, false, Error: $"OAuth validation failed: {ex.Message}"));
+            }
+        });
+
+        // Session validation middleware for non-GET requests
+        app.MapPost("/oauth/validate-session", async (HttpContext context) =>
+        {
+            try
+            {
+                if (!context.Request.Cookies.TryGetValue("session", out var sessionCookie))
+                {
+                    return Results.Unauthorized();
+                }
+
+                var sessionBytes = Convert.FromBase64String(sessionCookie);
+                var sessionJson = System.Text.Encoding.UTF8.GetString(sessionBytes);
+                var sessionData = JsonSerializer.Deserialize<SessionData>(sessionJson);
+
+                if (sessionData == null || sessionData.ExpiresAt < DateTimeOffset.UtcNow)
+                {
+                    return Results.Unauthorized();
+                }
+
+                return Results.Ok(new { 
+                    userId = sessionData.UserId, 
+                    provider = sessionData.Provider,
+                    email = sessionData.Email,
+                    name = sessionData.Name,
+                    isAuthenticated = true 
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Session validation error: {ex.Message}", ex);
+                return Results.Unauthorized();
+            }
         });
     }
 
-    private async Task StoreOAuthUser(string userId, ClaimsPrincipal principal, string provider)
+    private async Task StoreOAuthUser(string userId, string provider, string email, string name)
     {
         try
         {
@@ -531,7 +770,7 @@ public sealed class OAuthUserDiscoveryModule : IModule
                 TypeId: "codex.user",
                 State: ContentState.Ice,
                 Locale: "en",
-                Title: principal.FindFirst(ClaimTypes.Name)?.Value ?? principal.FindFirst("name")?.Value ?? "Unknown User",
+                Title: name ?? "Unknown User",
                 Description: $"User authenticated via {provider}",
                 Content: new ContentRef(
                     MediaType: "application/json",
@@ -539,16 +778,17 @@ public sealed class OAuthUserDiscoveryModule : IModule
                     {
                         provider = provider,
                         authenticatedAt = DateTime.UtcNow,
-                        claims = principal.Claims.ToDictionary(c => c.Type, c => c.Value)
+                        email = email,
+                        name = name
                     }),
                     InlineBytes: null,
                     ExternalUri: null
                 ),
                 Meta: new Dictionary<string, object>
                 {
-                    ["displayName"] = principal.FindFirst(ClaimTypes.Name)?.Value ?? principal.FindFirst("name")?.Value ?? "Unknown",
-                    ["email"] = principal.FindFirst(ClaimTypes.Email)?.Value ?? principal.FindFirst("email")?.Value ?? "",
-                    ["avatarUrl"] = principal.FindFirst("picture")?.Value ?? principal.FindFirst("avatar_url")?.Value ?? "",
+                    ["displayName"] = name ?? "Unknown",
+                    ["email"] = email ?? "",
+                    ["avatarUrl"] = "",
                     ["provider"] = provider,
                     ["authenticatedAt"] = DateTime.UtcNow.ToString("O"),
                     ["interests"] = "",

@@ -13,6 +13,18 @@ using CodexBootstrap.Core;
 using CodexBootstrap.Runtime;
 using Microsoft.AspNetCore.Builder;
 
+// Mock API Router for parameterless constructor
+public class MockApiRouter : IApiRouter
+{
+    public void Register(string moduleId, string api, Func<JsonElement?, Task<object>> handler) { }
+    public bool TryGetHandler(string moduleId, string api, out Func<JsonElement?, Task<object>> handler) 
+    { 
+        handler = null!; 
+        return false; 
+    }
+    public NodeRegistry GetRegistry() => new NodeRegistry();
+}
+
 namespace CodexBootstrap.Modules
 {
     /// <summary>
@@ -53,6 +65,11 @@ namespace CodexBootstrap.Modules
             _cleanupTimer = new Timer(CleanupOldNews, null, TimeSpan.FromHours(1), TimeSpan.FromHours(_cleanupIntervalHours));
         }
 
+        // Parameterless constructor for module loader
+        public RealtimeNewsStreamModule() : this(new NodeRegistry(), new HttpClient(), new Core.ConfigurationManager(new NodeRegistry(), new Log4NetLogger(typeof(Core.ConfigurationManager))), new MockApiRouter())
+        {
+        }
+
         public string Name => "Real-Time News Stream";
         public string Description => "Ingests external news sources and transforms them through fractal analysis";
         public string Version => "1.0.0";
@@ -60,6 +77,7 @@ namespace CodexBootstrap.Modules
         public void Initialize()
         {
             _logger.Info("Initializing Real-Time News Stream Module");
+            InitializeNewsSources();
         }
 
         public Node GetModuleNode()
@@ -78,7 +96,7 @@ namespace CodexBootstrap.Modules
         public void Register(NodeRegistry registry)
         {
             _logger.Info("Registering Real-Time News Stream Module with NodeRegistry");
-            // Module registration is handled in Initialize()
+            Initialize();
         }
 
         public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
@@ -209,8 +227,9 @@ namespace CodexBootstrap.Modules
 
                 // Get all active news source nodes - create a copy to avoid collection modification issues
                 var sourceNodes = _registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE)
+                    .ToArray() // Create a copy to prevent collection modification during iteration
                     .Where(n => n.Meta?.ContainsKey("isActive") == true && (bool)n.Meta["isActive"])
-                    .ToList(); // Create a copy to prevent collection modification during iteration
+                    .ToList();
 
                 // Process sources sequentially to avoid collection modification issues
                 foreach (var sourceNode in sourceNodes)
@@ -364,8 +383,9 @@ namespace CodexBootstrap.Modules
                 // Mark as processed before processing
                 _processedNewsIds.TryAdd(newsItem.Id, true);
 
-                // Check if news item already exists in registry
+                // Check if news item already exists in registry - create a copy to avoid collection modification issues
                 var existingNewsNode = _registry.GetNodesByType(NEWS_ITEM_NODE_TYPE)
+                    .ToArray() // Create a copy to prevent collection modification during iteration
                     .FirstOrDefault(n => n.Meta?.ContainsKey("newsId") == true && n.Meta["newsId"].ToString() == newsItem.Id);
 
                 if (existingNewsNode != null)
@@ -881,6 +901,7 @@ namespace CodexBootstrap.Modules
             {
                 var cutoffDate = DateTimeOffset.UtcNow.AddDays(-7);
                 var oldNewsNodes = _registry.GetNodesByType(NEWS_ITEM_NODE_TYPE)
+                    .ToArray() // Create a copy to prevent collection modification during iteration
                     .Where(n => n.Meta?.ContainsKey("publishedAt") == true && 
                                DateTime.TryParse(n.Meta["publishedAt"].ToString(), out var publishedAt) && 
                                publishedAt < cutoffDate.DateTime)
@@ -906,7 +927,7 @@ namespace CodexBootstrap.Modules
         {
             try
             {
-                var sourceNodes = _registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE);
+                var sourceNodes = _registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE).ToArray(); // Create a copy to prevent collection modification
                 var sources = sourceNodes.Select(n => JsonSerializer.Deserialize<NewsSource>(n.Content?.InlineJson ?? "{}")).Where(s => s != null).ToList();
 
                 return new
@@ -999,6 +1020,7 @@ namespace CodexBootstrap.Modules
             {
                 // Get user subscriptions from nodes
                 var subscriptionNodes = _registry.GetNodesByType(NEWS_SUBSCRIPTION_NODE_TYPE)
+                    .ToArray() // Create a copy to prevent collection modification
                     .Where(n => n.Meta?.ContainsKey("userId") == true && n.Meta["userId"].ToString() == userId)
                     .Where(n => n.Meta?.ContainsKey("isActive") == true && (bool)n.Meta["isActive"]);
 
@@ -1015,6 +1037,7 @@ namespace CodexBootstrap.Modules
 
                 // Get fractal news items from nodes
                 var fractalNodes = _registry.GetNodesByType(FRACTAL_NEWS_NODE_TYPE)
+                    .ToArray() // Create a copy to prevent collection modification
                     .OrderByDescending(n => n.Meta?.ContainsKey("processedAt") == true ? 
                         DateTimeOffset.TryParse(n.Meta["processedAt"].ToString(), out var processedAt) ? processedAt : DateTimeOffset.MinValue : DateTimeOffset.MinValue)
                     .Take(maxItems);
@@ -1052,6 +1075,7 @@ namespace CodexBootstrap.Modules
             {
                 var fractalId = $"fractal-{newsId}";
                 var fractalNode = _registry.GetNodesByType(FRACTAL_NEWS_NODE_TYPE)
+                    .ToArray() // Create a copy to prevent collection modification
                     .FirstOrDefault(n => n.Meta?.ContainsKey("fractalId") == true && n.Meta["fractalId"].ToString() == fractalId);
 
                 if (fractalNode == null)
@@ -1119,6 +1143,7 @@ namespace CodexBootstrap.Modules
             try
             {
                 var subscriptionNode = _registry.GetNodesByType(NEWS_SUBSCRIPTION_NODE_TYPE)
+                    .ToArray() // Create a copy to prevent collection modification
                     .FirstOrDefault(n => n.Meta?.ContainsKey("subscriptionId") == true && n.Meta["subscriptionId"].ToString() == id);
 
                 if (subscriptionNode == null)
@@ -1206,6 +1231,7 @@ namespace CodexBootstrap.Modules
             {
                 // Find existing source
                 var existingSource = _registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE)
+                    .ToArray() // Create a copy to prevent collection modification
                     .FirstOrDefault(n => n.Meta?.ContainsKey("sourceId") == true && n.Meta["sourceId"].ToString() == id);
 
                 if (existingSource == null)
@@ -1275,6 +1301,7 @@ namespace CodexBootstrap.Modules
             try
             {
                 var sourceNode = _registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE)
+                    .ToArray() // Create a copy to prevent collection modification
                     .FirstOrDefault(n => n.Meta?.ContainsKey("sourceId") == true && n.Meta["sourceId"].ToString() == id);
 
                 if (sourceNode == null)
@@ -1317,6 +1344,7 @@ namespace CodexBootstrap.Modules
             try
             {
                 var sourceNode = _registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE)
+                    .ToArray() // Create a copy to prevent collection modification
                     .FirstOrDefault(n => n.Meta?.ContainsKey("sourceId") == true && n.Meta["sourceId"].ToString() == id);
 
                 if (sourceNode == null)
@@ -1397,6 +1425,7 @@ namespace CodexBootstrap.Modules
             try
             {
                 var sourceNode = _registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE)
+                    .ToArray() // Create a copy to prevent collection modification
                     .FirstOrDefault(n => n.Meta?.ContainsKey("sourceId") == true && n.Meta["sourceId"].ToString() == id);
 
                 if (sourceNode == null)

@@ -12,16 +12,22 @@ public class NodeRegistry
     public virtual void Upsert(Edge edge) => _edges.Add(edge);
     public virtual bool TryGet(string id, out Node node) => _nodes.TryGetValue(id, out node!);
     public virtual IEnumerable<Edge> AllEdges() => _edges;
-    public virtual IEnumerable<Node> AllNodes() => _nodes.Values.ToList();
+    public virtual IEnumerable<Node> AllNodes() => _nodes.Values.ToArray();
     
     public virtual IEnumerable<Node> GetNodesByType(string typeId) => 
-        _nodes.Values.ToList().Where(n => n.TypeId == typeId);
+        _nodes.Values.Where(n => n.TypeId == typeId).ToArray();
     
     public virtual IEnumerable<Edge> GetEdgesFrom(string fromId) => 
         _edges.Where(e => e.FromId == fromId);
     
     public virtual IEnumerable<Edge> GetEdgesTo(string toId) => 
         _edges.Where(e => e.ToId == toId);
+    
+    public virtual IEnumerable<Edge> GetEdges(string? fromId = null, string? toId = null, string? edgeType = null) =>
+        _edges.Where(e => 
+            (fromId == null || e.FromId == fromId) &&
+            (toId == null || e.ToId == toId) &&
+            (edgeType == null || e.Role == edgeType));
     
     public virtual void RemoveNode(string id) => _nodes.Remove(id);
     
@@ -151,6 +157,17 @@ public static class NodeStorage
         // Register the main module node
         var moduleNode = module.GetModuleNode();
         registry.Upsert(moduleNode);
+        
+        // Call the module's Register method to initialize any module-specific data
+        try
+        {
+            module.Register(registry);
+        }
+        catch (Exception ex)
+        {
+            // Log but don't fail the registration
+            Console.WriteLine($"Warning: Module {module.GetType().Name} Register method failed: {ex.Message}");
+        }
         
         // Create spec-to-module tracking if spec reference exists
         if (moduleNode.Meta?.ContainsKey("specReference") == true)

@@ -121,7 +121,7 @@ public class PersistentNodeRegistry : NodeRegistry
         }
 
         var allNodes = AllNodes();
-        return allNodes.Where(n => n.TypeId == typeId).ToList();
+        return allNodes.Where(n => n.TypeId == typeId).ToArray();
     }
 
     public override IEnumerable<Edge> GetEdgesFrom(string fromId)
@@ -146,6 +146,21 @@ public class PersistentNodeRegistry : NodeRegistry
         var edgesTask = _cacheManager.GetAllEdgesAsync();
         edgesTask.Wait();
         return edgesTask.Result.Where(e => e.ToId == toId).ToList();
+    }
+
+    public override IEnumerable<Edge> GetEdges(string? fromId = null, string? toId = null, string? edgeType = null)
+    {
+        if (!_isInitialized)
+        {
+            throw new InvalidOperationException("Registry not initialized. Call InitializeAsync() first.");
+        }
+
+        var edgesTask = _cacheManager.GetAllEdgesAsync();
+        edgesTask.Wait();
+        return edgesTask.Result.Where(e => 
+            (fromId == null || e.FromId == fromId) &&
+            (toId == null || e.ToId == toId) &&
+            (edgeType == null || e.Role == edgeType)).ToList();
     }
 
     /// <summary>

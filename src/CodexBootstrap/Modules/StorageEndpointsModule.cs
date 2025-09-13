@@ -24,6 +24,11 @@ public sealed class StorageEndpointsModule : IModule
         _storageBackend = storageBackend;
         _cacheManager = cacheManager;
     }
+    
+    // Parameterless constructor for module loader
+    public StorageEndpointsModule() : this(new NodeRegistry(), null, null)
+    {
+    }
 
     public Node GetModuleNode()
     {
