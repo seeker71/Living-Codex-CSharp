@@ -54,6 +54,19 @@ else
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Disable HTTPS for Docker/development
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenAnyIP(8080); // HTTP only
+});
+
+// Disable HTTPS redirect
+builder.Services.Configure<Microsoft.AspNetCore.HttpsPolicy.HttpsRedirectionOptions>(options =>
+{
+    options.RedirectStatusCode = Microsoft.AspNetCore.Http.StatusCodes.Status307TemporaryRedirect;
+    options.HttpsPort = 5001;
+});
+
 // Enable hot reload in development
 if (builder.Environment.IsDevelopment())
 {
@@ -86,6 +99,7 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
         });
         builder.Services.AddSingleton<ApiRouter>();
         builder.Services.AddSingleton<IApiRouter>(sp => sp.GetRequiredService<ApiRouter>());
+        builder.Services.AddSingleton<ModuleCommunicationWrapper>();
 
         // Generic services with interface registration
         builder.Services.AddSingleton<ModuleLoader>(sp => 
@@ -240,6 +254,16 @@ var app = builder.Build();
 var urls = args.Where(arg => arg.StartsWith("--urls=")).FirstOrDefault();
 var baseUrl = urls?.Split('=')[1] ?? "http://localhost:5001";
 GlobalConfiguration.Initialize(baseUrl);
+
+// Disable HTTPS redirection
+app.Use(async (context, next) =>
+{
+    if (context.Request.Scheme == "https")
+    {
+        context.Request.Scheme = "http";
+    }
+    await next();
+});
 
 // Add generic error handling middleware
 app.UseExceptionHandler(errorApp =>

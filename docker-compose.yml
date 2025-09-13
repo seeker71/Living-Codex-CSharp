@@ -8,11 +8,10 @@ services:
       dockerfile: Dockerfile
     container_name: living-codex-api
     ports:
-      - "5002:5000"
-      - "5003:5001"
+      - "5002:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:5000
+      - ASPNETCORE_URLS=http://+:8080
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=livingcodex;Username=postgres;Password=postgres
       - ConnectionStrings__Redis=redis:6379
       - ConnectionStrings__RabbitMQ=amqp://guest:guest@rabbitmq:5672
@@ -20,6 +19,10 @@ services:
       - ENCRYPTION_KEY=your-32-character-encryption-key-here
       - OLLAMA_BASE_URL=http://ollama:11434
       - LOG_LEVEL=Information
+      - GOOGLE_CLIENT_ID=your-google-client-id
+      - GOOGLE_CLIENT_SECRET=your-google-client-secret
+      - MICROSOFT_CLIENT_ID=your-microsoft-client-id
+      - MICROSOFT_CLIENT_SECRET=your-microsoft-client-secret
     volumes:
       - ./src:/app/src
       - ./specs:/app/specs

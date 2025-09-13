@@ -1,0 +1,23 @@
+﻿<?xml version = "1.0" encoding = "UTF-8" ?>
+<Application xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:LivingCodexMobile"
+             xmlns:converters="clr-namespace:LivingCodexMobile.Converters"
+             x:Class="LivingCodexMobile.App">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Resources/Styles/Colors.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Styles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            
+                    <!-- Converters -->
+                    <converters:BoolToLoginTextConverter x:Key="BoolToLoginTextConverter" />
+                    <converters:BoolToButtonTextConverter x:Key="BoolToButtonTextConverter" />
+                    <converters:BoolToAltButtonTextConverter x:Key="BoolToAltButtonTextConverter" />
+                    <converters:InvertedBoolConverter x:Key="InvertedBoolConverter" />
+                    <converters:StringToBoolConverter x:Key="StringToBoolConverter" />
+                    <converters:ConnectionStatusConverter x:Key="ConnectionStatusConverter" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>
