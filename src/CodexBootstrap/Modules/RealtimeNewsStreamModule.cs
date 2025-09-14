@@ -176,11 +176,11 @@ namespace CodexBootstrap.Modules
                 },
                 new NewsSource
                 {
-                    Id = "reddit-tech",
-                    Name = "Reddit Technology",
+                    Id = "hacker-news",
+                    Name = "Hacker News",
                     Type = "rss",
-                    Url = "https://www.reddit.com/r/technology/.rss",
-                    Categories = new[] { "technology", "discussion", "community" },
+                    Url = "https://hnrss.org/frontpage",
+                    Categories = new[] { "technology", "programming", "startup", "community" },
                     IsActive = true,
                     UpdateIntervalMinutes = 20
                 }
@@ -330,10 +330,47 @@ namespace CodexBootstrap.Modules
 
         private async Task IngestRssFeed(NewsSource source)
         {
-            try
+            const int maxRetries = 3;
+            const int baseDelayMs = 1000;
+            
+            for (int attempt = 0; attempt < maxRetries; attempt++)
             {
-                using var reader = XmlReader.Create(source.Url);
-                var feed = SyndicationFeed.Load(reader);
+                try
+                {
+                    // Create HttpClient with proper headers to avoid bot detection
+                    using var httpClient = new HttpClient();
+                    httpClient.DefaultRequestHeaders.Add("User-Agent", "Living-Codex-NewsBot/1.0 (https://living-codex.com)");
+                    httpClient.DefaultRequestHeaders.Add("Accept", "application/rss+xml, application/xml, text/xml");
+                    httpClient.Timeout = TimeSpan.FromSeconds(30);
+                    
+                    // Get the RSS content with proper error handling
+                    var response = await httpClient.GetAsync(source.Url);
+                    
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                        {
+                            _logger.Warn($"RSS feed {source.Name} is blocked (403). This may be due to rate limiting or bot detection. Skipping this source.");
+                            return;
+                        }
+                        
+                        if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                        {
+                            _logger.Warn($"RSS feed {source.Name} rate limited (429). Attempt {attempt + 1}/{maxRetries}");
+                            if (attempt < maxRetries - 1)
+                            {
+                                await Task.Delay(baseDelayMs * (int)Math.Pow(2, attempt));
+                                continue;
+                            }
+                        }
+                        
+                        _logger.Warn($"RSS feed {source.Name} returned status {response.StatusCode}. Skipping this source.");
+                        return;
+                    }
+                    
+                    var content = await response.Content.ReadAsStringAsync();
+                    using var reader = XmlReader.Create(new StringReader(content));
+                    var feed = SyndicationFeed.Load(reader);
 
                 foreach (var item in feed.Items.Take(_maxItemsPerSource).ToList())
                 {
@@ -357,10 +394,23 @@ namespace CodexBootstrap.Modules
 
                     await ProcessNewsItem(newsItem);
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Error ingesting RSS feed {source.Name}: {ex.Message}", ex);
+                
+                // Success - break out of retry loop
+                break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.Warn($"Error ingesting RSS feed {source.Name} (attempt {attempt + 1}/{maxRetries}): {ex.Message}");
+                    
+                    if (attempt == maxRetries - 1)
+                    {
+                        _logger.Error($"Failed to ingest RSS feed {source.Name} after {maxRetries} attempts: {ex.Message}", ex);
+                        return;
+                    }
+                    
+                    // Wait before retry with exponential backoff
+                    await Task.Delay(baseDelayMs * (int)Math.Pow(2, attempt));
+                }
             }
         }
 
