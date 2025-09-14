@@ -7,37 +7,187 @@ public class NodeRegistry
 {
     private readonly Dictionary<string, Node> _nodes = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<Edge> _edges = new();
+    private readonly ReaderWriterLockSlim _lock = new();
 
-    public virtual void Upsert(Node node) => _nodes[node.Id] = node;
-    public virtual void Upsert(Edge edge) => _edges.Add(edge);
-    public virtual bool TryGet(string id, out Node node) => _nodes.TryGetValue(id, out node!);
-    public virtual IEnumerable<Edge> AllEdges() => _edges;
-    public virtual IEnumerable<Node> AllNodes() => _nodes.Values.ToArray();
+    public virtual void Upsert(Node node)
+    {
+        _lock.EnterWriteLock();
+        try
+        {
+            _nodes[node.Id] = node;
+        }
+        finally
+        {
+            _lock.ExitWriteLock();
+        }
+    }
+
+    public virtual void Upsert(Edge edge)
+    {
+        _lock.EnterWriteLock();
+        try
+        {
+            _edges.Add(edge);
+        }
+        finally
+        {
+            _lock.ExitWriteLock();
+        }
+    }
+
+    public virtual bool TryGet(string id, out Node node)
+    {
+        _lock.EnterReadLock();
+        try
+        {
+            return _nodes.TryGetValue(id, out node!);
+        }
+        finally
+        {
+            _lock.ExitReadLock();
+        }
+    }
+
+    public virtual IEnumerable<Edge> AllEdges()
+    {
+        _lock.EnterReadLock();
+        try
+        {
+            return _edges.ToArray(); // Return a copy to prevent modification during iteration
+        }
+        finally
+        {
+            _lock.ExitReadLock();
+        }
+    }
+
+    public virtual IEnumerable<Node> AllNodes()
+    {
+        _lock.EnterReadLock();
+        try
+        {
+            return _nodes.Values.ToArray(); // Return a copy to prevent modification during iteration
+        }
+        finally
+        {
+            _lock.ExitReadLock();
+        }
+    }
     
-    public virtual IEnumerable<Node> GetNodesByType(string typeId) => 
-        _nodes.Values.Where(n => n.TypeId == typeId).ToArray();
+    public virtual IEnumerable<Node> GetNodesByType(string typeId)
+    {
+        _lock.EnterReadLock();
+        try
+        {
+            return _nodes.Values.Where(n => n.TypeId == typeId).ToArray();
+        }
+        finally
+        {
+            _lock.ExitReadLock();
+        }
+    }
     
-    public virtual IEnumerable<Edge> GetEdgesFrom(string fromId) => 
-        _edges.Where(e => e.FromId == fromId);
+    public virtual IEnumerable<Edge> GetEdgesFrom(string fromId)
+    {
+        _lock.EnterReadLock();
+        try
+        {
+            return _edges.Where(e => e.FromId == fromId).ToArray();
+        }
+        finally
+        {
+            _lock.ExitReadLock();
+        }
+    }
     
-    public virtual IEnumerable<Edge> GetEdgesTo(string toId) => 
-        _edges.Where(e => e.ToId == toId);
+    public virtual IEnumerable<Edge> GetEdgesTo(string toId)
+    {
+        _lock.EnterReadLock();
+        try
+        {
+            return _edges.Where(e => e.ToId == toId).ToArray();
+        }
+        finally
+        {
+            _lock.ExitReadLock();
+        }
+    }
     
-    public virtual IEnumerable<Edge> GetEdges(string? fromId = null, string? toId = null, string? edgeType = null) =>
-        _edges.Where(e => 
-            (fromId == null || e.FromId == fromId) &&
-            (toId == null || e.ToId == toId) &&
-            (edgeType == null || e.Role == edgeType));
+    public virtual IEnumerable<Edge> GetEdges(string? fromId = null, string? toId = null, string? edgeType = null)
+    {
+        _lock.EnterReadLock();
+        try
+        {
+            return _edges.Where(e => 
+                (fromId == null || e.FromId == fromId) &&
+                (toId == null || e.ToId == toId) &&
+                (edgeType == null || e.Role == edgeType)).ToArray();
+        }
+        finally
+        {
+            _lock.ExitReadLock();
+        }
+    }
     
-    public virtual void RemoveNode(string id) => _nodes.Remove(id);
+    public virtual void RemoveNode(string id)
+    {
+        _lock.EnterWriteLock();
+        try
+        {
+            _nodes.Remove(id);
+        }
+        finally
+        {
+            _lock.ExitWriteLock();
+        }
+    }
     
-    public virtual void RemoveEdge(string fromId, string toId) => 
-        _edges.RemoveAll(e => e.FromId == fromId && e.ToId == toId);
+    public virtual void RemoveEdge(string fromId, string toId)
+    {
+        _lock.EnterWriteLock();
+        try
+        {
+            _edges.RemoveAll(e => e.FromId == fromId && e.ToId == toId);
+        }
+        finally
+        {
+            _lock.ExitWriteLock();
+        }
+    }
     
-    public virtual Node? GetNode(string id) => _nodes.TryGetValue(id, out var node) ? node : null;
+    public virtual Node? GetNode(string id)
+    {
+        _lock.EnterReadLock();
+        try
+        {
+            return _nodes.TryGetValue(id, out var node) ? node : null;
+        }
+        finally
+        {
+            _lock.ExitReadLock();
+        }
+    }
     
-    public virtual Edge? GetEdge(string fromId, string toId) => 
-        _edges.FirstOrDefault(e => e.FromId == fromId && e.ToId == toId);
+    public virtual Edge? GetEdge(string fromId, string toId)
+    {
+        _lock.EnterReadLock();
+        try
+        {
+            return _edges.FirstOrDefault(e => e.FromId == fromId && e.ToId == toId);
+        }
+        finally
+        {
+            _lock.ExitReadLock();
+        }
+    }
+
+    /// <summary>
+    /// Dispose the lock when the registry is disposed
+    /// </summary>
+    public virtual void Dispose()
+    {
+        _lock?.Dispose();
+    }
 }
 
 

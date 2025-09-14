@@ -2,6 +2,7 @@ using System;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using CodexBootstrap.Core;
 
@@ -14,10 +15,10 @@ namespace CodexBootstrap.Core;
 public class LLMClient
 {
     private readonly HttpClient _httpClient;
-    private readonly ILogger _logger;
+    private readonly Core.ILogger _logger;
     private readonly string _baseUrl;
 
-    public LLMClient(HttpClient httpClient, ILogger logger, string baseUrl = "http://localhost:11434")
+    public LLMClient(HttpClient httpClient, Core.ILogger logger, string baseUrl = "http://localhost:11434")
     {
         _httpClient = httpClient;
         _logger = logger;
@@ -80,7 +81,10 @@ public class LLMClient
             }
 
             var responseContent = await response.Content.ReadAsStringAsync();
+            _logger.Debug($"Raw LLM response content: '{responseContent}'");
+            
             var llmResponse = JsonSerializer.Deserialize<OllamaResponse>(responseContent);
+            _logger.Debug($"Deserialized LLM response: Response='{llmResponse?.Response}', Done={llmResponse?.Done}");
 
             return new LLMResponse
             {
@@ -140,8 +144,15 @@ public class LLMResponse
 [ResponseType("codex.core.ollama-response", "OllamaResponse", "Response from Ollama API")]
 public class OllamaResponse
 {
+    [JsonPropertyName("response")]
     public string Response { get; set; } = "";
+    
+    [JsonPropertyName("done")]
     public bool Done { get; set; }
+    
+    [JsonPropertyName("model")]
     public string Model { get; set; } = "";
-    public long CreatedAt { get; set; }
+    
+    [JsonPropertyName("created_at")]
+    public string CreatedAt { get; set; } = "";
 }

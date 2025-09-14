@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using CodexBootstrap.Core;
 using CodexBootstrap.Runtime;
@@ -107,6 +108,7 @@ namespace CodexBootstrap.Modules
             return task.ToLowerInvariant() switch
             {
                 "concept-extraction" => MacM1_ConceptExtraction,
+                "fractal-transformation" => MacM1_FractalTransform,
                 "fractal-transform" => MacM1_FractalTransform,
                 "future-query" => MacM1_FutureQuery,
                 _ => MacM1_ConceptExtraction
@@ -116,6 +118,7 @@ namespace CodexBootstrap.Modules
         private static float GetDefaultTemperature(string task) => task.ToLowerInvariant() switch
         {
             "concept-extraction" => 0.3f,
+            "fractal-transformation" => 0.7f,
             "fractal-transform" => 0.7f,
             "future-query" => 0.8f,
             _ => 0.5f
@@ -124,6 +127,7 @@ namespace CodexBootstrap.Modules
         private static int GetDefaultMaxTokens(string task) => task.ToLowerInvariant() switch
         {
             "concept-extraction" => 2048,
+            "fractal-transformation" => 4096,
             "fractal-transform" => 4096,
             "future-query" => 3072,
             _ => 2048
@@ -132,6 +136,7 @@ namespace CodexBootstrap.Modules
         private static float GetDefaultTopP(string task) => task.ToLowerInvariant() switch
         {
             "concept-extraction" => 0.9f,
+            "fractal-transformation" => 0.95f,
             "fractal-transform" => 0.95f,
             "future-query" => 0.9f,
             _ => 0.9f
@@ -149,10 +154,14 @@ namespace CodexBootstrap.Modules
         private readonly LLMOrchestrator _llmOrchestrator;
         private readonly PromptTemplateRepository _promptRepo;
 
-        public AIModule(NodeRegistry registry)
+        public AIModule() : this(new NodeRegistry(), new Log4NetLogger(typeof(AIModule)))
+        {
+        }
+
+        public AIModule(NodeRegistry registry, Core.ILogger logger)
         {
             _registry = registry;
-            _logger = new Log4NetLogger(typeof(AIModule));
+            _logger = logger;
             
             // Initialize LLM infrastructure
             var httpClient = new HttpClient();
@@ -241,7 +250,8 @@ Text: ""{content}""
 
 Focus on: consciousness, transformation, unity, love, wisdom, energy, healing, abundance, sacred patterns.
 
-Return JSON array:
+IMPORTANT: Return ONLY a valid JSON array, no markdown, no explanations, no additional text. Start with [ and end with ].
+
 [
   {{
     ""concept"": ""concept_name"",
@@ -259,25 +269,31 @@ Return JSON array:
                 new PromptTemplate(
                     Id: "fractal-transformation",
                     Name: "Fractal Transformation",
-                    Template: @"Transform the following content using fractal consciousness principles.
+                    Template: @"Transform the following content into a structured analysis format.
 
 Content: ""{content}""
-Consciousness Level: {consciousnessLevel}
+Analysis Level: {consciousnessLevel}
 
-Apply fractal patterns for:
-1. Self-similarity across scales
-2. Recursive depth expansion
-3. Consciousness elevation
-4. Unity resonance amplification
+You must return a JSON object with these exact fields:
+- headline: A transformed headline for the content
+- beliefTranslation: How this content translates to belief systems
+- summary: A transformed summary of the content
+- impactAreas: An array of impact areas (e.g., [""Technology"", ""Environment""])
+- consciousnessLevel: A level from L1 to L7
+- resonanceFrequency: A number between 0.0 and 1.0
+- unityScore: A number between 0.0 and 1.0
 
-Return JSON:
-{{
-  ""transformedContent"": ""transformed version"",
-  ""fractalPatterns"": [""pattern1"", ""pattern2""],
-  ""consciousnessLevel"": ""L1-L7"",
-  ""resonanceFrequency"": 0.0-1.0,
-  ""unityScore"": 0.0-1.0
-}}",
+CRITICAL: Return ONLY a valid JSON object. Do NOT return an array. Do NOT include markdown. Do NOT include explanations.
+
+{
+  ""headline"": ""Your transformed headline here"",
+  ""beliefTranslation"": ""Your belief translation here"",
+  ""summary"": ""Your transformed summary here"",
+  ""impactAreas"": [""Area1"", ""Area2""],
+  ""consciousnessLevel"": ""L3"",
+  ""resonanceFrequency"": 0.8,
+  ""unityScore"": 0.7
+}",
                     DefaultParameters: new Dictionary<string, object> 
                     { 
                         ["content"] = "", 
@@ -296,25 +312,19 @@ Content: ""{content}""
 Analysis Type: {analysisType}
 Criteria: {criteria}
 
-Evaluate the content and provide:
-1. Overall score (0.0-1.0)
-2. Individual criteria scores
-3. Key strengths
-4. Areas for improvement
-5. Specific recommendations
+Score each criterion from 0.0 to 1.0:
+- Abundance: Growth, prosperity, opportunity, collective benefit
+- Consciousness: Awareness, mindfulness, wisdom, spiritual insight
+- Unity: Connection, collaboration, harmony, global perspective
 
-Return JSON:
+IMPORTANT: Return ONLY a valid JSON object, no markdown, no explanations, no additional text. Start with {{ and end with }}.
+
 {{
+  ""abundanceScore"": 0.0-1.0,
+  ""consciousnessScore"": 0.0-1.0,
+  ""unityScore"": 0.0-1.0,
   ""overallScore"": 0.0-1.0,
-  ""criteriaScores"": {{
-    ""relevance"": 0.0-1.0,
-    ""quality"": 0.0-1.0,
-    ""impact"": 0.0-1.0
-  }},
-  ""strengths"": [""strength1"", ""strength2""],
-  ""weaknesses"": [""weakness1"", ""weakness2""],
-  ""recommendations"": [""recommendation1"", ""recommendation2""],
-  ""confidence"": 0.0-1.0
+  ""reasoning"": ""brief explanation of scores""
 }}",
                     DefaultParameters: new Dictionary<string, object> 
                     { 
@@ -399,31 +409,7 @@ Response:",
                     ["content"] = request.Content
                 }, config);
 
-                if (!result.Success)
-                {
-                    return new { success = false, error = result.Error };
-                }
-
-                var concepts = _llmOrchestrator.ParseStructuredResponse<List<ConceptScore>>(result);
-
-                return new
-                {
-                    success = true,
-                    data = new
-                    {
-                        concepts = concepts ?? new List<ConceptScore>(),
-                        confidence = result.Confidence,
-                        isFallback = result.IsFallback,
-                        timestamp = result.Timestamp,
-                        tracking = new
-                        {
-                            templateId = result.TemplateId,
-                            provider = result.Provider,
-                            model = result.Model,
-                            executionTimeMs = result.ExecutionTime.TotalMilliseconds
-                        }
-                    }
-                };
+                return _llmOrchestrator.ParseStructuredResponse<List<ConceptScore>>(result, "concept extraction");
             }
             catch (Exception ex)
             {
@@ -442,35 +428,14 @@ Response:",
                     return new { success = false, error = "Content is required" };
                 }
 
-                var config = LLMConfigurations.GetConfigForTask("fractal-transform", request.Provider, request.Model);
+                var config = LLMConfigurations.GetConfigForTask("fractal-transformation", request.Provider, request.Model);
                 var result = await _llmOrchestrator.ExecuteAsync("fractal-transformation", new Dictionary<string, object>
                 {
                     ["content"] = request.Content,
                     ["consciousnessLevel"] = "L3" // Default consciousness level
                 }, config);
 
-                if (!result.Success)
-                {
-                    return new { success = false, error = result.Error };
-                }
-
-                var transformation = _llmOrchestrator.ParseStructuredResponse<FractalTransformationResult>(result);
-
-                return new
-                {
-                    success = true,
-                    data = transformation,
-                    confidence = result.Confidence,
-                    isFallback = result.IsFallback,
-                    timestamp = result.Timestamp,
-                    tracking = new
-                    {
-                        templateId = result.TemplateId,
-                        provider = result.Provider,
-                        model = result.Model,
-                        executionTimeMs = result.ExecutionTime.TotalMilliseconds
-                    }
-                };
+                return _llmOrchestrator.ParseStructuredResponse<FractalTransformationResult>(result, "fractal transformation");
             }
             catch (Exception ex)
             {
@@ -497,28 +462,7 @@ Response:",
                     ["criteria"] = request.Criteria ?? new[] { "relevance", "quality", "impact" }
                 }, config);
 
-                if (!result.Success)
-                {
-                    return new { success = false, error = result.Error };
-                }
-
-                var scoring = _llmOrchestrator.ParseStructuredResponse<ScoringAnalysisResult>(result);
-
-                return new
-                {
-                    success = true,
-                    data = scoring,
-                    confidence = result.Confidence,
-                    isFallback = result.IsFallback,
-                    timestamp = result.Timestamp,
-                    tracking = new
-                    {
-                        templateId = result.TemplateId,
-                        provider = result.Provider,
-                        model = result.Model,
-                        executionTimeMs = result.ExecutionTime.TotalMilliseconds
-                    }
-                };
+                return _llmOrchestrator.ParseStructuredResponse<ScoringAnalysisResult>(result, "scoring analysis");
             }
             catch (Exception ex)
             {
@@ -696,30 +640,31 @@ Response:",
 
     [MetaNodeAttribute("codex.ai.concept-score", "codex.meta/type", "ConceptScore", "Score for a concept")]
     public record ConceptScore(
-        string Concept,
-        double Score,
-        string Description,
-        string Category,
-        double Confidence
+        [property: JsonPropertyName("concept")] string Concept,
+        [property: JsonPropertyName("score")] double Score,
+        [property: JsonPropertyName("description")] string Description,
+        [property: JsonPropertyName("category")] string Category,
+        [property: JsonPropertyName("confidence")] double Confidence
     );
 
     [ResponseType("codex.ai.fractal-transformation-result", "FractalTransformationResult", "Result of fractal transformation")]
     public record FractalTransformationResult(
-        string TransformedContent,
-        string[] FractalPatterns,
-        string ConsciousnessLevel,
-        double ResonanceFrequency,
-        double UnityScore
+        [property: JsonPropertyName("headline")] string Headline,
+        [property: JsonPropertyName("beliefTranslation")] string BeliefTranslation,
+        [property: JsonPropertyName("summary")] string Summary,
+        [property: JsonPropertyName("impactAreas")] string[] ImpactAreas,
+        [property: JsonPropertyName("consciousnessLevel")] string ConsciousnessLevel,
+        [property: JsonPropertyName("resonanceFrequency")] double ResonanceFrequency,
+        [property: JsonPropertyName("unityScore")] double UnityScore
     );
 
     [ResponseType("codex.ai.scoring-analysis-result", "ScoringAnalysisResult", "Result of scoring analysis")]
     public record ScoringAnalysisResult(
-        double OverallScore,
-        Dictionary<string, double> CriteriaScores,
-        string[] Strengths,
-        string[] Weaknesses,
-        string[] Recommendations,
-        double Confidence
+        [property: JsonPropertyName("abundanceScore")] double AbundanceScore,
+        [property: JsonPropertyName("consciousnessScore")] double ConsciousnessScore,
+        [property: JsonPropertyName("unityScore")] double UnityScore,
+        [property: JsonPropertyName("overallScore")] double OverallScore,
+        [property: JsonPropertyName("reasoning")] string Reasoning
     );
 
     // Legacy data structures for compatibility

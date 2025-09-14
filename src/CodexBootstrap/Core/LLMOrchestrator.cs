@@ -13,9 +13,9 @@ namespace CodexBootstrap.Core
     {
         private readonly LLMClient _llmClient;
         private readonly PromptTemplateRepository _promptRepo;
-        private readonly ILogger _logger;
+        private readonly Core.ILogger _logger;
 
-        public LLMOrchestrator(LLMClient llmClient, PromptTemplateRepository promptRepo, ILogger logger)
+        public LLMOrchestrator(LLMClient llmClient, PromptTemplateRepository promptRepo, Core.ILogger logger)
         {
             _llmClient = llmClient;
             _promptRepo = promptRepo;
@@ -27,6 +27,7 @@ namespace CodexBootstrap.Core
         /// </summary>
         public async Task<LLMOperationResult> ExecuteAsync(string templateId, Dictionary<string, object> parameters, CodexBootstrap.Modules.LLMConfig? overrideConfig = null)
         {
+            _logger.Debug($"LLMOrchestrator.ExecuteAsync called with templateId: {templateId}");
             var startTime = DateTimeOffset.UtcNow;
             try
             {
@@ -94,33 +95,211 @@ namespace CodexBootstrap.Core
         }
 
         /// <summary>
-        /// Parse structured response from LLM
+        /// Parse structured response from LLM and return a standardized API response
         /// </summary>
-        public T? ParseStructuredResponse<T>(LLMOperationResult result) where T : class
+        public object ParseStructuredResponse<T>(LLMOperationResult result, string? operationName = null) where T : class
         {
-            if (!result.Success || string.IsNullOrEmpty(result.Content))
-                return null;
+            _logger.Debug($"ParseStructuredResponse called for type {typeof(T).Name}");
+            _logger.Debug($"ParseStructuredResponse: Success={result.Success}, Content='{result.Content}', ContentLength={result.Content?.Length ?? 0}");
+            
+            // Handle LLM operation failure
+            if (!result.Success)
+            {
+                var errorMessage = result.Error ?? "Unknown LLM operation error";
+                _logger.Error($"LLM operation failed{(operationName != null ? $" for {operationName}" : "")}: {errorMessage}");
+                return new 
+                { 
+                    success = false, 
+                    error = errorMessage,
+                    details = "LLM operation failed",
+                    confidence = result.Confidence,
+                    isFallback = result.IsFallback,
+                    timestamp = result.Timestamp,
+                    tracking = new
+                    {
+                        templateId = result.TemplateId,
+                        provider = result.Provider,
+                        model = result.Model,
+                        executionTimeMs = result.ExecutionTime.TotalMilliseconds
+                    }
+                };
+            }
+
+            // Handle empty content
+            if (string.IsNullOrEmpty(result.Content))
+            {
+                _logger.Debug("ParseStructuredResponse: content is empty");
+                return new 
+                { 
+                    success = false, 
+                    error = "Empty LLM response",
+                    details = "The LLM returned an empty response",
+                    confidence = result.Confidence,
+                    isFallback = result.IsFallback,
+                    timestamp = result.Timestamp,
+                    tracking = new
+                    {
+                        templateId = result.TemplateId,
+                        provider = result.Provider,
+                        model = result.Model,
+                        executionTimeMs = result.ExecutionTime.TotalMilliseconds
+                    }
+                };
+            }
 
             try
             {
                 // Extract JSON from response
                 var content = result.Content;
-                var jsonStart = content.IndexOf('[');
-                var jsonEnd = content.LastIndexOf(']') + 1;
+                _logger.Debug($"Raw LLM response: {content}");
                 
-                if (jsonStart >= 0 && jsonEnd > jsonStart)
+                // Try multiple extraction strategies
+                string? jsonToParse = null;
+                
+                // Strategy 1: Look for JSON array in markdown code blocks
+                var codeBlockMatch = System.Text.RegularExpressions.Regex.Match(content, @"```(?:json)?\s*(\[.*?\])\s*```", System.Text.RegularExpressions.RegexOptions.Singleline);
+                if (codeBlockMatch.Success)
                 {
-                    var json = content.Substring(jsonStart, jsonEnd - jsonStart);
-                    return JsonSerializer.Deserialize<T>(json);
+                    jsonToParse = codeBlockMatch.Groups[1].Value.Trim();
+                    _logger.Debug($"Extracted JSON from code block: {jsonToParse}");
                 }
-
-                // Try parsing the entire content as JSON
-                return JsonSerializer.Deserialize<T>(content);
+                else
+                {
+                    // Strategy 2: Look for JSON array directly
+                    var jsonStart = content.IndexOf('[');
+                    var jsonEnd = content.LastIndexOf(']') + 1;
+                    
+                    if (jsonStart >= 0 && jsonEnd > jsonStart)
+                    {
+                        jsonToParse = content.Substring(jsonStart, jsonEnd - jsonStart);
+                        _logger.Debug($"Extracted JSON array: {jsonToParse}");
+                    }
+                    else
+                    {
+                        // Strategy 3: Look for JSON object
+                        var objStart = content.IndexOf('{');
+                        var objEnd = content.LastIndexOf('}') + 1;
+                        
+                        if (objStart >= 0 && objEnd > objStart)
+                        {
+                            jsonToParse = content.Substring(objStart, objEnd - objStart);
+                            _logger.Debug($"Extracted JSON object: {jsonToParse}");
+                        }
+                        else
+                        {
+                            // Strategy 4: Try parsing the entire content as JSON
+                            jsonToParse = content.Trim();
+                            _logger.Debug($"Trying to parse entire content as JSON: {jsonToParse}");
+                        }
+                    }
+                }
+                
+                if (!string.IsNullOrEmpty(jsonToParse))
+                {
+                    _logger.Debug($"Attempting to deserialize JSON: {jsonToParse}");
+                    
+                    // Check if we're expecting an object but got an array
+                    if (jsonToParse.TrimStart().StartsWith("[") && !typeof(T).IsArray && !typeof(T).IsGenericType)
+                    {
+                        _logger.Warn($"Expected object type {typeof(T).Name} but received JSON array. Rejecting response.");
+                        return new 
+                        { 
+                            success = false, 
+                            error = $"Expected JSON object but received array",
+                            details = $"The LLM returned a JSON array but we expected a {typeof(T).Name} object",
+                            confidence = result.Confidence,
+                            isFallback = result.IsFallback,
+                            timestamp = result.Timestamp,
+                            tracking = new
+                            {
+                                templateId = result.TemplateId,
+                                provider = result.Provider,
+                                model = result.Model,
+                                executionTimeMs = result.ExecutionTime.TotalMilliseconds
+                            }
+                        };
+                    }
+                    
+                    var deserializedResult = JsonSerializer.Deserialize<T>(jsonToParse);
+                    if (deserializedResult == null)
+                    {
+                        _logger.Warn($"Deserialization returned null for type {typeof(T).Name}");
+                        return new 
+                        { 
+                            success = false, 
+                            error = $"Failed to deserialize {typeof(T).Name}",
+                            details = "The LLM returned valid JSON but deserialization failed. Check logs for details.",
+                            confidence = result.Confidence,
+                            isFallback = result.IsFallback,
+                            timestamp = result.Timestamp,
+                            tracking = new
+                            {
+                                templateId = result.TemplateId,
+                                provider = result.Provider,
+                                model = result.Model,
+                                executionTimeMs = result.ExecutionTime.TotalMilliseconds
+                            }
+                        };
+                    }
+                    else
+                    {
+                        _logger.Debug($"Successfully deserialized to type {typeof(T).Name}");
+                        return new
+                        {
+                            success = true,
+                            data = deserializedResult,
+                            confidence = result.Confidence,
+                            isFallback = result.IsFallback,
+                            timestamp = result.Timestamp,
+                            tracking = new
+                            {
+                                templateId = result.TemplateId,
+                                provider = result.Provider,
+                                model = result.Model,
+                                executionTimeMs = result.ExecutionTime.TotalMilliseconds
+                            }
+                        };
+                    }
+                }
+                
+                _logger.Warn("No valid JSON found in LLM response");
+                return new 
+                { 
+                    success = false, 
+                    error = "No valid JSON found",
+                    details = "The LLM response did not contain valid JSON",
+                    confidence = result.Confidence,
+                    isFallback = result.IsFallback,
+                    timestamp = result.Timestamp,
+                    tracking = new
+                    {
+                        templateId = result.TemplateId,
+                        provider = result.Provider,
+                        model = result.Model,
+                        executionTimeMs = result.ExecutionTime.TotalMilliseconds
+                    }
+                };
             }
             catch (Exception ex)
             {
                 _logger.Error($"Error parsing structured response: {ex.Message}", ex);
-                return null;
+                _logger.Error($"Raw content that failed to parse: {result.Content}");
+                return new 
+                { 
+                    success = false, 
+                    error = "JSON parsing error",
+                    details = $"Failed to parse LLM response: {ex.Message}",
+                    confidence = result.Confidence,
+                    isFallback = result.IsFallback,
+                    timestamp = result.Timestamp,
+                    tracking = new
+                    {
+                        templateId = result.TemplateId,
+                        provider = result.Provider,
+                        model = result.Model,
+                        executionTimeMs = result.ExecutionTime.TotalMilliseconds
+                    }
+                };
             }
         }
     }

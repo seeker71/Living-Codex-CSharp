@@ -40,6 +40,7 @@ namespace CodexBootstrap.Modules
         private readonly IApiRouter _apiRouter;
         private readonly Timer _ingestionTimer;
         private readonly Timer _cleanupTimer;
+        private CrossModuleCommunicator? _moduleCommunicator;
         private readonly int _ingestionIntervalMinutes = 15;
         private readonly int _cleanupIntervalHours = 24;
         private readonly int _maxItemsPerSource = 50; // Increased from 10
@@ -52,6 +53,81 @@ namespace CodexBootstrap.Modules
         private const string FRACTAL_NEWS_NODE_TYPE = "codex.news.fractal";
         private const string NEWS_SUBSCRIPTION_NODE_TYPE = "codex.news.subscription";
 
+        // Lazy-loaded cross-module communicator
+        private CrossModuleCommunicator ModuleCommunicator => _moduleCommunicator ??= new CrossModuleCommunicator();
+
+        // AI Module call templates
+        private static class AIModuleTemplates
+        {
+            public static async Task<ConceptExtractionResult?> ExtractConceptsAsync(
+                CrossModuleCommunicator communicator, 
+                string content, 
+                int maxConcepts = 5)
+            {
+                var request = new
+                {
+                    content = content,
+                    maxConcepts = maxConcepts
+                };
+
+                return await communicator.CallModuleAsync<object, ConceptExtractionResult>(
+                    "ai", "extract-concepts", request);
+            }
+
+            public static async Task<ScoringAnalysisResult?> AnalyzeScoringAsync(
+                CrossModuleCommunicator communicator, 
+                string content, 
+                string analysisType = "relevance")
+            {
+                var request = new
+                {
+                    content = content,
+                    analysisType = analysisType,
+                    criteria = new[] { "relevance", "quality", "impact" }
+                };
+
+                return await communicator.CallModuleAsync<object, ScoringAnalysisResult>(
+                    "ai", "score-analysis", request);
+            }
+
+            public static async Task<FractalTransformResult?> TransformFractalAsync(
+                CrossModuleCommunicator communicator, 
+                string content)
+            {
+                var request = new
+                {
+                    content = content
+                };
+
+                return await communicator.CallModuleAsync<object, FractalTransformResult>(
+                    "ai", "fractal-transform", request);
+            }
+        }
+
+        // AI Module response types
+        private class ConceptExtractionResult
+        {
+            public List<string> Concepts { get; set; } = new();
+            public double Confidence { get; set; }
+            public List<string> OntologyLevels { get; set; } = new();
+        }
+
+        private class ScoringAnalysisResult
+        {
+            public double AbundanceScore { get; set; }
+            public double ConsciousnessScore { get; set; }
+            public double UnityScore { get; set; }
+            public double OverallScore { get; set; }
+        }
+
+        private class FractalTransformResult
+        {
+            public string Headline { get; set; } = "";
+            public string BeliefTranslation { get; set; } = "";
+            public string Summary { get; set; } = "";
+            public List<string> ImpactAreas { get; set; } = new();
+        }
+
         public RealtimeNewsStreamModule(NodeRegistry registry, HttpClient? httpClient = null, Core.ConfigurationManager? configManager = null, IApiRouter? apiRouter = null)
         {
             _logger = new Log4NetLogger(typeof(RealtimeNewsStreamModule));
@@ -59,6 +135,8 @@ namespace CodexBootstrap.Modules
             _httpClient = httpClient ?? new HttpClient();
             _configManager = configManager ?? new Core.ConfigurationManager(registry, new Log4NetLogger(typeof(Core.ConfigurationManager)));
             _apiRouter = apiRouter ?? throw new ArgumentNullException(nameof(apiRouter), "IApiRouter is required for AI module integration");
+            
+            // Cross-module communicator will be initialized lazily
             
             // Set up timers
             _ingestionTimer = new Timer(async _ => await IngestNewsFromSources(null), null, TimeSpan.Zero, TimeSpan.FromMinutes(_ingestionIntervalMinutes));
@@ -128,6 +206,7 @@ namespace CodexBootstrap.Modules
             _cleanupTimer?.Dispose();
             _httpClient?.Dispose();
             _semaphore?.Dispose();
+            _moduleCommunicator?.Dispose();
         }
 
         private void InitializeNewsSources()
@@ -251,10 +330,8 @@ namespace CodexBootstrap.Modules
             {
                 _logger.Info("Starting news ingestion from all sources");
 
-                // Get all active news source nodes - create a copy to avoid collection modification issues
                 var allSourceNodes = _registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE);
                 var sourceNodes = allSourceNodes
-                    .ToArray() // Create a copy to prevent collection modification during iteration
                     .Where(n => n.Meta?.ContainsKey("isActive") == true && (bool)n.Meta["isActive"])
                     .ToList();
 
@@ -283,40 +360,6 @@ namespace CodexBootstrap.Modules
                 }
 
                 _logger.Info("Completed news ingestion cycle");
-            }
-            catch (InvalidOperationException ex) when (ex.Message.Contains("Collection was modified"))
-            {
-                _logger.Warn($"Collection modification detected during news ingestion, retrying: {ex.Message}");
-                // Retry once after a short delay
-                await Task.Delay(100);
-                try
-                {
-                    var allSourceNodes = _registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE);
-                    var sourceNodes = allSourceNodes
-                        .ToArray()
-                        .Where(n => n.Meta?.ContainsKey("isActive") == true && (bool)n.Meta["isActive"])
-                        .ToList();
-                    
-                    foreach (var sourceNode in sourceNodes)
-                    {
-                        try
-                        {
-                            var source = JsonSerializer.Deserialize<NewsSource>(sourceNode.Content?.InlineJson ?? "{}");
-                            if (source != null)
-                            {
-                                await IngestNewsFromSourceAsync(source);
-                            }
-                        }
-                        catch (Exception innerEx)
-                        {
-                            _logger.Error($"Error processing source {sourceNode.Id}: {innerEx.Message}");
-                        }
-                    }
-                }
-                catch (Exception retryEx)
-                {
-                    _logger.Error($"Error during retry news ingestion: {retryEx.Message}", retryEx);
-                }
             }
             catch (Exception ex)
             {
@@ -609,91 +652,37 @@ namespace CodexBootstrap.Modules
             {
                 _logger.Debug($"Attempting AI concept extraction for news item: {newsItem.Title}");
 
-                // Call AI module via router API
-                var request = new
-                {
-                    title = newsItem.Title,
-                    content = newsItem.Content,
-                    categories = newsItem.Tags ?? Array.Empty<string>(),
-                    source = newsItem.Source,
-                    url = newsItem.Url
-                };
-
-                var result = _apiRouter.TryGetHandler("ai", "extract-concepts", out var handler);
-                if (!result)
-                {
-                    _logger.Warn($"AI handler 'ai.extract-concepts' not found, falling back to local extraction");
-                    return await FallbackConceptExtraction(newsItem);
-                }
-
-                if (handler == null)
-                {
-                    _logger.Warn($"AI handler 'ai.extract-concepts' is null, falling back to local extraction");
-                    return await FallbackConceptExtraction(newsItem);
-                }
-
-                _logger.Debug($"Calling AI module for concept extraction: {newsItem.Title}");
-                var response = await handler(JsonSerializer.SerializeToElement(request));
+                var content = newsItem.Title + " " + newsItem.Content;
+                var result = await AIModuleTemplates.ExtractConceptsAsync(ModuleCommunicator, content, 5);
                 
-                if (response == null)
+                if (result != null)
                 {
-                    _logger.Warn($"AI module returned null response for concept extraction: {newsItem.Title}");
-                    return await FallbackConceptExtraction(newsItem);
-                }
-
-                if (response is JsonElement jsonResponse)
-                {
-                    if (jsonResponse.TryGetProperty("success", out var success) && success.GetBoolean())
+                    _logger.Info($"AI concept extraction successful for: {newsItem.Title} (confidence: {result.Confidence})");
+                    
+                    return new ConceptAnalysis
                     {
-                        if (jsonResponse.TryGetProperty("concepts", out var concepts) && 
-                            jsonResponse.TryGetProperty("confidence", out var confidence) &&
-                            jsonResponse.TryGetProperty("ontologyLevels", out var ontologyLevels))
+                        Id = $"concept-{Guid.NewGuid():N}",
+                        NewsItemId = newsItem.Id,
+                        Concepts = result.Concepts,
+                        Confidence = result.Confidence,
+                        OntologyLevels = result.OntologyLevels,
+                        ExtractedAt = DateTimeOffset.UtcNow,
+                        Metadata = new Dictionary<string, object>
                         {
-                            _logger.Info($"AI concept extraction successful for: {newsItem.Title} (confidence: {confidence.GetDouble()})");
-                            
-                            // Create ConceptAnalysis from response
-                            return new ConceptAnalysis
-                            {
-                                Id = $"concept-{Guid.NewGuid():N}",
-                                NewsItemId = newsItem.Id,
-                                Concepts = concepts.EnumerateArray().Select(c => c.GetString() ?? "").ToList(),
-                                Confidence = confidence.GetDouble(),
-                                OntologyLevels = ontologyLevels.EnumerateArray().Select(o => o.GetString() ?? "").ToList(),
-                                ExtractedAt = DateTimeOffset.UtcNow,
-                                Metadata = new Dictionary<string, object>
-                                {
-                                    ["source"] = "ai-module",
-                                    ["originalTitle"] = newsItem.Title,
-                                    ["processingTime"] = DateTimeOffset.UtcNow
-                                }
-                            };
+                            ["source"] = "ai-module",
+                            ["originalTitle"] = newsItem.Title,
+                            ["processingTime"] = DateTimeOffset.UtcNow
                         }
-                        else
-                        {
-                            _logger.Warn($"AI module response missing required fields for concept extraction: {newsItem.Title}");
-                        }
-                    }
-                    else
-                    {
-                        _logger.Warn($"AI module returned error for concept extraction: {newsItem.Title}");
-                        if (jsonResponse.TryGetProperty("error", out var error))
-                        {
-                            _logger.Warn($"AI module error: {error.GetString()}");
-                        }
-                    }
+                    };
                 }
                 else
                 {
-                    _logger.Warn($"AI module returned unexpected response type for concept extraction: {newsItem.Title}");
+                    _logger.Warn($"AI module returned null result for concept extraction: {newsItem.Title}");
                 }
-            }
-            catch (JsonException ex)
-            {
-                _logger.Error($"JSON serialization/deserialization error in AI concept extraction for {newsItem.Title}: {ex.Message}", ex);
             }
             catch (Exception ex)
             {
-                _logger.Error($"Unexpected error calling AI module for concept extraction {newsItem.Title}: {ex.Message}", ex);
+                _logger.Error($"Error in AI concept extraction for {newsItem.Title}: {ex.Message}", ex);
             }
 
             _logger.Info($"Falling back to local concept extraction for: {newsItem.Title}");
@@ -706,98 +695,39 @@ namespace CodexBootstrap.Modules
             {
                 _logger.Debug($"Attempting AI scoring analysis for news item: {newsItem.Title}");
 
-                // Call AI module via router API
-                var request = new
-                {
-                    conceptAnalysis = conceptAnalysis,
-                    content = new
-                    {
-                        title = newsItem.Title,
-                        content = newsItem.Content,
-                        categories = newsItem.Tags ?? Array.Empty<string>(),
-                        source = newsItem.Source,
-                        url = newsItem.Url
-                    }
-                };
-
-                var result = _apiRouter.TryGetHandler("ai", "score-analysis", out var handler);
-                if (!result)
-                {
-                    _logger.Warn($"AI handler 'ai.score-analysis' not found, falling back to local analysis");
-                    return await FallbackScoringAnalysis(conceptAnalysis, newsItem);
-                }
-
-                if (handler == null)
-                {
-                    _logger.Warn($"AI handler 'ai.score-analysis' is null, falling back to local analysis");
-                    return await FallbackScoringAnalysis(conceptAnalysis, newsItem);
-                }
-
-                _logger.Debug($"Calling AI module for scoring analysis: {newsItem.Title}");
-                var response = await handler(JsonSerializer.SerializeToElement(request));
+                var content = newsItem.Title + " " + newsItem.Content;
+                var result = await AIModuleTemplates.AnalyzeScoringAsync(ModuleCommunicator, content, "relevance");
                 
-                if (response == null)
+                if (result != null)
                 {
-                    _logger.Warn($"AI module returned null response for scoring analysis: {newsItem.Title}");
-                    return await FallbackScoringAnalysis(conceptAnalysis, newsItem);
-                }
-
-                if (response is JsonElement jsonResponse)
-                {
-                    if (jsonResponse.TryGetProperty("success", out var success) && success.GetBoolean())
+                    _logger.Info($"AI scoring analysis successful for: {newsItem.Title} (overall: {result.OverallScore})");
+                    
+                    return new ScoringAnalysis
                     {
-                        if (jsonResponse.TryGetProperty("abundanceScore", out var abundanceScore) &&
-                            jsonResponse.TryGetProperty("consciousnessScore", out var consciousnessScore) &&
-                            jsonResponse.TryGetProperty("unityScore", out var unityScore) &&
-                            jsonResponse.TryGetProperty("overallScore", out var overallScore))
+                        Id = $"scoring-{Guid.NewGuid():N}",
+                        NewsItemId = newsItem.Id,
+                        ConceptAnalysisId = conceptAnalysis.Id,
+                        AbundanceScore = result.AbundanceScore,
+                        ConsciousnessScore = result.ConsciousnessScore,
+                        UnityScore = result.UnityScore,
+                        OverallScore = result.OverallScore,
+                        ScoredAt = DateTimeOffset.UtcNow,
+                        Metadata = new Dictionary<string, object>
                         {
-                            _logger.Info($"AI scoring analysis successful for: {newsItem.Title} (overall: {overallScore.GetDouble()})");
-                            
-                            // Create ScoringAnalysis from response
-                            return new ScoringAnalysis
-                            {
-                                Id = $"scoring-{Guid.NewGuid():N}",
-                                NewsItemId = newsItem.Id,
-                                ConceptAnalysisId = conceptAnalysis.Id,
-                                AbundanceScore = abundanceScore.GetDouble(),
-                                ConsciousnessScore = consciousnessScore.GetDouble(),
-                                UnityScore = unityScore.GetDouble(),
-                                OverallScore = overallScore.GetDouble(),
-                                ScoredAt = DateTimeOffset.UtcNow,
-                                Metadata = new Dictionary<string, object>
-                                {
-                                    ["source"] = "ai-module",
-                                    ["originalTitle"] = newsItem.Title,
-                                    ["processingTime"] = DateTimeOffset.UtcNow
-                                }
-                            };
+                            ["source"] = "ai-module",
+                            ["originalTitle"] = newsItem.Title,
+                            ["processingTime"] = DateTimeOffset.UtcNow
                         }
-                        else
-                        {
-                            _logger.Warn($"AI module response missing required fields for scoring analysis: {newsItem.Title}");
-                        }
-                    }
-                    else
-                    {
-                        _logger.Warn($"AI module returned error for scoring analysis: {newsItem.Title}");
-                        if (jsonResponse.TryGetProperty("error", out var error))
-                        {
-                            _logger.Warn($"AI module error: {error.GetString()}");
-                        }
-                    }
+                    };
                 }
                 else
                 {
-                    _logger.Warn($"AI module returned unexpected response type for scoring analysis: {newsItem.Title}");
+                    _logger.Warn($"AI module returned null result for scoring analysis: {newsItem.Title}");
                 }
-            }
-            catch (JsonException ex)
-            {
-                _logger.Error($"JSON serialization/deserialization error in AI scoring analysis for {newsItem.Title}: {ex.Message}", ex);
             }
             catch (Exception ex)
             {
-                _logger.Error($"Unexpected error calling AI module for scoring analysis {newsItem.Title}: {ex.Message}", ex);
+                _logger.Error($"Error in AI scoring analysis for {newsItem.Title}: {ex.Message}", ex);
             }
 
             _logger.Info($"Falling back to local scoring analysis for: {newsItem.Title}");
@@ -810,102 +740,42 @@ namespace CodexBootstrap.Modules
             {
                 _logger.Debug($"Attempting AI fractal transformation for news item: {newsItem.Title}");
 
-                // Call AI module via router API
-                var request = new
-                {
-                    content = new
-                    {
-                        title = newsItem.Title,
-                        content = newsItem.Content,
-                        categories = newsItem.Tags ?? Array.Empty<string>(),
-                        source = newsItem.Source,
-                        url = newsItem.Url
-                    },
-                    conceptAnalysis = conceptAnalysis,
-                    scoringAnalysis = scoringAnalysis
-                };
-
-                var result = _apiRouter.TryGetHandler("ai", "fractal-transform", out var handler);
-                if (!result)
-                {
-                    _logger.Warn($"AI handler 'ai.fractal-transform' not found, falling back to local transformation");
-                    return await FallbackFractalTransformation(newsItem, conceptAnalysis, scoringAnalysis);
-                }
-
-                if (handler == null)
-                {
-                    _logger.Warn($"AI handler 'ai.fractal-transform' is null, falling back to local transformation");
-                    return await FallbackFractalTransformation(newsItem, conceptAnalysis, scoringAnalysis);
-                }
-
-                _logger.Debug($"Calling AI module for fractal transformation: {newsItem.Title}");
-                var response = await handler(JsonSerializer.SerializeToElement(request));
+                var content = newsItem.Title + " " + newsItem.Content;
+                var result = await AIModuleTemplates.TransformFractalAsync(ModuleCommunicator, content);
                 
-                if (response == null)
+                if (result != null)
                 {
-                    _logger.Warn($"AI module returned null response for fractal transformation: {newsItem.Title}");
-                    return await FallbackFractalTransformation(newsItem, conceptAnalysis, scoringAnalysis);
-                }
-
-                if (response is JsonElement jsonResponse)
-                {
-                    if (jsonResponse.TryGetProperty("success", out var success) && success.GetBoolean())
+                    _logger.Info($"AI fractal transformation successful for: {newsItem.Title}");
+                    
+                    return new FractalTransformation
                     {
-                        if (jsonResponse.TryGetProperty("headline", out var headline) &&
-                            jsonResponse.TryGetProperty("beliefTranslation", out var beliefTranslation) &&
-                            jsonResponse.TryGetProperty("summary", out var summary) &&
-                            jsonResponse.TryGetProperty("impactAreas", out var impactAreas))
+                        Id = $"fractal-{Guid.NewGuid():N}",
+                        NewsItemId = newsItem.Id,
+                        Headline = result.Headline,
+                        BeliefSystemTranslation = result.BeliefTranslation,
+                        Summary = result.Summary,
+                        ImpactAreas = result.ImpactAreas.ToArray(),
+                        AmplificationFactors = new Dictionary<string, double> { { "resonance", 0.8 } },
+                        ResonanceData = new Dictionary<string, object>(),
+                        TransformationType = "consciousness-expansion",
+                        ConsciousnessLevel = "L5",
+                        TransformedAt = DateTimeOffset.UtcNow,
+                        Metadata = new Dictionary<string, object>
                         {
-                            _logger.Info($"AI fractal transformation successful for: {newsItem.Title}");
-                            
-                            // Create FractalTransformation from response
-                            return new FractalTransformation
-                            {
-                                Id = $"fractal-{Guid.NewGuid():N}",
-                                NewsItemId = newsItem.Id,
-                                Headline = headline.GetString() ?? newsItem.Title,
-                                BeliefSystemTranslation = beliefTranslation.GetString() ?? newsItem.Content,
-                                Summary = summary.GetString() ?? newsItem.Content,
-                                ImpactAreas = impactAreas.EnumerateArray().Select(a => a.GetString() ?? "").ToArray(),
-                                AmplificationFactors = new Dictionary<string, double> { { "resonance", 0.8 } },
-                                ResonanceData = new Dictionary<string, object>(),
-                                TransformationType = "consciousness-expansion",
-                                ConsciousnessLevel = "L5",
-                                TransformedAt = DateTimeOffset.UtcNow,
-                                Metadata = new Dictionary<string, object>
-                                {
-                                    ["source"] = "ai-module",
-                                    ["originalTitle"] = newsItem.Title,
-                                    ["processingTime"] = DateTimeOffset.UtcNow
-                                }
-                            };
+                            ["source"] = "ai-module",
+                            ["originalTitle"] = newsItem.Title,
+                            ["processingTime"] = DateTimeOffset.UtcNow
                         }
-                        else
-                        {
-                            _logger.Warn($"AI module response missing required fields for fractal transformation: {newsItem.Title}");
-                        }
-                    }
-                    else
-                    {
-                        _logger.Warn($"AI module returned error for fractal transformation: {newsItem.Title}");
-                        if (jsonResponse.TryGetProperty("error", out var error))
-                        {
-                            _logger.Warn($"AI module error: {error.GetString()}");
-                        }
-                    }
+                    };
                 }
                 else
                 {
-                    _logger.Warn($"AI module returned unexpected response type for fractal transformation: {newsItem.Title}");
+                    _logger.Warn($"AI module returned null result for fractal transformation: {newsItem.Title}");
                 }
-            }
-            catch (JsonException ex)
-            {
-                _logger.Error($"JSON serialization/deserialization error in AI fractal transformation for {newsItem.Title}: {ex.Message}", ex);
             }
             catch (Exception ex)
             {
-                _logger.Error($"Unexpected error calling AI module for fractal transformation {newsItem.Title}: {ex.Message}", ex);
+                _logger.Error($"Error in AI fractal transformation for {newsItem.Title}: {ex.Message}", ex);
             }
 
             _logger.Info($"Falling back to local fractal transformation for: {newsItem.Title}");
