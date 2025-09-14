@@ -12,7 +12,7 @@ public sealed class CoreApiService
 {
     private readonly NodeRegistry _registry;
     private readonly IApiRouter _router;
-    private readonly Core.ILogger _logger;
+    private readonly Core.ICodexLogger _logger;
 
     public CoreApiService(NodeRegistry registry, IApiRouter router)
     {

@@ -22,7 +22,7 @@ public sealed class SpecModule : IModule
 {
     private readonly IApiRouter _apiRouter;
     private readonly NodeRegistry _registry;
-    private readonly Core.ILogger _logger;
+    private readonly Core.ICodexLogger _logger;
 
     public SpecModule(IApiRouter apiRouter, NodeRegistry registry)
     {

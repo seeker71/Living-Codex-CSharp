@@ -13,7 +13,7 @@ namespace CodexBootstrap.Modules;
 /// </summary>
 public sealed class RealtimeModule : IModule
 {
-    private readonly Core.ILogger _logger;
+    private readonly Core.ICodexLogger _logger;
     private readonly NodeRegistry _registry;
     private readonly ConcurrentDictionary<string, WebSocket> _webSockets = new();
     private readonly ConcurrentDictionary<string, HashSet<string>> _subscriptions = new();
@@ -556,7 +556,7 @@ public sealed class RealtimeModule : IModule
 [ResponseType("codex.realtime.hub", "RealtimeHub", "SignalR Hub for real-time communication")]
 public class RealtimeHub : Hub
 {
-    private readonly Core.ILogger _logger;
+    private readonly Core.ICodexLogger _logger;
     private readonly NodeRegistry _registry;
     private readonly RealtimeModule _realtimeModule;
 

@@ -1,6 +1,8 @@
 using System.Text;
 using System.Text.Json;
 using LivingCodexMobile.Models;
+using Microsoft.Maui.Authentication.WebAuthenticator;
+using System.Web;
 
 namespace LivingCodexMobile.Services;
 
@@ -59,26 +61,76 @@ public class AuthenticationService : IAuthenticationService
     {
         try
         {
-            // Create a Google user for demonstration
-            var googleUser = new User
+            // Get OAuth providers from backend
+            var providersResponse = await GetAvailableProvidersAsync();
+            var googleProvider = providersResponse.Providers.FirstOrDefault(p => p.Provider == "google");
+            
+            if (googleProvider == null || !googleProvider.IsEnabled)
             {
-                Id = Guid.NewGuid().ToString(),
-                Username = "google_user",
-                Email = "user@gmail.com",
-                DisplayName = "Google Test User",
-                CreatedAt = DateTime.UtcNow,
-                LastActive = DateTime.UtcNow,
-                Permissions = new List<string> { "read", "write", "contribute" }
-            };
+                System.Diagnostics.Debug.WriteLine("Google OAuth not available");
+                return false;
+            }
 
-            _currentUser = googleUser;
-            _isAuthenticated = true;
-            
-            AuthenticationStateChanged?.Invoke(this, true);
-            UserLoggedIn?.Invoke(this, googleUser);
-            
-            System.Diagnostics.Debug.WriteLine("Google login successful!");
-            return true;
+            // Start OAuth challenge with backend
+            var challengeUrl = $"http://localhost:5002/oauth/challenge/google";
+            var callbackUrl = "livingcodex://oauth-callback";
+
+            var authResult = await WebAuthenticator.AuthenticateAsync(
+                new WebAuthenticatorOptions
+                {
+                    Url = new Uri(challengeUrl),
+                    CallbackUrl = new Uri(callbackUrl),
+                    PrefersEphemeralWebBrowserSession = false
+                });
+
+            if (authResult?.Properties != null)
+            {
+                // Extract user info from OAuth result
+                var userId = authResult.Properties.TryGetValue("user_id", out var uid) ? uid : Guid.NewGuid().ToString();
+                var email = authResult.Properties.TryGetValue("email", out var em) ? em : "user@gmail.com";
+                var name = authResult.Properties.TryGetValue("name", out var nm) ? nm : "Google User";
+                var accessToken = authResult.Properties.TryGetValue("access_token", out var token) ? token : "";
+
+                // Validate with backend
+                var validationRequest = new OAuthValidationRequest
+                {
+                    Provider = "google",
+                    Secret = "google_client_secret", // In production, get from secure storage
+                    UserId = userId,
+                    Email = email,
+                    Name = name
+                };
+
+                var validationResponse = await ValidateOAuthWithBackendAsync(validationRequest);
+                
+                if (validationResponse?.Success == true)
+                {
+                    // Create user from OAuth data
+                    var googleUser = new User
+                    {
+                        Id = userId,
+                        Username = email.Split('@')[0],
+                        Email = email,
+                        DisplayName = name,
+                        CreatedAt = DateTime.UtcNow,
+                        LastActive = DateTime.UtcNow,
+                        Permissions = new List<string> { "read", "write", "contribute" },
+                        AvatarUrl = authResult.Properties.TryGetValue("picture", out var pic) ? pic : null
+                    };
+
+                    _currentUser = googleUser;
+                    _isAuthenticated = true;
+                    
+                    AuthenticationStateChanged?.Invoke(this, true);
+                    UserLoggedIn?.Invoke(this, googleUser);
+                    
+                    System.Diagnostics.Debug.WriteLine($"Google login successful for {email}!");
+                    return true;
+                }
+            }
+
+            System.Diagnostics.Debug.WriteLine("Google OAuth failed - no valid response");
+            return false;
         }
         catch (Exception ex)
         {
@@ -165,7 +217,16 @@ public class AuthenticationService : IAuthenticationService
     {
         try
         {
-            // Return available OAuth providers for demonstration
+            var response = await _httpClient.GetAsync("http://localhost:5002/oauth/providers");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var providersResponse = JsonSerializer.Deserialize<OAuthProvidersResponse>(content);
+                return providersResponse ?? new OAuthProvidersResponse(new List<OAuthProviderInfo>(), 0);
+            }
+            
+            // Fallback to demo providers if backend is not available
             var providers = new List<OAuthProviderInfo>
             {
                 new OAuthProviderInfo("google", "Google", "google_client_id", true),
@@ -186,6 +247,30 @@ public class AuthenticationService : IAuthenticationService
         // In a real app, you'd load from secure storage
         // For now, we'll just return null
         await Task.CompletedTask;
+    }
+
+    private async Task<OAuthCallbackResponse?> ValidateOAuthWithBackendAsync(OAuthValidationRequest request)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(request);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            
+            var response = await _httpClient.PostAsync("http://localhost:5002/oauth/validate", content);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var responseContent = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<OAuthCallbackResponse>(responseContent);
+            }
+            
+            return null;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"OAuth validation error: {ex.Message}");
+            return null;
+        }
     }
 }
 

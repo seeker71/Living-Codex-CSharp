@@ -33,7 +33,7 @@ namespace CodexBootstrap.Modules
     /// </summary>
     public class RealtimeNewsStreamModule : IModule, IHostedService
     {
-        private readonly Core.ILogger _logger;
+        private readonly Core.ICodexLogger _logger;
         private readonly NodeRegistry _registry;
         private readonly HttpClient _httpClient;
         private readonly Core.ConfigurationManager _configManager;
@@ -54,7 +54,7 @@ namespace CodexBootstrap.Modules
         private const string NEWS_SUBSCRIPTION_NODE_TYPE = "codex.news.subscription";
 
         // Lazy-loaded cross-module communicator
-        private CrossModuleCommunicator ModuleCommunicator => _moduleCommunicator ??= new CrossModuleCommunicator();
+        private CrossModuleCommunicator ModuleCommunicator => _moduleCommunicator ??= new CrossModuleCommunicator(_logger);
 
         // AI Module call templates
         private static class AIModuleTemplates
@@ -128,12 +128,12 @@ namespace CodexBootstrap.Modules
             public List<string> ImpactAreas { get; set; } = new();
         }
 
-        public RealtimeNewsStreamModule(NodeRegistry registry, HttpClient? httpClient = null, Core.ConfigurationManager? configManager = null, IApiRouter? apiRouter = null)
+        public RealtimeNewsStreamModule(NodeRegistry registry, ICodexLogger logger, HttpClient? httpClient = null, Core.ConfigurationManager? configManager = null, IApiRouter? apiRouter = null)
         {
-            _logger = new Log4NetLogger(typeof(RealtimeNewsStreamModule));
+            _logger = logger;
             _registry = registry;
             _httpClient = httpClient ?? new HttpClient();
-            _configManager = configManager ?? new Core.ConfigurationManager(registry, new Log4NetLogger(typeof(Core.ConfigurationManager)));
+            _configManager = configManager ?? new Core.ConfigurationManager(registry, logger);
             _apiRouter = apiRouter ?? throw new ArgumentNullException(nameof(apiRouter), "IApiRouter is required for AI module integration");
             
             // Cross-module communicator will be initialized lazily
@@ -144,7 +144,7 @@ namespace CodexBootstrap.Modules
         }
 
         // Parameterless constructor for module loader
-        public RealtimeNewsStreamModule() : this(new NodeRegistry(), new HttpClient(), new Core.ConfigurationManager(new NodeRegistry(), new Log4NetLogger(typeof(Core.ConfigurationManager))), new MockApiRouter())
+        public RealtimeNewsStreamModule() : this(new NodeRegistry(), new Log4NetLogger(typeof(RealtimeNewsStreamModule)), new HttpClient(), new Core.ConfigurationManager(new NodeRegistry(), new Log4NetLogger(typeof(Core.ConfigurationManager))), new MockApiRouter())
         {
         }
 

@@ -24,13 +24,13 @@ namespace CodexBootstrap.Core
         protected readonly NodeRegistry _nodeRegistry;
         protected readonly AttributeProcessor _attributeProcessor;
         protected readonly Dictionary<string, Node> _moduleNodes = new();
-        protected readonly ILogger _logger;
+        protected readonly ICodexLogger _logger;
 
-        public EnhancedModuleBase(NodeRegistry nodeRegistry)
+        public EnhancedModuleBase(NodeRegistry nodeRegistry, ICodexLogger logger)
         {
             _nodeRegistry = nodeRegistry ?? throw new ArgumentNullException(nameof(nodeRegistry));
             _attributeProcessor = new AttributeProcessor(nodeRegistry);
-            _logger = new Log4NetLogger(GetType());
+            _logger = logger;
             
             // Auto-process this module's attributes
             ProcessModuleAttributes();

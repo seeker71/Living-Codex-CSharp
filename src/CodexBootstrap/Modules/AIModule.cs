@@ -150,7 +150,7 @@ namespace CodexBootstrap.Modules
     public class AIModule : IModule
     {
         private readonly NodeRegistry _registry;
-        private readonly Core.ILogger _logger;
+        private readonly Core.ICodexLogger _logger;
         private readonly LLMOrchestrator _llmOrchestrator;
         private readonly PromptTemplateRepository _promptRepo;
 
@@ -158,7 +158,7 @@ namespace CodexBootstrap.Modules
         {
         }
 
-        public AIModule(NodeRegistry registry, Core.ILogger logger)
+        public AIModule(NodeRegistry registry, Core.ICodexLogger logger)
         {
             _registry = registry;
             _logger = logger;
@@ -269,31 +269,22 @@ IMPORTANT: Return ONLY a valid JSON array, no markdown, no explanations, no addi
                 new PromptTemplate(
                     Id: "fractal-transformation",
                     Name: "Fractal Transformation",
-                    Template: @"Transform the following content into a structured analysis format.
+                    Template: @"You are a JSON API. You must respond with ONLY valid JSON. No markdown, no explanations, no other text.
 
-Content: ""{content}""
-Analysis Level: {consciousnessLevel}
+Transform this content: ""{content}""
 
-You must return a JSON object with these exact fields:
-- headline: A transformed headline for the content
-- beliefTranslation: How this content translates to belief systems
-- summary: A transformed summary of the content
-- impactAreas: An array of impact areas (e.g., [""Technology"", ""Environment""])
-- consciousnessLevel: A level from L1 to L7
-- resonanceFrequency: A number between 0.0 and 1.0
-- unityScore: A number between 0.0 and 1.0
-
-CRITICAL: Return ONLY a valid JSON object. Do NOT return an array. Do NOT include markdown. Do NOT include explanations.
-
+Return this exact JSON structure:
 {
-  ""headline"": ""Your transformed headline here"",
-  ""beliefTranslation"": ""Your belief translation here"",
-  ""summary"": ""Your transformed summary here"",
-  ""impactAreas"": [""Area1"", ""Area2""],
+  ""headline"": ""transformed headline"",
+  ""beliefTranslation"": ""how this translates to belief systems"",
+  ""summary"": ""transformed summary"",
+  ""impactAreas"": [""area1"", ""area2""],
   ""consciousnessLevel"": ""L3"",
   ""resonanceFrequency"": 0.8,
   ""unityScore"": 0.7
-}",
+}
+
+RESPOND WITH ONLY THE JSON OBJECT. NO OTHER TEXT.",
                     DefaultParameters: new Dictionary<string, object> 
                     { 
                         ["content"] = "", 

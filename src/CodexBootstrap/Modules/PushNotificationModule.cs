@@ -11,7 +11,7 @@ namespace CodexBootstrap.Modules;
 /// </summary>
 public sealed class PushNotificationModule : IModule
 {
-    private readonly Core.ILogger _logger;
+    private readonly Core.ICodexLogger _logger;
     private readonly NodeRegistry _registry;
     private readonly RealtimeModule? _realtimeModule;
     private readonly ConcurrentDictionary<string, NotificationSubscription> _subscriptions = new();

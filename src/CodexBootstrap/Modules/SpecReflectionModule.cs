@@ -13,7 +13,7 @@ public record IngestResponse(ModuleSpec Spec, bool Success, string Message);
 public sealed class SpecReflectionModule : IModule
 {
     private readonly NodeRegistry _registry;
-    private readonly Core.ILogger _logger;
+    private readonly Core.ICodexLogger _logger;
 
     public SpecReflectionModule(NodeRegistry registry)
     {

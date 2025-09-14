@@ -7,7 +7,7 @@ public sealed class RouteDiscovery
 {
     private readonly IApiRouter _router;
     private readonly NodeRegistry _registry;
-    private readonly Core.ILogger _logger;
+    private readonly Core.ICodexLogger _logger;
 
     public RouteDiscovery(IApiRouter router, NodeRegistry registry)
     {

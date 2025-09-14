@@ -12,7 +12,7 @@ namespace CodexBootstrap.Modules;
 /// </summary>
 public sealed class TemporalConsciousnessModule : IModule
 {
-    private readonly Core.ILogger _logger;
+    private readonly Core.ICodexLogger _logger;
     private readonly NodeRegistry _registry;
     private readonly ModuleCommunicationWrapper _communicationWrapper;
 

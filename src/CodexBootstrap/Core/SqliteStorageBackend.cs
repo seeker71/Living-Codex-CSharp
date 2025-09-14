@@ -11,7 +11,7 @@ public class SqliteStorageBackend : IStorageBackend
 {
     private readonly string _connectionString;
     private readonly JsonSerializerOptions _jsonOptions;
-    private readonly ILogger _logger;
+    private readonly ICodexLogger _logger;
 
     public SqliteStorageBackend(string connectionString = "Data Source=data/codex.db")
     {

@@ -11,7 +11,7 @@ namespace CodexBootstrap.Modules;
 /// </summary>
 public sealed class DigitalSignatureModule : IModule
 {
-    private readonly Core.ILogger _logger;
+    private readonly Core.ICodexLogger _logger;
     private const string SignatureKey = "digitalSignature";
     private const string PublicKeyKey = "publicKey";
     private const string AlgorithmKey = "signatureAlgorithm";

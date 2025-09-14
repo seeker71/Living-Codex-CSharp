@@ -54,11 +54,11 @@ public class InMemoryUserRepository : IUserRepository
     private readonly Dictionary<string, User> _users = new();
     private readonly Dictionary<string, string> _usernameIndex = new();
     private readonly Dictionary<string, string> _emailIndex = new();
-    private readonly ILogger _logger;
+    private readonly ICodexLogger _logger;
 
-    public InMemoryUserRepository()
+    public InMemoryUserRepository(ICodexLogger logger)
     {
-        _logger = new Log4NetLogger(typeof(InMemoryUserRepository));
+        _logger = logger;
     }
 
     public Task<User?> GetByIdAsync(string id)
@@ -152,11 +152,11 @@ public class InMemoryRoleRepository : IRoleRepository
 {
     private readonly Dictionary<string, Role> _roles = new();
     private readonly Dictionary<string, string> _nameIndex = new();
-    private readonly ILogger _logger;
+    private readonly ICodexLogger _logger;
 
-    public InMemoryRoleRepository()
+    public InMemoryRoleRepository(ICodexLogger logger)
     {
-        _logger = new Log4NetLogger(typeof(InMemoryRoleRepository));
+        _logger = logger;
     }
 
     public Task<Role?> GetByIdAsync(string id)
@@ -232,11 +232,11 @@ public class InMemoryPermissionRepository : IPermissionRepository
     private readonly Dictionary<string, Permission> _permissions = new();
     private readonly Dictionary<string, string> _resourceActionIndex = new();
     private readonly Dictionary<string, HashSet<string>> _userPermissions = new();
-    private readonly ILogger _logger;
+    private readonly ICodexLogger _logger;
 
-    public InMemoryPermissionRepository()
+    public InMemoryPermissionRepository(ICodexLogger logger)
     {
-        _logger = new Log4NetLogger(typeof(InMemoryPermissionRepository));
+        _logger = logger;
     }
 
     public Task<Permission?> GetByIdAsync(string id)

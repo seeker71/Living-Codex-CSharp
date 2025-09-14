@@ -13,9 +13,9 @@ namespace CodexBootstrap.Core
     {
         private readonly LLMClient _llmClient;
         private readonly PromptTemplateRepository _promptRepo;
-        private readonly Core.ILogger _logger;
+        private readonly Core.ICodexLogger _logger;
 
-        public LLMOrchestrator(LLMClient llmClient, PromptTemplateRepository promptRepo, Core.ILogger logger)
+        public LLMOrchestrator(LLMClient llmClient, PromptTemplateRepository promptRepo, Core.ICodexLogger logger)
         {
             _llmClient = llmClient;
             _promptRepo = promptRepo;
@@ -51,7 +51,7 @@ namespace CodexBootstrap.Core
 
                 var response = await _llmClient.QueryAsync(prompt, config);
                 var executionTime = DateTimeOffset.UtcNow - startTime;
-                
+
                 return new LLMOperationResult(
                     Success: true,
                     Content: response.Response,
@@ -74,12 +74,26 @@ namespace CodexBootstrap.Core
         }
 
         /// <summary>
+        /// Execute an LLM operation and parse to type T
+        /// </summary>
+        public async Task<T?> ExecuteAsync<T>(string templateId, Dictionary<string, object> parameters, CodexBootstrap.Modules.LLMConfig? overrideConfig = null) where T : class
+        {
+            var result = await ExecuteAsync(templateId, parameters, overrideConfig);
+            var parsed = ParseStructuredResponse<T>(result, templateId);
+            if (parsed is T typedResult)
+            {
+                return typedResult;
+            }
+            return default;
+        }
+
+        /// <summary>
         /// Execute multiple LLM operations in parallel
         /// </summary>
         public async Task<Dictionary<string, LLMOperationResult>> ExecuteParallelAsync(Dictionary<string, (string templateId, Dictionary<string, object> parameters)> operations)
         {
             var tasks = new Dictionary<string, Task<LLMOperationResult>>();
-            
+
             foreach (var operation in operations)
             {
                 tasks[operation.Key] = ExecuteAsync(operation.Value.templateId, operation.Value.parameters);
@@ -101,15 +115,15 @@ namespace CodexBootstrap.Core
         {
             _logger.Debug($"ParseStructuredResponse called for type {typeof(T).Name}");
             _logger.Debug($"ParseStructuredResponse: Success={result.Success}, Content='{result.Content}', ContentLength={result.Content?.Length ?? 0}");
-            
+
             // Handle LLM operation failure
             if (!result.Success)
             {
                 var errorMessage = result.Error ?? "Unknown LLM operation error";
                 _logger.Error($"LLM operation failed{(operationName != null ? $" for {operationName}" : "")}: {errorMessage}");
-                return new 
-                { 
-                    success = false, 
+                return new
+                {
+                    success = false,
                     error = errorMessage,
                     details = "LLM operation failed",
                     confidence = result.Confidence,
@@ -129,9 +143,9 @@ namespace CodexBootstrap.Core
             if (string.IsNullOrEmpty(result.Content))
             {
                 _logger.Debug("ParseStructuredResponse: content is empty");
-                return new 
-                { 
-                    success = false, 
+                return new
+                {
+                    success = false,
                     error = "Empty LLM response",
                     details = "The LLM returned an empty response",
                     confidence = result.Confidence,
@@ -152,59 +166,112 @@ namespace CodexBootstrap.Core
                 // Extract JSON from response
                 var content = result.Content;
                 _logger.Debug($"Raw LLM response: {content}");
-                
+
                 // Try multiple extraction strategies
                 string? jsonToParse = null;
-                
-                // Strategy 1: Look for JSON array in markdown code blocks
-                var codeBlockMatch = System.Text.RegularExpressions.Regex.Match(content, @"```(?:json)?\s*(\[.*?\])\s*```", System.Text.RegularExpressions.RegexOptions.Singleline);
-                if (codeBlockMatch.Success)
+
+                // Determine if we're expecting an array or object based on the type
+                bool expectingArray = typeof(T).IsArray || (typeof(T).IsGenericType && typeof(T).GetGenericTypeDefinition() == typeof(List<>));
+                _logger.Debug($"JSON extraction: expectingArray = {expectingArray}, type = {typeof(T).Name}");
+
+                if (expectingArray)
                 {
-                    jsonToParse = codeBlockMatch.Groups[1].Value.Trim();
-                    _logger.Debug($"Extracted JSON from code block: {jsonToParse}");
-                }
-                else
-                {
-                    // Strategy 2: Look for JSON array directly
-                    var jsonStart = content.IndexOf('[');
-                    var jsonEnd = content.LastIndexOf(']') + 1;
-                    
-                    if (jsonStart >= 0 && jsonEnd > jsonStart)
+                    // Strategy 1: Look for JSON array in markdown code blocks
+                    var arrayCodeBlockMatch = System.Text.RegularExpressions.Regex.Match(content, @"```(?:json)?\s*(\[.*?\])\s*```", System.Text.RegularExpressions.RegexOptions.Singleline);
+                    if (arrayCodeBlockMatch.Success)
                     {
-                        jsonToParse = content.Substring(jsonStart, jsonEnd - jsonStart);
-                        _logger.Debug($"Extracted JSON array: {jsonToParse}");
+                        jsonToParse = arrayCodeBlockMatch.Groups[1].Value.Trim();
+                        _logger.Debug($"Extracted JSON array from code block: {jsonToParse}");
                     }
                     else
                     {
-                        // Strategy 3: Look for JSON object
-                        var objStart = content.IndexOf('{');
-                        var objEnd = content.LastIndexOf('}') + 1;
-                        
-                        if (objStart >= 0 && objEnd > objStart)
+                        // Strategy 2: Look for JSON array directly
+                        var jsonStart = content.IndexOf('[');
+                        var jsonEnd = content.LastIndexOf(']') + 1;
+
+                        if (jsonStart >= 0 && jsonEnd > jsonStart)
                         {
-                            jsonToParse = content.Substring(objStart, objEnd - objStart);
-                            _logger.Debug($"Extracted JSON object: {jsonToParse}");
+                            jsonToParse = content.Substring(jsonStart, jsonEnd - jsonStart);
+                            _logger.Debug($"Extracted JSON array: {jsonToParse}");
                         }
                         else
                         {
-                            // Strategy 4: Try parsing the entire content as JSON
+                            // Strategy 3: Try parsing the entire content as JSON
                             jsonToParse = content.Trim();
                             _logger.Debug($"Trying to parse entire content as JSON: {jsonToParse}");
                         }
                     }
                 }
-                
+                else
+                {
+                    // Strategy 1: Look for JSON object in markdown code blocks
+                    var objectCodeBlockMatch = System.Text.RegularExpressions.Regex.Match(content, @"```(?:json)?\s*(\{.*\})\s*```", System.Text.RegularExpressions.RegexOptions.Singleline);
+                    if (objectCodeBlockMatch.Success)
+                    {
+                        jsonToParse = objectCodeBlockMatch.Groups[1].Value.Trim();
+                        _logger.Debug($"Extracted JSON object from code block: {jsonToParse}");
+                    }
+                    else
+                    {
+                        // Strategy 2: Look for JSON object directly
+                        var objStart = content.IndexOf('{');
+                        _logger.Debug($"Object extraction: objStart = {objStart}");
+                        if (objStart >= 0)
+                        {
+                            // Find the matching closing brace by counting braces
+                            var braceCount = 0;
+                            var objEnd = objStart;
+                            for (int i = objStart; i < content.Length; i++)
+                            {
+                                if (content[i] == '{')
+                                    braceCount++;
+                                else if (content[i] == '}')
+                                {
+                                    braceCount--;
+                                    if (braceCount == 0)
+                                    {
+                                        objEnd = i + 1;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            _logger.Debug($"Object extraction: objEnd = {objEnd}, braceCount = {braceCount}");
+                            if (objEnd > objStart)
+                            {
+                                jsonToParse = content.Substring(objStart, objEnd - objStart);
+                                _logger.Debug($"Extracted JSON object: {jsonToParse}");
+                            }
+                            else
+                            {
+                                _logger.Debug("Object extraction failed: objEnd <= objStart");
+                            }
+                        }
+                        else
+                        {
+                            _logger.Debug("Object extraction failed: no opening brace found");
+                        }
+
+                        if (jsonToParse == null)
+                        {
+                            // Strategy 3: Try parsing the entire content as JSON
+                            jsonToParse = content.Trim();
+                            _logger.Debug($"Trying to parse entire content as JSON: {jsonToParse}");
+                        }
+                    }
+                }
+
                 if (!string.IsNullOrEmpty(jsonToParse))
                 {
                     _logger.Debug($"Attempting to deserialize JSON: {jsonToParse}");
-                    
+
                     // Check if we're expecting an object but got an array
                     if (jsonToParse.TrimStart().StartsWith("[") && !typeof(T).IsArray && !typeof(T).IsGenericType)
                     {
                         _logger.Warn($"Expected object type {typeof(T).Name} but received JSON array. Rejecting response.");
-                        return new 
-                        { 
-                            success = false, 
+                        return new
+                        {
+                            success = false,
                             error = $"Expected JSON object but received array",
                             details = $"The LLM returned a JSON array but we expected a {typeof(T).Name} object",
                             confidence = result.Confidence,
@@ -219,14 +286,14 @@ namespace CodexBootstrap.Core
                             }
                         };
                     }
-                    
+
                     var deserializedResult = JsonSerializer.Deserialize<T>(jsonToParse);
                     if (deserializedResult == null)
                     {
                         _logger.Warn($"Deserialization returned null for type {typeof(T).Name}");
-                        return new 
-                        { 
-                            success = false, 
+                        return new
+                        {
+                            success = false,
                             error = $"Failed to deserialize {typeof(T).Name}",
                             details = "The LLM returned valid JSON but deserialization failed. Check logs for details.",
                             confidence = result.Confidence,
@@ -261,11 +328,11 @@ namespace CodexBootstrap.Core
                         };
                     }
                 }
-                
+
                 _logger.Warn("No valid JSON found in LLM response");
-                return new 
-                { 
-                    success = false, 
+                return new
+                {
+                    success = false,
                     error = "No valid JSON found",
                     details = "The LLM response did not contain valid JSON",
                     confidence = result.Confidence,
@@ -284,9 +351,9 @@ namespace CodexBootstrap.Core
             {
                 _logger.Error($"Error parsing structured response: {ex.Message}", ex);
                 _logger.Error($"Raw content that failed to parse: {result.Content}");
-                return new 
-                { 
-                    success = false, 
+                return new
+                {
+                    success = false,
                     error = "JSON parsing error",
                     details = $"Failed to parse LLM response: {ex.Message}",
                     confidence = result.Confidence,

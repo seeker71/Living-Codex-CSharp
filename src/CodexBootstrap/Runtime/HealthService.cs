@@ -9,7 +9,7 @@ namespace CodexBootstrap.Runtime;
 public sealed class HealthService
 {
     private readonly NodeRegistry _registry;
-    private readonly Core.ILogger _logger;
+    private readonly Core.ICodexLogger _logger;
     private readonly DateTime _startTime;
     private long _requestCount;
     private readonly object _lock = new object();

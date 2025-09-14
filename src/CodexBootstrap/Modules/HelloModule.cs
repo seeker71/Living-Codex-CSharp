@@ -84,6 +84,19 @@ public sealed class HelloModule : IModule
         _registry.Upsert(node);
         return await Task.FromResult<object>(new SuccessResponse($"Hello, {name}! NodeId={node.Id}"));
     }
+
+    /// <summary>
+    /// Hot-reload test endpoint - added to test module reloading
+    /// </summary>
+    [ApiRoute("GET", "/hello/hot-reload-test", "hot-reload-test", "Tests hot-reload functionality", "codex.hello")]
+    public async Task<object> HotReloadTestAsync()
+    {
+        return await Task.FromResult<object>(new {
+            message = "Hot-reload test endpoint - successfully reloaded!",
+            timestamp = DateTime.UtcNow,
+            version = "1.0.1"
+        });
+    }
 }
 
 /// <summary>

@@ -13,17 +13,17 @@ namespace CodexBootstrap.Core;
 public class JwtAuthenticationService : IAuthenticationService
 {
     private readonly IUserRepository _userRepository;
-    private readonly ILogger _logger;
+    private readonly ICodexLogger _logger;
     private readonly JwtSettings _jwtSettings;
     private readonly Dictionary<string, string> _refreshTokens = new();
     private readonly HashSet<string> _revokedTokens = new();
     private readonly Dictionary<string, PasswordResetInfo> _passwordResetTokens = new();
 
-    public JwtAuthenticationService(IUserRepository userRepository, JwtSettings jwtSettings)
+    public JwtAuthenticationService(IUserRepository userRepository, JwtSettings jwtSettings, ICodexLogger logger)
     {
         _userRepository = userRepository;
         _jwtSettings = jwtSettings;
-        _logger = new Log4NetLogger(typeof(JwtAuthenticationService));
+        _logger = logger;
     }
 
     public async Task<AuthenticationResult> AuthenticateAsync(string username, string password)

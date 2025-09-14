@@ -8,12 +8,12 @@ namespace CodexBootstrap.Core;
 public class AuthorizationMiddleware
 {
     private readonly RequestDelegate _next;
-    private readonly ILogger _logger;
+    private readonly ICodexLogger _logger;
 
-    public AuthorizationMiddleware(RequestDelegate next)
+    public AuthorizationMiddleware(RequestDelegate next, ICodexLogger logger)
     {
         _next = next;
-        _logger = new Log4NetLogger(typeof(AuthorizationMiddleware));
+        _logger = logger;
     }
 
     public async Task InvokeAsync(HttpContext context, IAuthenticationService authService, IAuthorizationService authzService)

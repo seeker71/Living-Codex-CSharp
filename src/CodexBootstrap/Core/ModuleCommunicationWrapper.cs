@@ -16,11 +16,11 @@ namespace CodexBootstrap.Core
     public class ModuleCommunicationWrapper
     {
         private readonly HttpClient _httpClient;
-        private readonly ILogger _logger;
+        private readonly ICodexLogger _logger;
         private readonly string _baseUrl;
         private readonly JsonSerializerOptions _jsonOptions;
 
-        public ModuleCommunicationWrapper(ILogger logger, string baseUrl = null)
+        public ModuleCommunicationWrapper(ICodexLogger logger, string baseUrl = null)
         {
             _httpClient = new HttpClient();
             _logger = logger;

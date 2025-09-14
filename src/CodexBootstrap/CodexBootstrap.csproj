@@ -7,6 +7,15 @@
     <NoWarn>$(NoWarn);CS1998;CS8625;CS8603;CS8604;CS8601;CS8602;CS0114</NoWarn>
     <UseAppHost>true</UseAppHost>
     <EnableHotReload>true</EnableHotReload>
+    <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+    <HotReloadProfile>aspnetcore</HotReloadProfile>
+    <UseRidGraph>false</UseRidGraph>
+  </PropertyGroup>
+  
+  <!-- Release configuration - disable PDB generation to prevent file locks -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="FluentValidation" Version="11.8.0" />
@@ -17,13 +26,15 @@
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="6.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.WebSockets" Version="2.2.0" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="7.0.0" />
-    <PackageReference Include="Nethereum.Web3" Version="4.15.0" />
+    <PackageReference Include="Nethereum.Web3" Version="4.16.0" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.14.0" />
     <PackageReference Include="System.ServiceModel.Syndication" Version="6.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="6.0.0" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
+    <PackageReference Include="Microsoft.SemanticKernel" Version="1.65.0" />
     <PackageReference Include="System.Reactive" Version="5.0.0" />
-    <PackageReference Include="System.Text.Json" Version="6.0.0" />
+    <PackageReference Include="System.Text.Json" Version="8.0.6" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="6.0.0" />

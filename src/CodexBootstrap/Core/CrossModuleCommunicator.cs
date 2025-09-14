@@ -14,12 +14,12 @@ namespace CodexBootstrap.Core
     /// </summary>
     public class CrossModuleCommunicator
     {
-        private readonly ILogger _logger;
+        private readonly ICodexLogger _logger;
         private readonly HttpClient _httpClient;
 
-        public CrossModuleCommunicator()
+        public CrossModuleCommunicator(ICodexLogger logger)
         {
-            _logger = new Log4NetLogger(typeof(CrossModuleCommunicator));
+            _logger = logger;
             _httpClient = new HttpClient();
         }
 

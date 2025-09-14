@@ -7,10 +7,10 @@ namespace CodexBootstrap.Core
     public class GeocodingService
     {
         private readonly HttpClient _httpClient;
-        private readonly ILogger _logger;
+        private readonly ICodexLogger _logger;
         private readonly string _apiKey;
 
-        public GeocodingService(HttpClient httpClient, ILogger logger)
+        public GeocodingService(HttpClient httpClient, ICodexLogger logger)
         {
             _httpClient = httpClient;
             _logger = logger;

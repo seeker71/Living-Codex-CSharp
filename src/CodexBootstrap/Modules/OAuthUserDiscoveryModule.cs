@@ -103,14 +103,17 @@ public record ConceptContributorsResponse(
 public sealed class OAuthUserDiscoveryModule : IModule
 {
     private readonly NodeRegistry _registry;
-    private readonly CodexBootstrap.Core.ILogger _logger;
+    private readonly CodexBootstrap.Core.ICodexLogger _logger;
     private readonly HttpClient _httpClient;
+    private readonly Dictionary<string, OAuthState> _oauthStates = new();
+    private readonly string _baseUrl;
 
-    public OAuthUserDiscoveryModule(NodeRegistry registry, CodexBootstrap.Core.ILogger logger, HttpClient httpClient)
+    public OAuthUserDiscoveryModule(NodeRegistry registry, CodexBootstrap.Core.ICodexLogger logger, HttpClient httpClient)
     {
         _registry = registry;
         _logger = logger;
         _httpClient = httpClient;
+        _baseUrl = Environment.GetEnvironmentVariable("BASE_URL") ?? "http://localhost:5002";
     }
 
     // Parameterless constructor for module loader
@@ -304,6 +307,376 @@ public sealed class OAuthUserDiscoveryModule : IModule
         {
             _logger.Error($"Error finding concept contributors: {ex.Message}");
             return new ConceptContributorsResponse(conceptId, new List<ConceptContributor>(), 0, new Dictionary<string, int>());
+        }
+    }
+
+    // OAuth Login Endpoints
+    [ApiRoute("GET", "/oauth/google/login", "Google OAuth Login", "Initiate Google OAuth login", "codex.oauth-discovery")]
+    public async Task<object> GoogleLoginAsync([ApiParameter("returnUrl", "URL to return to after login", Required = false, Location = "query")] string? returnUrl = null)
+    {
+        try
+        {
+            var state = Guid.NewGuid().ToString();
+            var redirectUrl = $"/oauth/google/callback?state={state}";
+            
+            if (!string.IsNullOrEmpty(returnUrl))
+            {
+                redirectUrl += $"&returnUrl={Uri.EscapeDataString(returnUrl)}";
+            }
+
+            // Store state for validation
+            _oauthStates[state] = new OAuthState(
+                State: state,
+                Provider: "google",
+                CreatedAt: DateTime.UtcNow,
+                ReturnUrl: returnUrl
+            );
+
+            return new OAuthLoginResponse("google", redirectUrl, state);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Google OAuth login initiation error: {ex.Message}", ex);
+            return new { success = false, error = "Failed to initiate Google login" };
+        }
+    }
+
+    [ApiRoute("GET", "/oauth/google/callback", "Google OAuth Callback", "Handle Google OAuth callback", "codex.oauth-discovery")]
+    public async Task<object> GoogleCallbackAsync(
+        [ApiParameter("code", "Authorization code from Google", Required = true, Location = "query")] string code,
+        [ApiParameter("state", "State parameter for validation", Required = true, Location = "query")] string state,
+        [ApiParameter("returnUrl", "URL to return to after login", Required = false, Location = "query")] string? returnUrl = null)
+    {
+        try
+        {
+            // Validate state
+            if (!_oauthStates.TryGetValue(state, out var oauthState) || 
+                oauthState.CreatedAt < DateTime.UtcNow.AddMinutes(-10))
+            {
+                return new OAuthCallbackResponse("google", false, Error: "Invalid or expired state");
+            }
+
+            // Exchange code for token
+            var tokenResponse = await ExchangeCodeForTokenAsync(code, "google");
+            if (tokenResponse == null)
+            {
+                return new OAuthCallbackResponse("google", false, Error: "Failed to exchange code for token");
+            }
+
+            // Get user info from Google
+            var userInfo = await GetGoogleUserInfoAsync(tokenResponse.AccessToken);
+            if (userInfo == null)
+            {
+                return new OAuthCallbackResponse("google", false, Error: "Failed to get user info from Google");
+            }
+
+            // Create or update user in our system
+            var userId = await CreateOrUpdateOAuthUserAsync("google", userInfo);
+
+            // Clean up state
+            _oauthStates.Remove(state);
+
+            return new OAuthCallbackResponse("google", true, userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Google OAuth callback error: {ex.Message}", ex);
+            return new OAuthCallbackResponse("google", false, Error: "OAuth callback failed");
+        }
+    }
+
+    [ApiRoute("GET", "/news/feed/{userId}", "Get User News Feed", "Get personalized news feed for a user", "codex.oauth-discovery")]
+    public async Task<object> GetUserNewsFeedAsync([ApiParameter("userId", "User ID", Required = true, Location = "path")] string userId)
+    {
+        try
+        {
+            // Get user node
+            var userNode = _registry.GetNode($"user.{userId}");
+            if (userNode == null)
+            {
+                return new { success = false, error = "User not found" };
+            }
+
+            // Create a personalized news feed showcasing platform capabilities
+            var newsFeed = new List<NewsItem>
+            {
+                new NewsItem
+                {
+                    Id = "welcome-1",
+                    Title = "Welcome to Living Codex! 🌟",
+                    Content = "You've just joined a revolutionary platform that connects consciousness, knowledge, and collective intelligence. Explore the infinite possibilities of fractal-based knowledge systems.",
+                    Source = "Living Codex Platform",
+                    Url = "https://livingcodex.com/welcome",
+                    PublishedAt = DateTimeOffset.UtcNow,
+                    Tags = new[] { "welcome", "platform", "consciousness" },
+                    Metadata = new Dictionary<string, object> { ["type"] = "welcome", ["priority"] = 1 }
+                },
+                new NewsItem
+                {
+                    Id = "feature-1",
+                    Title = "Discover the U-CORE Framework",
+                    Content = "The Universal Consciousness Resonance Engine (U-CORE) powers our platform. Learn how fractal nodes and harmonic resonance create living knowledge systems.",
+                    Source = "Living Codex Platform",
+                    Url = "https://livingcodex.com/ucore",
+                    PublishedAt = DateTimeOffset.UtcNow.AddMinutes(-5),
+                    Tags = new[] { "ucore", "framework", "knowledge" },
+                    Metadata = new Dictionary<string, object> { ["type"] = "feature", ["priority"] = 2 }
+                },
+                new NewsItem
+                {
+                    Id = "concept-1",
+                    Title = "Explore Concept Resonance",
+                    Content = "Find concepts that resonate with your interests. Our AI-powered system matches you with knowledge that amplifies your consciousness and growth.",
+                    Source = "Living Codex Platform",
+                    Url = "https://livingcodex.com/concepts",
+                    PublishedAt = DateTimeOffset.UtcNow.AddMinutes(-10),
+                    Tags = new[] { "concepts", "resonance", "ai" },
+                    Metadata = new Dictionary<string, object> { ["type"] = "concept", ["priority"] = 3 }
+                },
+                new NewsItem
+                {
+                    Id = "community-1",
+                    Title = "Connect with Like-Minded Souls",
+                    Content = "Discover users with similar interests, locations, and contributions. Build meaningful connections in our conscious community.",
+                    Source = "Living Codex Platform",
+                    Url = "https://livingcodex.com/community",
+                    PublishedAt = DateTimeOffset.UtcNow.AddMinutes(-15),
+                    Tags = new[] { "community", "connection", "discovery" },
+                    Metadata = new Dictionary<string, object> { ["type"] = "community", ["priority"] = 4 }
+                },
+                new NewsItem
+                {
+                    Id = "news-1",
+                    Title = "Latest Platform Updates",
+                    Content = "We've just released new features including real-time collaboration, advanced concept mapping, and enhanced OAuth integration. Stay tuned for more!",
+                    Source = "Living Codex Platform",
+                    Url = "https://livingcodex.com/updates",
+                    PublishedAt = DateTimeOffset.UtcNow.AddMinutes(-20),
+                    Tags = new[] { "updates", "features", "collaboration" },
+                    Metadata = new Dictionary<string, object> { ["type"] = "update", ["priority"] = 5 }
+                }
+            };
+
+            return new
+            {
+                success = true,
+                userId = userId,
+                feed = newsFeed,
+                totalItems = newsFeed.Count,
+                lastUpdated = DateTime.UtcNow
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error getting news feed for user {userId}: {ex.Message}", ex);
+            return new { success = false, error = "Failed to get news feed" };
+        }
+    }
+
+    [ApiRoute("POST", "/oauth/validate", "Validate OAuth User", "Validate OAuth user and return user info", "codex.oauth-discovery")]
+    public async Task<object> ValidateOAuthUserAsync([ApiParameter("request", "OAuth validation request", Required = true, Location = "body")] OAuthValidationRequest request)
+    {
+        try
+        {
+            // Validate the OAuth user
+            var user = await ValidateOAuthUserAsync(request.Provider, request.UserId, request.Email, request.Name);
+            
+            if (user != null)
+            {
+                return new
+                {
+                    success = true,
+                    user = new
+                    {
+                        id = user.Id,
+                        username = user.Username,
+                        email = user.Email,
+                        displayName = user.DisplayName,
+                        avatarUrl = user.AvatarUrl,
+                        createdAt = user.CreatedAt,
+                        isActive = user.IsActive
+                    }
+                };
+            }
+            else
+            {
+                return new { success = false, error = "Invalid OAuth user" };
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"OAuth validation error: {ex.Message}", ex);
+            return new { success = false, error = "OAuth validation failed" };
+        }
+    }
+
+    // OAuth Helper Methods
+    private async Task<TokenResponse?> ExchangeCodeForTokenAsync(string code, string provider)
+    {
+        try
+        {
+            var clientId = Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID");
+            var clientSecret = Environment.GetEnvironmentVariable("GOOGLE_CLIENT_SECRET");
+            
+            if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(clientSecret))
+            {
+                _logger.Error("Google OAuth credentials not configured");
+                return null;
+            }
+
+            var tokenUrl = "https://oauth2.googleapis.com/token";
+            var parameters = new Dictionary<string, string>
+            {
+                ["client_id"] = clientId,
+                ["client_secret"] = clientSecret,
+                ["code"] = code,
+                ["grant_type"] = "authorization_code",
+                ["redirect_uri"] = $"{_baseUrl}/oauth/google/callback"
+            };
+
+            var content = new FormUrlEncodedContent(parameters);
+            var response = await _httpClient.PostAsync(tokenUrl, content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                var tokenData = JsonSerializer.Deserialize<TokenResponse>(responseContent);
+                return tokenData;
+            }
+            else
+            {
+                _logger.Error($"Token exchange failed: {responseContent}");
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error exchanging code for token: {ex.Message}", ex);
+            return null;
+        }
+    }
+
+    private async Task<GoogleUserInfo?> GetGoogleUserInfoAsync(string accessToken)
+    {
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, "https://www.googleapis.com/oauth2/v2/userinfo");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+
+            var response = await _httpClient.SendAsync(request);
+            var content = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                return JsonSerializer.Deserialize<GoogleUserInfo>(content);
+            }
+            else
+            {
+                _logger.Error($"Failed to get Google user info: {content}");
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error getting Google user info: {ex.Message}", ex);
+            return null;
+        }
+    }
+
+    private async Task<string> CreateOrUpdateOAuthUserAsync(string provider, GoogleUserInfo userInfo)
+    {
+        try
+        {
+            var userId = $"oauth-{provider}-{userInfo.Id}";
+            var existingUser = _registry.GetNode($"user.{userId}");
+
+            if (existingUser == null)
+            {
+                // Create new user node
+                var userNode = new Node(
+                    Id: $"user.{userId}",
+                    TypeId: "codex.user",
+                    State: ContentState.Ice,
+                    Locale: "en",
+                    Title: userInfo.Name ?? "OAuth User",
+                    Description: $"User authenticated via {provider}",
+                    Content: new ContentRef(
+                        MediaType: "application/json",
+                        InlineJson: JsonSerializer.Serialize(new
+                        {
+                            provider = provider,
+                            providerId = userInfo.Id,
+                            email = userInfo.Email,
+                            name = userInfo.Name,
+                            picture = userInfo.Picture,
+                            createdAt = DateTime.UtcNow,
+                            isActive = true
+                        }),
+                        InlineBytes: null,
+                        ExternalUri: null
+                    ),
+                    Meta: new Dictionary<string, object>
+                    {
+                        ["username"] = userInfo.Email?.Split('@')[0] ?? userId,
+                        ["email"] = userInfo.Email ?? "",
+                        ["displayName"] = userInfo.Name ?? "OAuth User",
+                        ["avatarUrl"] = userInfo.Picture ?? "",
+                        ["provider"] = provider,
+                        ["providerId"] = userInfo.Id,
+                        ["createdAt"] = DateTime.UtcNow,
+                        ["updatedAt"] = DateTime.UtcNow,
+                        ["status"] = "active",
+                        ["isActive"] = true
+                    }
+                );
+
+                _registry.Upsert(userNode);
+                _logger.Info($"Created new OAuth user: {userId}");
+            }
+            else
+            {
+                // Update existing user
+                existingUser.Meta["updatedAt"] = DateTime.UtcNow;
+                existingUser.Meta["avatarUrl"] = userInfo.Picture ?? existingUser.Meta.GetValueOrDefault("avatarUrl", "");
+                _registry.Upsert(existingUser);
+                _logger.Info($"Updated existing OAuth user: {userId}");
+            }
+
+            return userId;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error creating/updating OAuth user: {ex.Message}", ex);
+            throw;
+        }
+    }
+
+    private async Task<OAuthUser?> ValidateOAuthUserAsync(string provider, string userId, string email, string name)
+    {
+        try
+        {
+            var userNodeId = $"user.oauth-{provider}-{userId}";
+            var userNode = _registry.GetNode(userNodeId);
+
+            if (userNode != null)
+            {
+                return new OAuthUser(
+                    Id: userNodeId,
+                    Username: userNode.Meta.GetValueOrDefault("username", "").ToString() ?? "",
+                    Email: userNode.Meta.GetValueOrDefault("email", "").ToString() ?? "",
+                    DisplayName: userNode.Meta.GetValueOrDefault("displayName", "").ToString() ?? "",
+                    AvatarUrl: userNode.Meta.GetValueOrDefault("avatarUrl", "").ToString(),
+                    CreatedAt: (DateTime)userNode.Meta.GetValueOrDefault("createdAt", DateTime.UtcNow),
+                    IsActive: (bool)userNode.Meta.GetValueOrDefault("isActive", true)
+                );
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error validating OAuth user: {ex.Message}", ex);
+            return null;
         }
     }
 
@@ -806,3 +1179,18 @@ public sealed class OAuthUserDiscoveryModule : IModule
         }
     }
 }
+
+// OAuth Data Structures
+[MetaNode(Id = "codex.oauth.token-response", Name = "Token Response", Description = "OAuth token response")]
+public record TokenResponse(string AccessToken, string TokenType, int ExpiresIn, string? RefreshToken = null, string? Scope = null);
+
+[MetaNode(Id = "codex.oauth.google-user-info", Name = "Google User Info", Description = "User information from Google OAuth")]
+public record GoogleUserInfo(string Id, string Email, string Name, string? Picture = null, bool? VerifiedEmail = null);
+
+[MetaNode(Id = "codex.oauth.oauth-user", Name = "OAuth User", Description = "OAuth user information")]
+public record OAuthUser(string Id, string Username, string Email, string DisplayName, string? AvatarUrl, DateTime CreatedAt, bool IsActive);
+
+[MetaNode(Id = "codex.oauth.oauth-state", Name = "OAuth State", Description = "OAuth state for validation")]
+public record OAuthState(string State, string Provider, DateTime CreatedAt, string? ReturnUrl = null);
+
+// Note: OAuthValidationRequest and NewsItem are already defined in other modules

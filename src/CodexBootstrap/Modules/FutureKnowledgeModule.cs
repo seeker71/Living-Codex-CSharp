@@ -12,7 +12,7 @@ public class FutureKnowledgeModule : IModule
     private readonly IApiRouter _apiRouter;
     private readonly NodeRegistry _registry;
     private CoreApiService? _coreApiService;
-    private readonly CodexBootstrap.Core.ILogger _logger;
+    private readonly CodexBootstrap.Core.ICodexLogger _logger;
 
     public FutureKnowledgeModule(IApiRouter apiRouter, NodeRegistry registry)
     {

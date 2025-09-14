@@ -10,17 +10,18 @@ public class RoleBasedAuthorizationService : IAuthorizationService
     private readonly IUserRepository _userRepository;
     private readonly IRoleRepository _roleRepository;
     private readonly IPermissionRepository _permissionRepository;
-    private readonly ILogger _logger;
+    private readonly ICodexLogger _logger;
 
     public RoleBasedAuthorizationService(
         IUserRepository userRepository,
         IRoleRepository roleRepository,
-        IPermissionRepository permissionRepository)
+        IPermissionRepository permissionRepository,
+        ICodexLogger logger)
     {
         _userRepository = userRepository;
         _roleRepository = roleRepository;
         _permissionRepository = permissionRepository;
-        _logger = new Log4NetLogger(typeof(RoleBasedAuthorizationService));
+        _logger = logger;
     }
 
     public async Task<bool> HasPermissionAsync(string userId, string resource, string action)

@@ -11,7 +11,7 @@ public record HydrateNodeResponse(string NodeId, object Content, bool Success, s
 public sealed class HydrateModule : IModule
 {
     private readonly NodeRegistry _registry;
-    private readonly Core.ILogger _logger;
+    private readonly Core.ICodexLogger _logger;
 
     public HydrateModule(NodeRegistry registry)
     {

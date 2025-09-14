@@ -12,7 +12,7 @@ public sealed class ModuleLoader
     private readonly IApiRouter _router;
     private readonly IServiceProvider _serviceProvider;
     private readonly List<IModule> _loadedModules = new();
-    private readonly Core.ILogger _logger;
+    private readonly Core.ICodexLogger _logger;
 
     public ModuleLoader(NodeRegistry registry, IApiRouter router, IServiceProvider serviceProvider)
     {

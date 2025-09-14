@@ -194,7 +194,7 @@ public class NodeRegistry
 public sealed class ApiRouter : IApiRouter
 {
     private readonly Dictionary<(string module, string api), Func<JsonElement?, Task<object>>> _handlers = new();
-    private readonly Core.ILogger _logger;
+    private readonly Core.ICodexLogger _logger;
     private readonly NodeRegistry _registry;
     
     public ApiRouter(NodeRegistry registry)

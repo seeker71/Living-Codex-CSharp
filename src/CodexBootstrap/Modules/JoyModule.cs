@@ -16,7 +16,7 @@ namespace CodexBootstrap.Modules;
 public class JoyModule : IModule
 {
     private readonly NodeRegistry _registry;
-    private readonly CodexBootstrap.Core.ILogger _logger;
+    private readonly CodexBootstrap.Core.ICodexLogger _logger;
 
     public JoyModule(NodeRegistry registry)
     {

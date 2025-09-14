@@ -4,9 +4,9 @@ using log4net;
 namespace CodexBootstrap.Core
 {
     /// <summary>
-    /// Log4Net implementation of ILogger
+    /// Log4Net implementation of ICodexLogger
     /// </summary>
-    public class Log4NetLogger : ILogger
+    public class Log4NetLogger : ICodexLogger
     {
         private readonly ILog _logger;
 

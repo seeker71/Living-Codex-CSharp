@@ -151,56 +151,142 @@ public class UserModule : IModule
     // API Implementation Methods
     private Task<object> CreateUser(UserCreateRequest request, NodeRegistry registry)
     {
-        // Create user node
-        var userNode = new Node(
-            Id: $"user.{request.Username}",
-            TypeId: "codex.user",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: request.Username,
-            Description: $"User account for {request.Username}",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    username = request.Username,
-                    email = request.Email,
-                    displayName = request.DisplayName,
-                    createdAt = DateTime.UtcNow
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
+        try
+        {
+            // Check if user already exists
+            var existingUser = registry.GetNode($"user.{request.Username}");
+            if (existingUser != null)
             {
-                ["username"] = request.Username,
-                ["email"] = request.Email,
-                ["displayName"] = request.DisplayName,
-                ["createdAt"] = DateTime.UtcNow,
-                ["status"] = "active"
+                return Task.FromResult<object>(new UserCreateResponse(
+                    Success: false,
+                    UserId: null,
+                    Message: "User already exists"
+                ));
             }
-        );
 
-        // Store the user node in the registry
-        registry.Upsert(userNode);
+            // Hash password
+            var passwordHash = HashPassword(request.Password);
 
-        return Task.FromResult<object>(new UserCreateResponse(
-            Success: true,
-            UserId: userNode.Id,
-            Message: "User created successfully"
-        ));
+            // Create user node
+            var userNode = new Node(
+                Id: $"user.{request.Username}",
+                TypeId: "codex.user",
+                State: ContentState.Ice,
+                Locale: "en",
+                Title: request.Username,
+                Description: $"User account for {request.Username}",
+                Content: new ContentRef(
+                    MediaType: "application/json",
+                    InlineJson: JsonSerializer.Serialize(new
+                    {
+                        username = request.Username,
+                        email = request.Email,
+                        displayName = request.DisplayName,
+                        createdAt = DateTime.UtcNow,
+                        isActive = true
+                    }),
+                    InlineBytes: null,
+                    ExternalUri: null
+                ),
+                Meta: new Dictionary<string, object>
+                {
+                    ["username"] = request.Username,
+                    ["email"] = request.Email,
+                    ["displayName"] = request.DisplayName,
+                    ["passwordHash"] = passwordHash,
+                    ["createdAt"] = DateTime.UtcNow,
+                    ["updatedAt"] = DateTime.UtcNow,
+                    ["status"] = "active",
+                    ["isActive"] = true
+                }
+            );
+
+            // Store the user node in the registry
+            registry.Upsert(userNode);
+
+            // Create email index edge for fast lookup
+            var emailIndexEdge = new Edge(
+                FromId: "email-index",
+                ToId: userNode.Id,
+                Role: "email-index",
+                Weight: 1.0,
+                Meta: new Dictionary<string, object>
+                {
+                    ["email"] = request.Email,
+                    ["username"] = request.Username
+                }
+            );
+            registry.Upsert(emailIndexEdge);
+
+            return Task.FromResult<object>(new UserCreateResponse(
+                Success: true,
+                UserId: userNode.Id,
+                Message: "User created successfully"
+            ));
+        }
+        catch (Exception ex)
+        {
+            return Task.FromResult<object>(new UserCreateResponse(
+                Success: false,
+                UserId: null,
+                Message: $"Error creating user: {ex.Message}"
+            ));
+        }
     }
 
     private Task<object> AuthenticateUser(UserAuthRequest request)
     {
-        // Simple authentication logic (in real implementation, use proper auth)
-        var isValid = !string.IsNullOrEmpty(request.Username) && !string.IsNullOrEmpty(request.Password);
-        
-        return Task.FromResult<object>(new UserAuthResponse(
-            Success: isValid,
-            Token: isValid ? Guid.NewGuid().ToString() : null,
-            Message: isValid ? "Authentication successful" : "Invalid credentials"
-        ));
+        try
+        {
+            // Get user by username
+            var userNode = _registry.GetNode($"user.{request.Username}");
+            if (userNode == null)
+            {
+                return Task.FromResult<object>(new UserAuthResponse(
+                    Success: false,
+                    Token: null,
+                    Message: "Invalid credentials"
+                ));
+            }
+
+            // Check if user is active
+            if (!userNode.Meta.ContainsKey("isActive") || !(bool)userNode.Meta["isActive"])
+            {
+                return Task.FromResult<object>(new UserAuthResponse(
+                    Success: false,
+                    Token: null,
+                    Message: "Account is disabled"
+                ));
+            }
+
+            // Verify password
+            var storedHash = userNode.Meta["passwordHash"]?.ToString();
+            if (storedHash == null || !VerifyPassword(request.Password, storedHash))
+            {
+                return Task.FromResult<object>(new UserAuthResponse(
+                    Success: false,
+                    Token: null,
+                    Message: "Invalid credentials"
+                ));
+            }
+
+            // Generate token
+            var token = GenerateJwtToken(request.Username, userNode.Meta["email"]?.ToString() ?? "");
+
+            return Task.FromResult<object>(new UserAuthResponse(
+                Success: true,
+                Token: token,
+                Message: "Authentication successful"
+            ));
+        }
+        catch (Exception ex)
+        {
+            return Task.FromResult<object>(new UserAuthResponse(
+                Success: false,
+                Token: null,
+                Message: $"Authentication error: {ex.Message}"
+            ));
+        }
     }
 
     private Task<object> GetUserProfile(UserProfileRequest request, NodeRegistry registry)
@@ -299,6 +385,29 @@ public class UserModule : IModule
     {
         var request = new UserSessionsRequest(id);
         return await Task.FromResult(GetUserSessions(request));
+    }
+
+    // Helper methods
+    private string HashPassword(string password)
+    {
+        // In a real system, use proper password hashing like BCrypt or Argon2
+        // For now, we'll use a simple hash for demonstration
+        using var sha256 = System.Security.Cryptography.SHA256.Create();
+        var hashedBytes = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password + "salt"));
+        return Convert.ToBase64String(hashedBytes);
+    }
+
+    private bool VerifyPassword(string password, string hash)
+    {
+        var hashedPassword = HashPassword(password);
+        return hashedPassword == hash;
+    }
+
+    private string GenerateJwtToken(string username, string email)
+    {
+        // In a real system, generate a proper JWT token
+        // For now, we'll return a simple token for demonstration
+        return $"jwt-{username}-{email}-{DateTime.UtcNow.Ticks}";
     }
 }
 

@@ -9,15 +9,15 @@ public class PersistentNodeRegistry : NodeRegistry
 {
     private readonly IStorageBackend _storage;
     private readonly ICacheManager _cacheManager;
-    private readonly ILogger _logger;
+    private readonly ICodexLogger _logger;
     private readonly ReaderWriterLockSlim _lock = new();
     private bool _isInitialized = false;
 
-    public PersistentNodeRegistry(IStorageBackend storage)
+    public PersistentNodeRegistry(IStorageBackend storage, ICodexLogger logger)
     {
         _storage = storage;
-        _cacheManager = new NodeCacheManager(storage);
-        _logger = new Log4NetLogger(typeof(PersistentNodeRegistry));
+        _cacheManager = new NodeCacheManager(storage, logger);
+        _logger = logger;
     }
 
     public async Task InitializeAsync()

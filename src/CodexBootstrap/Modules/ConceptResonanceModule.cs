@@ -24,7 +24,7 @@ public record ResonanceCompareResponse(double CRK, double Dres, double DOTPhi, d
 public sealed class ConceptResonanceModule : IModule
 {
     private readonly NodeRegistry _registry;
-    private readonly CodexBootstrap.Core.ILogger _logger;
+    private readonly CodexBootstrap.Core.ICodexLogger _logger;
 
     // ====== Tunables: CRK tolerant kernels ======
     private const double SigmaOmega = 1e-2;   // frequency tolerance
@@ -38,7 +38,7 @@ public sealed class ConceptResonanceModule : IModule
     private const double OtStabilityFloor = 1e-12;
     private const double OtConvergenceTol = 1e-6;
 
-    public ConceptResonanceModule(NodeRegistry registry, CodexBootstrap.Core.ILogger logger /* HttpClient removed */)
+    public ConceptResonanceModule(NodeRegistry registry, CodexBootstrap.Core.ICodexLogger logger /* HttpClient removed */)
     {
         _registry = registry;
         _logger = logger;

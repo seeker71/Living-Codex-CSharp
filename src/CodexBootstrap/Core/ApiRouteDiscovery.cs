@@ -16,7 +16,7 @@ namespace CodexBootstrap.Core;
 /// </summary>
 public static class ApiRouteDiscovery
 {
-    private static readonly ILogger _logger = new Log4NetLogger(typeof(ApiRouteDiscovery));
+    private static readonly ICodexLogger _logger = new Log4NetLogger(typeof(ApiRouteDiscovery));
     private static readonly Dictionary<Type, object> _moduleInstances = new();
     private static IServiceProvider? ServiceProvider;
     /// <summary>

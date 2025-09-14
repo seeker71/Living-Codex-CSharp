@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="LivingCodexMobile.Views.NewsFeedPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:DataType="viewmodel:NewsFeedViewModel"
+             xmlns:viewmodel="clr-namespace:LivingCodexMobile.ViewModels"
+             xmlns:model="clr-namespace:LivingCodexMobile.Models"
+             Title="Living Codex News">
+
+    <RefreshView IsRefreshing="{Binding IsBusy}"
+                 Command="{Binding RefreshCommand}">
+        <ScrollView>
+            <StackLayout Padding="20" Spacing="20">
+                
+                <!-- Header with Energy Display -->
+                <Frame BackgroundColor="#E3F2FD"
+                       CornerRadius="15"
+                       Padding="20">
+                    <StackLayout>
+                        <Label Text="Collective Knowledge Energy"
+                               FontSize="18"
+                               FontAttributes="Bold"
+                               TextColor="#1976D2"
+                               HorizontalOptions="Center" />
+                        <Label Text="{Binding CollectiveEnergy, StringFormat='{0:F1} Hz'}"
+                               FontSize="32"
+                               FontAttributes="Bold"
+                               TextColor="#1976D2"
+                               HorizontalOptions="Center" />
+                        <Label Text="Resonating with 432Hz, 528Hz, 741Hz"
+                               FontSize="12"
+                               TextColor="Gray"
+                               HorizontalOptions="Center" />
+                    </StackLayout>
+                </Frame>
+
+                <!-- News Feed -->
+                <StackLayout>
+                    <Label Text="Resonant News Feed"
+                           FontSize="20"
+                           FontAttributes="Bold"
+                           Margin="0,10,0,15" />
+                    
+                    <CollectionView ItemsSource="{Binding NewsItems}">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="model:NewsItem">
+                                <Frame BackgroundColor="White"
+                                       CornerRadius="10"
+                                       Padding="15"
+                                       Margin="0,0,0,15"
+                                       HasShadow="True">
+                                    <StackLayout Spacing="10">
+                                        
+                                        <!-- News Header -->
+                                        <StackLayout Orientation="Horizontal" Spacing="10">
+                                            <Label Text="{Binding Source}"
+                                                   FontSize="12"
+                                                   TextColor="Gray"
+                                                   VerticalOptions="Center" />
+                                            <Label Text="•"
+                                                   FontSize="12"
+                                                   TextColor="Gray"
+                                                   VerticalOptions="Center" />
+                                            <Label Text="{Binding PublishedAt, StringFormat='{0:MMM dd, HH:mm}'}"
+                                                   FontSize="12"
+                                                   TextColor="Gray"
+                                                   VerticalOptions="Center" />
+                                        </StackLayout>
+
+                                        <!-- News Title -->
+                                        <Label Text="{Binding Title}"
+                                               FontSize="16"
+                                               FontAttributes="Bold"
+                                               MaxLines="2" />
+
+                                        <!-- News Content -->
+                                        <Label Text="{Binding Content}"
+                                               FontSize="14"
+                                               TextColor="DarkGray"
+                                               MaxLines="3" />
+
+                                        <!-- Categories -->
+                                        <CollectionView ItemsSource="{Binding Categories}"
+                                                       HeightRequest="30">
+                                            <CollectionView.ItemsLayout>
+                                                <LinearItemsLayout Orientation="Horizontal" />
+                                            </CollectionView.ItemsLayout>
+                                            <CollectionView.ItemTemplate>
+                                                <DataTemplate x:DataType="x:String">
+                                                    <Frame BackgroundColor="#F0F0F0"
+                                                           CornerRadius="12"
+                                                           Padding="8,4"
+                                                           Margin="0,0,5,0">
+                                                        <Label Text="{Binding .}"
+                                                               FontSize="10"
+                                                               TextColor="Gray" />
+                                                    </Frame>
+                                                </DataTemplate>
+                                            </CollectionView.ItemTemplate>
+                                        </CollectionView>
+
+                                        <!-- Resonance and Energy -->
+                                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto">
+                                            <StackLayout Grid.Column="0" Grid.Row="0">
+                                                <Label Text="Resonance"
+                                                       FontSize="12"
+                                                       TextColor="Gray" />
+                                                <Label Text="{Binding Resonance, StringFormat='{0:F1}'}"
+                                                       FontSize="18"
+                                                       FontAttributes="Bold"
+                                                       TextColor="#512BD4" />
+                                            </StackLayout>
+                                            <StackLayout Grid.Column="1" Grid.Row="0">
+                                                <Label Text="Energy"
+                                                       FontSize="12"
+                                                       TextColor="Gray" />
+                                                <Label Text="{Binding Energy, StringFormat='{0:F1}'}"
+                                                       FontSize="18"
+                                                       FontAttributes="Bold"
+                                                       TextColor="#7B1FA2" />
+                                            </StackLayout>
+                                        </Grid>
+
+                                        <!-- Action Buttons -->
+                                        <StackLayout Orientation="Horizontal" Spacing="10">
+                                            <Button Text="Analyze"
+                                                    Command="{Binding Source={x:RelativeSource AncestorType={x:Type viewmodel:NewsFeedViewModel}}, Path=AnalyzeNewsCommand}"
+                                                    CommandParameter="{Binding .}"
+                                                    BackgroundColor="#512BD4"
+                                                    TextColor="White"
+                                                    FontSize="12"
+                                                    HeightRequest="30"
+                                                    HorizontalOptions="FillAndExpand" />
+                                            <Button Text="Extract Concepts"
+                                                    Command="{Binding Source={x:RelativeSource AncestorType={x:Type viewmodel:NewsFeedViewModel}}, Path=ExtractConceptsCommand}"
+                                                    CommandParameter="{Binding .}"
+                                                    BackgroundColor="#7B1FA2"
+                                                    TextColor="White"
+                                                    FontSize="12"
+                                                    HeightRequest="30"
+                                                    HorizontalOptions="FillAndExpand" />
+                                        </StackLayout>
+
+                                    </StackLayout>
+                                </Frame>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </StackLayout>
+
+                <!-- Extracted Concepts Section -->
+                <StackLayout IsVisible="{Binding ExtractedConcepts.Count, Converter={StaticResource StringToBoolConverter}}">
+                    <Label Text="Extracted Concepts"
+                           FontSize="18"
+                           FontAttributes="Bold"
+                           Margin="0,20,0,15" />
+                    
+                    <CollectionView ItemsSource="{Binding ExtractedConcepts}">
+                        <CollectionView.ItemsLayout>
+                            <LinearItemsLayout Orientation="Horizontal" />
+                        </CollectionView.ItemsLayout>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="model:Concept">
+                                <Frame BackgroundColor="#F3E5F5"
+                                       CornerRadius="15"
+                                       Padding="12,6"
+                                       Margin="0,0,8,0">
+                                    <Label Text="{Binding Name}"
+                                           FontSize="12"
+                                           TextColor="#7B1FA2"
+                                           FontAttributes="Bold" />
+                                </Frame>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </StackLayout>
+
+            </StackLayout>
+        </ScrollView>
+    </RefreshView>
+
+</ContentPage>
+

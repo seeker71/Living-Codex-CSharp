@@ -9,15 +9,15 @@ public class DistributedCacheManager : ICacheManager
 {
     private readonly IDistributedStorageBackend _distributedStorage;
     private readonly ICacheManager _localCacheManager;
-    private readonly ILogger _logger;
+    private readonly ICodexLogger _logger;
     private readonly ConcurrentDictionary<string, Node> _distributedCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _cacheLock = new(1, 1);
 
-    public DistributedCacheManager(IDistributedStorageBackend distributedStorage, ICacheManager localCacheManager)
+    public DistributedCacheManager(IDistributedStorageBackend distributedStorage, ICacheManager localCacheManager, ICodexLogger logger)
     {
         _distributedStorage = distributedStorage;
         _localCacheManager = localCacheManager;
-        _logger = new Log4NetLogger(typeof(DistributedCacheManager));
+        _logger = logger;
     }
 
     public async Task InitializeAsync()

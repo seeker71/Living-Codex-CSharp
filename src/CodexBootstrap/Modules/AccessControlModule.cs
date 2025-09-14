@@ -11,7 +11,7 @@ namespace CodexBootstrap.Modules;
 /// </summary>
 public sealed class AccessControlModule : IModule
 {
-    private readonly Core.ILogger _logger;
+    private readonly Core.ICodexLogger _logger;
     private readonly Dictionary<string, Permission> _permissions = new();
     private readonly Dictionary<string, Role> _roles = new();
     private readonly Dictionary<string, List<string>> _userRoles = new();

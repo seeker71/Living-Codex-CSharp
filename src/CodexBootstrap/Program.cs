@@ -258,8 +258,9 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
         }
         
         // Register custom logger interface
-        builder.Services.AddSingleton<CodexBootstrap.Core.ILogger, Log4NetLogger>(sp => 
+        builder.Services.AddSingleton<CodexBootstrap.Core.ICodexLogger, Log4NetLogger>(sp => 
             new Log4NetLogger("Program"));
+
 
         // Register self-updating system services
         builder.Services.AddSingleton<ModuleCompiler>();
@@ -274,6 +275,9 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
         builder.Services.AddSingleton<DynamicAttributionSystem>();
         builder.Services.AddSingleton<EndpointGenerator>();
         builder.Services.AddSingleton<object>(sp => new object()); // Placeholder for UCoreResonanceEngine
+
+        // Register HttpClient for SecurityModule REST API calls
+        builder.Services.AddHttpClient<CodexBootstrap.Modules.SecurityModule>();
 
 // HTTP client for adapters
 builder.Services.AddHttpClient();
@@ -325,6 +329,7 @@ app.UseExceptionHandler(errorApp =>
 app.UseAuthentication();
 app.UseAuthorization();
 
+
 // Add Swagger middleware
 if (app.Environment.IsDevelopment())
 {
@@ -364,7 +369,7 @@ healthService.SetModuleLoader(moduleLoader);
 
 // Display comprehensive module loading summary
 var loadedModules = moduleLoader.GetLoadedModules();
-var logger = app.Services.GetRequiredService<ILogger<Program>>();
+ var logger = app.Services.GetRequiredService<ILogger<Program>>();
 logger.LogInformation("Module Loading Summary:");
 logger.LogInformation("  Successfully loaded: {ModuleCount} modules", loadedModules.Count);
 foreach (var module in loadedModules)
@@ -482,7 +487,27 @@ ApiRouteDiscovery.DiscoverAndRegisterRoutes(app, router, registry);
 // Note: Traditional route discovery is disabled to prevent duplicate route registration
 // routeDiscovery.DiscoverAndRegisterRoutes(app);
 
-app.Run();
+// Initialize port configuration service
+var portConfig = new PortConfigurationService(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "development");
+
+try
+{
+    // Validate port configuration
+    portConfig.ValidateConfiguration();
+    Console.WriteLine(portConfig.GetConfigurationSummary());
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Port configuration warning: {ex.Message}");
+    Console.WriteLine("Continuing with fallback configuration...");
+}
+
+// Get the configured port for this service
+var configuredPort = portConfig.GetPort("codex-bootstrap");
+var url = $"http://localhost:{configuredPort}";
+
+Console.WriteLine($"Starting Living Codex on {url}");
+app.Run(url);
 
 // Helper function to determine module status
 static string DetermineModuleStatus(IModule module)

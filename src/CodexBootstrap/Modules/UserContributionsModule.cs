@@ -15,7 +15,7 @@ namespace CodexBootstrap.Modules;
 /// </summary>
 public sealed class UserContributionsModule : IModule
 {
-    private readonly Core.ILogger _logger;
+    private readonly Core.ICodexLogger _logger;
     private readonly NodeRegistry _registry;
     private readonly Web3? _web3;
     private readonly ConcurrentDictionary<string, Contribution> _contributions = new();

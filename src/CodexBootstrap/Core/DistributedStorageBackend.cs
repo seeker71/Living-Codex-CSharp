@@ -12,7 +12,7 @@ public class DistributedStorageBackend : IDistributedStorageBackend
 {
     private readonly IStorageBackend _localBackend;
     private readonly HttpClient _httpClient;
-    private readonly ILogger _logger;
+    private readonly ICodexLogger _logger;
     private readonly ClusterConfig _clusterConfig;
     private readonly ConcurrentDictionary<string, NodeInfo> _clusterNodes = new();
     private readonly SemaphoreSlim _clusterLock = new(1, 1);
@@ -25,12 +25,13 @@ public class DistributedStorageBackend : IDistributedStorageBackend
     public DistributedStorageBackend(
         IStorageBackend localBackend, 
         ClusterConfig clusterConfig,
+        ICodexLogger logger,
         HttpClient? httpClient = null)
     {
         _localBackend = localBackend;
         _clusterConfig = clusterConfig;
         _httpClient = httpClient ?? new HttpClient();
-        _logger = new Log4NetLogger(typeof(DistributedStorageBackend));
+        _logger = logger;
         NodeId = Environment.MachineName + "-" + Guid.NewGuid().ToString("N")[..8];
     }
 

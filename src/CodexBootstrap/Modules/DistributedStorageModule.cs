@@ -11,15 +11,15 @@ public sealed class DistributedStorageModule : IModule
     private readonly NodeRegistry _registry;
     private readonly IDistributedStorageBackend? _distributedStorage;
     private readonly DistributedCacheManager? _distributedCacheManager;
-    private readonly Core.ILogger _logger;
+    private readonly Core.ICodexLogger _logger;
 
-    public DistributedStorageModule(NodeRegistry registry, IDistributedStorageBackend? distributedStorage = null)
+    public DistributedStorageModule(NodeRegistry registry, ICodexLogger logger, IDistributedStorageBackend? distributedStorage = null)
     {
         _registry = registry;
         _distributedStorage = distributedStorage;
         _distributedCacheManager = distributedStorage != null ? 
-            new DistributedCacheManager(distributedStorage, new NodeCacheManager(distributedStorage)) : null;
-        _logger = new Log4NetLogger(typeof(DistributedStorageModule));
+            new DistributedCacheManager(distributedStorage, new NodeCacheManager(distributedStorage, logger), logger) : null;
+        _logger = logger;
     }
 
     public Node GetModuleNode()

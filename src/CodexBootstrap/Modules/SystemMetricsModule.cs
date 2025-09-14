@@ -15,7 +15,7 @@ namespace CodexBootstrap.Modules;
 public class SystemMetricsModule : IModule
 {
     private readonly NodeRegistry _registry;
-    private readonly CodexBootstrap.Core.ILogger _logger;
+    private readonly CodexBootstrap.Core.ICodexLogger _logger;
     private readonly Dictionary<string, object> _metrics = new();
     private readonly DateTime _startTime = DateTime.UtcNow;
 

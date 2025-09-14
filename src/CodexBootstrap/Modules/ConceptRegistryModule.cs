@@ -16,7 +16,7 @@ public class ConceptRegistryModule : IModule
     private readonly Dictionary<string, ConceptVersion> _conceptVersions = new();
     private readonly Dictionary<string, List<ConceptRelationship>> _conceptRelationships = new();
     private CoreApiService? _coreApiService;
-    private readonly Core.ILogger _logger;
+    private readonly Core.ICodexLogger _logger;
 
     public ConceptRegistryModule(NodeRegistry registry)
     {

@@ -5,7 +5,7 @@ namespace CodexBootstrap.Core
     /// <summary>
     /// Simple logging interface for the Codex Bootstrap system
     /// </summary>
-    public interface ILogger
+    public interface ICodexLogger
     {
         void Debug(string message);
         void Debug(string message, Exception exception);

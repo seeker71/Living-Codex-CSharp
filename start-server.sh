@@ -13,8 +13,8 @@ PROJECT_DIR="$SCRIPT_DIR/src/CodexBootstrap"
 LOG_DIR="$SCRIPT_DIR/logs"
 LOG_FILE="$LOG_DIR/server-$(date +%Y%m%d-%H%M%S).log"
 
-# Configuration
-PORT=5001
+# Configuration - will be determined by PortConfigurationService
+PORT=5002  # Default fallback port
 
 # Ensure we're in the script directory
 cd "$SCRIPT_DIR"
@@ -28,15 +28,15 @@ mkdir -p "$LOG_DIR"
 stop_server() {
     echo "🛑 Stopping any running dotnet processes..."
     
-    # Find and kill any dotnet processes
-    PIDS=$(pgrep -f "dotnet.*CodexBootstrap" || true)
+    # Find and kill any dotnet processes (including dotnet watch)
+    PIDS=$(pgrep -f "dotnet.*CodexBootstrap\|dotnet.*watch" || true)
     if [ ! -z "$PIDS" ]; then
-        echo "Found running CodexBootstrap processes: $PIDS"
+        echo "Found running dotnet processes: $PIDS"
         kill -TERM $PIDS 2>/dev/null || true
-        sleep 2
+        sleep 3
         
         # Force kill if still running
-        PIDS=$(pgrep -f "dotnet.*CodexBootstrap" || true)
+        PIDS=$(pgrep -f "dotnet.*CodexBootstrap\|dotnet.*watch" || true)
         if [ ! -z "$PIDS" ]; then
             echo "Force killing remaining processes: $PIDS"
             kill -9 $PIDS 2>/dev/null || true
@@ -283,8 +283,8 @@ main() {
     echo "📝 Logs will be written to: $LOG_FILE"
     echo "📺 Logs will also be displayed on screen"
     
-    # Start server with dual logging (file + screen)
-    dotnet run --urls "http://localhost:$PORT" --configuration Release 2>&1 | tee "$LOG_FILE" &
+    # Start server with hot-reload and dual logging (file + screen)
+    dotnet watch run --hot-reload --urls "http://localhost:$PORT" --configuration Release 2>&1 | tee "$LOG_FILE" &
     SERVER_PID=$!
     
     echo "🆔 Server PID: $SERVER_PID"

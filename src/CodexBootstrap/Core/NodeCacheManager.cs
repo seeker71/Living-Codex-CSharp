@@ -12,7 +12,7 @@ namespace CodexBootstrap.Core;
 public class NodeCacheManager : ICacheManager
 {
     private readonly IStorageBackend _storage;
-    private readonly ILogger _logger;
+    private readonly ICodexLogger _logger;
     private readonly ConcurrentDictionary<string, Node> _iceNodes = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, Node> _waterNodes = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentBag<Edge> _edges = new();
@@ -20,10 +20,10 @@ public class NodeCacheManager : ICacheManager
     private readonly TimeSpan _waterNodeCacheExpiry = TimeSpan.FromMinutes(30);
     private readonly Dictionary<string, DateTime> _waterNodeTimestamps = new();
 
-    public NodeCacheManager(IStorageBackend storage)
+    public NodeCacheManager(IStorageBackend storage, ICodexLogger logger)
     {
         _storage = storage;
-        _logger = new Log4NetLogger(typeof(NodeCacheManager));
+        _logger = logger;
     }
 
     public async Task InitializeAsync()

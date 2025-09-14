@@ -11,7 +11,7 @@ namespace CodexBootstrap.Modules;
 /// </summary>
 public sealed class IdentityManagementModule : IModule
 {
-    private readonly Core.ILogger _logger;
+    private readonly Core.ICodexLogger _logger;
     private readonly Dictionary<string, IdentityProfile> _identityProfiles = new();
     private readonly Dictionary<string, List<Credential>> _userCredentials = new();
     private readonly Dictionary<string, List<IdentityClaim>> _userClaims = new();

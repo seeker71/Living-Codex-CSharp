@@ -15,10 +15,10 @@ namespace CodexBootstrap.Core;
 public class LLMClient
 {
     private readonly HttpClient _httpClient;
-    private readonly Core.ILogger _logger;
+    private readonly Core.ICodexLogger _logger;
     private readonly string _baseUrl;
 
-    public LLMClient(HttpClient httpClient, Core.ILogger logger, string baseUrl = "http://localhost:11434")
+    public LLMClient(HttpClient httpClient, Core.ICodexLogger logger, string baseUrl = "http://localhost:11434")
     {
         _httpClient = httpClient;
         _logger = logger;

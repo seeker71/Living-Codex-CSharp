@@ -12,7 +12,7 @@ namespace CodexBootstrap.Modules;
 /// </summary>
 public sealed class StorageEndpointsModule : IModule
 {
-    private readonly Core.ILogger _logger;
+    private readonly Core.ICodexLogger _logger;
     private readonly NodeRegistry _registry;
     private readonly IStorageBackend? _storageBackend;
     private readonly ICacheManager? _cacheManager;

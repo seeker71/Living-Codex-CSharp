@@ -11,12 +11,12 @@ public sealed class StorageModule : IModule
 {
     private readonly NodeRegistry _registry;
     private readonly IStorageBackend? _storage;
-    private readonly Core.ILogger _logger;
+    private readonly Core.ICodexLogger _logger;
 
-    public StorageModule(NodeRegistry registry, IStorageBackend? storage = null)
+    public StorageModule(NodeRegistry registry, ICodexLogger logger, IStorageBackend? storage = null)
     {
         _registry = registry;
-        _logger = new Log4NetLogger(typeof(StorageModule));
+        _logger = logger;
         _storage = storage ?? ConfigureDefaultStorageBackend();
     }
 
@@ -59,7 +59,7 @@ public sealed class StorageModule : IModule
                 );
                 
                 _logger.Info($"Configuring distributed storage with cluster ID: {clusterId}, seed nodes: {string.Join(", ", seedNodes)}");
-                return new DistributedStorageBackend(baseBackend, clusterConfig);
+                return new DistributedStorageBackend(baseBackend, clusterConfig, _logger);
             }
 
             return baseBackend;
