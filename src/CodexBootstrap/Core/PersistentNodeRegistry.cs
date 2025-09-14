@@ -120,7 +120,8 @@ public class PersistentNodeRegistry : NodeRegistry
             throw new InvalidOperationException("Registry not initialized. Call InitializeAsync() first.");
         }
 
-        var allNodes = AllNodes();
+        // Create a snapshot to prevent collection modification during iteration
+        var allNodes = AllNodes().ToArray();
         return allNodes.Where(n => n.TypeId == typeId).ToArray();
     }
 

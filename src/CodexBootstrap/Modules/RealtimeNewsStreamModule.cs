@@ -218,6 +218,32 @@ namespace CodexBootstrap.Modules
             _logger.Info($"Initialized {newsSources.Length} news sources as nodes");
         }
 
+        private async Task IngestNewsFromSourceAsync(NewsSource source)
+        {
+            try
+            {
+                switch (source.Type.ToLower())
+                {
+                    case "rss":
+                        await IngestRssFeed(source);
+                        break;
+                    case "api":
+                        await IngestApiFeed(source);
+                        break;
+                    case "hackernews":
+                        await IngestHackerNews(source);
+                        break;
+                    default:
+                        _logger.Warn($"Unknown source type: {source.Type}");
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error ingesting from source {source.Name}: {ex.Message}", ex);
+            }
+        }
+
         private async Task IngestNewsFromSources(object? state)
         {
             await _semaphore.WaitAsync();
@@ -226,7 +252,8 @@ namespace CodexBootstrap.Modules
                 _logger.Info("Starting news ingestion from all sources");
 
                 // Get all active news source nodes - create a copy to avoid collection modification issues
-                var sourceNodes = _registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE)
+                var allSourceNodes = _registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE);
+                var sourceNodes = allSourceNodes
                     .ToArray() // Create a copy to prevent collection modification during iteration
                     .Where(n => n.Meta?.ContainsKey("isActive") == true && (bool)n.Meta["isActive"])
                     .ToList();
@@ -256,6 +283,40 @@ namespace CodexBootstrap.Modules
                 }
 
                 _logger.Info("Completed news ingestion cycle");
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("Collection was modified"))
+            {
+                _logger.Warn($"Collection modification detected during news ingestion, retrying: {ex.Message}");
+                // Retry once after a short delay
+                await Task.Delay(100);
+                try
+                {
+                    var allSourceNodes = _registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE);
+                    var sourceNodes = allSourceNodes
+                        .ToArray()
+                        .Where(n => n.Meta?.ContainsKey("isActive") == true && (bool)n.Meta["isActive"])
+                        .ToList();
+                    
+                    foreach (var sourceNode in sourceNodes)
+                    {
+                        try
+                        {
+                            var source = JsonSerializer.Deserialize<NewsSource>(sourceNode.Content?.InlineJson ?? "{}");
+                            if (source != null)
+                            {
+                                await IngestNewsFromSourceAsync(source);
+                            }
+                        }
+                        catch (Exception innerEx)
+                        {
+                            _logger.Error($"Error processing source {sourceNode.Id}: {innerEx.Message}");
+                        }
+                    }
+                }
+                catch (Exception retryEx)
+                {
+                    _logger.Error($"Error during retry news ingestion: {retryEx.Message}", retryEx);
+                }
             }
             catch (Exception ex)
             {

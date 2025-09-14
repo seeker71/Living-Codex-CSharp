@@ -37,9 +37,32 @@ namespace CodexBootstrap.Core
 
             _baseUrl = baseUrl.TrimEnd('/');
             
-            // Extract port from URL
-            var uri = new Uri(_baseUrl);
-            _port = uri.Port;
+            // Extract port from URL with error handling
+            _port = 5001; // Default port
+            try
+            {
+                if (Uri.TryCreate(_baseUrl, UriKind.Absolute, out var uri))
+                {
+                    _port = uri.Port;
+                }
+                else
+                {
+                    // Fallback to environment variable or default
+                    var portEnv = Environment.GetEnvironmentVariable("ASPNETCORE_URLS");
+                    if (!string.IsNullOrEmpty(portEnv) && portEnv.Contains(":"))
+                    {
+                        var portStr = portEnv.Split(':').LastOrDefault();
+                        if (int.TryParse(portStr, out var envPort))
+                        {
+                            _port = envPort;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Warning: Could not parse URL '{_baseUrl}', using default port 5001. Error: {ex.Message}");
+            }
             
             _isInitialized = true;
             

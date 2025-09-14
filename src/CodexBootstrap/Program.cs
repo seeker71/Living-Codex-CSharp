@@ -54,10 +54,41 @@ else
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Disable HTTPS for Docker/development
+// Get the URLs from ASP.NET Core configuration (includes --urls argument)
+var urls = builder.Configuration["urls"] ?? "http://localhost:5001";
+var baseUrl = urls.Split(';')[0]; // Take the first URL if multiple are specified
+
+// Parse the port from the URL with error handling
+int port = 5001; // Default port
+try
+{
+    if (!string.IsNullOrEmpty(baseUrl) && Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri))
+    {
+        port = uri.Port;
+    }
+    else
+    {
+        // Fallback to environment variable or default
+        var portEnv = Environment.GetEnvironmentVariable("ASPNETCORE_URLS");
+        if (!string.IsNullOrEmpty(portEnv) && portEnv.Contains(":"))
+        {
+            var portStr = portEnv.Split(':').LastOrDefault();
+            if (int.TryParse(portStr, out var envPort))
+            {
+                port = envPort;
+            }
+        }
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Warning: Could not parse URL '{baseUrl}', using default port 5001. Error: {ex.Message}");
+}
+
+// Configure Kestrel to listen on the specified port
 builder.WebHost.ConfigureKestrel(options =>
 {
-    options.ListenAnyIP(8080); // HTTP only
+    options.ListenAnyIP(port); // HTTP only
 });
 
 // Disable HTTPS redirect
@@ -250,9 +281,6 @@ builder.Services.AddHttpClient();
 var app = builder.Build();
 
 // Initialize global configuration with the application's base URL
-// Get the URL from command line args or use default
-var urls = args.Where(arg => arg.StartsWith("--urls=")).FirstOrDefault();
-var baseUrl = urls?.Split('=')[1] ?? "http://localhost:5001";
 GlobalConfiguration.Initialize(baseUrl);
 
 // Disable HTTPS redirection

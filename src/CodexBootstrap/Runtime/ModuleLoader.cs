@@ -433,41 +433,66 @@ public sealed class ModuleLoader
     {
         try
         {
-            // Look for spec files in the project root (three levels up from the current directory)
-            var projectRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", ".."));
+            // Look for spec files in the project root
+            // Try multiple possible locations
+            var possibleRoots = new[]
+            {
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..")), // From bin/Debug/net6.0
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..")), // From bin/Release/net6.0
+                Directory.GetCurrentDirectory(), // Current working directory
+                Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "..")) // Two levels up from current
+            };
+            
+            var projectRoot = possibleRoots.FirstOrDefault(Directory.Exists);
+            if (projectRoot == null)
+            {
+                projectRoot = Directory.GetCurrentDirectory();
+            }
+            
             _logger.Info($"Looking for spec files in: {projectRoot}");
             _logger.Info($"AppContext.BaseDirectory: {AppContext.BaseDirectory}");
+            _logger.Info($"Current Directory: {Directory.GetCurrentDirectory()}");
             
-            var specFiles = Directory.GetFiles(projectRoot, "*.md")
-                .Concat(Directory.GetFiles(projectRoot, "*.spec"))
-                .Concat(Directory.GetFiles(projectRoot, "*.txt"))
-                .Where(f => (Path.GetFileName(f).StartsWith("FRACTAL_") || 
-                           Path.GetFileName(f).StartsWith("U-CORE_") ||
-                           Path.GetFileName(f).StartsWith("UCORE_") ||
-                           Path.GetFileName(f).StartsWith("MULTI_SERVICE_") ||
-                           Path.GetFileName(f).StartsWith("GRAPH_QUERY_") ||
-                           Path.GetFileName(f).StartsWith("DYNAMIC_") ||
-                           Path.GetFileName(f).StartsWith("ENDPOINT_") ||
-                           Path.GetFileName(f).StartsWith("LLM_") ||
-                           Path.GetFileName(f).StartsWith("MODULE_") ||
-                           Path.GetFileName(f).StartsWith("MARKETING_") ||
-                           Path.GetFileName(f).StartsWith("QUICK_START_") ||
-                           Path.GetFileName(f).StartsWith("WORLD_") ||
-                           Path.GetFileName(f).StartsWith("JOY_") ||
-                           Path.GetFileName(f).StartsWith("FUTURE_") ||
-                           Path.GetFileName(f).StartsWith("END_TO_END_") ||
-                           Path.GetFileName(f).StartsWith("test_")) &&
-                           !Path.GetFileName(f).StartsWith("README") &&
-                           !Path.GetFileName(f).Equals("README.md", StringComparison.OrdinalIgnoreCase))
+            // Look for spec files in multiple locations
+            var specDirectories = new[]
+            {
+                projectRoot,
+                Path.Combine(projectRoot, "specs"),
+                Path.Combine(projectRoot, "docs"),
+                Path.Combine(projectRoot, "documentation")
+            };
+            
+            var specFiles = new List<string>();
+            
+            foreach (var specDir in specDirectories)
+            {
+                if (Directory.Exists(specDir))
+                {
+                    specFiles.AddRange(Directory.GetFiles(specDir, "*.md", SearchOption.AllDirectories));
+                    specFiles.AddRange(Directory.GetFiles(specDir, "*.spec", SearchOption.AllDirectories));
+                    specFiles.AddRange(Directory.GetFiles(specDir, "*.txt", SearchOption.AllDirectories));
+                }
+            }
+            
+            // Filter spec files - be more inclusive but exclude README files
+            var filteredSpecFiles = specFiles
+                .Where(f => {
+                    var fileName = Path.GetFileName(f);
+                    return !fileName.StartsWith("README", StringComparison.OrdinalIgnoreCase) &&
+                           !fileName.Equals("README.md", StringComparison.OrdinalIgnoreCase) &&
+                           !fileName.StartsWith("CHANGELOG", StringComparison.OrdinalIgnoreCase) &&
+                           !fileName.StartsWith("LICENSE", StringComparison.OrdinalIgnoreCase) &&
+                           !fileName.StartsWith("CONTRIBUTING", StringComparison.OrdinalIgnoreCase);
+                })
                 .ToArray();
             
-            _logger.Info($"Found {specFiles.Length} spec files to process");
-            foreach (var specFile in specFiles)
+            _logger.Info($"Found {filteredSpecFiles.Length} spec files to process");
+            foreach (var specFile in filteredSpecFiles)
             {
                 _logger.Info($"  - {Path.GetFileName(specFile)}");
             }
             
-            foreach (var specFile in specFiles)
+            foreach (var specFile in filteredSpecFiles)
             {
                 try
                 {

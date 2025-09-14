@@ -146,21 +146,25 @@ namespace LivingCodexMobile.ViewModels
 
             try
             {
+                System.Diagnostics.Debug.WriteLine("Starting Google login...");
                 var success = await _authService.LoginWithGoogleAsync();
                 
                 if (success)
                 {
+                    System.Diagnostics.Debug.WriteLine("Google login successful, navigating to main page...");
                     // Navigate to main page
                     await Shell.Current.GoToAsync("//main");
                 }
                 else
                 {
                     ErrorMessage = "Google login failed. Please try again.";
+                    System.Diagnostics.Debug.WriteLine("Google login failed");
                 }
             }
             catch (Exception ex)
             {
                 ErrorMessage = $"Google login error: {ex.Message}";
+                System.Diagnostics.Debug.WriteLine($"Google login error: {ex.Message}");
             }
             finally
             {
@@ -177,21 +181,25 @@ namespace LivingCodexMobile.ViewModels
 
             try
             {
+                System.Diagnostics.Debug.WriteLine("Starting Microsoft login...");
                 var success = await _authService.LoginWithMicrosoftAsync();
                 
                 if (success)
                 {
+                    System.Diagnostics.Debug.WriteLine("Microsoft login successful, navigating to main page...");
                     // Navigate to main page
                     await Shell.Current.GoToAsync("//main");
                 }
                 else
                 {
                     ErrorMessage = "Microsoft login failed. Please try again.";
+                    System.Diagnostics.Debug.WriteLine("Microsoft login failed");
                 }
             }
             catch (Exception ex)
             {
                 ErrorMessage = $"Microsoft login error: {ex.Message}";
+                System.Diagnostics.Debug.WriteLine($"Microsoft login error: {ex.Message}");
             }
             finally
             {

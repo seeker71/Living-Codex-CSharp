@@ -48,3 +48,4 @@ public interface IConversationService
     event EventHandler<FractalChannel>? FractalChannelCreated;
 }
 
+

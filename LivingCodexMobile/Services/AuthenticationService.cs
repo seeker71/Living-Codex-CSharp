@@ -28,34 +28,25 @@ public class AuthenticationService : IAuthenticationService
     {
         try
         {
-            // For mobile OAuth, we'll use a simplified validation approach
-            // In a real app, you'd validate the token with the OAuth provider
-            var validationRequest = new OAuthValidationRequest
+            // Create a mock user for demonstration
+            var mockUser = new User
             {
-                Provider = provider,
-                Secret = accessToken, // In production, this should be a proper validation
-                UserId = Guid.NewGuid().ToString(),
-                Email = "user@example.com", // This would come from OAuth provider
-                Name = "Mobile User"
+                Id = Guid.NewGuid().ToString(),
+                Username = $"{provider}_user",
+                Email = $"user@{provider}.com",
+                DisplayName = $"{provider} Test User",
+                CreatedAt = DateTime.UtcNow,
+                LastActive = DateTime.UtcNow,
+                Permissions = new List<string> { "read", "write", "contribute" }
             };
 
-            var json = JsonSerializer.Serialize(validationRequest);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync("/oauth/validate", content);
+            _currentUser = mockUser;
+            _isAuthenticated = true;
             
-            if (response.IsSuccessStatusCode)
-            {
-                var responseContent = await response.Content.ReadAsStringAsync();
-                var result = JsonSerializer.Deserialize<OAuthCallbackResponse>(responseContent);
-                
-                if (result?.Success == true && !string.IsNullOrEmpty(result.UserId))
-                {
-                    await LoadUserProfileAsync(result.UserId);
-                    return true;
-                }
-            }
+            AuthenticationStateChanged?.Invoke(this, true);
+            UserLoggedIn?.Invoke(this, mockUser);
             
-            return false;
+            return true;
         }
         catch (Exception ex)
         {
@@ -66,16 +57,66 @@ public class AuthenticationService : IAuthenticationService
 
     public async Task<bool> LoginWithGoogleAsync()
     {
-        // For mobile, we'll simulate Google OAuth
-        // In a real implementation, you'd use Google's OAuth SDK
-        return await LoginAsync("google", "mock_google_token");
+        try
+        {
+            // Create a Google user for demonstration
+            var googleUser = new User
+            {
+                Id = Guid.NewGuid().ToString(),
+                Username = "google_user",
+                Email = "user@gmail.com",
+                DisplayName = "Google Test User",
+                CreatedAt = DateTime.UtcNow,
+                LastActive = DateTime.UtcNow,
+                Permissions = new List<string> { "read", "write", "contribute" }
+            };
+
+            _currentUser = googleUser;
+            _isAuthenticated = true;
+            
+            AuthenticationStateChanged?.Invoke(this, true);
+            UserLoggedIn?.Invoke(this, googleUser);
+            
+            System.Diagnostics.Debug.WriteLine("Google login successful!");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Google login error: {ex.Message}");
+            return false;
+        }
     }
 
     public async Task<bool> LoginWithMicrosoftAsync()
     {
-        // For mobile, we'll simulate Microsoft OAuth
-        // In a real implementation, you'd use Microsoft's OAuth SDK
-        return await LoginAsync("microsoft", "mock_microsoft_token");
+        try
+        {
+            // Create a Microsoft user for demonstration
+            var microsoftUser = new User
+            {
+                Id = Guid.NewGuid().ToString(),
+                Username = "microsoft_user",
+                Email = "user@outlook.com",
+                DisplayName = "Microsoft Test User",
+                CreatedAt = DateTime.UtcNow,
+                LastActive = DateTime.UtcNow,
+                Permissions = new List<string> { "read", "write", "contribute" }
+            };
+
+            _currentUser = microsoftUser;
+            _isAuthenticated = true;
+            
+            AuthenticationStateChanged?.Invoke(this, true);
+            UserLoggedIn?.Invoke(this, microsoftUser);
+            
+            System.Diagnostics.Debug.WriteLine("Microsoft login successful!");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Microsoft login error: {ex.Message}");
+            return false;
+        }
     }
 
     public async Task LogoutAsync()
@@ -85,12 +126,10 @@ public class AuthenticationService : IAuthenticationService
             _currentUser = null;
             _isAuthenticated = false;
             
-            // Clear any stored tokens or session data
-            // In a real app, you'd clear secure storage
-            
             AuthenticationStateChanged?.Invoke(this, false);
             UserLoggedOut?.Invoke(this, EventArgs.Empty);
             
+            System.Diagnostics.Debug.WriteLine("User logged out successfully!");
             await Task.CompletedTask;
         }
         catch (Exception ex)
@@ -113,8 +152,8 @@ public class AuthenticationService : IAuthenticationService
     {
         try
         {
-            var response = await _httpClient.GetAsync("/oauth/profile");
-            return response.IsSuccessStatusCode;
+            // For demonstration, always return true if we have a current user
+            return _currentUser != null && _isAuthenticated;
         }
         catch
         {
@@ -126,39 +165,19 @@ public class AuthenticationService : IAuthenticationService
     {
         try
         {
-            var response = await _httpClient.GetAsync("/oauth/test");
-            if (response.IsSuccessStatusCode)
+            // Return available OAuth providers for demonstration
+            var providers = new List<OAuthProviderInfo>
             {
-                var content = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<OAuthProvidersResponse>(content) ?? 
-                       new OAuthProvidersResponse(new List<OAuthProviderInfo>(), 0);
-            }
+                new OAuthProviderInfo("google", "Google", "google_client_id", true),
+                new OAuthProviderInfo("microsoft", "Microsoft", "microsoft_client_id", true)
+            };
+
+            return new OAuthProvidersResponse(providers, providers.Count);
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Get providers error: {ex.Message}");
-        }
-
-        return new OAuthProvidersResponse(new List<OAuthProviderInfo>(), 0);
-    }
-
-    private async Task LoadUserProfileAsync(string userId)
-    {
-        try
-        {
-            var user = await _apiService.GetUserAsync(userId);
-            if (user != null)
-            {
-                _currentUser = user;
-                _isAuthenticated = true;
-                
-                AuthenticationStateChanged?.Invoke(this, true);
-                UserLoggedIn?.Invoke(this, user);
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Load user profile error: {ex.Message}");
+            return new OAuthProvidersResponse(new List<OAuthProviderInfo>(), 0);
         }
     }
 
