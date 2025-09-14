@@ -16,6 +16,9 @@ namespace CodexBootstrap.Modules
     
     [RequestType("codex.ai.future-query-request", "AIFutureQueryRequest", "Request for future knowledge query")]
     public record AIFutureQueryRequest(string Query, string? Model = null, string? Provider = null);
+    
+    [RequestType("codex.ai.scoring-analysis-request", "ScoringAnalysisRequest", "Request for scoring analysis")]
+    public record ScoringAnalysisRequest(string Content, string? AnalysisType = null, string[]? Criteria = null, string? Model = null, string? Provider = null);
 
     [MetaNodeAttribute("codex.ai.llm-configurations", "codex.meta/type", "LLMConfigurations", "LLM configuration management")]
     public static class LLMConfigurations
@@ -185,7 +188,26 @@ namespace CodexBootstrap.Modules
 
         public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
         {
-            // API handlers are registered via [ApiRoute] attributes
+            // Register AI handlers for internal module communication
+            router.Register("ai", "extract-concepts", async (JsonElement? json) => 
+            {
+                var request = JsonSerializer.Deserialize<ConceptExtractionRequest>(json?.GetRawText() ?? "{}");
+                return await HandleConceptExtractionAsync(request);
+            });
+            
+            router.Register("ai", "score-analysis", async (JsonElement? json) => 
+            {
+                var request = JsonSerializer.Deserialize<ScoringAnalysisRequest>(json?.GetRawText() ?? "{}");
+                return await HandleScoringAnalysisAsync(request);
+            });
+            
+            router.Register("ai", "fractal-transform", async (JsonElement? json) => 
+            {
+                var request = JsonSerializer.Deserialize<FractalTransformRequest>(json?.GetRawText() ?? "{}");
+                return await HandleFractalTransformAsync(request);
+            });
+            
+            _logger.Info("AI module API handlers registered for internal communication");
         }
 
         public void RegisterHttpEndpoints(Microsoft.AspNetCore.Builder.WebApplication app, NodeRegistry registry, Runtime.CoreApiService coreApiService, Runtime.ModuleLoader moduleLoader)
@@ -263,6 +285,45 @@ Return JSON:
                     },
                     DefaultLLMConfig: defaultLLMConfig,
                     Category: "transformation"
+                ),
+
+                new PromptTemplate(
+                    Id: "scoring-analysis",
+                    Name: "Scoring Analysis",
+                    Template: @"Analyze and score the following content based on the specified criteria.
+
+Content: ""{content}""
+Analysis Type: {analysisType}
+Criteria: {criteria}
+
+Evaluate the content and provide:
+1. Overall score (0.0-1.0)
+2. Individual criteria scores
+3. Key strengths
+4. Areas for improvement
+5. Specific recommendations
+
+Return JSON:
+{{
+  ""overallScore"": 0.0-1.0,
+  ""criteriaScores"": {{
+    ""relevance"": 0.0-1.0,
+    ""quality"": 0.0-1.0,
+    ""impact"": 0.0-1.0
+  }},
+  ""strengths"": [""strength1"", ""strength2""],
+  ""weaknesses"": [""weakness1"", ""weakness2""],
+  ""recommendations"": [""recommendation1"", ""recommendation2""],
+  ""confidence"": 0.0-1.0
+}}",
+                    DefaultParameters: new Dictionary<string, object> 
+                    { 
+                        ["content"] = "",
+                        ["analysisType"] = "general",
+                        ["criteria"] = new[] { "relevance", "quality", "impact" }
+                    },
+                    DefaultLLMConfig: defaultLLMConfig,
+                    Category: "analysis"
                 ),
 
                 new PromptTemplate(
@@ -414,6 +475,54 @@ Response:",
             catch (Exception ex)
             {
                 _logger.Error($"Error in fractal transformation: {ex.Message}", ex);
+                return new { success = false, error = ex.Message };
+            }
+        }
+
+        [ApiRoute("POST", "/ai/score-analysis", "ai-score-analysis", "Score and analyze content using AI", "ai-module")]
+        public async Task<object> HandleScoringAnalysisAsync([ApiParameter("request", "Scoring analysis request", Required = true, Location = "body")] ScoringAnalysisRequest request)
+        {
+            try
+            {
+                if (request == null || string.IsNullOrEmpty(request.Content))
+                {
+                    return new { success = false, error = "Content is required" };
+                }
+
+                var config = LLMConfigurations.GetConfigForTask("scoring-analysis", request.Provider, request.Model);
+                var result = await _llmOrchestrator.ExecuteAsync("scoring-analysis", new Dictionary<string, object>
+                {
+                    ["content"] = request.Content,
+                    ["analysisType"] = request.AnalysisType ?? "general",
+                    ["criteria"] = request.Criteria ?? new[] { "relevance", "quality", "impact" }
+                }, config);
+
+                if (!result.Success)
+                {
+                    return new { success = false, error = result.Error };
+                }
+
+                var scoring = _llmOrchestrator.ParseStructuredResponse<ScoringAnalysisResult>(result);
+
+                return new
+                {
+                    success = true,
+                    data = scoring,
+                    confidence = result.Confidence,
+                    isFallback = result.IsFallback,
+                    timestamp = result.Timestamp,
+                    tracking = new
+                    {
+                        templateId = result.TemplateId,
+                        provider = result.Provider,
+                        model = result.Model,
+                        executionTimeMs = result.ExecutionTime.TotalMilliseconds
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in scoring analysis: {ex.Message}", ex);
                 return new { success = false, error = ex.Message };
             }
         }
@@ -601,6 +710,16 @@ Response:",
         string ConsciousnessLevel,
         double ResonanceFrequency,
         double UnityScore
+    );
+
+    [ResponseType("codex.ai.scoring-analysis-result", "ScoringAnalysisResult", "Result of scoring analysis")]
+    public record ScoringAnalysisResult(
+        double OverallScore,
+        Dictionary<string, double> CriteriaScores,
+        string[] Strengths,
+        string[] Weaknesses,
+        string[] Recommendations,
+        double Confidence
     );
 
     // Legacy data structures for compatibility
