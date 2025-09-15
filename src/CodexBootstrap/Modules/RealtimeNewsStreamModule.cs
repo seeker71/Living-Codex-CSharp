@@ -31,7 +31,7 @@ namespace CodexBootstrap.Modules
     /// Real-time fractal news streaming module that ingests external news sources
     /// and transforms them through fractal analysis aligned with belief systems
     /// </summary>
-    public class RealtimeNewsStreamModule : IModule, IHostedService
+    public class RealtimeNewsStreamModule : IModule
     {
         private readonly Core.ICodexLogger _logger;
         private readonly NodeRegistry _registry;
@@ -138,9 +138,9 @@ namespace CodexBootstrap.Modules
             
             // Cross-module communicator will be initialized lazily
             
-            // Set up timers
-            _ingestionTimer = new Timer(async _ => await IngestNewsFromSources(null), null, TimeSpan.Zero, TimeSpan.FromMinutes(_ingestionIntervalMinutes));
-            _cleanupTimer = new Timer(CleanupOldNews, null, TimeSpan.FromHours(1), TimeSpan.FromHours(_cleanupIntervalHours));
+            // Initialize timers but don't start them yet - they will be started in StartAsync
+            _ingestionTimer = new Timer(async _ => await IngestNewsFromSources(null), null, Timeout.Infinite, Timeout.Infinite);
+            _cleanupTimer = new Timer(CleanupOldNews, null, Timeout.Infinite, Timeout.Infinite);
         }
 
         // Parameterless constructor for module loader
@@ -171,11 +171,18 @@ namespace CodexBootstrap.Modules
             );
         }
 
-        public void Register(NodeRegistry registry)
-        {
-            _logger.Info("Registering Real-Time News Stream Module with NodeRegistry");
-            Initialize();
-        }
+    public void Register(NodeRegistry registry)
+    {
+        _logger.Info("Registering Real-Time News Stream Module with NodeRegistry");
+        Initialize();
+        
+        // Start the timers when module is registered
+        _ingestionTimer.Change(TimeSpan.Zero, TimeSpan.FromMinutes(_ingestionIntervalMinutes));
+        _cleanupTimer.Change(TimeSpan.FromHours(1), TimeSpan.FromHours(_cleanupIntervalHours));
+        
+        // Start initial news ingestion
+        _ = Task.Run(async () => await IngestNewsFromSources(null));
+    }
 
         public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
         {
@@ -189,25 +196,26 @@ namespace CodexBootstrap.Modules
             // HTTP endpoints are registered via ApiRoute attributes
         }
 
-        public async Task StartAsync(CancellationToken cancellationToken)
+        public void Unregister()
         {
-            _logger.Info("Starting Real-Time News Stream Module");
+            _logger.Info("Unregistering Real-Time News Stream Module");
             
-            // Load configurations from seed nodes
-            await _configManager.LoadConfigurationsAsync();
+            // Stop the timers
+            _ingestionTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            _cleanupTimer?.Change(Timeout.Infinite, Timeout.Infinite);
             
-            await IngestNewsFromSources(null);
+            // Wait for any running operations to complete
+            _semaphore?.Wait(TimeSpan.FromSeconds(5));
+            try
+            {
+                _logger.Info("Real-Time News Stream Module unregistered gracefully");
+            }
+            finally
+            {
+                _semaphore?.Release();
+            }
         }
 
-        public async Task StopAsync(CancellationToken cancellationToken)
-        {
-            _logger.Info("Stopping Real-Time News Stream Module");
-            _ingestionTimer?.Dispose();
-            _cleanupTimer?.Dispose();
-            _httpClient?.Dispose();
-            _semaphore?.Dispose();
-            _moduleCommunicator?.Dispose();
-        }
 
         private void InitializeNewsSources()
         {

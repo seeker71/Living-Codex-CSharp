@@ -146,6 +146,7 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
         // Add SignalR services for RealtimeModule
         builder.Services.AddSignalR();
         
+        
         // Add Swagger/OpenAPI services
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen(c =>
@@ -460,6 +461,25 @@ app.MapGet("/modules/status", () => {
     };
 });
 
+// Root endpoint
+app.MapGet("/", () =>
+{
+    return Results.Ok(new
+    {
+        message = "Living Codex API",
+        version = "1.0.0",
+        status = "running",
+        timestamp = DateTime.UtcNow,
+        endpoints = new
+        {
+            health = "/health",
+            modules = "/modules",
+            nodes = "/nodes",
+            swagger = "/swagger"
+        }
+    });
+});
+
 // Health endpoint
 app.MapGet("/health", () =>
 {
@@ -507,7 +527,12 @@ var configuredPort = portConfig.GetPort("codex-bootstrap");
 var url = $"http://localhost:{configuredPort}";
 
 Console.WriteLine($"Starting Living Codex on {url}");
-app.Run(url);
+
+// Only run the server if not in test environment
+if (!Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")?.Equals("Testing", StringComparison.OrdinalIgnoreCase) == true)
+{
+    app.Run(url);
+}
 
 // Helper function to determine module status
 static string DetermineModuleStatus(IModule module)

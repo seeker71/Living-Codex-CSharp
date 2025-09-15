@@ -52,11 +52,18 @@ namespace CodexBootstrap.Tests
         [Fact]
         public async Task Root_ShouldReturnResponse()
         {
+            Console.WriteLine($"[ApiEndpointTests] Starting Root_ShouldReturnResponse at {DateTime.UtcNow:HH:mm:ss.fff}");
+            
             // Act
+            Console.WriteLine($"[ApiEndpointTests] Making GET request to /...");
             var response = await _fixture.HttpClient.GetAsync("/");
+            Console.WriteLine($"[ApiEndpointTests] Response received: {response.StatusCode}");
 
             // Assert
+            Console.WriteLine($"[ApiEndpointTests] Asserting response is successful...");
             response.IsSuccessStatusCode.Should().BeTrue();
+            
+            Console.WriteLine($"[ApiEndpointTests] Root_ShouldReturnResponse completed at {DateTime.UtcNow:HH:mm:ss.fff}");
         }
 
         [Fact]
