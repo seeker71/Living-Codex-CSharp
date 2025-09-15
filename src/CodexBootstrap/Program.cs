@@ -285,8 +285,11 @@ builder.Services.AddHttpClient();
 
 var app = builder.Build();
 
-// Initialize global configuration with the application's base URL
-GlobalConfiguration.Initialize(baseUrl);
+// Initialize global configuration with the correct port from PortConfigurationService
+var portConfig = new PortConfigurationService(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "development");
+var configuredPort = portConfig.GetPort("codex-bootstrap");
+var correctBaseUrl = $"http://localhost:{configuredPort}";
+GlobalConfiguration.Initialize(correctBaseUrl);
 
 // Disable HTTPS redirection
 app.Use(async (context, next) =>
@@ -350,9 +353,13 @@ var coreApi = app.Services.GetRequiredService<CoreApiService>();
 var moduleLoader = app.Services.GetRequiredService<ModuleLoader>();
 var routeDiscovery = app.Services.GetRequiredService<RouteDiscovery>();
 var healthService = app.Services.GetRequiredService<HealthService>();
+var codexLogger = app.Services.GetRequiredService<CodexBootstrap.Core.ICodexLogger>();
 
 // Initialize meta-node system
 InitializeMetaNodeSystem(registry);
+
+// Initialize U-CORE foundational nodes (root + axes) before modules load
+CodexBootstrap.Core.UCoreInitializer.SeedIfMissing(registry, codexLogger);
 
 // Load all built-in modules using the standardized approach
 moduleLoader.LoadBuiltInModules();
@@ -370,15 +377,15 @@ healthService.SetModuleLoader(moduleLoader);
 
 // Display comprehensive module loading summary
 var loadedModules = moduleLoader.GetLoadedModules();
- var logger = app.Services.GetRequiredService<ILogger<Program>>();
-logger.LogInformation("Module Loading Summary:");
-logger.LogInformation("  Successfully loaded: {ModuleCount} modules", loadedModules.Count);
+ var logger = app.Services.GetRequiredService<CodexBootstrap.Core.ICodexLogger>();
+logger.Info("Module Loading Summary:");
+logger.Info($"  Successfully loaded: {loadedModules.Count} modules");
 foreach (var module in loadedModules)
 {
     var moduleNode = module.GetModuleNode();
     var name = moduleNode.Meta?.GetValueOrDefault("name")?.ToString() ?? moduleNode.Title;
     var version = moduleNode.Meta?.GetValueOrDefault("version")?.ToString() ?? "0.1.0";
-    logger.LogInformation("  {ModuleName} v{ModuleVersion} ({ModuleId})", name, version, moduleNode.Id);
+    logger.Info($"  {name} v{version} ({moduleNode.Id})");
 }
 
 // Register HTTP endpoints from all modules
@@ -507,8 +514,7 @@ ApiRouteDiscovery.DiscoverAndRegisterRoutes(app, router, registry);
 // Note: Traditional route discovery is disabled to prevent duplicate route registration
 // routeDiscovery.DiscoverAndRegisterRoutes(app);
 
-// Initialize port configuration service
-var portConfig = new PortConfigurationService(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "development");
+// Port configuration service already initialized above
 
 try
 {
@@ -522,8 +528,7 @@ catch (Exception ex)
     Console.WriteLine("Continuing with fallback configuration...");
 }
 
-// Get the configured port for this service
-var configuredPort = portConfig.GetPort("codex-bootstrap");
+// Use the already configured port
 var url = $"http://localhost:{configuredPort}";
 
 Console.WriteLine($"Starting Living Codex on {url}");

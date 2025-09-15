@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
+using System.Security.Cryptography;
 using CodexBootstrap.Core;
 using CodexBootstrap.Runtime;
 using Microsoft.AspNetCore.Builder;
@@ -41,6 +42,7 @@ namespace CodexBootstrap.Modules
         private readonly Timer _ingestionTimer;
         private readonly Timer _cleanupTimer;
         private CrossModuleCommunicator? _moduleCommunicator;
+        private readonly AIModuleTemplates _aiTemplates;
         private readonly int _ingestionIntervalMinutes = 15;
         private readonly int _cleanupIntervalHours = 24;
         private readonly int _maxItemsPerSource = 50; // Increased from 10
@@ -57,50 +59,149 @@ namespace CodexBootstrap.Modules
         private CrossModuleCommunicator ModuleCommunicator => _moduleCommunicator ??= new CrossModuleCommunicator(_logger);
 
         // AI Module call templates
-        private static class AIModuleTemplates
+        private class AIModuleTemplates
         {
-            public static async Task<ConceptExtractionResult?> ExtractConceptsAsync(
-                CrossModuleCommunicator communicator, 
+            private readonly IApiRouter _apiRouter;
+            private readonly Core.ICodexLogger _logger;
+
+            public AIModuleTemplates(IApiRouter apiRouter, Core.ICodexLogger logger)
+            {
+                _apiRouter = apiRouter;
+                _logger = logger;
+            }
+
+            public async Task<ConceptExtractionResult?> ExtractConceptsAsync(
                 string content, 
                 int maxConcepts = 5)
             {
-                var request = new
+                try
                 {
-                    content = content,
-                    maxConcepts = maxConcepts
-                };
+                    var request = new
+                    {
+                        content = content,
+                        maxConcepts = maxConcepts
+                    };
 
-                return await communicator.CallModuleAsync<object, ConceptExtractionResult>(
-                    "ai", "extract-concepts", request);
+                    var requestJson = JsonSerializer.Serialize(request);
+                    var requestElement = JsonSerializer.Deserialize<JsonElement>(requestJson);
+
+                    if (_apiRouter.TryGetHandler("ai", "extract-concepts", out var handler))
+                    {
+                        var result = await handler(requestElement);
+                        if (result != null)
+                        {
+                            // Parse the result from the AI module
+                            var resultJson = JsonSerializer.Serialize(result);
+                            var resultElement = JsonSerializer.Deserialize<JsonElement>(resultJson);
+                            
+                            if (resultElement.TryGetProperty("success", out var success) && success.GetBoolean())
+                            {
+                                if (resultElement.TryGetProperty("data", out var data))
+                                {
+                                    return JsonSerializer.Deserialize<ConceptExtractionResult>(data.GetRawText());
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        _logger.Warn("AI module extract-concepts handler not found");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"Error calling AI module extract-concepts: {ex.Message}", ex);
+                }
+                return null;
             }
 
-            public static async Task<ScoringAnalysisResult?> AnalyzeScoringAsync(
-                CrossModuleCommunicator communicator, 
+            public async Task<ScoringAnalysisResult?> AnalyzeScoringAsync(
                 string content, 
                 string analysisType = "relevance")
             {
-                var request = new
+                try
                 {
-                    content = content,
-                    analysisType = analysisType,
-                    criteria = new[] { "relevance", "quality", "impact" }
-                };
+                    var request = new
+                    {
+                        content = content,
+                        analysisType = analysisType,
+                        criteria = new[] { "relevance", "quality", "impact" }
+                    };
 
-                return await communicator.CallModuleAsync<object, ScoringAnalysisResult>(
-                    "ai", "score-analysis", request);
+                    var requestJson = JsonSerializer.Serialize(request);
+                    var requestElement = JsonSerializer.Deserialize<JsonElement>(requestJson);
+
+                    if (_apiRouter.TryGetHandler("ai", "score-analysis", out var handler))
+                    {
+                        var result = await handler(requestElement);
+                        if (result != null)
+                        {
+                            // Parse the result from the AI module
+                            var resultJson = JsonSerializer.Serialize(result);
+                            var resultElement = JsonSerializer.Deserialize<JsonElement>(resultJson);
+                            
+                            if (resultElement.TryGetProperty("success", out var success) && success.GetBoolean())
+                            {
+                                if (resultElement.TryGetProperty("data", out var data))
+                                {
+                                    return JsonSerializer.Deserialize<ScoringAnalysisResult>(data.GetRawText());
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        _logger.Warn("AI module score-analysis handler not found");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"Error calling AI module score-analysis: {ex.Message}", ex);
+                }
+                return null;
             }
 
-            public static async Task<FractalTransformResult?> TransformFractalAsync(
-                CrossModuleCommunicator communicator, 
+            public async Task<FractalTransformResult?> TransformFractalAsync(
                 string content)
             {
-                var request = new
+                try
                 {
-                    content = content
-                };
+                    var request = new
+                    {
+                        content = content
+                    };
 
-                return await communicator.CallModuleAsync<object, FractalTransformResult>(
-                    "ai", "fractal-transform", request);
+                    var requestJson = JsonSerializer.Serialize(request);
+                    var requestElement = JsonSerializer.Deserialize<JsonElement>(requestJson);
+
+                    if (_apiRouter.TryGetHandler("ai", "fractal-transform", out var handler))
+                    {
+                        var result = await handler(requestElement);
+                        if (result != null)
+                        {
+                            // Parse the result from the AI module
+                            var resultJson = JsonSerializer.Serialize(result);
+                            var resultElement = JsonSerializer.Deserialize<JsonElement>(resultJson);
+                            
+                            if (resultElement.TryGetProperty("success", out var success) && success.GetBoolean())
+                            {
+                                if (resultElement.TryGetProperty("data", out var data))
+                                {
+                                    return JsonSerializer.Deserialize<FractalTransformResult>(data.GetRawText());
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        _logger.Warn("AI module fractal-transform handler not found");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"Error calling AI module fractal-transform: {ex.Message}", ex);
+                }
+                return null;
             }
         }
 
@@ -128,6 +229,10 @@ namespace CodexBootstrap.Modules
             public List<string> ImpactAreas { get; set; } = new();
         }
 
+        // Ontology axis loaded from U-CORE
+        private record OntologyAxis(string Name, List<string> Keywords);
+        private List<OntologyAxis> _ontologyAxes = new();
+
         public RealtimeNewsStreamModule(NodeRegistry registry, ICodexLogger logger, HttpClient? httpClient = null, Core.ConfigurationManager? configManager = null, IApiRouter? apiRouter = null)
         {
             _logger = logger;
@@ -135,6 +240,7 @@ namespace CodexBootstrap.Modules
             _httpClient = httpClient ?? new HttpClient();
             _configManager = configManager ?? new Core.ConfigurationManager(registry, logger);
             _apiRouter = apiRouter ?? throw new ArgumentNullException(nameof(apiRouter), "IApiRouter is required for AI module integration");
+            _aiTemplates = new AIModuleTemplates(_apiRouter, _logger);
             
             // Cross-module communicator will be initialized lazily
             
@@ -155,6 +261,13 @@ namespace CodexBootstrap.Modules
         public void Initialize()
         {
             _logger.Info("Initializing Real-Time News Stream Module");
+            LoadOntologyAxes();
+            if (_ontologyAxes.Count == 0)
+            {
+                _logger.Warn("No ontology axes found in U-CORE. Seeding minimal default axes.");
+                SeedDefaultOntologyAxes();
+                LoadOntologyAxes();
+            }
             InitializeNewsSources();
         }
 
@@ -227,7 +340,7 @@ namespace CodexBootstrap.Modules
                     Name = "Wired",
                     Type = "rss",
                     Url = "https://www.wired.com/feed/rss",
-                    Categories = new[] { "technology", "science", "culture", "business" },
+                    Categories = Array.Empty<string>(),
                     IsActive = true,
                     UpdateIntervalMinutes = 30
                 },
@@ -237,7 +350,7 @@ namespace CodexBootstrap.Modules
                     Name = "Hacker News",
                     Type = "api",
                     Url = "https://hacker-news.firebaseio.com/v0/topstories.json",
-                    Categories = new[] { "technology", "programming", "startup", "science" },
+                    Categories = Array.Empty<string>(),
                     IsActive = true,
                     UpdateIntervalMinutes = 30
                 },
@@ -247,7 +360,7 @@ namespace CodexBootstrap.Modules
                     Name = "Ars Technica",
                     Type = "rss",
                     Url = "https://feeds.arstechnica.com/arstechnica/index/",
-                    Categories = new[] { "technology", "science", "policy", "gaming" },
+                    Categories = Array.Empty<string>(),
                     IsActive = true,
                     UpdateIntervalMinutes = 25
                 },
@@ -257,7 +370,7 @@ namespace CodexBootstrap.Modules
                     Name = "TechCrunch",
                     Type = "rss",
                     Url = "https://techcrunch.com/feed/",
-                    Categories = new[] { "technology", "startup", "AI", "innovation" },
+                    Categories = Array.Empty<string>(),
                     IsActive = true,
                     UpdateIntervalMinutes = 15
                 },
@@ -267,7 +380,7 @@ namespace CodexBootstrap.Modules
                     Name = "Hacker News",
                     Type = "rss",
                     Url = "https://hnrss.org/frontpage",
-                    Categories = new[] { "technology", "programming", "startup", "community" },
+                    Categories = Array.Empty<string>(),
                     IsActive = true,
                     UpdateIntervalMinutes = 20
                 }
@@ -425,9 +538,14 @@ namespace CodexBootstrap.Modules
 
                 foreach (var item in feed.Items.Take(_maxItemsPerSource).ToList())
                 {
+                    var deterministicIdSeed = !string.IsNullOrEmpty(item.Id)
+                        ? item.Id
+                        : (item.Links.FirstOrDefault()?.Uri?.ToString() ?? (item.Title?.Text ?? ""));
+                    var stableId = ComputeDeterministicId($"rss:{source.Id}:{deterministicIdSeed}");
+
                     var newsItem = new NewsItem
                     {
-                        Id = $"rss-{source.Id}-{Guid.NewGuid().ToString("N")[..8]}",
+                        Id = $"rss-{source.Id}-{stableId}",
                         Title = item.Title?.Text ?? "",
                         Content = item.Summary?.Text ?? "",
                         Source = source.Name,
@@ -436,7 +554,6 @@ namespace CodexBootstrap.Modules
                         Tags = ExtractTagsFromContent(item.Title?.Text + " " + item.Summary?.Text),
                         Metadata = new Dictionary<string, object>
                         {
-                            ["category"] = "technology",
                             ["sourceType"] = "RSS",
                             ["sourceId"] = source.Id,
                             ["rssId"] = item.Id
@@ -508,7 +625,6 @@ namespace CodexBootstrap.Modules
                                 Tags = ExtractTagsFromContent(story.Title + " " + (story.Text ?? "")),
                                 Metadata = new Dictionary<string, object>
                                 {
-                                    ["category"] = "technology",
                                     ["sourceType"] = "API",
                                     ["sourceId"] = source.Id,
                                     ["score"] = story.Score,
@@ -661,7 +777,7 @@ namespace CodexBootstrap.Modules
                 _logger.Debug($"Attempting AI concept extraction for news item: {newsItem.Title}");
 
                 var content = newsItem.Title + " " + newsItem.Content;
-                var result = await AIModuleTemplates.ExtractConceptsAsync(ModuleCommunicator, content, 5);
+                var result = await _aiTemplates.ExtractConceptsAsync(content, 5);
                 
                 if (result != null)
                 {
@@ -704,7 +820,7 @@ namespace CodexBootstrap.Modules
                 _logger.Debug($"Attempting AI scoring analysis for news item: {newsItem.Title}");
 
                 var content = newsItem.Title + " " + newsItem.Content;
-                var result = await AIModuleTemplates.AnalyzeScoringAsync(ModuleCommunicator, content, "relevance");
+                var result = await _aiTemplates.AnalyzeScoringAsync(content, "relevance");
                 
                 if (result != null)
                 {
@@ -749,7 +865,7 @@ namespace CodexBootstrap.Modules
                 _logger.Debug($"Attempting AI fractal transformation for news item: {newsItem.Title}");
 
                 var content = newsItem.Title + " " + newsItem.Content;
-                var result = await AIModuleTemplates.TransformFractalAsync(ModuleCommunicator, content);
+                var result = await _aiTemplates.TransformFractalAsync(content);
                 
                 if (result != null)
                 {
@@ -792,8 +908,9 @@ namespace CodexBootstrap.Modules
 
         private double CalculateAbundanceScore(List<string> concepts, NewsItem newsItem)
         {
-            var abundanceKeywords = new[] { "abundance", "amplification", "collective", "community", "collaboration", "growth", "innovation" };
-            var abundanceCount = concepts.Count(c => abundanceKeywords.Contains(c));
+            var abundanceAxis = _ontologyAxes.FirstOrDefault(a => a.Name.Equals("abundance", StringComparison.OrdinalIgnoreCase));
+            var abundanceKeywords = abundanceAxis?.Keywords ?? new List<string>();
+            var abundanceCount = concepts.Count(c => abundanceKeywords.Contains(c, StringComparer.OrdinalIgnoreCase));
             var totalConcepts = Math.Max(concepts.Count, 1);
             
             return Math.Min(abundanceCount / (double)totalConcepts * 2.0, 1.0);
@@ -801,8 +918,9 @@ namespace CodexBootstrap.Modules
 
         private double CalculateResonanceScore(List<string> concepts)
         {
-            var resonanceKeywords = new[] { "love", "joy", "consciousness", "unity", "harmony", "peace", "wisdom" };
-            var resonanceCount = concepts.Count(c => resonanceKeywords.Contains(c));
+            var resonanceAxis = _ontologyAxes.FirstOrDefault(a => a.Name.Equals("resonance", StringComparison.OrdinalIgnoreCase));
+            var resonanceKeywords = resonanceAxis?.Keywords ?? new List<string>();
+            var resonanceCount = concepts.Count(c => resonanceKeywords.Contains(c, StringComparer.OrdinalIgnoreCase));
             var totalConcepts = Math.Max(concepts.Count, 1);
             
             return Math.Min(resonanceCount / (double)totalConcepts * 1.5, 1.0);
@@ -810,7 +928,8 @@ namespace CodexBootstrap.Modules
 
         private string CreateBeliefSystemTranslation(NewsItem newsItem, List<string> concepts)
         {
-            var abundanceKeywords = concepts.Where(c => new[] { "abundance", "amplification", "collective" }.Contains(c)).ToList();
+            var abundanceAxis = _ontologyAxes.FirstOrDefault(a => a.Name.Equals("abundance", StringComparison.OrdinalIgnoreCase));
+            var abundanceKeywords = concepts.Where(c => (abundanceAxis?.Keywords ?? new List<string>()).Contains(c, StringComparer.OrdinalIgnoreCase)).ToList();
             
             if (abundanceKeywords.Any())
             {
@@ -822,7 +941,8 @@ namespace CodexBootstrap.Modules
 
         private string CreateAbundanceHeadline(NewsItem newsItem, List<string> concepts)
         {
-            var abundanceKeywords = concepts.Where(c => new[] { "abundance", "amplification", "collective" }.Contains(c)).ToList();
+            var abundanceAxis = _ontologyAxes.FirstOrDefault(a => a.Name.Equals("abundance", StringComparison.OrdinalIgnoreCase));
+            var abundanceKeywords = concepts.Where(c => (abundanceAxis?.Keywords ?? new List<string>()).Contains(c, StringComparer.OrdinalIgnoreCase)).ToList();
             
             if (abundanceKeywords.Any())
             {
@@ -839,11 +959,14 @@ namespace CodexBootstrap.Modules
             
             if (abundanceScore > 0.7)
                 factors.Add("High Collective Impact Potential");
-            if (concepts.Contains("community") || concepts.Contains("collaboration"))
+            var unityAxis = _ontologyAxes.FirstOrDefault(a => a.Name.Equals("unity", StringComparison.OrdinalIgnoreCase));
+            if (concepts.Any(c => (unityAxis?.Keywords ?? new List<string>()).Contains(c, StringComparer.OrdinalIgnoreCase)))
                 factors.Add("Community Engagement");
-            if (concepts.Contains("innovation") || concepts.Contains("breakthrough"))
+            var innovationAxis = _ontologyAxes.FirstOrDefault(a => a.Name.Equals("innovation", StringComparison.OrdinalIgnoreCase));
+            if (concepts.Any(c => (innovationAxis?.Keywords ?? new List<string>()).Contains(c, StringComparer.OrdinalIgnoreCase)))
                 factors.Add("Innovation Catalyst");
-            if (concepts.Contains("research") || concepts.Contains("science"))
+            var scienceAxis = _ontologyAxes.FirstOrDefault(a => a.Name.Equals("science", StringComparison.OrdinalIgnoreCase));
+            if (concepts.Any(c => (scienceAxis?.Keywords ?? new List<string>()).Contains(c, StringComparer.OrdinalIgnoreCase)))
                 factors.Add("Scientific Advancement");
             
             return factors.Any() ? factors : new List<string> { "General Interest" };
@@ -1579,20 +1702,11 @@ namespace CodexBootstrap.Modules
             var themes = new List<string>();
             var lowerContent = content.ToLower();
             
-            var themeKeywords = new Dictionary<string, string[]>
+            foreach (var axis in _ontologyAxes)
             {
-                ["technology"] = new[] { "tech", "digital", "ai", "software", "computer", "internet" },
-                ["science"] = new[] { "research", "study", "discovery", "experiment", "data" },
-                ["consciousness"] = new[] { "mind", "awareness", "consciousness", "mindfulness", "meditation" },
-                ["unity"] = new[] { "together", "collaboration", "community", "global", "united" },
-                ["abundance"] = new[] { "growth", "prosperity", "wealth", "success", "opportunity" }
-            };
-
-            foreach (var theme in themeKeywords)
-            {
-                if (theme.Value.Any(keyword => lowerContent.Contains(keyword)))
+                if (axis.Keywords.Any(keyword => lowerContent.Contains(keyword, StringComparison.OrdinalIgnoreCase)))
                 {
-                    themes.Add(theme.Key);
+                    themes.Add(axis.Name);
                 }
             }
 
@@ -1630,11 +1744,13 @@ namespace CodexBootstrap.Modules
         {
             var impactAreas = new List<string>();
             
-            if (concepts.Contains("consciousness")) impactAreas.Add("consciousness");
-            if (concepts.Contains("unity")) impactAreas.Add("unity");
-            if (concepts.Contains("abundance")) impactAreas.Add("abundance");
-            if (concepts.Contains("technology")) impactAreas.Add("technology");
-            if (concepts.Contains("science")) impactAreas.Add("science");
+            foreach (var axis in _ontologyAxes)
+            {
+                if (concepts.Any(c => axis.Keywords.Contains(c, StringComparer.OrdinalIgnoreCase)))
+                {
+                    impactAreas.Add(axis.Name);
+                }
+            }
             
             return impactAreas.Count > 0 ? impactAreas.ToArray() : new[] { "consciousness" };
         }
@@ -1661,30 +1777,144 @@ namespace CodexBootstrap.Modules
 
         private double CalculateInnovationScore(List<string> concepts, NewsItem newsItem)
         {
-            var innovationKeywords = new[] { "innovation", "breakthrough", "discovery", "new", "revolutionary", "cutting-edge" };
-            var innovationCount = concepts.Count(c => innovationKeywords.Contains(c));
+            var innovationAxis = _ontologyAxes.FirstOrDefault(a => a.Name.Equals("innovation", StringComparison.OrdinalIgnoreCase));
+            var innovationKeywords = innovationAxis?.Keywords ?? new List<string>();
+            var innovationCount = concepts.Count(c => innovationKeywords.Contains(c, StringComparer.OrdinalIgnoreCase));
             return Math.Min(1.0, innovationCount / 2.0);
         }
 
         private double CalculateImpactScore(List<string> concepts, NewsItem newsItem)
         {
-            var impactKeywords = new[] { "impact", "change", "transformation", "breakthrough", "revolutionary", "significant" };
-            var impactCount = concepts.Count(c => impactKeywords.Contains(c));
+            var impactAxis = _ontologyAxes.FirstOrDefault(a => a.Name.Equals("impact", StringComparison.OrdinalIgnoreCase));
+            var impactKeywords = impactAxis?.Keywords ?? new List<string>();
+            var impactCount = concepts.Count(c => impactKeywords.Contains(c, StringComparer.OrdinalIgnoreCase));
             return Math.Min(1.0, impactCount / 2.0);
         }
 
         private double CalculateConsciousnessScore(List<string> concepts, NewsItem newsItem)
         {
-            var consciousnessKeywords = new[] { "consciousness", "awareness", "mindfulness", "meditation", "wisdom", "enlightenment", "spiritual", "transcendence" };
-            var consciousnessCount = concepts.Count(c => consciousnessKeywords.Contains(c));
+            var axis = _ontologyAxes.FirstOrDefault(a => a.Name.Equals("consciousness", StringComparison.OrdinalIgnoreCase));
+            var consciousnessKeywords = axis?.Keywords ?? new List<string>();
+            var consciousnessCount = concepts.Count(c => consciousnessKeywords.Contains(c, StringComparer.OrdinalIgnoreCase));
             return Math.Min(1.0, consciousnessCount / 3.0);
         }
 
         private double CalculateUnityScore(List<string> concepts, NewsItem newsItem)
         {
-            var unityKeywords = new[] { "unity", "collaboration", "collective", "together", "community", "global", "international", "cooperation" };
-            var unityCount = concepts.Count(c => unityKeywords.Contains(c));
+            var axis = _ontologyAxes.FirstOrDefault(a => a.Name.Equals("unity", StringComparison.OrdinalIgnoreCase));
+            var unityKeywords = axis?.Keywords ?? new List<string>();
+            var unityCount = concepts.Count(c => unityKeywords.Contains(c, StringComparer.OrdinalIgnoreCase));
             return Math.Min(1.0, unityCount / 3.0);
+        }
+
+        // --- U-CORE Ontology integration helpers ---
+        private void LoadOntologyAxes()
+        {
+            try
+            {
+                var axes = new List<OntologyAxis>();
+
+                // Try multiple likely type ids for axes
+                foreach (var typeId in new[] { "codex.ontology.axis", "codex.meta/axis", "u-core.axis" })
+                {
+                    var nodes = _registry.GetNodesByType(typeId).ToArray();
+                    foreach (var n in nodes)
+                    {
+                        var name = n.Meta?.GetValueOrDefault("name")?.ToString() ?? n.Title;
+                        var keywordsObj = n.Meta?.GetValueOrDefault("keywords");
+                        List<string> keywords = new();
+                        if (keywordsObj is IEnumerable<object> objs)
+                        {
+                            keywords = objs.Select(o => o?.ToString() ?? "").Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                        }
+                        else if (!string.IsNullOrEmpty(n.Content?.InlineJson))
+                        {
+                            try
+                            {
+                                using var doc = JsonDocument.Parse(n.Content.InlineJson);
+                                if (doc.RootElement.TryGetProperty("keywords", out var kw) && kw.ValueKind == JsonValueKind.Array)
+                                {
+                                    keywords = kw.EnumerateArray().Select(e => e.GetString() ?? "").Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                                }
+                            }
+                            catch { }
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(name) && keywords.Any())
+                        {
+                            axes.Add(new OntologyAxis(name, keywords));
+                        }
+                    }
+                }
+
+                _ontologyAxes = axes.DistinctBy(a => a.Name.ToLowerInvariant()).ToList();
+                _logger.Info($"Loaded {_ontologyAxes.Count} ontology axes from U-CORE");
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"Failed to load ontology axes from U-CORE: {ex.Message}");
+                _ontologyAxes = new List<OntologyAxis>();
+            }
+        }
+
+        private void SeedDefaultOntologyAxes()
+        {
+            try
+            {
+                var defaults = new List<(string name, string[] keywords)>
+                {
+                    ("abundance", new [] { "abundance", "amplification", "growth", "prosperity", "opportunity" }),
+                    ("unity", new [] { "unity", "collaboration", "collective", "community", "global" }),
+                    ("resonance", new [] { "resonance", "harmony", "coherence", "joy", "love", "peace", "wisdom" }),
+                    ("innovation", new [] { "innovation", "breakthrough", "cutting-edge", "new", "discovery" }),
+                    ("science", new [] { "science", "research", "study", "experiment", "data" })
+                };
+
+                foreach (var (name, keywords) in defaults)
+                {
+                    // Skip if already exists
+                    var exists = _registry.GetNodesByType("codex.ontology.axis")
+                        .ToArray()
+                        .Any(n => string.Equals(n.Meta?.GetValueOrDefault("name")?.ToString(), name, StringComparison.OrdinalIgnoreCase));
+                    if (exists) continue;
+
+                    var node = new Node(
+                        Id: $"u-core-axis-{name.ToLowerInvariant()}",
+                        TypeId: "codex.ontology.axis",
+                        State: ContentState.Ice,
+                        Locale: "en-US",
+                        Title: name,
+                        Description: $"U-CORE ontology axis: {name}",
+                        Content: new ContentRef(
+                            MediaType: "application/json",
+                            InlineJson: JsonSerializer.Serialize(new { name, keywords }),
+                            InlineBytes: null,
+                            ExternalUri: null
+                        ),
+                        Meta: new Dictionary<string, object>
+                        {
+                            ["name"] = name,
+                            ["keywords"] = keywords
+                        }
+                    );
+
+                    _registry.Upsert(node);
+                }
+
+                _logger.Info("Seeded minimal U-CORE ontology axes.");
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"Failed seeding default ontology axes: {ex.Message}");
+            }
+        }
+
+        private static string ComputeDeterministicId(string seed)
+        {
+            using var sha1 = SHA1.Create();
+            var bytes = Encoding.UTF8.GetBytes(seed);
+            var hash = sha1.ComputeHash(bytes);
+            return Convert.ToHexString(hash)[..12].ToLowerInvariant();
         }
     }
 

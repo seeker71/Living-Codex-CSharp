@@ -49,7 +49,7 @@ namespace CodexBootstrap.Tests
             try
             {
                 // Act
-                var response = await _httpClient.GetAsync("/oauth/providers");
+                var response = await _httpClient.GetAsync("/identity/providers");
                 
                 // Assert
                 response.IsSuccessStatusCode.Should().BeTrue();
@@ -69,7 +69,7 @@ namespace CodexBootstrap.Tests
             try
             {
                 // Act
-                var response = await _httpClient.GetAsync("/oauth/google/login");
+                var response = await _httpClient.GetAsync("/identity/login/google");
                 
                 // Assert
                 response.IsSuccessStatusCode.Should().BeTrue();
@@ -164,7 +164,7 @@ namespace CodexBootstrap.Tests
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
                 
                 // Act
-                var response = await _httpClient.PostAsync("/oauth/validate", content);
+                var response = await _httpClient.PostAsync("/identity/validate", content);
                 
                 // Assert
                 response.IsSuccessStatusCode.Should().BeTrue();

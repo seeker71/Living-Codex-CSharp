@@ -209,8 +209,8 @@ namespace CodexBootstrap.Tests
                 content.Should().NotBeNullOrEmpty();
                 
                 var result = JsonSerializer.Deserialize<JsonElement>(content);
-                result.GetProperty("Provider").GetString().Should().Be("mock");
-                result.GetProperty("Success").GetBoolean().Should().BeTrue();
+                result.GetProperty("provider").GetString().Should().Be("mock");
+                result.GetProperty("success").GetBoolean().Should().BeTrue();
             }
             catch (HttpRequestException)
             {
@@ -238,7 +238,7 @@ namespace CodexBootstrap.Tests
                 responseContent.Should().NotBeNullOrEmpty();
                 
                 var result = JsonSerializer.Deserialize<JsonElement>(responseContent);
-                result.GetProperty("Success").GetBoolean().Should().BeTrue();
+                result.GetProperty("success").GetBoolean().Should().BeTrue();
             }
             catch (HttpRequestException)
             {
@@ -266,8 +266,8 @@ namespace CodexBootstrap.Tests
                 responseContent.Should().NotBeNullOrEmpty();
                 
                 var result = JsonSerializer.Deserialize<JsonElement>(responseContent);
-                result.GetProperty("Success").GetBoolean().Should().BeTrue();
-                result.GetProperty("Token").GetString().Should().NotBeNullOrEmpty();
+                result.GetProperty("success").GetBoolean().Should().BeTrue();
+                result.GetProperty("token").GetString().Should().NotBeNullOrEmpty();
             }
             catch (HttpRequestException)
             {
@@ -290,8 +290,8 @@ namespace CodexBootstrap.Tests
                 content.Should().NotBeNullOrEmpty();
                 
                 var result = JsonSerializer.Deserialize<JsonElement>(content);
-                result.GetProperty("UserId").GetString().Should().NotBeNullOrEmpty();
-                result.GetProperty("Username").GetString().Should().NotBeNullOrEmpty();
+                result.GetProperty("userId").GetString().Should().NotBeNullOrEmpty();
+                result.GetProperty("username").GetString().Should().NotBeNullOrEmpty();
             }
             catch (HttpRequestException)
             {
@@ -319,8 +319,8 @@ namespace CodexBootstrap.Tests
                 responseContent.Should().NotBeNullOrEmpty();
                 
                 var result = JsonSerializer.Deserialize<JsonElement>(responseContent);
-                result.GetProperty("Success").GetBoolean().Should().BeTrue();
-                result.GetProperty("SessionToken").GetString().Should().NotBeNullOrEmpty();
+                result.GetProperty("success").GetBoolean().Should().BeTrue();
+                result.GetProperty("sessionToken").GetString().Should().NotBeNullOrEmpty();
             }
             catch (HttpRequestException)
             {
@@ -346,7 +346,7 @@ namespace CodexBootstrap.Tests
                 content.Should().NotBeNullOrEmpty();
                 
                 var result = JsonSerializer.Deserialize<JsonElement>(content);
-                result.GetProperty("Success").GetBoolean().Should().BeTrue();
+                result.GetProperty("success").GetBoolean().Should().BeTrue();
             }
             catch (HttpRequestException)
             {

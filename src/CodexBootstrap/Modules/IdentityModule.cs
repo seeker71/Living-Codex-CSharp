@@ -128,20 +128,26 @@ public sealed class IdentityModule : IModule, IRegistryModule
     {
         try
         {
+            // Simple debug output to console
+            Console.WriteLine($"[DEBUG] InitiateLoginAsync called with provider: {provider}, returnUrl: {returnUrl}");
+            
             var identityProvider = _providerRegistry.GetProvider(provider);
             if (identityProvider == null)
             {
-                _logger.Warn($"Identity provider not found: {provider}");
+                Console.WriteLine($"[DEBUG] Identity provider not found: {provider}");
                 return new { success = false, error = $"Provider '{provider}' not found" };
             }
 
             if (!identityProvider.IsEnabled)
             {
-                _logger.Warn($"Identity provider is disabled: {provider}");
+                Console.WriteLine($"[DEBUG] Identity provider is disabled: {provider}");
                 return new { success = false, error = $"Provider '{provider}' is disabled" };
             }
 
-            return await identityProvider.InitiateLogin(returnUrl);
+            Console.WriteLine($"[DEBUG] Calling InitiateLogin on provider: {provider}");
+            var result = await identityProvider.InitiateLogin(returnUrl);
+            Console.WriteLine($"[DEBUG] InitiateLogin result: {JsonSerializer.Serialize(result)}");
+            return result;
         }
         catch (Exception ex)
         {
