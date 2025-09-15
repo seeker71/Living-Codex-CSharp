@@ -14,7 +14,7 @@ namespace CodexBootstrap.Tests
         {
             _httpClient = new HttpClient
             {
-                BaseAddress = new Uri("http://localhost:5000"), // Default port
+                BaseAddress = new Uri("http://localhost:5002"), // Correct port
                 Timeout = TimeSpan.FromSeconds(10)
             };
         }

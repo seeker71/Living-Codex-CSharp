@@ -162,7 +162,7 @@ namespace CodexBootstrap.Tests
                 
                 var providers = JsonSerializer.Deserialize<IdentityProvidersResponse>(content);
                 providers.Should().NotBeNull();
-                providers.Providers.Should().NotBeEmpty();
+                providers.providers.Should().NotBeEmpty();
             }
             catch (HttpRequestException)
             {

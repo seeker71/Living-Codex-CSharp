@@ -458,7 +458,7 @@ public sealed class IdentityModule : IModule, IRegistryModule
 public record IdentityProviderInfo(string Provider, string DisplayName, string ClientId, bool IsEnabled);
 
 [ResponseType("codex.identity.providers-response", "IdentityProvidersResponse", "Response containing available identity providers")]
-public record IdentityProvidersResponse(List<IdentityProviderInfo> Providers);
+public record IdentityProvidersResponse(List<IdentityProviderInfo> providers);
 
 [ResponseType("codex.identity.callback-response", "IdentityCallbackResponse", "Response for identity provider callback")]
 public record IdentityCallbackResponse(string Provider, bool Success, string? Token = null, string? Error = null);
