@@ -13,12 +13,16 @@ namespace CodexBootstrap.Modules;
 public class ConceptModule : IModule
 {
     private readonly IApiRouter _apiRouter;
-    private readonly NodeRegistry _registry;
+    private readonly INodeRegistry _registry;
+    private readonly ICodexLogger _logger;
+    private readonly HttpClient _httpClient;
 
-    public ConceptModule(IApiRouter apiRouter, NodeRegistry registry)
+    public ConceptModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient)
     {
-        _apiRouter = apiRouter;
         _registry = registry;
+        _logger = logger;
+        _httpClient = httpClient;
+        _apiRouter = new MockApiRouter(); // Will be set during registration
     }
 
     public string ModuleId => "codex.concept";
@@ -39,19 +43,20 @@ public class ConceptModule : IModule
         );
     }
 
-    public void Register(NodeRegistry registry)
+    public void Register(INodeRegistry registry)
     {
         // Module registration is now handled automatically by the attribute discovery system
         // This method can be used for additional module-specific setup if needed
     }
 
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
+        _apiRouter = router; // Set the actual router during registration
         // API handlers are now registered automatically by the attribute discovery system
         // This method can be used for additional manual registrations if needed
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // HTTP endpoints are now registered automatically by the attribute discovery system
         // This method can be used for additional manual registrations if needed
@@ -215,29 +220,7 @@ public class ConceptModule : IModule
             }
 
             // Remove the node from the registry
-            if (_registry is PersistentNodeRegistry persistentRegistry)
-            {
-                await persistentRegistry.DeleteNodeAsync(id);
-            }
-            else
-            {
-                // For non-persistent registries, we can't actually delete, so we'll mark as deleted
-                var deletedNode = new Node(
-                    Id: node.Id,
-                    TypeId: "codex.concept.deleted",
-                    State: ContentState.Gas,
-                    Locale: node.Locale,
-                    Title: node.Title,
-                    Description: node.Description,
-                    Content: node.Content,
-                    Meta: new Dictionary<string, object>(node.Meta ?? new Dictionary<string, object>())
-                    {
-                        ["deletedAt"] = DateTime.UtcNow,
-                        ["deleted"] = true
-                    }
-                );
-                _registry.Upsert(deletedNode);
-            }
+            _registry.RemoveNode(id);
 
             return new { 
                 id = id, 

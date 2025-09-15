@@ -8,13 +8,13 @@ namespace CodexBootstrap.Runtime;
 
 public sealed class ModuleLoader
 {
-    private readonly NodeRegistry _registry;
+    private readonly INodeRegistry _registry;
     private readonly IApiRouter _router;
     private readonly IServiceProvider _serviceProvider;
     private readonly List<IModule> _loadedModules = new();
     private readonly Core.ICodexLogger _logger;
 
-    public ModuleLoader(NodeRegistry registry, IApiRouter router, IServiceProvider serviceProvider)
+    public ModuleLoader(INodeRegistry registry, IApiRouter router, IServiceProvider serviceProvider)
     {
         _registry = registry;
         _router = router;
@@ -122,12 +122,80 @@ public sealed class ModuleLoader
 
     private void LoadModulesFromAssembly(Assembly assembly)
     {
+        var moduleTypes = new List<Type>();
+        
+        // Phase 1: Discover all module types
         foreach (var type in assembly.GetTypes())
         {
-            if (typeof(IModule).IsAssignableFrom(type) && !type.IsAbstract && Activator.CreateInstance(type) is IModule module)
+            if (typeof(IModule).IsAssignableFrom(type) && !type.IsAbstract)
             {
-                LoadModule(module);
+                moduleTypes.Add(type);
             }
+        }
+        
+        // Phase 2: Create all modules with required dependencies
+        var modules = new List<IModule>();
+        foreach (var moduleType in moduleTypes)
+        {
+            try
+            {
+                var module = CreateModule(moduleType);
+                if (module != null)
+                {
+                    modules.Add(module);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Failed to create module {moduleType.Name}: {ex.Message}", ex);
+            }
+        }
+        
+        // Phase 3: Setup inter-module communication
+        foreach (var module in modules)
+        {
+            try
+            {
+                module.SetupInterModuleCommunication(_serviceProvider);
+                _logger.Info($"Setup inter-module communication for {module.GetType().Name}");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Failed to setup inter-module communication for {module.GetType().Name}: {ex.Message}", ex);
+            }
+        }
+        
+        // Phase 4: Register all modules
+        foreach (var module in modules)
+        {
+            LoadModule(module);
+        }
+    }
+    
+    /// <summary>
+    /// Create a module instance with required dependencies
+    /// All modules must have constructor(NodeRegistry, ICodexLogger, HttpClient)
+    /// </summary>
+    private IModule? CreateModule(Type moduleType)
+    {
+        try
+        {
+            // Single constructor pattern: (INodeRegistry, ICodexLogger, HttpClient)
+            var constructor = moduleType.GetConstructor(new[] { typeof(INodeRegistry), typeof(ICodexLogger), typeof(HttpClient) });
+            if (constructor != null)
+            {
+                var logger = _serviceProvider.GetRequiredService<ICodexLogger>();
+                var httpClient = _serviceProvider.GetService<HttpClient>() ?? new HttpClient();
+                return (IModule)constructor.Invoke(new object[] { _registry, logger, httpClient });
+            }
+            
+            _logger.Error($"No suitable constructor found for module {moduleType.Name}. Expected: (INodeRegistry, ICodexLogger, HttpClient)");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Failed to create module {moduleType.Name}: {ex.Message}", ex);
+            return null;
         }
     }
 
@@ -229,7 +297,7 @@ public sealed class ModuleLoader
                     var metaNode = new Node(
                         Id: $"{moduleNode.Id}.meta.{recordType.ToLower()}",
                         TypeId: "codex.meta/type",
-                        State: ContentState.Ice,
+                        State: ContentState.Water,
                         Locale: "en",
                         Title: $"{recordType} Record Type",
                         Description: $"Meta-node definition for {recordType} record type used by {moduleNode.Title}",
@@ -290,7 +358,7 @@ public sealed class ModuleLoader
             var classNode = new Node(
                 Id: $"meta.class.{fullName}",
                 TypeId: "meta.class",
-                State: ContentState.Ice,
+                State: ContentState.Water,
                 Locale: "en",
                 Title: className,
                 Description: $"Meta-node for class {className}",
@@ -353,7 +421,7 @@ public sealed class ModuleLoader
                 var methodNode = new Node(
                     Id: $"meta.method.{classType.FullName}.{methodName}",
                     TypeId: "meta.method",
-                    State: ContentState.Ice,
+                    State: ContentState.Water,
                     Locale: "en",
                     Title: methodName,
                     Description: $"Method {methodName} in {classType.Name}",
@@ -400,7 +468,7 @@ public sealed class ModuleLoader
                     var routeNode = new Node(
                         Id: $"meta.route.{moduleType.Name}.{method.Name}",
                         TypeId: "meta.route",
-                        State: ContentState.Ice,
+                        State: ContentState.Water,
                         Locale: "en",
                         Title: $"{attr.Verb} {attr.Route}",
                         Description: $"API route {attr.Verb} {attr.Route} in {moduleType.Name}",
@@ -510,7 +578,7 @@ public sealed class ModuleLoader
                     var specNode = new Node(
                         Id: $"meta.spec.{fileName}",
                         TypeId: "meta.spec",
-                        State: ContentState.Ice,
+                        State: ContentState.Water,
                         Locale: "en",
                         Title: fileName,
                         Description: $"Specification file: {fileName}",
@@ -538,7 +606,7 @@ public sealed class ModuleLoader
                         var sectionNode = new Node(
                             Id: $"meta.spec.section.{fileName}.{section.Key}",
                             TypeId: "meta.spec.section",
-                            State: ContentState.Ice,
+                            State: ContentState.Water,
                             Locale: "en",
                             Title: section.Key,
                             Description: $"Section '{section.Key}' from {fileName}",

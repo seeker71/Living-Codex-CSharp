@@ -25,9 +25,6 @@ public sealed class UserDiscoveryModule : IModule, IRegistryModule
     }
 
     // Parameterless constructor for module loader
-    public UserDiscoveryModule() : this(new NodeRegistry(), new Log4NetLogger(typeof(UserDiscoveryModule)), new HttpClient())
-    {
-    }
 
     /// <summary>
     /// Gets the registry to use - global registry if set, otherwise local registry

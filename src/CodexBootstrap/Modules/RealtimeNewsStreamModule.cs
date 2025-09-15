@@ -266,9 +266,6 @@ namespace CodexBootstrap.Modules
         }
 
         // Parameterless constructor for module loader
-        public RealtimeNewsStreamModule() : this(new NodeRegistry(), new Log4NetLogger(typeof(RealtimeNewsStreamModule)), new HttpClient(), new Core.ConfigurationManager(new NodeRegistry(), new Log4NetLogger(typeof(Core.ConfigurationManager))), new MockApiRouter())
-        {
-        }
 
         public string Name => "Real-Time News Stream";
         public string Description => "Ingests external news sources and transforms them through fractal analysis";

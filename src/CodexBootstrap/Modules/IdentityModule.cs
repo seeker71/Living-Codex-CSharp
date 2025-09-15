@@ -39,9 +39,6 @@ public sealed class IdentityModule : IModule, IRegistryModule
     }
 
     // Parameterless constructor for module loader
-    public IdentityModule() : this(new NodeRegistry(), new Log4NetLogger(typeof(IdentityModule)), new HttpClient())
-    {
-    }
 
     /// <summary>
     /// Gets the registry to use - global registry if set, otherwise local registry

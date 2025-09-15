@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using CodexBootstrap.Core;
+using CodexBootstrap.Core.Storage;
 using CodexBootstrap.Runtime;
 using CodexBootstrap.Modules;
 using log4net;
@@ -120,46 +121,60 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
     o.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
 });
 
-        // Core services - only nodes and edges
-        // Storage backend will be configured by StorageModule
-        var persistenceEnabled = (Environment.GetEnvironmentVariable("PERSISTENCE_ENABLED") ?? "false").Equals("true", StringComparison.OrdinalIgnoreCase);
+        // Core services - Unified NodeRegistry with Ice and Water storage backends
+        var persistenceEnabled = (Environment.GetEnvironmentVariable("PERSISTENCE_ENABLED") ?? "true").Equals("true", StringComparison.OrdinalIgnoreCase);
         if (persistenceEnabled)
         {
-            builder.Services.AddSingleton<IStorageBackend>(sp =>
+            // Register Ice storage backend (high-performance, federated)
+            builder.Services.AddSingleton<IIceStorageBackend>(sp =>
             {
-                // Determine backend type and connection string
-                var storageType = Environment.GetEnvironmentVariable("STORAGE_TYPE") ?? "sqlite";
-                var storagePath = Environment.GetEnvironmentVariable("STORAGE_PATH") ?? "Data Source=data/codex.db";
-                return storageType.ToLowerInvariant() switch
+                var iceStorageType = Environment.GetEnvironmentVariable("ICE_STORAGE_TYPE") ?? "postgresql";
+                var iceConnectionString = Environment.GetEnvironmentVariable("ICE_CONNECTION_STRING") ?? 
+                    "Host=localhost;Database=codex_ice;Username=codex;Password=codex";
+                
+                return iceStorageType.ToLowerInvariant() switch
                 {
-                    "sqlite" => new SqliteStorageBackend(storagePath),
-                    _ => new SqliteStorageBackend(storagePath)
+                    "postgresql" => new PostgreSqlIceStorageBackend(iceConnectionString),
+                    _ => new PostgreSqlIceStorageBackend(iceConnectionString)
                 };
             });
 
-            builder.Services.AddSingleton<NodeRegistry>(sp =>
+            // Register Water storage backend (semi-persistent, local cache)
+            builder.Services.AddSingleton<IWaterStorageBackend>(sp =>
             {
-                var backend = sp.GetRequiredService<IStorageBackend>();
+                var waterConnectionString = Environment.GetEnvironmentVariable("WATER_CONNECTION_STRING") ?? 
+                    "Data Source=data/water_cache.db";
+                return new SqliteWaterStorageBackend(waterConnectionString);
+            });
+
+            // Register NodeRegistry
+            builder.Services.AddSingleton<INodeRegistry>(sp =>
+            {
+                var iceStorage = sp.GetRequiredService<IIceStorageBackend>();
+                var waterStorage = sp.GetRequiredService<IWaterStorageBackend>();
                 var logger = sp.GetRequiredService<CodexBootstrap.Core.ICodexLogger>();
-                return new PersistentNodeRegistry(backend, logger);
+                return new NodeRegistry(iceStorage, waterStorage, logger);
             });
         }
         else
         {
-            builder.Services.AddSingleton<NodeRegistry>(sp =>
+            builder.Services.AddSingleton<INodeRegistry>(sp =>
             {
-                // Start with a basic NodeRegistry, will be replaced by PersistentNodeRegistry
-                // when StorageModule is loaded
-                return new NodeRegistry();
+                // Fallback to basic NodeRegistry for development
+                // This would need a basic implementation for development mode
+                throw new NotImplementedException("Development mode NodeRegistry not yet implemented");
             });
         }
         builder.Services.AddSingleton<ApiRouter>();
         builder.Services.AddSingleton<IApiRouter>(sp => sp.GetRequiredService<ApiRouter>());
+        
+        // Register INodeRegistry as the primary interface
+        builder.Services.AddSingleton<INodeRegistry>(sp => sp.GetRequiredService<INodeRegistry>());
         builder.Services.AddSingleton<ModuleCommunicationWrapper>();
 
         // Generic services with interface registration
         builder.Services.AddSingleton<ModuleLoader>(sp => 
-            new ModuleLoader(sp.GetRequiredService<NodeRegistry>(), sp.GetRequiredService<IApiRouter>(), sp));
+            new ModuleLoader(sp.GetRequiredService<INodeRegistry>(), sp.GetRequiredService<IApiRouter>(), sp));
         builder.Services.AddSingleton<RouteDiscovery>();
         builder.Services.AddSingleton<CoreApiService>();
         builder.Services.AddSingleton<HealthService>();

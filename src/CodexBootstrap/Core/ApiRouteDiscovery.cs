@@ -22,7 +22,7 @@ public static class ApiRouteDiscovery
     /// <summary>
     /// Discovers and registers all API routes from attributes in the current assembly
     /// </summary>
-    public static void DiscoverAndRegisterRoutes(WebApplication app, IApiRouter router, NodeRegistry registry)
+    public static void DiscoverAndRegisterRoutes(WebApplication app, IApiRouter router, INodeRegistry registry)
     {
         ServiceProvider = app.Services;
         var assembly = Assembly.GetExecutingAssembly();
@@ -75,7 +75,7 @@ public static class ApiRouteDiscovery
     /// <summary>
     /// Registers a single route
     /// </summary>
-    private static void RegisterRoute(WebApplication app, IApiRouter router, NodeRegistry registry, 
+    private static void RegisterRoute(WebApplication app, IApiRouter router, INodeRegistry registry, 
         MethodInfo method, ApiRouteAttribute attribute)
     {
         try
@@ -237,7 +237,7 @@ public static class ApiRouteDiscovery
     /// <summary>
     /// Registers the API handler with the router
     /// </summary>
-    private static void RegisterApiHandler(IApiRouter router, NodeRegistry registry, ApiRouteAttribute attribute, MethodInfo method)
+    private static void RegisterApiHandler(IApiRouter router, INodeRegistry registry, ApiRouteAttribute attribute, MethodInfo method)
     {
         var handler = CreateHandlerDelegate(method, router, registry);
         // Convert Func<object?, Task<object>> to Func<JsonElement?, Task<object>>
@@ -251,7 +251,7 @@ public static class ApiRouteDiscovery
     /// <summary>
     /// Creates a handler delegate from the method
     /// </summary>
-    private static Func<object?, Task<object>> CreateHandlerDelegate(MethodInfo method, IApiRouter router, NodeRegistry registry)
+    private static Func<object?, Task<object>> CreateHandlerDelegate(MethodInfo method, IApiRouter router, INodeRegistry registry)
     {
         return async (object? request) =>
         {
@@ -272,8 +272,9 @@ public static class ApiRouteDiscovery
 
     /// <summary>
     /// Creates a module instance with proper dependency injection
+    /// All modules must have constructor(INodeRegistry, ICodexLogger, HttpClient)
     /// </summary>
-    private static object CreateModuleInstance(Type moduleType, IApiRouter router, NodeRegistry registry)
+    private static object CreateModuleInstance(Type moduleType, IApiRouter router, INodeRegistry registry)
     {
         // Check if we already have an instance of this module type
         if (_moduleInstances.TryGetValue(moduleType, out var existingInstance))
@@ -281,80 +282,18 @@ public static class ApiRouteDiscovery
             return existingInstance;
         }
 
-        object instance;
-
-        // Try to find a constructor that takes IApiRouter and NodeRegistry
-        var constructor = moduleType.GetConstructor(new[] { typeof(IApiRouter), typeof(NodeRegistry) });
+        // Single constructor pattern: (INodeRegistry, ICodexLogger, HttpClient)
+        var constructor = moduleType.GetConstructor(new[] { typeof(INodeRegistry), typeof(ICodexLogger), typeof(HttpClient) });
         if (constructor != null)
         {
-            instance = Activator.CreateInstance(moduleType, router, registry)!;
-        }
-        // Try to find a constructor that takes just IApiRouter
-        else if ((constructor = moduleType.GetConstructor(new[] { typeof(IApiRouter) })) != null)
-        {
-            instance = Activator.CreateInstance(moduleType, router)!;
-        }
-        // Try to find a constructor that takes just NodeRegistry
-        else if ((constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry) })) != null)
-        {
-            instance = Activator.CreateInstance(moduleType, registry)!;
-        }
-        // Try to find a constructor that takes NodeRegistry and optional RealtimeModule
-        else if ((constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(RealtimeModule) })) != null)
-        {
-            instance = Activator.CreateInstance(moduleType, registry, (RealtimeModule?)null)!;
-        }
-        // Try to find a constructor that takes NodeRegistry and optional string
-        else if ((constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(string) })) != null)
-        {
-            instance = Activator.CreateInstance(moduleType, registry, (string?)null)!;
-        }
-        // Try to find a constructor that takes NodeRegistry and optional IStorageBackend
-        else if ((constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(IStorageBackend) })) != null)
-        {
-            instance = Activator.CreateInstance(moduleType, registry, (IStorageBackend?)null)!;
-        }
-        // Try to find a constructor that takes NodeRegistry and optional ICacheManager
-        else if ((constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(ICacheManager) })) != null)
-        {
-            instance = Activator.CreateInstance(moduleType, registry, (ICacheManager?)null)!;
-        }
-        // Try to find a constructor that takes NodeRegistry and optional HttpClient
-        else if ((constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(HttpClient) })) != null)
-        {
-            // Get HttpClient from service provider
+            var logger = new Log4NetLogger(moduleType);
             var httpClient = ServiceProvider?.GetService<HttpClient>() ?? new HttpClient();
-            instance = Activator.CreateInstance(moduleType, registry, httpClient)!;
+            var instance = Activator.CreateInstance(moduleType, registry, logger, httpClient)!;
+            _moduleInstances[moduleType] = instance;
+            return instance;
         }
-        // Try to find a constructor that takes NodeRegistry and optional IDistributedStorageBackend
-        else if ((constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(IDistributedStorageBackend) })) != null)
-        {
-            instance = Activator.CreateInstance(moduleType, registry, (IDistributedStorageBackend?)null)!;
-        }
-        // Try to find a constructor that takes NodeRegistry and IApiRouter (different order)
-        else if ((constructor = moduleType.GetConstructor(new[] { typeof(NodeRegistry), typeof(IApiRouter) })) != null)
-        {
-            instance = Activator.CreateInstance(moduleType, registry, router)!;
-        }
-        // Try to find a constructor that takes IServiceProvider
-        else if ((constructor = moduleType.GetConstructor(new[] { typeof(IServiceProvider) })) != null)
-        {
-            // Create a minimal service provider
-            var services = new ServiceCollection();
-            services.AddSingleton(router);
-            services.AddSingleton(registry);
-            var serviceProvider = services.BuildServiceProvider();
-            instance = Activator.CreateInstance(moduleType, serviceProvider)!;
-        }
-        // Fallback to parameterless constructor
-        else
-        {
-            instance = Activator.CreateInstance(moduleType)!;
-        }
-
-        // Cache the instance for reuse
-        _moduleInstances[moduleType] = instance;
-        return instance;
+        
+        throw new InvalidOperationException($"Module {moduleType.Name} does not have required constructor(INodeRegistry, ICodexLogger, HttpClient)");
     }
 
     /// <summary>
@@ -372,7 +311,7 @@ public static class ApiRouteDiscovery
     /// <summary>
     /// Maps the HTTP endpoint
     /// </summary>
-    private static void MapHttpEndpoint(WebApplication app, ApiRouteAttribute attribute, MethodInfo method, IApiRouter router, NodeRegistry registry)
+    private static void MapHttpEndpoint(WebApplication app, ApiRouteAttribute attribute, MethodInfo method, IApiRouter router, INodeRegistry registry)
     {
         var httpVerb = attribute.Verb.ToUpperInvariant();
         app.MapMethods(attribute.Route, new[] { httpVerb }, async (HttpContext context) =>

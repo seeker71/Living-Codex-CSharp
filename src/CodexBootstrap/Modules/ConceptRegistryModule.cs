@@ -24,7 +24,6 @@ public class ConceptRegistryModule : IModule
         _logger = new Log4NetLogger(typeof(ConceptRegistryModule));
     }
 
-    public ConceptRegistryModule() : this(new NodeRegistry()) { }
 
     public string ModuleId => "codex.concept-registry";
     public string Name => "Concept Registry Module";

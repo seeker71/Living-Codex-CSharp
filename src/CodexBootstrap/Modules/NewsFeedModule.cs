@@ -23,10 +23,6 @@ public sealed class NewsFeedModule : IModule, IRegistryModule
         _httpClient = httpClient;
     }
 
-    // Parameterless constructor for module loader
-    public NewsFeedModule() : this(new NodeRegistry(), new Log4NetLogger(typeof(NewsFeedModule)), new HttpClient())
-    {
-    }
 
     /// <summary>
     /// Gets the registry to use - global registry if set, otherwise local registry

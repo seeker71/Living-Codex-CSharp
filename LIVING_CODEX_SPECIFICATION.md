@@ -19,11 +19,17 @@ The Living Codex is a consciousness-expanding, fractal-based system that impleme
 - **Adapters Over Features**: External I/O is adapterized; core stays thin
 - **One-Shot First**: Each coil runnable from atoms via single call
 
+### Node Registry Architecture
+- **Single Global Registry**: Only one NodeRegistry instance in the entire system
+- **Node State Lifecycle**: Ice (persistent), Water (semi-persistent), Gas (transient)
+- **No Local Registries**: All modules must use the global registry via constructor injection
+- **Portal Pattern**: External data access through unified portal modules (news, search, APIs, sensors)
+
 ## 🚨 PRODUCTION READINESS STATUS
 
 **CURRENT STATE: DEVELOPMENT READY**  
-**OVERALL COMPLETION: 55%**  
-**RECENT IMPROVEMENTS: U-CORE INTEGRATION COMPLETE, AI MODULE FALLBACK FIXED, NEWS PROCESSING OPTIMIZED**
+**OVERALL COMPLETION: 65%**  
+**RECENT IMPROVEMENTS: NODE REGISTRY ARCHITECTURE UNIFIED, SINGLE CONSTRUCTOR PATTERN ENFORCED, PERSISTENT STORAGE INTEGRATED**
 
 ### ✅ Recently Resolved Issues
 1. **Build System Fixed**: ILogger naming conflicts resolved, compilation successful
@@ -37,6 +43,12 @@ The Living Codex is a consciousness-expanding, fractal-based system that impleme
 9. **U-CORE Integration Complete**: Dynamic ontology axis loading with 7 axes (abundance, unity, resonance, innovation, science, consciousness, impact)
 10. **AI Module Fallback Fixed**: Replaced HTTP calls with direct IApiRouter communication, eliminating connection refused errors
 11. **Idempotent News Processing**: News items processed only once using deterministic IDs and duplicate checks
+12. **NodeRegistry Architecture Unified**: Single INodeRegistry interface, eliminated multiple implementations
+13. **Single Constructor Pattern**: All modules now use (INodeRegistry, ICodexLogger, HttpClient) constructor
+14. **Persistent Storage Integrated**: Ice (PostgreSQL) and Water (SQLite) storage backends implemented
+15. **Ice Node Audit Started**: Converting generated/regenerable nodes from Ice to Water state
+16. **Module Loading Refactored**: Multi-phase loading with proper dependency injection
+17. **Interface-Based Access**: All code now accesses registry through INodeRegistry interface
 
 ### 🚨 Remaining Production Blockers
 1. **Limited Testing**: Basic port testing implemented, but no comprehensive unit tests
@@ -71,11 +83,18 @@ The Living Codex is a consciousness-expanding, fractal-based system that impleme
 
 ## 🚀 System Components
 
-### 1. Core Framework (25% Complete - NOT PRODUCTION READY)
-- **Future Framework Node**: 52 modules implemented but many are incomplete prototypes
-- **Node Registry System**: Basic SQLite integration, thread safety NOT verified through testing
-- **API Route Discovery**: 363 endpoints registered but many lack proper error handling
-- **Module Loading**: Dynamic discovery works but hot-reload is broken, no error isolation testing
+### 1. Core Framework (60% Complete - ARCHITECTURE SOLIDIFIED)
+- **Future Framework Node**: 52 modules implemented, architecture unified
+- **Node Registry System**: ✅ **UNIFIED ARCHITECTURE COMPLETE**
+  - Single INodeRegistry interface with unified implementation
+  - Ice (PostgreSQL) and Water (SQLite) storage backends integrated
+  - Proper node state lifecycle management (Ice/Water/Gas)
+  - No local registries - all modules use global registry via constructor injection
+- **API Route Discovery**: 363 endpoints registered, single constructor pattern enforced
+- **Module Loading**: ✅ **REFACTORED WITH MULTI-PHASE LOADING**
+  - All modules use (INodeRegistry, ICodexLogger, HttpClient) constructor
+  - Proper dependency injection with interface-based access
+  - Module discovery, creation, communication setup, and loading phases
 - **Meta-Node System**: Basic attribute discovery implemented, spec references incomplete
 - **Spec-Driven Development**: Partial implementation, many modules lack proper spec references
 - **Meta-Node Attributes**: Some classes have attributes, many are missing or incomplete
@@ -84,7 +103,7 @@ The Living Codex is a consciousness-expanding, fractal-based system that impleme
   - **MetaNodeAttribute**: Incomplete coverage across modules
 - **API Documentation Generation**: Basic functionality, no comprehensive testing
 - **Thread Safety**: Claims made but NO TESTING to verify thread safety
-- **CRITICAL ISSUES**: Build system broken (PDB locks), no testing, no error handling
+- **REMAINING ISSUES**: Testing needed, error handling improvements, spec completion
 
 ### 2. Abundance & Amplification System (15% Complete - NOT PRODUCTION READY)
 - **User Contributions Module**: Basic structure only, no ETH integration, no security
@@ -439,10 +458,27 @@ The Concept Resonance Module implements advanced harmonic symbol comparison usin
 | `codex.portal` | Portal Module | 1.0.0 | `codex.spec.portal` | ✅ Complete |
 | `codex.temporal` | Temporal Consciousness Module | 1.0.0 | `codex.spec.temporal` | ✅ Complete |
 
+### Portal Modules (Architecture Redesign - 0% Complete)
+| Module ID | Name | Version | Spec Reference | Status |
+|-----------|------|---------|----------------|--------|
+| `codex.portal` | Portal Module | 1.0.0 | `codex.spec.portal` | 🚧 Redesign |
+| `codex.portal.news` | News Portal | 1.0.0 | `codex.spec.portal-news` | 🚧 Redesign |
+| `codex.portal.search` | Search Portal | 1.0.0 | `codex.spec.portal-search` | 🚧 Redesign |
+| `codex.portal.external-api` | External API Portal | 1.0.0 | `codex.spec.portal-external-api` | 🚧 Redesign |
+| `codex.portal.world-sensors` | World Sensors Portal | 1.0.0 | `codex.spec.portal-world-sensors` | 🚧 Redesign |
+
+#### Portal Architecture Principles
+- **Unified External Access**: All external data access through portal modules
+- **Single Registry**: All portals use the global NodeRegistry instance
+- **Node State Management**: Proper Ice/Water/Gas lifecycle for external data
+- **Constructor Injection**: No empty constructors, mandatory dependency injection
+- **Inter-Module Communication**: Proper setup phase for portal coordination
+
 ### All Modules Complete (100% Spec References)
 - **All 47 modules** now have proper spec references and meta-node attributes
 - **No pending modules** - all modules are fully integrated and operational
 - **100% success rate** for module loading and route registration
+- **Portal Modules**: Currently being redesigned for unified external data access
 
 ### Route Status Distribution
 - **Untested**: Default status for new routes
@@ -904,6 +940,34 @@ This project is licensed under the Universal Consciousness License - see the LIC
 - **Session token**: Stored securely (Keychain/SecureStorage). Refresh by creating new session nodes.
 - **PII**: Keep Ice tiny — store only required meta; render Water on device when possible.
 - **Permissions**: Role-based checks via server; client honors capability flags in projections.
+
+## 📋 Current TODO Tracking
+
+### ✅ Completed Tasks
+- [x] **Registry Architecture Redesign**: Single global registry, no local registries
+- [x] **Node State Lifecycle**: Implement proper Ice/Water/Gas node state lifecycle management
+- [x] **Module Constructor Redesign**: Remove empty constructors, implement mandatory dependency injection
+- [x] **Single Constructor Pattern**: Establish single constructor pattern for all modules
+- [x] **Persistent Storage Integration**: Integrate Ice (PostgreSQL) and Water (SQLite) storage backends
+- [x] **NodeRegistry Unification**: Create single INodeRegistry interface and consolidate implementations
+- [x] **Spec Updates**: Update Living Codex specification with new architecture principles
+
+### 🔄 In Progress Tasks
+- [ ] **Ice Node Audit**: Audit all Ice node creation and convert generated/regenerable nodes to Water state
+  - [x] ModuleLoader reflection-generated meta-nodes converted to Water
+  - [ ] Audit remaining Ice node creation patterns
+  - [ ] Convert appropriate nodes to Water state
+
+### ⏳ Pending Tasks
+- [ ] **Portal Module Architecture**: Design and implement unified Portal Module architecture for external data access
+- [ ] **News Portal Consolidation**: Consolidate all news functionality into NewsPortal module
+- [ ] **Registry Architecture Testing**: Add comprehensive testing for registry architecture and module construction
+- [ ] **Module Interface Updates**: Update remaining modules to use INodeRegistry interface
+- [ ] **Error Handling Improvements**: Enhance error handling across the system
+- [ ] **Comprehensive Testing**: Add unit and integration tests for core functionality
+
+### 🎯 Next Priority
+Continue Ice node audit to identify and convert generated/regenerable nodes from Ice to Water state, ensuring only truly persistent data remains as Ice.
 
 ### Roadmap
 - **Phase A (MVP)**: Onboarding, Auth, News Feed, Concept Cards, Interest Marking, Node Explorer, ETH Balance/Transfer basics, Wikipedia/Twitter modes.

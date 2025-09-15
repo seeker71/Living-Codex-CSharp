@@ -126,28 +126,41 @@ public sealed record ModuleSpec(
 public interface IModule
 {
     Node GetModuleNode();
-    void Register(NodeRegistry registry);
-    void RegisterApiHandlers(IApiRouter router, NodeRegistry registry);
-    void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader);
+    void Register(INodeRegistry registry);
+    void RegisterApiHandlers(IApiRouter router, INodeRegistry registry);
+    void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader);
+    
+    /// <summary>
+    /// Setup inter-module communication after all modules are created
+    /// This allows modules to reference each other and set up dependencies
+    /// Default implementation does nothing
+    /// </summary>
+    void SetupInterModuleCommunication(IServiceProvider services) { }
+    
+    /// <summary>
+    /// Unregister the module and clean up resources
+    /// Default implementation does nothing
+    /// </summary>
+    void Unregister() { }
 }
 
 public interface IApiRouter
 {
     void Register(string moduleId, string api, Func<JsonElement?, Task<object>> handler);
     bool TryGetHandler(string moduleId, string api, out Func<JsonElement?, Task<object>> handler);
-    NodeRegistry GetRegistry();
+    INodeRegistry GetRegistry();
 }
 
 public interface ISynthesizer
 {
-    Task<Node> SynthesizeAsync(Node node, NodeRegistry registry);
+    Task<Node> SynthesizeAsync(Node node, INodeRegistry registry);
 }
 
 // External source adapters resolve ContentRef.ExternalUri and/or Query
 public interface ISourceAdapter
 {
     string Scheme { get; } // e.g., http, https, file, ipfs, data, prompt
-    Task<ContentRef?> ResolveAsync(ContentRef reference, NodeRegistry registry);
+    Task<ContentRef?> ResolveAsync(ContentRef reference, INodeRegistry registry);
 }
 
 public interface IAdapterRegistry

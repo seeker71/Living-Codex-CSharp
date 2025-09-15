@@ -15,24 +15,20 @@ namespace CodexBootstrap.Modules;
     {
         private readonly IApiRouter _apiRouter;
         private readonly NodeRegistry _registry;
+        private readonly ICodexLogger _logger;
+        private readonly HttpClient _httpClient;
         private readonly Dictionary<string, UserBeliefSystem> _userBeliefSystems = new();
         private readonly Dictionary<string, ConceptTranslationCache> _translationCache = new();
         private CoreApiService? _coreApiService;
         private readonly IServiceProvider? _serviceProvider;
 
-    public UserConceptModule()
+    public UserConceptModule(NodeRegistry registry, ICodexLogger logger, HttpClient httpClient)
     {
-        // Parameterless constructor for attribute discovery
-        _apiRouter = null!;
-        _registry = null!;
-        _serviceProvider = null;
-    }
-
-    public UserConceptModule(IApiRouter apiRouter, NodeRegistry registry, IServiceProvider? serviceProvider = null)
-    {
-        _apiRouter = apiRouter;
         _registry = registry;
-        _serviceProvider = serviceProvider;
+        _logger = logger;
+        _httpClient = httpClient;
+        _apiRouter = new MockApiRouter(); // Will be set during registration
+        _serviceProvider = null;
     }
 
     public string ModuleId => "codex.userconcept";
@@ -61,6 +57,7 @@ namespace CodexBootstrap.Modules;
 
     public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
     {
+        _apiRouter = router; // Set the actual router during registration
         // API handlers are now registered automatically by the attribute discovery system
         // This method can be used for additional manual registrations if needed
     }
