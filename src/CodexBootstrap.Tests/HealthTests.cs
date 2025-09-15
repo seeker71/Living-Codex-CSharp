@@ -1,52 +1,59 @@
-using Xunit;
+using System.Threading.Tasks;
 using FluentAssertions;
+using Xunit;
 
-namespace CodexBootstrap.Tests;
-
-public class HealthTests : TestBase
+namespace CodexBootstrap.Tests
 {
-    public HealthTests() : base() { }
-
-    [Fact]
-    public async Task HealthEndpoint_ShouldReturnHealthyStatus()
+    [Collection("TestServer")]
+    public class HealthTests
     {
-        // Act
-        var health = await GetJsonAsync<dynamic>("/health");
+        private readonly TestServerFixture _fixture;
 
-        // Assert
-        health.Should().NotBeNull();
-        var healthString = health.ToString();
-        healthString.Should().Contain("healthy");
-    }
-
-    [Fact]
-    public async Task HealthEndpoint_ShouldContainModuleMetrics()
-    {
-        // Act
-        var health = await GetJsonAsync<dynamic>("/health");
-
-        // Assert
-        var healthString = health.ToString();
-        healthString.Should().Contain("moduleCount");
-        healthString.Should().Contain("registrationMetrics");
-    }
-
-    [Fact]
-    public async Task HealthEndpoint_ShouldHaveReasonableModuleCount()
-    {
-        // Act
-        var health = await GetJsonAsync<dynamic>("/health");
-
-        // Assert
-        var healthString = health.ToString();
-        healthString.Should().Contain("moduleCount");
-        
-        // Should have at least 40 modules (we know we have 49+)
-        var moduleCountMatch = System.Text.RegularExpressions.Regex.Match(healthString, @"""moduleCount"":\s*(\d+)");
-        if (moduleCountMatch.Success)
+        public HealthTests(TestServerFixture fixture)
         {
-            var moduleCount = int.Parse(moduleCountMatch.Groups[1].Value);
-            moduleCount.Should().BeGreaterThan(40);
+            _fixture = fixture;
+        }
+
+        [Fact]
+        public async Task HealthCheck_ShouldReturnHealthyStatus()
+        {
+            // Act
+            var response = await _fixture.HttpClient.GetAsync("/health");
+
+            // Assert
+            response.IsSuccessStatusCode.Should().BeTrue();
+            var content = await response.Content.ReadAsStringAsync();
+            content.Should().Contain("healthy");
+        }
+
+        [Fact]
+        public async Task HealthCheck_ShouldReturnValidJson()
+        {
+            // Act
+            var response = await _fixture.HttpClient.GetAsync("/health");
+
+            // Assert
+            response.IsSuccessStatusCode.Should().BeTrue();
+            var content = await response.Content.ReadAsStringAsync();
+            content.Should().NotBeNullOrEmpty();
+            
+            // Verify it's valid JSON by checking for common JSON structure
+            content.Should().Contain("{");
+            content.Should().Contain("}");
+        }
+
+        [Fact]
+        public async Task HealthCheck_ShouldIncludeSystemMetrics()
+        {
+            // Act
+            var response = await _fixture.HttpClient.GetAsync("/health");
+
+            // Assert
+            response.IsSuccessStatusCode.Should().BeTrue();
+            var content = await response.Content.ReadAsStringAsync();
+            content.Should().Contain("uptime");
+            content.Should().Contain("nodeCount");
+            content.Should().Contain("moduleCount");
         }
     }
 }

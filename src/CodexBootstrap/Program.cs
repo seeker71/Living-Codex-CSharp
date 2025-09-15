@@ -641,3 +641,6 @@ static void InitializeMetaNodeSystem(NodeRegistry registry)
         registry.Upsert(node);
     }
 }
+
+// Make Program class accessible for testing
+public partial class Program { }

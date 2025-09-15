@@ -4,7 +4,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <InvariantGlobalization>true</InvariantGlobalization>
-    <NoWarn>$(NoWarn);CS1998;CS8625;CS8603;CS8604;CS8601;CS8602;CS0114</NoWarn>
+    <NoWarn>$(NoWarn);CS1998;CS8625;CS8603;CS8604;CS8601;CS8602;CS0114;CS8032;NU1608</NoWarn>
     <UseAppHost>true</UseAppHost>
     <EnableHotReload>true</EnableHotReload>
     <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
@@ -45,5 +45,10 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Facebook" Version="6.0.0" />
     <PackageReference Include="AspNet.Security.OAuth.Twitter" Version="6.0.3" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+  
+  <!-- Package version overrides to suppress warnings -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
   </ItemGroup>
 </Project>

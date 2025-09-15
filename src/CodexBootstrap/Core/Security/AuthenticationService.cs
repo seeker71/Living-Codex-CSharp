@@ -399,8 +399,8 @@ namespace CodexBootstrap.Core.Security
     /// </summary>
     public class UserSession
     {
-        public string UserId { get; set; }
-        public string Email { get; set; }
+        public string UserId { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public DateTime ExpiresAt { get; set; }
         public bool IsActive { get; set; }
@@ -411,10 +411,10 @@ namespace CodexBootstrap.Core.Security
     /// </summary>
     public class User
     {
-        public string Id { get; set; }
-        public string Email { get; set; }
-        public string DisplayName { get; set; }
-        public string PasswordHash { get; set; }
+        public string Id { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+        public string PasswordHash { get; set; } = string.Empty;
         public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
@@ -426,8 +426,8 @@ namespace CodexBootstrap.Core.Security
     /// </summary>
     public interface IUserRepository
     {
-        Task<User> GetByIdAsync(string userId);
-        Task<User> GetByEmailAsync(string email);
+        Task<User?> GetByIdAsync(string userId);
+        Task<User?> GetByEmailAsync(string email);
         Task CreateAsync(User user);
         Task UpdateAsync(User user);
         Task DeleteAsync(string userId);

@@ -1,313 +1,238 @@
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
+using System.Linq;
 using CodexBootstrap.Core;
 using FluentAssertions;
 using Moq;
 using Xunit;
-using Microsoft.Extensions.Logging;
 
 namespace CodexBootstrap.Tests.Core
 {
     public class NodeRegistryTests
     {
         private readonly Mock<CodexBootstrap.Core.ICodexLogger> _mockLogger;
-        private readonly Mock<ILoggerFactory> _mockLoggerFactory;
         private readonly NodeRegistry _registry;
 
         public NodeRegistryTests()
         {
             _mockLogger = new Mock<CodexBootstrap.Core.ICodexLogger>();
-            _mockLoggerFactory = new Mock<ILoggerFactory>();
-            
-            _mockLoggerFactory.Setup(x => x.CreateLogger(It.IsAny<string>()))
-                .Returns(_mockLogger.Object);
-            
-            _registry = new NodeRegistry(_mockLoggerFactory.Object);
+            _registry = new NodeRegistry();
         }
 
         [Fact]
-        public void RegisterNode_WithValidNode_ShouldRegisterSuccessfully()
+        public void UpsertNode_WithValidNode_ShouldRegisterSuccessfully()
         {
             // Arrange
             var nodeId = "test-node";
-            var node = new Node
-            {
-                Id = nodeId,
-                Type = "test",
-                Data = new Dictionary<string, object> { { "key", "value" } },
-                CreatedAt = DateTime.UtcNow
-            };
+            var node = new Node(
+                Id: nodeId,
+                TypeId: "test",
+                State: ContentState.Ice,
+                Locale: "en",
+                Title: "Test Node",
+                Description: "A test node",
+                Content: null,
+                Meta: new Dictionary<string, object> { { "key", "value" } }
+            );
 
             // Act
-            var result = _registry.RegisterNode(node);
+            _registry.Upsert(node);
 
             // Assert
-            result.Should().BeTrue();
-            _registry.GetNode(nodeId).Should().NotBeNull();
-            _registry.GetNode(nodeId).Id.Should().Be(nodeId);
+            _registry.TryGet(nodeId, out var retrievedNode).Should().BeTrue();
+            retrievedNode.Should().NotBeNull();
+            retrievedNode.Id.Should().Be(nodeId);
         }
 
         [Fact]
-        public void RegisterNode_WithDuplicateId_ShouldReturnFalse()
+        public void UpsertNode_WithDuplicateId_ShouldOverwrite()
         {
             // Arrange
             var nodeId = "duplicate-node";
-            var node1 = new Node { Id = nodeId, Type = "test1", CreatedAt = DateTime.UtcNow };
-            var node2 = new Node { Id = nodeId, Type = "test2", CreatedAt = DateTime.UtcNow };
+            var node1 = new Node(
+                Id: nodeId,
+                TypeId: "test",
+                State: ContentState.Ice,
+                Locale: "en",
+                Title: "Test Node 1",
+                Description: "First test node",
+                Content: null,
+                Meta: new Dictionary<string, object> { { "key1", "value1" } }
+            );
+            var node2 = new Node(
+                Id: nodeId,
+                TypeId: "test",
+                State: ContentState.Ice,
+                Locale: "en",
+                Title: "Test Node 2",
+                Description: "Second test node",
+                Content: null,
+                Meta: new Dictionary<string, object> { { "key2", "value2" } }
+            );
 
             // Act
-            var result1 = _registry.RegisterNode(node1);
-            var result2 = _registry.RegisterNode(node2);
+            _registry.Upsert(node1);
+            _registry.Upsert(node2);
 
             // Assert
-            result1.Should().BeTrue();
-            result2.Should().BeFalse();
+            _registry.TryGet(nodeId, out var retrievedNode).Should().BeTrue();
+            retrievedNode.Meta["key2"].Should().Be("value2");
         }
 
         [Fact]
-        public void RegisterNode_WithNullNode_ShouldThrowArgumentNullException()
-        {
-            // Act & Assert
-            Assert.Throws<ArgumentNullException>(() => _registry.RegisterNode(null));
-        }
-
-        [Fact]
-        public void GetNode_WithExistingId_ShouldReturnNode()
+        public void TryGet_WithExistingId_ShouldReturnNode()
         {
             // Arrange
             var nodeId = "existing-node";
-            var node = new Node { Id = nodeId, Type = "test", CreatedAt = DateTime.UtcNow };
-            _registry.RegisterNode(node);
+            var node = new Node(
+                Id: nodeId,
+                TypeId: "test",
+                State: ContentState.Ice,
+                Locale: "en",
+                Title: "Existing Node",
+                Description: "An existing test node",
+                Content: null,
+                Meta: null
+            );
+            _registry.Upsert(node);
 
             // Act
-            var result = _registry.GetNode(nodeId);
+            var result = _registry.TryGet(nodeId, out var retrievedNode);
 
             // Assert
-            result.Should().NotBeNull();
-            result.Id.Should().Be(nodeId);
+            result.Should().BeTrue();
+            retrievedNode.Should().NotBeNull();
+            retrievedNode.Id.Should().Be(nodeId);
         }
 
         [Fact]
-        public void GetNode_WithNonExistentId_ShouldReturnNull()
+        public void TryGet_WithNonExistentId_ShouldReturnFalse()
         {
             // Arrange
             var nodeId = "non-existent-node";
 
             // Act
-            var result = _registry.GetNode(nodeId);
-
-            // Assert
-            result.Should().BeNull();
-        }
-
-        [Fact]
-        public void GetAllNodes_ShouldReturnAllRegisteredNodes()
-        {
-            // Arrange
-            var node1 = new Node { Id = "node1", Type = "test", CreatedAt = DateTime.UtcNow };
-            var node2 = new Node { Id = "node2", Type = "test", CreatedAt = DateTime.UtcNow };
-            _registry.RegisterNode(node1);
-            _registry.RegisterNode(node2);
-
-            // Act
-            var result = _registry.GetAllNodes();
-
-            // Assert
-            result.Should().HaveCount(2);
-            result.Should().Contain(node1);
-            result.Should().Contain(node2);
-        }
-
-        [Fact]
-        public void GetNodesByType_WithExistingType_ShouldReturnMatchingNodes()
-        {
-            // Arrange
-            var node1 = new Node { Id = "node1", Type = "test", CreatedAt = DateTime.UtcNow };
-            var node2 = new Node { Id = "node2", Type = "other", CreatedAt = DateTime.UtcNow };
-            var node3 = new Node { Id = "node3", Type = "test", CreatedAt = DateTime.UtcNow };
-            _registry.RegisterNode(node1);
-            _registry.RegisterNode(node2);
-            _registry.RegisterNode(node3);
-
-            // Act
-            var result = _registry.GetNodesByType("test");
-
-            // Assert
-            result.Should().HaveCount(2);
-            result.Should().Contain(node1);
-            result.Should().Contain(node3);
-            result.Should().NotContain(node2);
-        }
-
-        [Fact]
-        public void GetNodesByType_WithNonExistentType_ShouldReturnEmptyList()
-        {
-            // Arrange
-            var node = new Node { Id = "node1", Type = "test", CreatedAt = DateTime.UtcNow };
-            _registry.RegisterNode(node);
-
-            // Act
-            var result = _registry.GetNodesByType("non-existent");
-
-            // Assert
-            result.Should().BeEmpty();
-        }
-
-        [Fact]
-        public void UpdateNode_WithExistingNode_ShouldUpdateSuccessfully()
-        {
-            // Arrange
-            var nodeId = "update-node";
-            var originalNode = new Node 
-            { 
-                Id = nodeId, 
-                Type = "test", 
-                Data = new Dictionary<string, object> { { "key", "original" } },
-                CreatedAt = DateTime.UtcNow 
-            };
-            _registry.RegisterNode(originalNode);
-
-            var updatedNode = new Node 
-            { 
-                Id = nodeId, 
-                Type = "test", 
-                Data = new Dictionary<string, object> { { "key", "updated" } },
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
-
-            // Act
-            var result = _registry.UpdateNode(updatedNode);
-
-            // Assert
-            result.Should().BeTrue();
-            var retrievedNode = _registry.GetNode(nodeId);
-            retrievedNode.Data["key"].Should().Be("updated");
-        }
-
-        [Fact]
-        public void UpdateNode_WithNonExistentNode_ShouldReturnFalse()
-        {
-            // Arrange
-            var node = new Node { Id = "non-existent", Type = "test", CreatedAt = DateTime.UtcNow };
-
-            // Act
-            var result = _registry.UpdateNode(node);
+            var result = _registry.TryGet(nodeId, out var retrievedNode);
 
             // Assert
             result.Should().BeFalse();
+            retrievedNode.Should().BeNull();
         }
 
         [Fact]
-        public void DeleteNode_WithExistingNode_ShouldDeleteSuccessfully()
+        public void AllNodes_ShouldReturnAllRegisteredNodes()
         {
             // Arrange
-            var nodeId = "delete-node";
-            var node = new Node { Id = nodeId, Type = "test", CreatedAt = DateTime.UtcNow };
-            _registry.RegisterNode(node);
+            var node1 = new Node(
+                Id: "node1",
+                TypeId: "test",
+                State: ContentState.Ice,
+                Locale: "en",
+                Title: "Node 1",
+                Description: "First node",
+                Content: null,
+                Meta: null
+            );
+            var node2 = new Node(
+                Id: "node2",
+                TypeId: "test",
+                State: ContentState.Ice,
+                Locale: "en",
+                Title: "Node 2",
+                Description: "Second node",
+                Content: null,
+                Meta: null
+            );
+
+            _registry.Upsert(node1);
+            _registry.Upsert(node2);
 
             // Act
-            var result = _registry.DeleteNode(nodeId);
+            var allNodes = _registry.AllNodes().ToList();
 
             // Assert
-            result.Should().BeTrue();
-            _registry.GetNode(nodeId).Should().BeNull();
+            allNodes.Should().HaveCount(2);
+            allNodes.Should().Contain(n => n.Id == "node1");
+            allNodes.Should().Contain(n => n.Id == "node2");
         }
 
         [Fact]
-        public void DeleteNode_WithNonExistentNode_ShouldReturnFalse()
+        public void GetNodesByType_ShouldReturnNodesOfSpecificType()
         {
             // Arrange
-            var nodeId = "non-existent";
+            var node1 = new Node(
+                Id: "node1",
+                TypeId: "type1",
+                State: ContentState.Ice,
+                Locale: "en",
+                Title: "Node 1",
+                Description: "First node",
+                Content: null,
+                Meta: null
+            );
+            var node2 = new Node(
+                Id: "node2",
+                TypeId: "type2",
+                State: ContentState.Ice,
+                Locale: "en",
+                Title: "Node 2",
+                Description: "Second node",
+                Content: null,
+                Meta: null
+            );
+
+            _registry.Upsert(node1);
+            _registry.Upsert(node2);
 
             // Act
-            var result = _registry.DeleteNode(nodeId);
+            var type1Nodes = _registry.GetNodesByType("type1").ToList();
 
             // Assert
-            result.Should().BeFalse();
+            type1Nodes.Should().HaveCount(1);
+            type1Nodes.First().Id.Should().Be("node1");
         }
 
         [Fact]
-        public void SearchNodes_WithMatchingQuery_ShouldReturnMatchingNodes()
+        public void UpsertEdge_ShouldRegisterEdgeSuccessfully()
         {
             // Arrange
-            var node1 = new Node 
-            { 
-                Id = "node1", 
-                Type = "test", 
-                Data = new Dictionary<string, object> { { "name", "test node" } },
-                CreatedAt = DateTime.UtcNow 
-            };
-            var node2 = new Node 
-            { 
-                Id = "node2", 
-                Type = "test", 
-                Data = new Dictionary<string, object> { { "name", "other node" } },
-                CreatedAt = DateTime.UtcNow 
-            };
-            _registry.RegisterNode(node1);
-            _registry.RegisterNode(node2);
+            var edge = new Edge(
+                FromId: "node1",
+                ToId: "node2",
+                Role: "connects",
+                Weight: 1.0,
+                Meta: new Dictionary<string, object> { { "strength", "strong" } }
+            );
 
             // Act
-            var result = _registry.SearchNodes("test node");
+            _registry.Upsert(edge);
 
             // Assert
-            result.Should().HaveCount(1);
-            result.Should().Contain(node1);
+            var allEdges = _registry.AllEdges().ToList();
+            allEdges.Should().HaveCount(1);
+            allEdges.First().FromId.Should().Be("node1");
+            allEdges.First().ToId.Should().Be("node2");
         }
 
         [Fact]
-        public void SearchNodes_WithNoMatches_ShouldReturnEmptyList()
+        public void GetEdgesFrom_ShouldReturnEdgesFromSpecificNode()
         {
             // Arrange
-            var node = new Node 
-            { 
-                Id = "node1", 
-                Type = "test", 
-                Data = new Dictionary<string, object> { { "name", "test node" } },
-                CreatedAt = DateTime.UtcNow 
-            };
-            _registry.RegisterNode(node);
+            var edge1 = new Edge("node1", "node2", "connects", 1.0, null);
+            var edge2 = new Edge("node1", "node3", "relates", 0.5, null);
+            var edge3 = new Edge("node2", "node3", "links", 0.8, null);
+
+            _registry.Upsert(edge1);
+            _registry.Upsert(edge2);
+            _registry.Upsert(edge3);
 
             // Act
-            var result = _registry.SearchNodes("no match");
+            var edgesFromNode1 = _registry.GetEdgesFrom("node1").ToList();
 
             // Assert
-            result.Should().BeEmpty();
-        }
-
-        [Fact]
-        public void GetNodeCount_ShouldReturnCorrectCount()
-        {
-            // Arrange
-            var node1 = new Node { Id = "node1", Type = "test", CreatedAt = DateTime.UtcNow };
-            var node2 = new Node { Id = "node2", Type = "test", CreatedAt = DateTime.UtcNow };
-            _registry.RegisterNode(node1);
-            _registry.RegisterNode(node2);
-
-            // Act
-            var count = _registry.GetNodeCount();
-
-            // Assert
-            count.Should().Be(2);
-        }
-
-        [Fact]
-        public void Clear_ShouldRemoveAllNodes()
-        {
-            // Arrange
-            var node1 = new Node { Id = "node1", Type = "test", CreatedAt = DateTime.UtcNow };
-            var node2 = new Node { Id = "node2", Type = "test", CreatedAt = DateTime.UtcNow };
-            _registry.RegisterNode(node1);
-            _registry.RegisterNode(node2);
-
-            // Act
-            _registry.Clear();
-
-            // Assert
-            _registry.GetNodeCount().Should().Be(0);
-            _registry.GetAllNodes().Should().BeEmpty();
+            edgesFromNode1.Should().HaveCount(2);
+            edgesFromNode1.Should().Contain(e => e.ToId == "node2");
+            edgesFromNode1.Should().Contain(e => e.ToId == "node3");
         }
     }
 }

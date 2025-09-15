@@ -22,22 +22,22 @@ namespace CodexBootstrap.Core.Security
             _usersByEmail = new Dictionary<string, User>(StringComparer.OrdinalIgnoreCase);
         }
 
-        public Task<User> GetByIdAsync(string userId)
+        public Task<User?> GetByIdAsync(string userId)
         {
             if (string.IsNullOrEmpty(userId))
             {
-                return Task.FromResult<User>(null);
+                return Task.FromResult<User?>(null);
             }
 
             _users.TryGetValue(userId, out var user);
             return Task.FromResult(user);
         }
 
-        public Task<User> GetByEmailAsync(string email)
+        public Task<User?> GetByEmailAsync(string email)
         {
             if (string.IsNullOrEmpty(email))
             {
-                return Task.FromResult<User>(null);
+                return Task.FromResult<User?>(null);
             }
 
             _usersByEmail.TryGetValue(email, out var user);

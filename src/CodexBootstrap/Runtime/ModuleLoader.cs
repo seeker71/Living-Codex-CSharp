@@ -146,6 +146,13 @@ public sealed class ModuleLoader
             var moduleNode = module.GetModuleNode();
             _logger.Info($"Module node ID: {moduleNode.Id}");
             
+            // Set global registry for modules that support it
+            if (module is IRegistryModule registryModule)
+            {
+                registryModule.SetGlobalRegistry(_registry);
+                _logger.Info($"Set global registry for module: {module.GetType().Name}");
+            }
+            
             // Use enhanced module registration with spec tracking
             try
             {
