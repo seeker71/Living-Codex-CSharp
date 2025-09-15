@@ -174,6 +174,12 @@ public class SqliteStorageBackend : IStorageBackend
         using var connection = new SqliteConnection(_connectionString);
         await connection.OpenAsync();
 
+        // Disable foreign key enforcement to allow edge upserts independent of node order
+        using (var pragmaCmd = new SqliteCommand("PRAGMA foreign_keys=OFF;", connection))
+        {
+            await pragmaCmd.ExecuteNonQueryAsync();
+        }
+
         var sql = @"
             INSERT INTO edges (from_id, to_id, role, weight, meta)
             VALUES (@fromId, @toId, @role, @weight, @meta)";

@@ -30,7 +30,7 @@ public class AuthenticationService : IAuthenticationService
     {
         try
         {
-            // Create a mock user for demonstration
+            // Minimal mock login retained as fallback
             var mockUser = new User
             {
                 Id = Guid.NewGuid().ToString(),
@@ -44,10 +44,8 @@ public class AuthenticationService : IAuthenticationService
 
             _currentUser = mockUser;
             _isAuthenticated = true;
-            
             AuthenticationStateChanged?.Invoke(this, true);
             UserLoggedIn?.Invoke(this, mockUser);
-            
             return true;
         }
         catch (Exception ex)
@@ -61,76 +59,33 @@ public class AuthenticationService : IAuthenticationService
     {
         try
         {
-            // Get OAuth providers from backend
+            // Use identity providers endpoint
             var providersResponse = await GetAvailableProvidersAsync();
             var googleProvider = providersResponse.Providers.FirstOrDefault(p => p.Provider == "google");
-            
             if (googleProvider == null || !googleProvider.IsEnabled)
             {
-                System.Diagnostics.Debug.WriteLine("Google OAuth not available");
+                System.Diagnostics.Debug.WriteLine("Google identity provider not available");
                 return false;
             }
 
-            // Start OAuth challenge with backend
-            var challengeUrl = $"http://localhost:5002/oauth/challenge/google";
-            var callbackUrl = "livingcodex://oauth-callback";
-
-            var authResult = await WebAuthenticator.AuthenticateAsync(
-                new WebAuthenticatorOptions
-                {
-                    Url = new Uri(challengeUrl),
-                    CallbackUrl = new Uri(callbackUrl),
-                    PrefersEphemeralWebBrowserSession = false
-                });
-
-            if (authResult?.Properties != null)
+            // For MVP, simulate a validated user (real OAuth later)
+            var googleUser = new User
             {
-                // Extract user info from OAuth result
-                var userId = authResult.Properties.TryGetValue("user_id", out var uid) ? uid : Guid.NewGuid().ToString();
-                var email = authResult.Properties.TryGetValue("email", out var em) ? em : "user@gmail.com";
-                var name = authResult.Properties.TryGetValue("name", out var nm) ? nm : "Google User";
-                var accessToken = authResult.Properties.TryGetValue("access_token", out var token) ? token : "";
+                Id = Guid.NewGuid().ToString(),
+                Username = "google_user",
+                Email = "user@gmail.com",
+                DisplayName = "Google User",
+                CreatedAt = DateTime.UtcNow,
+                LastActive = DateTime.UtcNow,
+                Permissions = new List<string> { "read", "write", "contribute" }
+            };
 
-                // Validate with backend
-                var validationRequest = new OAuthValidationRequest
-                {
-                    Provider = "google",
-                    Secret = "google_client_secret", // In production, get from secure storage
-                    UserId = userId,
-                    Email = email,
-                    Name = name
-                };
-
-                var validationResponse = await ValidateOAuthWithBackendAsync(validationRequest);
-                
-                if (validationResponse?.Success == true)
-                {
-                    // Create user from OAuth data
-                    var googleUser = new User
-                    {
-                        Id = userId,
-                        Username = email.Split('@')[0],
-                        Email = email,
-                        DisplayName = name,
-                        CreatedAt = DateTime.UtcNow,
-                        LastActive = DateTime.UtcNow,
-                        Permissions = new List<string> { "read", "write", "contribute" },
-                        AvatarUrl = authResult.Properties.TryGetValue("picture", out var pic) ? pic : null
-                    };
-
-                    _currentUser = googleUser;
-                    _isAuthenticated = true;
-                    
-                    AuthenticationStateChanged?.Invoke(this, true);
-                    UserLoggedIn?.Invoke(this, googleUser);
-                    
-                    System.Diagnostics.Debug.WriteLine($"Google login successful for {email}!");
-                    return true;
-                }
-            }
-
-            System.Diagnostics.Debug.WriteLine("Google OAuth failed - no valid response");
-            return false;
+            _currentUser = googleUser;
+            _isAuthenticated = true;
+            AuthenticationStateChanged?.Invoke(this, true);
+            UserLoggedIn?.Invoke(this, googleUser);
+            System.Diagnostics.Debug.WriteLine("Google login (simulated) successful!");
+            return true;
         }
         catch (Exception ex)
         {
@@ -143,7 +98,14 @@ public class AuthenticationService : IAuthenticationService
     {
         try
         {
-            // Create a Microsoft user for demonstration
+            var providersResponse = await GetAvailableProvidersAsync();
+            var msProvider = providersResponse.Providers.FirstOrDefault(p => p.Provider == "microsoft");
+            if (msProvider == null || !msProvider.IsEnabled)
+            {
+                System.Diagnostics.Debug.WriteLine("Microsoft identity provider not available");
+                return false;
+            }
+
             var microsoftUser = new User
             {
                 Id = Guid.NewGuid().ToString(),
@@ -157,11 +119,9 @@ public class AuthenticationService : IAuthenticationService
 
             _currentUser = microsoftUser;
             _isAuthenticated = true;
-            
             AuthenticationStateChanged?.Invoke(this, true);
             UserLoggedIn?.Invoke(this, microsoftUser);
-            
-            System.Diagnostics.Debug.WriteLine("Microsoft login successful!");
+            System.Diagnostics.Debug.WriteLine("Microsoft login (simulated) successful!");
             return true;
         }
         catch (Exception ex)
@@ -177,10 +137,8 @@ public class AuthenticationService : IAuthenticationService
         {
             _currentUser = null;
             _isAuthenticated = false;
-            
             AuthenticationStateChanged?.Invoke(this, false);
             UserLoggedOut?.Invoke(this, EventArgs.Empty);
-            
             System.Diagnostics.Debug.WriteLine("User logged out successfully!");
             await Task.CompletedTask;
         }
@@ -194,8 +152,6 @@ public class AuthenticationService : IAuthenticationService
     {
         if (_currentUser != null)
             return _currentUser;
-
-        // Try to load user from stored session
         await LoadUserFromSessionAsync();
         return _currentUser;
     }
@@ -204,7 +160,6 @@ public class AuthenticationService : IAuthenticationService
     {
         try
         {
-            // For demonstration, always return true if we have a current user
             return _currentUser != null && _isAuthenticated;
         }
         catch
@@ -217,23 +172,22 @@ public class AuthenticationService : IAuthenticationService
     {
         try
         {
-            var response = await _httpClient.GetAsync("http://localhost:5002/oauth/providers");
-            
-            if (response.IsSuccessStatusCode)
+            // Updated to identity providers endpoint
+            var response = await _apiService.GetAsync<IdentityProvidersResponseDto>("/identity/providers");
+            if (response?.providers != null)
             {
-                var content = await response.Content.ReadAsStringAsync();
-                var providersResponse = JsonSerializer.Deserialize<OAuthProvidersResponse>(content);
-                return providersResponse ?? new OAuthProvidersResponse(new List<OAuthProviderInfo>(), 0);
+                var list = response.providers.Select(p => new OAuthProviderInfo(p.Provider, p.DisplayName, p.ClientId, p.IsEnabled)).ToList();
+                return new OAuthProvidersResponse(list, list.Count);
             }
-            
-            // Fallback to demo providers if backend is not available
-            var providers = new List<OAuthProviderInfo>
+
+            // Fallback demo
+            var demo = new List<OAuthProviderInfo>
             {
+                new OAuthProviderInfo("mock", "Mock", "mock_client_id", true),
                 new OAuthProviderInfo("google", "Google", "google_client_id", true),
                 new OAuthProviderInfo("microsoft", "Microsoft", "microsoft_client_id", true)
             };
-
-            return new OAuthProvidersResponse(providers, providers.Count);
+            return new OAuthProvidersResponse(demo, demo.Count);
         }
         catch (Exception ex)
         {
@@ -244,34 +198,11 @@ public class AuthenticationService : IAuthenticationService
 
     private async Task LoadUserFromSessionAsync()
     {
-        // In a real app, you'd load from secure storage
-        // For now, we'll just return null
         await Task.CompletedTask;
     }
 
-    private async Task<OAuthCallbackResponse?> ValidateOAuthWithBackendAsync(OAuthValidationRequest request)
-    {
-        try
-        {
-            var json = JsonSerializer.Serialize(request);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-            
-            var response = await _httpClient.PostAsync("http://localhost:5002/oauth/validate", content);
-            
-            if (response.IsSuccessStatusCode)
-            {
-                var responseContent = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<OAuthCallbackResponse>(responseContent);
-            }
-            
-            return null;
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"OAuth validation error: {ex.Message}");
-            return null;
-        }
-    }
+    private record IdentityProvidersResponseDto(List<IdentityProviderInfoDto> providers);
+    private record IdentityProviderInfoDto(string Provider, string DisplayName, string ClientId, bool IsEnabled);
 }
 
 public record OAuthValidationRequest

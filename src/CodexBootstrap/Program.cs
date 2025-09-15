@@ -122,12 +122,37 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
 
         // Core services - only nodes and edges
         // Storage backend will be configured by StorageModule
-        builder.Services.AddSingleton<NodeRegistry>(sp =>
+        var persistenceEnabled = (Environment.GetEnvironmentVariable("PERSISTENCE_ENABLED") ?? "false").Equals("true", StringComparison.OrdinalIgnoreCase);
+        if (persistenceEnabled)
         {
-            // Start with a basic NodeRegistry, will be replaced by PersistentNodeRegistry
-            // when StorageModule is loaded
-            return new NodeRegistry();
-        });
+            builder.Services.AddSingleton<IStorageBackend>(sp =>
+            {
+                // Determine backend type and connection string
+                var storageType = Environment.GetEnvironmentVariable("STORAGE_TYPE") ?? "sqlite";
+                var storagePath = Environment.GetEnvironmentVariable("STORAGE_PATH") ?? "Data Source=data/codex.db";
+                return storageType.ToLowerInvariant() switch
+                {
+                    "sqlite" => new SqliteStorageBackend(storagePath),
+                    _ => new SqliteStorageBackend(storagePath)
+                };
+            });
+
+            builder.Services.AddSingleton<NodeRegistry>(sp =>
+            {
+                var backend = sp.GetRequiredService<IStorageBackend>();
+                var logger = sp.GetRequiredService<CodexBootstrap.Core.ICodexLogger>();
+                return new PersistentNodeRegistry(backend, logger);
+            });
+        }
+        else
+        {
+            builder.Services.AddSingleton<NodeRegistry>(sp =>
+            {
+                // Start with a basic NodeRegistry, will be replaced by PersistentNodeRegistry
+                // when StorageModule is loaded
+                return new NodeRegistry();
+            });
+        }
         builder.Services.AddSingleton<ApiRouter>();
         builder.Services.AddSingleton<IApiRouter>(sp => sp.GetRequiredService<ApiRouter>());
         builder.Services.AddSingleton<ModuleCommunicationWrapper>();
@@ -283,6 +308,9 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
 // HTTP client for adapters
 builder.Services.AddHttpClient();
 
+// Monitoring services
+builder.Services.AddSingleton<ErrorMetrics>();
+
 var app = builder.Build();
 
 // Initialize global configuration with the correct port from PortConfigurationService
@@ -290,6 +318,25 @@ var portConfig = new PortConfigurationService(Environment.GetEnvironmentVariable
 var configuredPort = portConfig.GetPort("codex-bootstrap");
 var correctBaseUrl = $"http://localhost:{configuredPort}";
 GlobalConfiguration.Initialize(correctBaseUrl);
+
+// Initialize persistence if enabled
+try
+{
+    if (persistenceEnabled)
+    {
+        var storage = app.Services.GetRequiredService<IStorageBackend>();
+        storage.InitializeAsync().GetAwaiter().GetResult();
+        var reg = app.Services.GetRequiredService<NodeRegistry>();
+        if (reg is PersistentNodeRegistry preg)
+        {
+            preg.InitializeAsync().GetAwaiter().GetResult();
+        }
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Persistence initialization failed: {ex.Message}");
+}
 
 // Disable HTTPS redirection
 app.Use(async (context, next) =>
@@ -301,21 +348,24 @@ app.Use(async (context, next) =>
     await next();
 });
 
-// Add generic error handling middleware
+// Structured request logging
+app.UseRequestLogging();
+
+// Add standardized exception handling middleware with ICodexLogger
 app.UseExceptionHandler(errorApp =>
 {
     errorApp.Run(async context =>
     {
         context.Response.StatusCode = 500;
         context.Response.ContentType = "application/json";
-        
-        var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+
+        var logger = context.RequestServices.GetRequiredService<CodexBootstrap.Core.ICodexLogger>();
         var exception = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
-        
+
         if (exception != null)
         {
-            logger.LogError(exception, "An unhandled exception occurred");
-            
+            logger.Error($"Unhandled exception: {exception.Message}", exception);
+
             var response = new
             {
                 success = false,
@@ -323,7 +373,7 @@ app.UseExceptionHandler(errorApp =>
                 message = builder.Environment.IsDevelopment() ? exception.Message : "An error occurred while processing your request",
                 timestamp = DateTime.UtcNow
             };
-            
+
             await context.Response.WriteAsync(JsonSerializer.Serialize(response));
         }
     });
@@ -492,6 +542,19 @@ app.MapGet("/health", () =>
 {
     healthService.IncrementRequestCount();
     return Results.Ok(healthService.GetHealthStatus());
+});
+
+// Error metrics endpoint
+app.MapGet("/metrics/errors", (ErrorMetrics metrics) =>
+{
+    var snapshot = metrics.GetSnapshot();
+    return Results.Ok(new
+    {
+        success = true,
+        timestamp = DateTime.UtcNow,
+        totalErrors = snapshot.TotalErrors,
+        byRoute = snapshot.ErrorsByRoute
+    });
 });
 
 // Dynamic API route — self‑describing invocation

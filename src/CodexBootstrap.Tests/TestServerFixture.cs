@@ -35,13 +35,20 @@ namespace CodexBootstrap.Tests
             var startInfo = new ProcessStartInfo
             {
                 FileName = "dotnet",
-                Arguments = $"run --project src/CodexBootstrap/CodexBootstrap.csproj",
+                Arguments = $"run --no-build --project src/CodexBootstrap/CodexBootstrap.csproj --urls http://localhost:{_port}",
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true,
                 WorkingDirectory = "/Users/ursmuff/source/Living-Codex-CSharp" // Set working directory to project root
             };
+
+            // Disable realtime news ingestion during tests to reduce noise and speed up shutdown
+            startInfo.EnvironmentVariables["NEWS_INGESTION_ENABLED"] = "false";
+            // Ensure server binds to the expected port and runs with predictable environment
+            startInfo.EnvironmentVariables["ASPNETCORE_URLS"] = $"http://localhost:{_port}";
+            startInfo.EnvironmentVariables["ASPNETCORE_ENVIRONMENT"] = "Testing";
+            startInfo.EnvironmentVariables["DOTNET_ENVIRONMENT"] = "Testing";
 
             _serverProcess = Process.Start(startInfo);
             if (_serverProcess == null)
@@ -142,42 +149,94 @@ namespace CodexBootstrap.Tests
                 
                 try
                 {
-                    // First try to close the main window (if it has one)
-                    if (!_serverProcess.CloseMainWindow())
+                    // macOS/Linux: try SIGINT, then SIGTERM
+                    try
                     {
-                        Console.WriteLine($"[TestServerFixture] CloseMainWindow failed, forcing kill...");
-                        _serverProcess.Kill();
+                        Console.WriteLine($"[TestServerFixture] Sending SIGINT to process {_serverProcess.Id}...");
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "/bin/kill",
+                            Arguments = $"-2 {_serverProcess.Id}",
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        })?.Dispose();
                     }
-                    
-                    // Wait for the process to exit with a timeout
-                    Console.WriteLine($"[TestServerFixture] Waiting for server process to exit (max 10s)...");
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[TestServerFixture] Failed to send SIGINT: {ex.Message}");
+                    }
+
                     var exitTask = _serverProcess.WaitForExitAsync();
-                    var timeoutTask = Task.Delay(TimeSpan.FromSeconds(10));
-                    
-                    var completedTask = await Task.WhenAny(exitTask, timeoutTask);
-                    
-                    if (completedTask == exitTask)
+                    var timeoutTask = Task.Delay(TimeSpan.FromSeconds(5));
+                    var completed = await Task.WhenAny(exitTask, timeoutTask);
+
+                    if (completed != exitTask && !_serverProcess.HasExited)
+                    {
+                        try
+                        {
+                            Console.WriteLine($"[TestServerFixture] Sending SIGTERM to process {_serverProcess.Id}...");
+                            Process.Start(new ProcessStartInfo
+                            {
+                                FileName = "/bin/kill",
+                                Arguments = $"-15 {_serverProcess.Id}",
+                                RedirectStandardOutput = true,
+                                RedirectStandardError = true,
+                                UseShellExecute = false,
+                                CreateNoWindow = true
+                            })?.Dispose();
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[TestServerFixture] Failed to send SIGTERM: {ex.Message}");
+                        }
+
+                        // Wait a bit after SIGTERM
+                        var termExitTask = _serverProcess.WaitForExitAsync();
+                        var termTimeoutTask = Task.Delay(TimeSpan.FromSeconds(5));
+                        completed = await Task.WhenAny(termExitTask, termTimeoutTask);
+                    }
+
+                    if (_serverProcess.HasExited)
                     {
                         Console.WriteLine($"[TestServerFixture] Server process exited gracefully with code {_serverProcess.ExitCode}");
                     }
                     else
                     {
-                        Console.WriteLine($"[TestServerFixture] Server process did not exit within 10s, forcing kill...");
-                        _serverProcess.Kill(true); // Kill the entire process tree
-                        
-                        // Wait a bit more for the forced kill
+                        Console.WriteLine($"[TestServerFixture] Graceful signals failed, falling back to Kill...");
+
+                        // Fallback: attempt to close main window (no-op for console apps) then kill
+                        if (!_serverProcess.CloseMainWindow())
+                        {
+                            Console.WriteLine($"[TestServerFixture] CloseMainWindow failed, forcing kill...");
+                            _serverProcess.Kill();
+                        }
+
+                        Console.WriteLine($"[TestServerFixture] Waiting for server process to exit (max 10s)...");
                         var forceExitTask = _serverProcess.WaitForExitAsync();
-                        var forceTimeoutTask = Task.Delay(TimeSpan.FromSeconds(5));
-                        
+                        var forceTimeoutTask = Task.Delay(TimeSpan.FromSeconds(10));
                         var forceCompletedTask = await Task.WhenAny(forceExitTask, forceTimeoutTask);
-                        
+
                         if (forceCompletedTask == forceExitTask)
                         {
                             Console.WriteLine($"[TestServerFixture] Server process killed with code {_serverProcess.ExitCode}");
                         }
                         else
                         {
-                            Console.WriteLine($"[TestServerFixture] WARNING: Server process still not exited after forced kill");
+                            Console.WriteLine($"[TestServerFixture] Server process did not exit within 10s, forcing kill of process tree...");
+                            _serverProcess.Kill(true);
+                            var treeExitTask = _serverProcess.WaitForExitAsync();
+                            var treeTimeoutTask = Task.Delay(TimeSpan.FromSeconds(5));
+                            var treeCompletedTask = await Task.WhenAny(treeExitTask, treeTimeoutTask);
+                            if (treeCompletedTask == treeExitTask)
+                            {
+                                Console.WriteLine($"[TestServerFixture] Server process tree killed with code {_serverProcess.ExitCode}");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"[TestServerFixture] WARNING: Server process still not exited after forced kill");
+                            }
                         }
                     }
                 }

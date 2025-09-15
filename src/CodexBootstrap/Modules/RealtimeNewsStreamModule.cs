@@ -289,12 +289,24 @@ namespace CodexBootstrap.Modules
         _logger.Info("Registering Real-Time News Stream Module with NodeRegistry");
         Initialize();
         
-        // Start the timers when module is registered
-        _ingestionTimer.Change(TimeSpan.Zero, TimeSpan.FromMinutes(_ingestionIntervalMinutes));
-        _cleanupTimer.Change(TimeSpan.FromHours(1), TimeSpan.FromHours(_cleanupIntervalHours));
-        
-        // Start initial news ingestion
-        _ = Task.Run(async () => await IngestNewsFromSources(null));
+        // Gate ingestion via environment flag (default: enabled)
+        var enabledEnv = Environment.GetEnvironmentVariable("NEWS_INGESTION_ENABLED");
+        var ingestionEnabled = string.IsNullOrWhiteSpace(enabledEnv) || enabledEnv.Equals("true", StringComparison.OrdinalIgnoreCase) || enabledEnv == "1";
+
+        if (ingestionEnabled)
+        {
+            // Start the timers when module is registered
+            _ingestionTimer.Change(TimeSpan.Zero, TimeSpan.FromMinutes(_ingestionIntervalMinutes));
+            _cleanupTimer.Change(TimeSpan.FromHours(1), TimeSpan.FromHours(_cleanupIntervalHours));
+            
+            // Start initial news ingestion
+            _ = Task.Run(async () => await IngestNewsFromSources(null));
+            _logger.Info("RealtimeNewsStreamModule ingestion enabled (NEWS_INGESTION_ENABLED=true)");
+        }
+        else
+        {
+            _logger.Warn("RealtimeNewsStreamModule ingestion disabled via NEWS_INGESTION_ENABLED=false");
+        }
     }
 
         public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)

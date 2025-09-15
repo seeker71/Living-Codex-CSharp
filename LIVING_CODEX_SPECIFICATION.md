@@ -280,7 +280,7 @@ The Living Codex is a consciousness-expanding, fractal-based system that impleme
 ### Technology Stack
 - **Backend**: .NET 6.0 with ASP.NET Core
 - **Database**: SQLite with JSON file backup
-- **AI Integration**: Ollama with local LLM models
+- **AI Integration**: Ollama with local LLM model
 - **Caching**: In-memory with configurable timeouts
 - **Monitoring**: Prometheus + Grafana
 - **Deployment**: Docker + Kubernetes
@@ -293,6 +293,22 @@ The Living Codex is a consciousness-expanding, fractal-based system that impleme
 - **Meta-Data Support**: Rich metadata stored in node.Meta dictionary
 - **Query Capabilities**: Type-based queries using NodeRegistry.GetNodesByType()
 - **Consistency**: All modules use same storage mechanism for unified data management
+
+#### Persistence Configuration
+- **Components**:
+  - `PersistentNodeRegistry`: registry that composes a storage backend and cache manager; initialize once at startup.
+  - `SqliteStorageBackend`: SQLite tables `nodes` and `edges` with JSON columns for `content` and `meta` and indices on type/state.
+  - `StorageModule`: selects backend via env; optionally wraps with `DistributedStorageBackend` when cluster settings are provided.
+- **Environment Flags**:
+  - `PERSISTENCE_ENABLED`: `true|false` toggle for using `PersistentNodeRegistry` via DI.
+  - `STORAGE_TYPE`: `sqlite|jsonfile` backend selector (default `sqlite` when persistence enabled).
+  - `STORAGE_PATH`: connection string or path. For SQLite use e.g. `Data Source=data/codex.db`.
+  - Optional clustering: `CLUSTER_ID`, `SEED_NODES`, `REPLICATION_FACTOR`, `READ_CONSISTENCY`, `WRITE_CONSISTENCY`.
+- **Startup Behavior**:
+  - On startup, when `PERSISTENCE_ENABLED=true`, backend and registry are initialized before module loading; U‑CORE seeding then proceeds and persists nodes.
+  - To support "Tiny Deltas", edges may be stored before related nodes; the SQLite backend relaxes FK enforcement on edge inserts to avoid ordering failures.
+- **One‑Shot Validation**:
+  - Quick check: create a node via `POST /nodes`, restart, and `GET /nodes/{id}` should return the persisted node.
 
 ### Multi-Service Architecture
 - **Distributed Service Mesh**: Automatic discovery and registration
@@ -426,7 +442,7 @@ The Concept Resonance Module implements advanced harmonic symbol comparison usin
 ### All Modules Complete (100% Spec References)
 - **All 47 modules** now have proper spec references and meta-node attributes
 - **No pending modules** - all modules are fully integrated and operational
-- **100% success rate** for module loading and registration
+- **100% success rate** for module loading and route registration
 
 ### Route Status Distribution
 - **Untested**: Default status for new routes
@@ -551,11 +567,11 @@ The Concept Resonance Module implements advanced harmonic symbol comparison usin
 - `POST /ucore/process` - Process U-CORE
 - `GET /ucore/status` - U-CORE status
 - `POST /ucore/resonance` - Calculate resonance
-- `GET /ucore/frequencies` - Get frequencies
+- `GET /ucore/patterns` - Get patterns
 - `POST /ucore/align` - Align frequencies
 - `GET /ucore/consciousness` - Consciousness level
 - `POST /ucore/expand` - Expand consciousness
-- `GET /ucore/patterns` - Get patterns
+- `GET /ucore/frequencies` - Get frequencies
 - `POST /ucore/transform` - Transform patterns
 - `GET /ucore/evolution` - Evolution status
 
@@ -798,183 +814,6 @@ curl -X POST http://localhost:5001/translation/translate \
 - [ ] Cross-service concept exchange
 - [x] **Automatic Concept Discovery & Ontology Integration** - Discovered concepts automatically registered in U-CORE ontology with relationships and amplification
 
-## 🚧 Mock/Simulation Code Tracking
-
-### Currently Mocked (Need Real Implementation):
-1. **AIModule Concept Extraction** - Lines 748-891 in AIModule.cs
-   - `ExtractConceptsBySemanticPatterns()` - TODO: Implement semantic pattern recognition
-   - `ExtractConceptsByContext()` - TODO: Implement context-aware concept detection  
-   - `ExtractConceptsByOntology()` - TODO: Implement ontology-aware concept mapping
-   - `MergeSimilarConcepts()` - TODO: Implement concept merging logic
-   - `CalculateConfidence()` - TODO: Implement confidence calculation
-
-2. **AIModule LLM Integration** - Lines 459-469 in AIModule.cs
-   - `LLMFutureQueryAsync()` - TODO: Implement actual LLM future query logic
-   - Placeholder responses instead of real LLM calls
-
-3. **Fractal Transformation** - Lines 819-837 in AIModule.cs
-   - `PerformFractalTransformation()` - TODO: Implement sophisticated fractal transformation
-
-### Recently Fixed Issues:
-1. **AI JSON Parsing** - Fixed LLM response parsing to handle markdown code blocks (```json)
-2. **Concept Discovery Integration** - Fixed HTTP integration between ConceptRegistryModule and AIModule
-3. **Model Management System** - Implemented automatic model availability checking and pulling
-4. **Task-Specific Model Configuration** - Added optimized configurations for different AI tasks
-5. **Concept Extraction Optimization** - Configured Llama 3.1 8B specifically for concept extraction with lower temperature and structured JSON output
-
-### Development Environment Issues:
-1. **Hot-Reloading Not Working** - Build errors not caught by hot-reloading, requiring manual restarts
-   - Status: CRITICAL - Development workflow is broken
-   - Impact: Slows development and allows broken code to run
-   - Solution Needed: Fix .NET hot-reload configuration
-
-### Real Implementation (Working):
-1. **LLMFutureKnowledgeModule** - Real Ollama integration with HTTP calls
-2. **DynamicAttributionSystem** - Real LLM integration with fallback handling
-3. **U-CORE Ontology System** - Real concept registration and relationship management
-4. **Concept Amplification** - Real resonance and frequency calculation
-
-## 📚 API Reference
-
-### Core Endpoints
-- `GET /health` - System health status
-- `GET /metrics` - Performance metrics
-- `GET /modules/status` - Module health
-
-### Abundance System
-- `POST /contributions/record` - Record user contribution
-- `GET /contributions/user/{userId}` - Get user contributions
-- `GET /contributions/abundance/collective-energy` - Get collective energy
-
-### Future Knowledge
-- `POST /future/knowledge/retrieve` - Retrieve future knowledge
-- `POST /future/patterns/discover` - Discover patterns
-- `GET /future/patterns/trending` - Get trending patterns
-
-### Resonance Engine
-- `POST /resonance/calculate` - Calculate resonance
-- `GET /resonance/patterns` - Get resonance patterns
-- `POST /joy/amplify` - Amplify joy
-
-### Concept Resonance (CRK + OT-φ)
-- `POST /concepts/resonance/compare` - Compare concept symbols using CRK and optional OT-φ
-- `POST /concepts/resonance/encode` - Store concept symbol as harmonic node
-
-### Translation
-- `POST /translation/translate` - Translate text
-- `GET /translation/history` - Get translation history
-
-### LLM Configuration
-- `GET /llm/configs` - Get available LLM configurations
-- `POST /llm/config` - Create custom LLM configuration
-- `GET /llm/optimal/{useCase}` - Get optimal configuration for use case
-
-### Real-time News
-- `GET /news/stream` - Subscribe to real-time news stream
-- `POST /news/sources` - Add news source
-- `GET /news/sources` - Get configured news sources
-- `POST /news/subscribe` - Subscribe to news feed
-- `GET /news/feed/{userId}` - Get personalized news feed
-
-### Dynamic Attribution
-- `POST /attribution/generate` - Generate dynamic content
-- `GET /attribution/cache` - Get cached attributions
-- `POST /attribution/clear` - Clear attribution cache
-
-### Graph Query System
-- `POST /graph/query` - Execute graph queries
-- `GET /graph/meta-nodes` - Get meta-node information
-- `POST /graph/explore` - Explore code structure
-- `GET /graph/relationships` - Get node relationships
-
-### Module Consciousness
-- `GET /consciousness/map` - Get module consciousness map
-- `GET /consciousness/frequencies` - Get frequency-based module organization
-- `POST /consciousness/align` - Align module frequencies
-
-### Concept Discovery & Ontology Integration
-- `POST /concept/discover` - Discover and register concepts from content
-- `POST /concept/ontology/register` - Register concept in U-CORE ontology
-- `POST /concept/ontology/relate` - Create relationships between concepts
-- `GET /concept/ontology/explore/{id}` - Explore concept relationships
-- `POST /concept/ontology/amplify` - Amplify concept resonance
-- `GET /concept/ontology/frequencies` - Get concept frequency mappings
-
-### OAuth Authentication & User Discovery
-- `GET /oauth/providers` - Get available OAuth providers
-- `GET /oauth/challenge/{provider}` - Initiate OAuth challenge
-- `GET /oauth/callback/{provider}` - Handle OAuth callback
-- `POST /oauth/validate` - Validate OAuth credentials and create session
-- `POST /oauth/validate-session` - Validate existing session cookie
-- `GET /oauth/test` - Test OAuth configuration (development)
-- `GET /oauth/debug` - Debug OAuth environment variables
-- `POST /oauth/discover/users` - Discover users by interests
-- `POST /oauth/discover/location` - Discover users by location
-- `POST /oauth/concepts/contributors` - Find concept contributors
-- `GET /oauth/geocode` - Geocode location string
-- `POST /oauth/users/store` - Store OAuth user profile
-
-### Portal System - External World Interface
-- `POST /portal/connect` - Connect to an external world through a portal
-- `GET /portal/list` - List all active portal connections
-- `POST /portal/explore` - Begin fractal exploration of a portal
-- `GET /portal/exploration/{explorationId}` - Get exploration results and progress
-- `POST /portal/contribute` - Contribute to an external world through a portal
-- `GET /portal/contributions/{portalId}` - Get contributions made to a specific portal
-- `POST /portal/disconnect` - Disconnect from a portal
-
-### Temporal Consciousness System - Time & Temporality Interface
-- `POST /temporal/portal/connect` - Connect to a temporal dimension through consciousness
-- `GET /temporal/portal/list` - List all active temporal portals
-- `POST /temporal/explore` - Begin fractal exploration of temporal dimensions
-- `GET /temporal/exploration/{explorationId}` - Get temporal exploration results and progress
-- `POST /temporal/contribute` - Contribute consciousness to a temporal moment
-- `GET /temporal/contributions/{portalId}` - Get contributions made to a specific temporal portal
-- `POST /temporal/disconnect` - Disconnect from a temporal portal
-
-## 🎯 Recent Improvements & Current Status
-
-### Latest Achievements (January 2025)
-1. **AI Module Refactoring**: Successfully refactored from 3300+ lines to 480 lines (85% reduction)
-2. **Meta-Node Attributes**: Added comprehensive meta-node registration attributes to all public classes and records
-3. **JSON Serialization Fix**: Resolved POST endpoint JSON parsing issues with proper request/response models
-4. **Environment Configuration**: Fixed .env file loading for OpenAI API key integration
-5. **LLM Integration**: Implemented real Ollama integration with task-specific configurations
-6. **Prompt Template System**: Externalized prompts with node-based storage and management
-7. **Tracking System**: Added comprehensive LLM operation tracking (provider, model, execution time)
-8. **OAuth Authentication**: Implemented multi-provider OAuth authentication (Google, Microsoft)
-9. **User Discovery System**: Advanced user discovery by interests, location, and concept contributions
-10. **Concept Resonance Module**: Implemented CRK (Codex Resonance Kernel) and OT-φ for harmonic symbol comparison
-11. **OAuth Session Management**: Implemented secure session cookies with OAuth validation
-12. **Collection Modification Fixes**: Resolved all thread-safety issues in RealtimeNewsStreamModule
-13. **Advanced Relationship Queries**: Implemented NodeRegistry.GetEdges() for concept relationship queries
-14. **External Geocoding**: Real implementation with external service integration
-15. **System Stability**: 100% success rate for module loading and route registration
-16. **Temporal Consciousness Module**: Implemented fractal time exploration with NodeRegistry storage
-17. **NodeRegistry Storage Migration**: Migrated Temporal Consciousness Module from in-memory to persistent node storage
-18. **Unified Data Model**: All temporal data now follows "Everything is a Node" principle for consistency
-
-### Current System State
-- **Total Modules**: 47 modules loaded with 100% success rate
-- **API Endpoints**: 347 endpoints with comprehensive status tracking
-- **Meta-Node Coverage**: 100% of public classes and records have proper attributes
-- **AI Integration**: Fully functional with multiple LLM providers
-- **OAuth Integration**: Multi-provider authentication with user discovery and session management
-- **Spec References**: 47/47 modules (100%) have spec references
-- **System Health**: 100% success rate for module and route registration
-- **Thread Safety**: All collection modification issues resolved
-- **Session Management**: Secure OAuth validation with persistent user profiles
-
-### Next Priorities
-1. **Performance Optimization**: Optimize node operations and caching for large-scale deployments
-2. **Hot-Reload System**: Implement dynamic module reloading for development workflows
-3. **Comprehensive Testing**: End-to-end integration testing across all 347 API routes
-4. **Real-time Features**: Enhance SignalR integration for live updates and notifications
-5. **Production Deployment**: Docker containerization and Kubernetes orchestration
-6. **API Documentation Enhancement**: Advanced OpenAPI features and client SDK generation
-7. **Advanced AI Features**: Enhanced concept extraction and semantic analysis
-8. **Mobile Integration**: Mobile app development and API optimization
-
 ## 🤝 Contributing
 
 The Living Codex is built on the principle of collective consciousness expansion. All contributions are welcome and will be rewarded through the abundance system.
@@ -998,3 +837,78 @@ This project is licensed under the Universal Consciousness License - see the LIC
 ---
 
 *"In the dance of consciousness, every node resonates with the infinite. The Living Codex is not just a system—it's a bridge between the known and unknown, a catalyst for human evolution, and a celebration of the sacred geometry that connects us all."* ✨
+
+## 📱 Mobile App Specification
+
+### Vision and Goals
+- **End-to-end resonance experience**: Register/sign in, hold ETH, discover concepts, express interest, explore nodes/edges, read news, and interact via multiple exploration modes — all driven by resonance instead of fixed social graphs.
+- **Everything is a Node**: The app renders nodes and edges via adapters without embedding persistence-specific logic. UI consumes projections (Water/Gas) derived from Ice atoms.
+- **Deterministic, tiny deltas**: All user actions generate minimal node/edge deltas; transient projections are cached but not persisted as distinct nodes unless promoted.
+
+### Architectural Principles (Ice / Water / Gas)
+- **Ice (Atoms)**: Canonical nodes/edges as stored via `PersistentNodeRegistry` (e.g., `codex.user`, `codex.concept`, `api`, `portal`, `news.item`).
+- **Water (Materialized Views)**: Deterministic projections for UI (lists, cards, feeds) computed from Ice with caching (time-bound, invalidation on deltas). Not persisted as independent nodes.
+- **Gas (Derivable/Transient)**: Real-time, ephemeral state (e.g., live filters, sort orders, hover/selection, drag context) that can be recomputed or discarded at will.
+
+### View-Adapter Pattern (Adapters over Features)
+- **Adapters**: Convert Ice nodes/edges into typed view models. One adapter per media type and per domain:
+  - Media adapters: `text/plain`, `text/markdown`, `text/html`, `application/json`, `image/*`, `code/*`.
+  - Domain adapters: `concept`, `user`, `news.item`, `portal`, `translation`, `ucore.axis`.
+- **Views**: Render projections using adapter-provided schemas. Views do not know about storage; they receive Water (VMs) and render.
+- **Deterministic Projections**: Given the same Ice inputs, adapters always produce the same Water/Gas outputs.
+
+### Core Mobile Flows (MVP)
+- **Onboarding**
+  - Welcome → About pages (reuse spec, guides) → Create account (username/password) → Optional OAuth (mock first).
+- **Authentication**
+  - Register: POST `/identity/users` → success node `user.{username}`.
+  - Login: POST `/identity/authenticate` → session token via `/identity/sessions`.
+- **Wallet / ETH**
+  - Display ETH balance via `GET /ledger/balance/{address}`.
+  - Transfer ETH via `POST /ledger/transfer` (dev/test chain or mock provider).
+- **Concept Discovery & Interest**
+  - Discover: POST `/users/discover` (by interest, geo, ontology level) and `GET /concepts/{conceptId}/contributors`.
+  - Interest marking: create edge `user->{concept}` role `interested-in` via domain API (or generic `POST /edges`).
+- **Node/Edge Explorer**
+  - Browse any node: `GET /nodes/{id}` with full content and meta; edges via `/edges/from/{id}` and `/edges/to/{id}`.
+  - Media renderers per content type; code/markdown/HTML/image supported with safe viewers.
+- **News Feed**
+  - Personalized feed: `GET /news/feed/{userId}`; items are nodes with deterministic IDs; open item to view full content and linked concepts.
+- **Concept Exploration**
+  - Concept page shows: name, description, full content; related users, topics, resonance/axes; actions: follow/interest/translate.
+
+### Exploration Modes (Resonance-first UI)
+- **Wikipedia Mode**: Hierarchical concept pages; sidebars of related concepts; emphasis on ontology and references.
+- **Twitter Mode**: Stream cards (concepts/news) with short excerpts, reactions, and quick interest toggles.
+- **Facebook Mode**: Rich feed with comments/threads as nodes; social resonance (who resonates) derived from edges, not friend lists.
+- **Reddit Mode**: Topic-centric boards mapped from ontology subgraphs; upvote = edge weight delta; threads are nodes and edges.
+- **Telegram Mode**: Chat-style streams of concept and news nodes; quick actions to expand and link concepts.
+- **Tinder Mode**: Swipe through concepts or opportunities; left/right gesture creates resonance edges with weights.
+- **Nextdoor/Zillow Modes**: Geo-anchored concept listings; property/neighbor nodes; map overlays from node meta.
+
+### APIs and Contracts (Reuse Existing Endpoints)
+- **Auth**: `/identity/users`, `/identity/authenticate`, `/identity/sessions`.
+- **Users / Profiles**: `/identity/users/{id}`.
+- **Ledger (ETH)**: `/ledger/balance/{address}`, `/ledger/transfer`.
+- **Concepts**: `/userconcept/*`, `/concept/create`, `/contributions/*`, `/concepts/{conceptId}/contributors`.
+- **News**: `/news/feed/{userId}`, `/news/search`.
+- **Core Graph**: `/nodes`, `/nodes/{id}`, `/edges`, `/edges/from/{id}`, `/edges/to/{id}`.
+- **U‑CORE**: `/ucore/frequencies`, resonance endpoints from Joy/U-CORE modules.
+
+### Caching and Performance
+- **Client cache**: Short‑lived caches of Water projections; invalidate on node delta events.
+- **Server cache**: Continue using `HealthService` counters and module caches; add ETags for static content nodes.
+- **Offline-first (later)**: Persist encrypted snapshots of selected Water for read-only viewing.
+
+### Security and Privacy
+- **Session token**: Stored securely (Keychain/SecureStorage). Refresh by creating new session nodes.
+- **PII**: Keep Ice tiny — store only required meta; render Water on device when possible.
+- **Permissions**: Role-based checks via server; client honors capability flags in projections.
+
+### Roadmap
+- **Phase A (MVP)**: Onboarding, Auth, News Feed, Concept Cards, Interest Marking, Node Explorer, ETH Balance/Transfer basics, Wikipedia/Twitter modes.
+- **Phase B**: Reddit/Telegram modes, geo overlays, translation and media adapters expansion, offline caches.
+- **Phase C**: OAuth providers, advanced resonance visualizations, portal integrations, push notifications.
+
+### Acceptance Criteria (One‑Shot First)
+- A new user can register, sign in, see a personalized feed, explore a concept, mark interest, view a node’s full content with appropriate renderer, and transfer ETH on a test chain — all without manual backend changes.

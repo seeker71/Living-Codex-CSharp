@@ -123,7 +123,7 @@ public sealed class IdentityModule : IModule, IRegistryModule
 
     [ApiRoute("GET", "/identity/login/{provider}", "Initiate Login", "Initiate login with specified identity provider", "codex.identity")]
     public async Task<object> InitiateLoginAsync(
-        [ApiParameter("path", "Identity provider name")] string provider,
+        [ApiParameter("provider", "Identity provider name", Location = "path")] string provider,
         [ApiParameter("returnUrl", "URL to return to after login", Required = false, Location = "query")] string? returnUrl = null)
     {
         try
@@ -146,7 +146,8 @@ public sealed class IdentityModule : IModule, IRegistryModule
 
             Console.WriteLine($"[DEBUG] Calling InitiateLogin on provider: {provider}");
             var result = await identityProvider.InitiateLogin(returnUrl);
-            Console.WriteLine($"[DEBUG] InitiateLogin result: {JsonSerializer.Serialize(result)}");
+            // Avoid serializing arbitrary objects for logging to prevent exceptions
+            _logger.Info($"Initiated login for provider: {provider}");
             return result;
         }
         catch (Exception ex)
@@ -158,7 +159,7 @@ public sealed class IdentityModule : IModule, IRegistryModule
 
     [ApiRoute("GET", "/identity/callback/{provider}", "Handle Callback", "Handle identity provider callback", "codex.identity")]
     public async Task<object> HandleCallbackAsync(
-        [ApiParameter("path", "Identity provider name")] string provider,
+        [ApiParameter("provider", "Identity provider name", Location = "path")] string provider,
         [ApiParameter("code", "Authorization code from provider", Required = true, Location = "query")] string code,
         [ApiParameter("state", "State parameter for validation", Required = true, Location = "query")] string state,
         [ApiParameter("returnUrl", "URL to return to after login", Required = false, Location = "query")] string? returnUrl = null)
@@ -189,7 +190,7 @@ public sealed class IdentityModule : IModule, IRegistryModule
 
     [ApiRoute("GET", "/identity/userinfo/{provider}", "Get User Info", "Get user information from identity provider", "codex.identity")]
     public async Task<object> GetUserInfoAsync(
-        [ApiParameter("path", "Identity provider name")] string provider,
+        [ApiParameter("provider", "Identity provider name", Location = "path")] string provider,
         [ApiParameter("accessToken", "Access token from provider", Required = true, Location = "query")] string accessToken)
     {
         try
@@ -331,7 +332,7 @@ public sealed class IdentityModule : IModule, IRegistryModule
     }
 
     [ApiRoute("GET", "/identity/users/{id}", "Get User Profile", "Get user identity information", "codex.identity")]
-    public async Task<object> GetUserProfileAsync([ApiParameter("path", "User ID")] string id)
+    public async Task<object> GetUserProfileAsync([ApiParameter("id", "User ID", Location = "path")] string id)
     {
         try
         {
@@ -407,7 +408,7 @@ public sealed class IdentityModule : IModule, IRegistryModule
     }
 
     [ApiRoute("DELETE", "/identity/sessions/{token}", "End Session", "End a user session", "codex.identity")]
-    public async Task<object> EndSessionAsync([ApiParameter("path", "Session token")] string token)
+    public async Task<object> EndSessionAsync([ApiParameter("token", "Session token", Location = "path")] string token)
     {
         try
         {
