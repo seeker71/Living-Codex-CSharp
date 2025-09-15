@@ -86,25 +86,33 @@ public sealed class NewsFeedModule : IModule, IRegistryModule
     // Get personalized news feed for user
     [ApiRoute("GET", "/news/feed/{userId}", "Get User News Feed", "Get personalized news feed for a user based on their interests", "codex.news-feed")]
     public async Task<object> GetUserNewsFeed(
-        [ApiParameter("path", "User ID to get news feed for", Required = true, Location = "path")] string userId,
-        [ApiParameter("query", "Number of news items to return", Required = false, Location = "query")] int limit = 20,
-        [ApiParameter("query", "Number of hours to look back for news", Required = false, Location = "query")] int hoursBack = 24)
+        [ApiParameter("userId", "User ID to get news feed for", Required = true, Location = "path")] string userId,
+        [ApiParameter("limit", "Number of news items to return", Required = false, Location = "query")] int limit = 20,
+        [ApiParameter("hoursBack", "Number of hours to look back for news", Required = false, Location = "query")] int hoursBack = 24)
     {
         try
         {
-            // Get user profile and interests
-            if (!Registry.TryGet(userId, out var userNode))
+            // Validate userId parameter
+            if (string.IsNullOrEmpty(userId))
             {
-                return new ErrorResponse($"User {userId} not found");
+                return new ErrorResponse("User ID is required");
             }
 
-            var userInterests = ParseStringList(userNode.Meta?.GetValueOrDefault("interests")?.ToString());
-            var userLocation = userNode.Meta?.GetValueOrDefault("location")?.ToString();
-            var userContributions = ParseStringList(userNode.Meta?.GetValueOrDefault("contributions")?.ToString());
+            // Get user profile and interests
+            List<string> userInterests = new();
+            string? userLocation = null;
+            List<string> userContributions = new();
 
-            if (!userInterests.Any())
+            if (Registry.TryGet(userId, out var userNode))
             {
-                return new NewsFeedResponse(new List<NewsFeedItem>(), 0, "No interests found for user");
+                userInterests = ParseStringList(userNode.Meta?.GetValueOrDefault("interests")?.ToString());
+                userLocation = userNode.Meta?.GetValueOrDefault("location")?.ToString();
+                userContributions = ParseStringList(userNode.Meta?.GetValueOrDefault("contributions")?.ToString());
+            }
+            else
+            {
+                // If user doesn't exist, use default interests
+                userInterests = new List<string> { "technology", "science", "business", "politics", "health" };
             }
 
             // Get news items based on user interests
@@ -160,6 +168,182 @@ public sealed class NewsFeedModule : IModule, IRegistryModule
         }
     }
 
+    // Get specific news item by ID
+    [ApiRoute("GET", "/news/item/{id}", "Get News Item", "Get specific news item by ID", "codex.news-feed")]
+    public async Task<object> GetNewsItem([ApiParameter("id", "News item ID", Required = true, Location = "path")] string id)
+    {
+        try
+        {
+            var node = Registry.GetNode(id);
+            if (node?.TypeId != "codex.news.item")
+            {
+                return new ErrorResponse("News item not found");
+            }
+
+            var newsItem = MapNodeToNewsFeedItem(node);
+            if (newsItem == null)
+            {
+                return new ErrorResponse("Failed to parse news item");
+            }
+
+            return new NewsItemResponse(newsItem);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error getting news item {id}: {ex.Message}", ex);
+            return new ErrorResponse($"Error getting news item: {ex.Message}");
+        }
+    }
+
+    // Get related news items
+    [ApiRoute("GET", "/news/related/{id}", "Get Related News", "Get related news items", "codex.news-feed")]
+    public async Task<object> GetRelatedNews(
+        [ApiParameter("id", "News item ID", Required = true, Location = "path")] string id,
+        [ApiParameter("query", "Number of related items to return", Required = false, Location = "query")] int limit = 10)
+    {
+        try
+        {
+            var sourceNode = Registry.GetNode(id);
+            if (sourceNode?.TypeId != "codex.news.item")
+            {
+                return new ErrorResponse("Source news item not found");
+            }
+
+            // Get other news items and calculate similarity
+            var allNewsNodes = Registry.GetNodesByType("codex.news.item")
+                .Where(n => n.Id != id)
+                .OrderByDescending(n => CalculateNewsSimilarity(sourceNode, n))
+                .Take(limit)
+                .ToList();
+
+            var relatedItems = allNewsNodes
+                .Select(MapNodeToNewsFeedItem)
+                .Where(item => item != null)
+                .Cast<NewsFeedItem>()
+                .ToList();
+
+            return new NewsFeedResponse(relatedItems, relatedItems.Count, "Related news items");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error getting related news for {id}: {ex.Message}", ex);
+            return new ErrorResponse($"Error getting related news: {ex.Message}");
+        }
+    }
+
+    // Mark news as read
+    [ApiRoute("POST", "/news/read", "Mark News as Read", "Mark news item as read by user", "codex.news-feed")]
+    public async Task<object> MarkNewsAsRead([ApiParameter("request", "Read request", Required = true, Location = "body")] NewsReadRequest request)
+    {
+        try
+        {
+            // Create a read tracking node
+            var readNode = new Node(
+                Id: $"read-{request.UserId}-{request.NewsId}",
+                TypeId: "codex.news.read",
+                State: ContentState.Water,
+                Locale: "en-US",
+                Title: $"Read: {request.NewsId}",
+                Description: null,
+                Content: null,
+                Meta: new Dictionary<string, object>
+                {
+                    ["userId"] = request.UserId,
+                    ["newsId"] = request.NewsId,
+                    ["readAt"] = DateTime.UtcNow
+                }
+            );
+
+            Registry.Upsert(readNode);
+            return new { success = true, message = "News marked as read" };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error marking news as read: {ex.Message}", ex);
+            return new ErrorResponse($"Error marking news as read: {ex.Message}");
+        }
+    }
+
+    // Get read news for user
+    [ApiRoute("GET", "/news/read/{userId}", "Get Read News", "Get read news items for user", "codex.news-feed")]
+    public async Task<object> GetReadNews(
+        [ApiParameter("userId", "User ID", Required = true, Location = "path")] string userId,
+        [ApiParameter("query", "Number of items to return", Required = false, Location = "query")] int limit = 20)
+    {
+        try
+        {
+            var readNodes = Registry.GetNodesByType("codex.news.read")
+                .Where(n => n.Meta?.GetValueOrDefault("userId")?.ToString() == userId)
+                .OrderByDescending(n => n.Meta?.GetValueOrDefault("readAt"))
+                .Take(limit)
+                .ToList();
+
+            var readNewsItems = new List<NewsFeedItem>();
+            foreach (var readNode in readNodes)
+            {
+                var newsId = readNode.Meta?.GetValueOrDefault("newsId")?.ToString();
+                if (!string.IsNullOrEmpty(newsId))
+                {
+                    var newsNode = Registry.GetNode(newsId);
+                    if (newsNode?.TypeId == "codex.news.item")
+                    {
+                        var newsItem = MapNodeToNewsFeedItem(newsNode);
+                        if (newsItem != null)
+                        {
+                            readNewsItems.Add(newsItem);
+                        }
+                    }
+                }
+            }
+
+            return new NewsFeedResponse(readNewsItems, readNewsItems.Count, "Read news items");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error getting read news for user {userId}: {ex.Message}", ex);
+            return new ErrorResponse($"Error getting read news: {ex.Message}");
+        }
+    }
+
+    // Get unread news for user
+    [ApiRoute("GET", "/news/unread/{userId}", "Get Unread News", "Get unread news items for user", "codex.news-feed")]
+    public async Task<object> GetUnreadNews(
+        [ApiParameter("userId", "User ID", Required = true, Location = "path")] string userId,
+        [ApiParameter("query", "Number of items to return", Required = false, Location = "query")] int limit = 20)
+    {
+        try
+        {
+            // Get all news items
+            var allNewsNodes = Registry.GetNodesByType("codex.news.item")
+                .OrderByDescending(n => n.Meta?.GetValueOrDefault("publishedAt"))
+                .Take(limit * 2)
+                .ToList();
+
+            // Get read news IDs
+            var readNewsIds = Registry.GetNodesByType("codex.news.read")
+                .Where(n => n.Meta?.GetValueOrDefault("userId")?.ToString() == userId)
+                .Select(n => n.Meta?.GetValueOrDefault("newsId")?.ToString())
+                .Where(id => !string.IsNullOrEmpty(id))
+                .ToHashSet();
+
+            // Filter out read news
+            var unreadNewsItems = allNewsNodes
+                .Where(n => !readNewsIds.Contains(n.Id))
+                .Take(limit)
+                .Select(MapNodeToNewsFeedItem)
+                .Where(item => item != null)
+                .Cast<NewsFeedItem>()
+                .ToList();
+
+            return new NewsFeedResponse(unreadNewsItems, unreadNewsItems.Count, "Unread news items");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error getting unread news for user {userId}: {ex.Message}", ex);
+            return new ErrorResponse($"Error getting unread news: {ex.Message}");
+        }
+    }
+
     // Get news items for specific interests
     private async Task<List<NewsFeedItem>> GetNewsFeedItemsForInterests(
         List<string> interests, 
@@ -172,20 +356,79 @@ public sealed class NewsFeedModule : IModule, IRegistryModule
         
         try
         {
-            // Get news from multiple sources
-            var newsSources = new[]
-            {
-                "https://newsapi.org/v2/everything",
-                "https://api.nytimes.com/svc/search/v2/articlesearch.json",
-                "https://content.guardianapis.com/search"
-            };
+            // Get news from internal news nodes instead of external APIs
+            var cutoffDate = DateTime.UtcNow.AddHours(-hoursBack);
+            
+            // First, let's get all news nodes to see what we have
+            var allNewsNodes = Registry.GetNodesByType("codex.news.item").ToList();
+            _logger.Info($"Found {allNewsNodes.Count} news nodes in registry");
+            
+            // Debug: Let's check if we can find any nodes with common types
+            var conceptNodes = Registry.GetNodesByType("codex.concept").ToList();
+            var moduleNodes = Registry.GetNodesByType("codex.module").ToList();
+            _logger.Info($"Found {conceptNodes.Count} concept nodes and {moduleNodes.Count} module nodes in registry");
+            
+            var newsNodes = allNewsNodes
+                .Where(n => 
+                {
+                    try
+                    {
+                        var publishedAt = n.Meta?.GetValueOrDefault("publishedAt");
+                        if (publishedAt is DateTime publishedDate)
+                        {
+                            return publishedDate >= cutoffDate;
+                        }
+                        return false;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Error($"Error checking publishedAt for node {n.Id}: {ex.Message}");
+                        return false;
+                    }
+                })
+                .OrderByDescending(n => 
+                {
+                    try
+                    {
+                        return n.Meta?.GetValueOrDefault("publishedAt") as DateTime? ?? DateTime.MinValue;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Error($"Error ordering node {n.Id}: {ex.Message}");
+                        return DateTime.MinValue;
+                    }
+                })
+                .Take(limit * 2) // Get more to account for filtering
+                .ToList();
 
-            var tasks = newsSources.Select(source => GetNewsFromSource(source, interests, location, limit / newsSources.Length, hoursBack));
-            var results = await Task.WhenAll(tasks);
+            _logger.Info($"Filtered to {newsNodes.Count} recent news nodes");
 
-            foreach (var result in results)
+            // Convert nodes to NewsFeedItem objects
+            foreach (var node in newsNodes)
             {
-                newsItems.AddRange(result);
+                try
+                {
+                    var newsItem = MapNodeToNewsFeedItem(node);
+                    if (newsItem != null)
+                    {
+                        newsItems.Add(newsItem);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"Error mapping node {node.Id} to NewsFeedItem: {ex.Message}");
+                }
+            }
+
+            // Filter by interests if provided
+            if (interests.Any())
+            {
+                newsItems = newsItems
+                    .Where(item => interests.Any(interest => 
+                        item.Title.Contains(interest, StringComparison.OrdinalIgnoreCase) ||
+                        item.Description.Contains(interest, StringComparison.OrdinalIgnoreCase) ||
+                        (item.Content?.Contains(interest, StringComparison.OrdinalIgnoreCase) ?? false)))
+                    .ToList();
             }
 
             // Sort by relevance score and take top items
@@ -383,21 +626,25 @@ public sealed class NewsFeedModule : IModule, IRegistryModule
         
         try
         {
-            // Get recent news items
-            var newsItems = await GetNewsFeedItemsForInterests(
-                new List<string> { "technology", "science", "business", "politics", "health" },
-                null,
-                new List<string>(),
-                100, // Get more items for trend analysis
-                hoursBack
-            );
+            // Get recent news items from internal nodes
+            var cutoffDate = DateTime.UtcNow.AddHours(-hoursBack);
+            var newsNodes = Registry.GetNodesByType("codex.news.item")
+                .Where(n => n.Meta?.GetValueOrDefault("publishedAt") is DateTime publishedAt && publishedAt >= cutoffDate)
+                .OrderByDescending(n => n.Meta?.GetValueOrDefault("publishedAt"))
+                .Take(100) // Get more items for trend analysis
+                .ToList();
 
             // Extract keywords and count frequency
             var keywordCounts = new Dictionary<string, int>();
             
-            foreach (var item in newsItems)
+            foreach (var node in newsNodes)
             {
-                var keywords = ExtractKeywords($"{item.Title} {item.Description}");
+                var title = node.Title ?? "";
+                var description = node.Description ?? "";
+                var content = node.Meta?.GetValueOrDefault("content")?.ToString() ?? "";
+                var text = $"{title} {description} {content}";
+                
+                var keywords = ExtractKeywords(text);
                 foreach (var keyword in keywords)
                 {
                     if (keywordCounts.ContainsKey(keyword))
@@ -411,7 +658,7 @@ public sealed class NewsFeedModule : IModule, IRegistryModule
             trendingTopics = keywordCounts
                 .OrderByDescending(kvp => kvp.Value)
                 .Take(limit)
-                .Select(kvp => new TrendingTopic(kvp.Key, kvp.Value, CalculateTrendScore(kvp.Value, newsItems.Count)))
+                .Select(kvp => new TrendingTopic(kvp.Key, kvp.Value, CalculateTrendScore(kvp.Value, newsNodes.Count)))
                 .ToList();
         }
         catch (Exception ex)
@@ -462,6 +709,44 @@ public sealed class NewsFeedModule : IModule, IRegistryModule
             .Select(s => s.Trim())
             .ToList();
     }
+
+    // Map Node to NewsFeedItem
+    private NewsFeedItem? MapNodeToNewsFeedItem(Node node)
+    {
+        try
+        {
+            return new NewsFeedItem(
+                Title: node.Title ?? "",
+                Description: node.Description ?? "",
+                Url: node.Meta?.GetValueOrDefault("url")?.ToString() ?? "",
+                PublishedAt: node.Meta?.GetValueOrDefault("publishedAt") is DateTime publishedAt ? publishedAt : DateTime.UtcNow,
+                Source: node.Meta?.GetValueOrDefault("source")?.ToString() ?? "Unknown",
+                Author: node.Meta?.GetValueOrDefault("author")?.ToString(),
+                ImageUrl: node.Meta?.GetValueOrDefault("imageUrl")?.ToString(),
+                Content: node.Meta?.GetValueOrDefault("content")?.ToString()
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error mapping node to NewsFeedItem: {ex.Message}", ex);
+            return null;
+        }
+    }
+
+    // Calculate similarity between two news items
+    private double CalculateNewsSimilarity(Node news1, Node news2)
+    {
+        var text1 = $"{news1.Title} {news1.Description} {news1.Meta?.GetValueOrDefault("content")}".ToLowerInvariant();
+        var text2 = $"{news2.Title} {news2.Description} {news2.Meta?.GetValueOrDefault("content")}".ToLowerInvariant();
+        
+        var words1 = text1.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToHashSet();
+        var words2 = text2.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToHashSet();
+        
+        var intersection = words1.Intersect(words2).Count();
+        var union = words1.Union(words2).Count();
+        
+        return union > 0 ? (double)intersection / union : 0.0;
+    }
 }
 
 // Response types for news feed
@@ -504,4 +789,15 @@ public record TrendingTopic(
 public record TrendingTopicsResponse(
     List<TrendingTopic> Topics,
     int TotalCount
+);
+
+[MetaNode(Id = "codex.news-feed.news-read-request", Name = "News Read Request", Description = "Request to mark news as read")]
+public record NewsReadRequest(
+    string UserId,
+    string NewsId
+);
+
+[MetaNode(Id = "codex.news-feed.news-item-response", Name = "News Item Response", Description = "Response containing a single news item")]
+public record NewsItemResponse(
+    NewsFeedItem? Item
 );

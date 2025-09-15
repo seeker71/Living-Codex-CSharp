@@ -78,7 +78,8 @@ namespace LivingCodexMobile.ViewModels
 
             try
             {
-                var response = await _apiService.AuthenticateAsync(Username, Password);
+                var request = new { username = Username, password = Password };
+                var response = await _apiService.PostAsync<object, ApiResponse<User>>("/identity/authenticate", request);
                 
                 if (response.Success && response.Data != null)
                 {
@@ -115,7 +116,8 @@ namespace LivingCodexMobile.ViewModels
 
             try
             {
-                var response = await _apiService.CreateUserAsync(Username, Email, Password);
+                var request = new { username = Username, email = Email, password = Password };
+                var response = await _apiService.PostAsync<object, ApiResponse<User>>("/identity/users", request);
                 
                 if (response.Success && response.Data != null)
                 {

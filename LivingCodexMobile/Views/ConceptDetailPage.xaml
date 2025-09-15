@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="LivingCodexMobile.Views.ConceptDetailPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:models="clr-namespace:LivingCodexMobile.Models"
+             Title="Concept Details"
+             x:DataType="models:Concept">
+
+    <ScrollView>
+        <StackLayout Padding="20" Spacing="15">
+            
+            <!-- Concept Header -->
+            <Frame BackgroundColor="LightBlue" Padding="15">
+                <StackLayout>
+                    <Label Text="{Binding Name}" 
+                           FontSize="24" 
+                           FontAttributes="Bold" />
+                    <Label Text="{Binding Domain, StringFormat='Domain: {0}'}" 
+                           FontSize="16" 
+                           TextColor="Blue" />
+                    <Label Text="{Binding Id, StringFormat='ID: {0}'}" 
+                           FontSize="12" 
+                           TextColor="Gray" />
+                </StackLayout>
+            </Frame>
+
+            <!-- Interest Button -->
+            <Button x:Name="InterestButton"
+                    Text="{Binding IsInterested, Converter={StaticResource BoolToInterestTextConverter}}"
+                    BackgroundColor="{Binding IsInterested, Converter={StaticResource BoolToInterestColorConverter}}"
+                    Clicked="OnInterestClicked"
+                    FontSize="16"
+                    Padding="20,10" />
+
+            <!-- Description -->
+            <Frame BackgroundColor="White" Padding="15">
+                <StackLayout>
+                    <Label Text="Description" 
+                           FontSize="18" 
+                           FontAttributes="Bold" />
+                    <Label Text="{Binding Description}" 
+                           FontSize="14" />
+                </StackLayout>
+            </Frame>
+
+            <!-- Stats -->
+            <Frame BackgroundColor="LightGray" Padding="15">
+                <StackLayout>
+                    <Label Text="Statistics" 
+                           FontSize="18" 
+                           FontAttributes="Bold" />
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Label Grid.Row="0" Grid.Column="0" 
+                               Text="{Binding InterestCount, StringFormat='Interest Count: {0}'}" 
+                               FontSize="14" />
+                        <Label Grid.Row="0" Grid.Column="1" 
+                               Text="{Binding Complexity, StringFormat='Complexity: {0}'}" 
+                               FontSize="14" />
+                        <Label Grid.Row="1" Grid.Column="0" 
+                               Text="{Binding Resonance, StringFormat='Resonance: {0:F1}'}" 
+                               FontSize="14" />
+                        <Label Grid.Row="1" Grid.Column="1" 
+                               Text="{Binding Energy, StringFormat='Energy: {0:F1}'}" 
+                               FontSize="14" />
+                        <Label Grid.Row="2" Grid.Column="0" 
+                               Text="{Binding CreatedAt, StringFormat='Created: {0:yyyy-MM-dd}'}" 
+                               FontSize="12" 
+                               TextColor="Gray" />
+                        <Label Grid.Row="2" Grid.Column="1" 
+                               Text="{Binding UpdatedAt, StringFormat='Updated: {0:yyyy-MM-dd}'}" 
+                               FontSize="12" 
+                               TextColor="Gray" />
+                    </Grid>
+                </StackLayout>
+            </Frame>
+
+            <!-- Tags -->
+            <Frame BackgroundColor="White" Padding="15">
+                <StackLayout>
+                    <Label Text="Tags" 
+                           FontSize="18" 
+                           FontAttributes="Bold" />
+                    <CollectionView ItemsSource="{Binding Tags}">
+                        <CollectionView.ItemsLayout>
+                            <LinearItemsLayout Orientation="Horizontal" />
+                        </CollectionView.ItemsLayout>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Frame BackgroundColor="LightBlue" 
+                                       Padding="8,4" 
+                                       Margin="0,0,5,0"
+                                       CornerRadius="10">
+                                    <Label Text="{Binding .}" 
+                                           FontSize="12" 
+                                           TextColor="Blue" />
+                                </Frame>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </StackLayout>
+            </Frame>
+
+            <!-- Related Concepts -->
+            <Frame BackgroundColor="White" Padding="15">
+                <StackLayout>
+                    <Label Text="Related Concepts" 
+                           FontSize="18" 
+                           FontAttributes="Bold" />
+                    <CollectionView ItemsSource="{Binding Relationships}" 
+                                    HeightRequest="200">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="models:ConceptRelationship">
+                                <Grid Padding="10" BackgroundColor="LightGray" Margin="0,0,0,5">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <Label Grid.Row="0" 
+                                           Text="{Binding ToConceptId}" 
+                                           FontSize="14" 
+                                           FontAttributes="Bold" />
+                                    <Label Grid.Row="1" 
+                                           Text="{Binding RelationshipType, StringFormat='Type: {0}'}" 
+                                           FontSize="12" 
+                                           TextColor="Blue" />
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </StackLayout>
+            </Frame>
+
+            <!-- Actions -->
+            <StackLayout Orientation="Horizontal" Spacing="10">
+                <Button Text="Explore Related" 
+                        Clicked="OnExploreRelatedClicked"
+                        BackgroundColor="Orange" />
+                <Button Text="Share" 
+                        Clicked="OnShareClicked"
+                        BackgroundColor="Blue" />
+                <Button Text="Edit" 
+                        Clicked="OnEditClicked"
+                        BackgroundColor="Green" />
+            </StackLayout>
+
+        </StackLayout>
+    </ScrollView>
+</ContentPage>

@@ -9,6 +9,11 @@ public interface ILoggingService
     void LogError(string message, Exception? exception = null, object? data = null);
     void LogDebug(string message, object? data = null);
     
+    // Convenience methods for EnergyService
+    void Info(string message, object? data = null);
+    void Warn(string message, object? data = null);
+    void Error(string message, Exception? exception = null, object? data = null);
+    
     // Events for UI to display logs
     event EventHandler<LogEntry> LogEntryAdded;
     
@@ -43,6 +48,22 @@ public class LoggingService : ILoggingService
     public void LogDebug(string message, object? data = null)
     {
         AddLog(LogLevel.Debug, message, null, data);
+    }
+
+    // Convenience methods for EnergyService
+    public void Info(string message, object? data = null)
+    {
+        LogInfo(message, data);
+    }
+
+    public void Warn(string message, object? data = null)
+    {
+        LogWarning(message, data);
+    }
+
+    public void Error(string message, Exception? exception = null, object? data = null)
+    {
+        LogError(message, exception, data);
     }
 
     public List<LogEntry> GetLogs(int maxCount = 100)

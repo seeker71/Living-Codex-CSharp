@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="LivingCodexMobile.Views.NodeDetailPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:models="clr-namespace:LivingCodexMobile.Models"
+             Title="Node Details"
+             x:DataType="models:Node">
+
+    <ScrollView>
+        <StackLayout Padding="20" Spacing="15">
+            
+            <!-- Node Header -->
+            <Frame BackgroundColor="LightBlue" Padding="15">
+                <StackLayout>
+                    <Label Text="{Binding Title, StringFormat='Title: {0}'}" 
+                           FontSize="20" 
+                           FontAttributes="Bold" />
+                    <Label Text="{Binding Id, StringFormat='ID: {0}'}" 
+                           FontSize="14" 
+                           TextColor="Gray" />
+                    <Label Text="{Binding TypeId, StringFormat='Type: {0}'}" 
+                           FontSize="14" 
+                           TextColor="Blue" />
+                    <Label Text="{Binding State, StringFormat='State: {0}'}" 
+                           FontSize="14" 
+                           TextColor="Green" />
+                </StackLayout>
+            </Frame>
+
+            <!-- Description -->
+            <Frame BackgroundColor="White" Padding="15">
+                <StackLayout>
+                    <Label Text="Description" 
+                           FontSize="16" 
+                           FontAttributes="Bold" />
+                    <Label Text="{Binding Description}" 
+                           FontSize="14" />
+                </StackLayout>
+            </Frame>
+
+            <!-- Content Section -->
+            <Frame BackgroundColor="White" Padding="15">
+                <StackLayout>
+                    <Label Text="Content" 
+                           FontSize="16" 
+                           FontAttributes="Bold" />
+                    
+                    <!-- Content based on media type -->
+                    <ContentView x:Name="ContentRenderer" />
+                </StackLayout>
+            </Frame>
+
+            <!-- Metadata -->
+            <Frame BackgroundColor="LightGray" Padding="15">
+                <StackLayout>
+                    <Label Text="Metadata" 
+                           FontSize="16" 
+                           FontAttributes="Bold" />
+                    <Label x:Name="MetadataLabel" 
+                           FontSize="12" 
+                           FontFamily="Courier" />
+                </StackLayout>
+            </Frame>
+
+            <!-- Timestamps -->
+            <Frame BackgroundColor="White" Padding="15">
+                <StackLayout>
+                    <Label Text="Timestamps" 
+                           FontSize="16" 
+                           FontAttributes="Bold" />
+                    <Label Text="{Binding CreatedAt, StringFormat='Created: {0:yyyy-MM-dd HH:mm:ss}'}" 
+                           FontSize="14" />
+                    <Label Text="{Binding UpdatedAt, StringFormat='Updated: {0:yyyy-MM-dd HH:mm:ss}'}" 
+                           FontSize="14" />
+                </StackLayout>
+            </Frame>
+
+            <!-- Actions -->
+            <StackLayout Orientation="Horizontal" Spacing="10">
+                <Button Text="View Edges" 
+                        Clicked="OnViewEdgesClicked"
+                        BackgroundColor="Orange" />
+                <Button Text="Edit" 
+                        Clicked="OnEditClicked"
+                        BackgroundColor="Green" />
+                <Button Text="Share" 
+                        Clicked="OnShareClicked"
+                        BackgroundColor="Blue" />
+            </StackLayout>
+
+        </StackLayout>
+    </ScrollView>
+</ContentPage>

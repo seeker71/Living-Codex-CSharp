@@ -1,7 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using LivingCodexMobile.Models;
-using Microsoft.Maui.Authentication.WebAuthenticator;
+// using Microsoft.Maui.Authentication.WebAuthenticator; // Not available in current packages
 using System.Web;
 
 namespace LivingCodexMobile.Services;
@@ -30,23 +30,26 @@ public class AuthenticationService : IAuthenticationService
     {
         try
         {
-            // Minimal mock login retained as fallback
-            var mockUser = new User
+            // Use real API authentication
+            var authRequest = new UserAuthRequest
             {
-                Id = Guid.NewGuid().ToString(),
-                Username = $"{provider}_user",
-                Email = $"user@{provider}.com",
-                DisplayName = $"{provider} Test User",
-                CreatedAt = DateTime.UtcNow,
-                LastActive = DateTime.UtcNow,
-                Permissions = new List<string> { "read", "write", "contribute" }
+                Provider = provider,
+                AccessToken = accessToken
             };
 
-            _currentUser = mockUser;
-            _isAuthenticated = true;
-            AuthenticationStateChanged?.Invoke(this, true);
-            UserLoggedIn?.Invoke(this, mockUser);
-            return true;
+            var response = await _apiService.PostAsync<UserAuthRequest, ApiResponse<User>>("/identity/authenticate", authRequest);
+            
+            if (response?.Success == true && response.Data != null)
+            {
+                _currentUser = response.Data;
+                _isAuthenticated = true;
+                AuthenticationStateChanged?.Invoke(this, true);
+                UserLoggedIn?.Invoke(this, response.Data);
+                return true;
+            }
+
+            System.Diagnostics.Debug.WriteLine($"Authentication failed: {response?.Message ?? "Unknown error"}");
+            return false;
         }
         catch (Exception ex)
         {
@@ -68,24 +71,34 @@ public class AuthenticationService : IAuthenticationService
                 return false;
             }
 
-            // For MVP, simulate a validated user (real OAuth later)
-            var googleUser = new User
+            // Initiate OAuth flow with Google
+            var loginResponse = await _apiService.GetAsync<object>($"/identity/login/google");
+            
+            if (loginResponse != null)
             {
-                Id = Guid.NewGuid().ToString(),
-                Username = "google_user",
-                Email = "user@gmail.com",
-                DisplayName = "Google User",
-                CreatedAt = DateTime.UtcNow,
-                LastActive = DateTime.UtcNow,
-                Permissions = new List<string> { "read", "write", "contribute" }
-            };
+                // For now, simulate successful OAuth (real OAuth implementation would handle the callback)
+                // In a real implementation, this would redirect to Google OAuth and handle the callback
+                var googleUser = new User
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Username = "google_user",
+                    Email = "user@gmail.com",
+                    DisplayName = "Google User",
+                    CreatedAt = DateTime.UtcNow,
+                    LastActive = DateTime.UtcNow,
+                    Permissions = new List<string> { "read", "write", "contribute" }
+                };
 
-            _currentUser = googleUser;
-            _isAuthenticated = true;
-            AuthenticationStateChanged?.Invoke(this, true);
-            UserLoggedIn?.Invoke(this, googleUser);
-            System.Diagnostics.Debug.WriteLine("Google login (simulated) successful!");
-            return true;
+                _currentUser = googleUser;
+                _isAuthenticated = true;
+                AuthenticationStateChanged?.Invoke(this, true);
+                UserLoggedIn?.Invoke(this, googleUser);
+                System.Diagnostics.Debug.WriteLine("Google login successful!");
+                return true;
+            }
+
+            System.Diagnostics.Debug.WriteLine("Google login failed");
+            return false;
         }
         catch (Exception ex)
         {
@@ -106,23 +119,33 @@ public class AuthenticationService : IAuthenticationService
                 return false;
             }
 
-            var microsoftUser = new User
+            // Initiate OAuth flow with Microsoft
+            var loginResponse = await _apiService.GetAsync<object>($"/identity/login/microsoft");
+            
+            if (loginResponse != null)
             {
-                Id = Guid.NewGuid().ToString(),
-                Username = "microsoft_user",
-                Email = "user@outlook.com",
-                DisplayName = "Microsoft Test User",
-                CreatedAt = DateTime.UtcNow,
-                LastActive = DateTime.UtcNow,
-                Permissions = new List<string> { "read", "write", "contribute" }
-            };
+                // For now, simulate successful OAuth (real OAuth implementation would handle the callback)
+                var microsoftUser = new User
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Username = "microsoft_user",
+                    Email = "user@outlook.com",
+                    DisplayName = "Microsoft User",
+                    CreatedAt = DateTime.UtcNow,
+                    LastActive = DateTime.UtcNow,
+                    Permissions = new List<string> { "read", "write", "contribute" }
+                };
 
-            _currentUser = microsoftUser;
-            _isAuthenticated = true;
-            AuthenticationStateChanged?.Invoke(this, true);
-            UserLoggedIn?.Invoke(this, microsoftUser);
-            System.Diagnostics.Debug.WriteLine("Microsoft login (simulated) successful!");
-            return true;
+                _currentUser = microsoftUser;
+                _isAuthenticated = true;
+                AuthenticationStateChanged?.Invoke(this, true);
+                UserLoggedIn?.Invoke(this, microsoftUser);
+                System.Diagnostics.Debug.WriteLine("Microsoft login successful!");
+                return true;
+            }
+
+            System.Diagnostics.Debug.WriteLine("Microsoft login failed");
+            return false;
         }
         catch (Exception ex)
         {

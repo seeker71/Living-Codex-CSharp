@@ -1,0 +1,110 @@
+{
+  "testSettings": {
+    "apiBaseUrl": "http://localhost:5002",
+    "timeout": 30,
+    "retryAttempts": 3,
+    "enableLogging": true,
+    "enableMocking": true
+  },
+  "testCategories": {
+    "unit": {
+      "enabled": true,
+      "parallel": true,
+      "timeout": 30
+    },
+    "integration": {
+      "enabled": true,
+      "parallel": false,
+      "timeout": 60,
+      "requiresServer": true
+    },
+    "ui": {
+      "enabled": true,
+      "parallel": false,
+      "timeout": 30
+    },
+    "api": {
+      "enabled": true,
+      "parallel": false,
+      "timeout": 45,
+      "requiresServer": true
+    }
+  },
+  "testData": {
+    "testUser": {
+      "id": "test-user-123",
+      "username": "testuser",
+      "email": "test@example.com",
+      "displayName": "Test User"
+    },
+    "testConcept": {
+      "id": "test-concept-123",
+      "name": "Test Concept",
+      "description": "A test concept for unit testing",
+      "domain": "testing"
+    },
+    "testNewsItem": {
+      "id": "test-news-123",
+      "title": "Test News Item",
+      "content": "This is a test news item for unit testing",
+      "source": "Test Source",
+      "publishedAt": "2024-01-01T00:00:00Z"
+    }
+  },
+  "mockResponses": {
+    "authentication": {
+      "success": {
+        "success": true,
+        "data": {
+          "id": "test-user-123",
+          "username": "testuser",
+          "email": "test@example.com",
+          "displayName": "Test User",
+          "createdAt": "2024-01-01T00:00:00Z",
+          "lastActive": "2024-01-01T00:00:00Z",
+          "permissions": ["read", "write", "contribute"]
+        }
+      },
+      "failure": {
+        "success": false,
+        "message": "Authentication failed"
+      }
+    },
+    "concepts": {
+      "list": {
+        "success": true,
+        "data": [
+          {
+            "id": "concept-1",
+            "name": "Artificial Intelligence",
+            "description": "The simulation of human intelligence in machines",
+            "domain": "technology",
+            "complexity": 8,
+            "tags": ["AI", "machine learning", "technology"],
+            "isInterested": false,
+            "resonance": 0.85,
+            "energy": 120.5
+          }
+        ]
+      }
+    },
+    "news": {
+      "feed": {
+        "success": true,
+        "data": {
+          "items": [
+            {
+              "id": "news-1",
+              "title": "AI Breakthrough in Healthcare",
+              "content": "New AI technology shows promise in medical diagnosis",
+              "source": "Tech News",
+              "publishedAt": "2024-01-01T00:00:00Z",
+              "resonance": 0.92,
+              "energy": 150.3
+            }
+          ]
+        }
+      }
+    }
+  }
+}

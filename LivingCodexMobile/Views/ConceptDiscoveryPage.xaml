@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="LivingCodexMobile.Views.ConceptDiscoveryPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:LivingCodexMobile.ViewModels"
+             xmlns:models="clr-namespace:LivingCodexMobile.Models"
+             Title="Concept Discovery"
+             x:DataType="vm:ConceptDiscoveryViewModel">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Search Bar -->
+        <SearchBar Grid.Row="0"
+                   Text="{Binding SearchQuery}"
+                   Placeholder="Search concepts..."
+                   SearchCommand="{Binding SearchConceptsCommand}"
+                   Margin="10" />
+
+        <!-- Filter Bar -->
+        <ScrollView Grid.Row="1" Margin="10,0">
+            <StackLayout Orientation="Horizontal" Spacing="10">
+                <Button Text="All" 
+                        Command="{Binding LoadConceptsCommand}"
+                        BackgroundColor="LightBlue" />
+                <Button Text="Trending" 
+                        Command="{Binding LoadTrendingCommand}"
+                        BackgroundColor="Orange" />
+                <Button Text="Recommended" 
+                        Command="{Binding LoadRecommendedCommand}"
+                        BackgroundColor="Green" />
+                <Button Text="Interested" 
+                        Command="{Binding LoadInterestedCommand}"
+                        BackgroundColor="Purple" />
+                <Button Text="Filter" 
+                        Command="{Binding ApplyFilterCommand}"
+                        BackgroundColor="Gray" />
+            </StackLayout>
+        </ScrollView>
+
+        <!-- Concepts List -->
+        <CollectionView Grid.Row="2" 
+                        ItemsSource="{Binding Concepts}"
+                        SelectionMode="Single"
+                        SelectionChanged="OnConceptSelected">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="models:ConceptCard">
+                    <Grid Padding="15" BackgroundColor="White" Margin="0,0,0,10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Concept Name and Domain -->
+                        <StackLayout Grid.Row="0" Grid.Column="0">
+                            <Label Text="{Binding Concept.Name}" 
+                                   FontSize="18" 
+                                   FontAttributes="Bold" />
+                            <Label Text="{Binding Concept.Domain, StringFormat='Domain: {0}'}" 
+                                   FontSize="12" 
+                                   TextColor="Blue" />
+                        </StackLayout>
+
+                        <!-- Interest Button -->
+                        <Button Grid.Row="0" Grid.Column="1"
+                                Text="{Binding Concept.IsInterested, Converter={StaticResource BoolToInterestTextConverter}}"
+                                BackgroundColor="{Binding Concept.IsInterested, Converter={StaticResource BoolToInterestColorConverter}}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type vm:ConceptDiscoveryViewModel}}, Path=ToggleInterestCommand}"
+                                CommandParameter="{Binding .}"
+                                WidthRequest="80" />
+
+                        <!-- Description -->
+                        <Label Grid.Row="1" Grid.ColumnSpan="2"
+                               Text="{Binding ShortDescription}"
+                               FontSize="14"
+                               TextColor="Gray"
+                               Margin="0,5,0,0" />
+
+                        <!-- Tags -->
+                        <CollectionView Grid.Row="2" Grid.ColumnSpan="2"
+                                        ItemsSource="{Binding DisplayTags}"
+                                        Margin="0,5,0,0">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate>
+                                    <Frame BackgroundColor="LightBlue" 
+                                           Padding="8,4" 
+                                           Margin="0,0,5,0"
+                                           CornerRadius="10">
+                                        <Label Text="{Binding .}" 
+                                               FontSize="10" 
+                                               TextColor="Blue" />
+                                    </Frame>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+
+                        <!-- Stats -->
+                        <StackLayout Grid.Row="3" Grid.ColumnSpan="2" 
+                                     Orientation="Horizontal" 
+                                     Margin="0,5,0,0">
+                            <Label Text="{Binding Concept.InterestCount, StringFormat='{0} interested'}" 
+                                   FontSize="12" 
+                                   TextColor="Green" />
+                            <Label Text="{Binding Concept.Complexity, StringFormat='Complexity: {0}'}" 
+                                   FontSize="12" 
+                                   TextColor="Orange" 
+                                   Margin="20,0,0,0" />
+                            <Label Text="{Binding Concept.Resonance, StringFormat='Resonance: {0:F1}'}" 
+                                   FontSize="12" 
+                                   TextColor="Purple" 
+                                   Margin="20,0,0,0" />
+                        </StackLayout>
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <!-- Loading Indicator -->
+        <ActivityIndicator Grid.Row="2" 
+                           IsVisible="{Binding IsLoading}"
+                           IsRunning="{Binding IsLoading}"
+                           VerticalOptions="Center"
+                           HorizontalOptions="Center" />
+    </Grid>
+</ContentPage>

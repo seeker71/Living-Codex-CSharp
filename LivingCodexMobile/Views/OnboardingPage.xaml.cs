@@ -1,4 +1,5 @@
 using LivingCodexMobile.ViewModels;
+using LivingCodexMobile.Models;
 
 namespace LivingCodexMobile.Views;
 
@@ -24,10 +25,10 @@ public partial class OnboardingPage : ContentPage
     private void UpdatePageIndicators(int currentStep)
     {
         // Reset all indicators
-        Indicator1.Color = LightGray;
-        Indicator2.Color = LightGray;
-        Indicator3.Color = LightGray;
-        Indicator4.Color = LightGray;
+        Indicator1.Color = Colors.LightGray;
+        Indicator2.Color = Colors.LightGray;
+        Indicator3.Color = Colors.LightGray;
+        Indicator4.Color = Colors.LightGray;
 
         // Highlight current step
         switch (currentStep)

@@ -32,10 +32,11 @@ namespace CodexBootstrap.Modules
     /// Real-time fractal news streaming module that ingests external news sources
     /// and transforms them through fractal analysis aligned with belief systems
     /// </summary>
-    public class RealtimeNewsStreamModule : IModule
+    public class RealtimeNewsStreamModule : IModule, IRegistryModule
     {
         private readonly Core.ICodexLogger _logger;
-        private readonly NodeRegistry _registry;
+        private readonly NodeRegistry _localRegistry;
+        private NodeRegistry? _globalRegistry;
         private readonly HttpClient _httpClient;
         private readonly Core.ConfigurationManager _configManager;
         private readonly IApiRouter _apiRouter;
@@ -54,6 +55,21 @@ namespace CodexBootstrap.Modules
         private const string NEWS_ITEM_NODE_TYPE = "codex.news.item";
         private const string FRACTAL_NEWS_NODE_TYPE = "codex.news.fractal";
         private const string NEWS_SUBSCRIPTION_NODE_TYPE = "codex.news.subscription";
+
+        /// <summary>
+        /// Gets the registry to use - global registry if set, otherwise local registry
+        /// This ensures the module uses the global registry when available
+        /// </summary>
+        private NodeRegistry Registry => _globalRegistry ?? _localRegistry;
+
+        /// <summary>
+        /// Sets the global registry for this module
+        /// This ensures the module uses the global registry instead of a local one
+        /// </summary>
+        public void SetGlobalRegistry(NodeRegistry registry)
+        {
+            _globalRegistry = registry;
+        }
 
         // Lazy-loaded cross-module communicator
         private CrossModuleCommunicator ModuleCommunicator => _moduleCommunicator ??= new CrossModuleCommunicator(_logger);
@@ -236,9 +252,9 @@ namespace CodexBootstrap.Modules
         public RealtimeNewsStreamModule(NodeRegistry registry, ICodexLogger logger, HttpClient? httpClient = null, Core.ConfigurationManager? configManager = null, IApiRouter? apiRouter = null)
         {
             _logger = logger;
-            _registry = registry;
+            _localRegistry = registry;
             _httpClient = httpClient ?? new HttpClient();
-            _configManager = configManager ?? new Core.ConfigurationManager(registry, logger);
+            _configManager = configManager ?? new Core.ConfigurationManager(_localRegistry, logger);
             _apiRouter = apiRouter ?? throw new ArgumentNullException(nameof(apiRouter), "IApiRouter is required for AI module integration");
             _aiTemplates = new AIModuleTemplates(_apiRouter, _logger);
             
@@ -287,6 +303,13 @@ namespace CodexBootstrap.Modules
     public void Register(NodeRegistry registry)
     {
         _logger.Info("Registering Real-Time News Stream Module with NodeRegistry");
+        
+        // Set the global registry if this is the first call
+        if (_globalRegistry == null)
+        {
+            SetGlobalRegistry(registry);
+        }
+        
         Initialize();
         
         // Gate ingestion via environment flag (default: enabled)
@@ -424,7 +447,7 @@ namespace CodexBootstrap.Modules
                     }
                 );
 
-                _registry.Upsert(sourceNode);
+                Registry.Upsert(sourceNode);
             }
 
             _logger.Info($"Initialized {newsSources.Length} news sources as nodes");
@@ -463,7 +486,7 @@ namespace CodexBootstrap.Modules
             {
                 _logger.Info("Starting news ingestion from all sources");
 
-                var allSourceNodes = _registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE);
+                var allSourceNodes = Registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE);
                 var sourceNodes = allSourceNodes
                     .Where(n => n.Meta?.ContainsKey("isActive") == true && (bool)n.Meta["isActive"])
                     .ToList();
@@ -663,6 +686,8 @@ namespace CodexBootstrap.Modules
         {
             try
             {
+                _logger.Info($"Processing news item: {newsItem.Id} - {newsItem.Title}");
+                
                 // Check for duplicates (ConcurrentDictionary is thread-safe)
                 if (_processedNewsIds.ContainsKey(newsItem.Id))
                 {
@@ -674,7 +699,7 @@ namespace CodexBootstrap.Modules
                 _processedNewsIds.TryAdd(newsItem.Id, true);
 
                 // Check if news item already exists in registry - create a copy to avoid collection modification issues
-                var existingNewsNode = _registry.GetNodesByType(NEWS_ITEM_NODE_TYPE)
+                var existingNewsNode = Registry.GetNodesByType(NEWS_ITEM_NODE_TYPE)
                     .ToArray() // Create a copy to prevent collection modification during iteration
                     .FirstOrDefault(n => n.Meta?.ContainsKey("newsId") == true && n.Meta["newsId"].ToString() == newsItem.Id);
 
@@ -708,7 +733,8 @@ namespace CodexBootstrap.Modules
                     }
                 );
 
-                _registry.Upsert(newsNode);
+                Registry.Upsert(newsNode);
+                _logger.Info($"Successfully stored news item as node: {newsNode.Id} - {newsItem.Title}");
 
                 // Create fractal news item
                 var fractalNews = await CreateFractalNewsItem(newsItem);
@@ -740,7 +766,7 @@ namespace CodexBootstrap.Modules
                         }
                     );
 
-                    _registry.Upsert(fractalNode);
+                    Registry.Upsert(fractalNode);
 
                     _logger.Info($"Processed news item: {newsItem.Title} from {newsItem.Source}");
                 }
@@ -1024,7 +1050,7 @@ namespace CodexBootstrap.Modules
             try
             {
                 var cutoffDate = DateTimeOffset.UtcNow.AddDays(-7);
-                var oldNewsNodes = _registry.GetNodesByType(NEWS_ITEM_NODE_TYPE)
+                var oldNewsNodes = Registry.GetNodesByType(NEWS_ITEM_NODE_TYPE)
                     .ToArray() // Create a copy to prevent collection modification during iteration
                     .Where(n => n.Meta?.ContainsKey("publishedAt") == true && 
                                DateTime.TryParse(n.Meta["publishedAt"].ToString(), out var publishedAt) && 
@@ -1033,7 +1059,7 @@ namespace CodexBootstrap.Modules
 
                 foreach (var node in oldNewsNodes)
                 {
-                    _registry.RemoveNode(node.Id);
+                    Registry.RemoveNode(node.Id);
                 }
 
                 _logger.Info($"Cleaned up {oldNewsNodes.Count} old news items");
@@ -1051,7 +1077,7 @@ namespace CodexBootstrap.Modules
         {
             try
             {
-                var sourceNodes = _registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE).ToArray(); // Create a copy to prevent collection modification
+                var sourceNodes = Registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE).ToArray(); // Create a copy to prevent collection modification
                 var sources = sourceNodes.Select(n => JsonSerializer.Deserialize<NewsSource>(n.Content?.InlineJson ?? "{}")).Where(s => s != null).ToList();
 
                 return new
@@ -1113,7 +1139,7 @@ namespace CodexBootstrap.Modules
                     }
                 );
 
-                _registry.Upsert(subscriptionNode);
+                Registry.Upsert(subscriptionNode);
 
                 _logger.Info($"User {request.UserId} subscribed to news feed");
 
@@ -1143,7 +1169,7 @@ namespace CodexBootstrap.Modules
             try
             {
                 // Get user subscriptions from nodes
-                var subscriptionNodes = _registry.GetNodesByType(NEWS_SUBSCRIPTION_NODE_TYPE)
+                var subscriptionNodes = Registry.GetNodesByType(NEWS_SUBSCRIPTION_NODE_TYPE)
                     .ToArray() // Create a copy to prevent collection modification
                     .Where(n => n.Meta?.ContainsKey("userId") == true && n.Meta["userId"].ToString() == userId)
                     .Where(n => n.Meta?.ContainsKey("isActive") == true && (bool)n.Meta["isActive"]);
@@ -1160,7 +1186,7 @@ namespace CodexBootstrap.Modules
                 }
 
                 // Get fractal news items from nodes
-                var fractalNodes = _registry.GetNodesByType(FRACTAL_NEWS_NODE_TYPE)
+                var fractalNodes = Registry.GetNodesByType(FRACTAL_NEWS_NODE_TYPE)
                     .ToArray() // Create a copy to prevent collection modification
                     .OrderByDescending(n => n.Meta?.ContainsKey("processedAt") == true ? 
                         DateTimeOffset.TryParse(n.Meta["processedAt"].ToString(), out var processedAt) ? processedAt : DateTimeOffset.MinValue : DateTimeOffset.MinValue)
@@ -1198,7 +1224,7 @@ namespace CodexBootstrap.Modules
             try
             {
                 var fractalId = $"fractal-{newsId}";
-                var fractalNode = _registry.GetNodesByType(FRACTAL_NEWS_NODE_TYPE)
+                var fractalNode = Registry.GetNodesByType(FRACTAL_NEWS_NODE_TYPE)
                     .ToArray() // Create a copy to prevent collection modification
                     .FirstOrDefault(n => n.Meta?.ContainsKey("fractalId") == true && n.Meta["fractalId"].ToString() == fractalId);
 
@@ -1266,7 +1292,7 @@ namespace CodexBootstrap.Modules
         {
             try
             {
-                var subscriptionNode = _registry.GetNodesByType(NEWS_SUBSCRIPTION_NODE_TYPE)
+                var subscriptionNode = Registry.GetNodesByType(NEWS_SUBSCRIPTION_NODE_TYPE)
                     .ToArray() // Create a copy to prevent collection modification
                     .FirstOrDefault(n => n.Meta?.ContainsKey("subscriptionId") == true && n.Meta["subscriptionId"].ToString() == id);
 
@@ -1281,7 +1307,7 @@ namespace CodexBootstrap.Modules
                     };
                 }
 
-                _registry.RemoveNode(subscriptionNode.Id);
+                Registry.RemoveNode(subscriptionNode.Id);
 
                 return new
                 {
@@ -1354,7 +1380,7 @@ namespace CodexBootstrap.Modules
             try
             {
                 // Find existing source
-                var existingSource = _registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE)
+                var existingSource = Registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE)
                     .ToArray() // Create a copy to prevent collection modification
                     .FirstOrDefault(n => n.Meta?.ContainsKey("sourceId") == true && n.Meta["sourceId"].ToString() == id);
 
@@ -1395,7 +1421,7 @@ namespace CodexBootstrap.Modules
                     }
                 );
 
-                _registry.Upsert(updatedSourceNode);
+                Registry.Upsert(updatedSourceNode);
 
                 _logger.Info($"Updated news source: {source.Name} ({source.Id})");
 
@@ -1424,7 +1450,7 @@ namespace CodexBootstrap.Modules
         {
             try
             {
-                var sourceNode = _registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE)
+                var sourceNode = Registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE)
                     .ToArray() // Create a copy to prevent collection modification
                     .FirstOrDefault(n => n.Meta?.ContainsKey("sourceId") == true && n.Meta["sourceId"].ToString() == id);
 
@@ -1439,7 +1465,7 @@ namespace CodexBootstrap.Modules
                     };
                 }
 
-                _registry.RemoveNode(sourceNode.Id);
+                Registry.RemoveNode(sourceNode.Id);
 
                 _logger.Info($"Removed news source: {id}");
 
@@ -1467,7 +1493,7 @@ namespace CodexBootstrap.Modules
         {
             try
             {
-                var sourceNode = _registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE)
+                var sourceNode = Registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE)
                     .ToArray() // Create a copy to prevent collection modification
                     .FirstOrDefault(n => n.Meta?.ContainsKey("sourceId") == true && n.Meta["sourceId"].ToString() == id);
 
@@ -1518,7 +1544,7 @@ namespace CodexBootstrap.Modules
                     }
                 );
 
-                _registry.Upsert(updatedSourceNode);
+                Registry.Upsert(updatedSourceNode);
 
                 _logger.Info($"Toggled news source {id}: {(source.IsActive ? "enabled" : "disabled")}");
 
@@ -1548,7 +1574,7 @@ namespace CodexBootstrap.Modules
         {
             try
             {
-                var sourceNode = _registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE)
+                var sourceNode = Registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE)
                     .ToArray() // Create a copy to prevent collection modification
                     .FirstOrDefault(n => n.Meta?.ContainsKey("sourceId") == true && n.Meta["sourceId"].ToString() == id);
 
@@ -1829,7 +1855,7 @@ namespace CodexBootstrap.Modules
                 // Try multiple likely type ids for axes
                 foreach (var typeId in new[] { "codex.ontology.axis", "codex.meta/axis", "u-core.axis" })
                 {
-                    var nodes = _registry.GetNodesByType(typeId).ToArray();
+                    var nodes = Registry.GetNodesByType(typeId).ToArray();
                     foreach (var n in nodes)
                     {
                         var name = n.Meta?.GetValueOrDefault("name")?.ToString() ?? n.Title;
@@ -1885,7 +1911,7 @@ namespace CodexBootstrap.Modules
                 foreach (var (name, keywords) in defaults)
                 {
                     // Skip if already exists
-                    var exists = _registry.GetNodesByType("codex.ontology.axis")
+                    var exists = Registry.GetNodesByType("codex.ontology.axis")
                         .ToArray()
                         .Any(n => string.Equals(n.Meta?.GetValueOrDefault("name")?.ToString(), name, StringComparison.OrdinalIgnoreCase));
                     if (exists) continue;
@@ -1910,7 +1936,7 @@ namespace CodexBootstrap.Modules
                         }
                     );
 
-                    _registry.Upsert(node);
+                    Registry.Upsert(node);
                 }
 
                 _logger.Info("Seeded minimal U-CORE ontology axes.");

@@ -1,4 +1,5 @@
 using LivingCodexMobile.Services;
+using LivingCodexMobile.Models;
 
 namespace LivingCodexMobile.Examples;
 
@@ -87,8 +88,6 @@ public class ApiUsageExamples
 }
 
 // Example request/response types
-public record CreateConceptRequest(string Name, string Description, List<string> Tags);
-public record UpdateConceptRequest(string Name, string Description, List<string> Tags);
 public record PatchConceptRequest(string? Name, string? Description, List<string>? Tags);
 public record LoginRequest(string Username, string Password);
 public record NewsResponse(List<NewsItem> Items, int TotalCount, DateTime LastUpdated);

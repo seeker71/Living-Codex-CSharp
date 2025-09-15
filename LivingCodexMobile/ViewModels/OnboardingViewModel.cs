@@ -9,13 +9,17 @@ public class OnboardingViewModel : BaseViewModel
 {
     private readonly INavigation _navigation;
     private readonly IAuthenticationService _authService;
+    private readonly IApiService _apiService;
+    private readonly ILoggingService _loggingService;
     private int _currentStep = 1;
     private string _nextButtonText = "Next";
 
-    public OnboardingViewModel(INavigation navigation, IAuthenticationService authService)
+    public OnboardingViewModel(INavigation navigation, IAuthenticationService authService, IApiService apiService, ILoggingService loggingService)
     {
         _navigation = navigation;
         _authService = authService;
+        _apiService = apiService;
+        _loggingService = loggingService;
         
         NextCommand = new Command(ExecuteNext);
         SkipCommand = new Command(ExecuteSkip);
@@ -108,14 +112,16 @@ public class OnboardingViewModel : BaseViewModel
         else
         {
             // Navigate to login/registration
-            _navigation.PushAsync(new MainPage());
+            var loginViewModel = new LoginViewModel(_apiService, _authService);
+            _navigation.PushAsync(new MainPage(loginViewModel));
         }
     }
 
     private void ExecuteSkip()
     {
         // Navigate directly to login/registration
-        _navigation.PushAsync(new MainPage());
+        var loginViewModel = new LoginViewModel(_apiService, _authService);
+        _navigation.PushAsync(new MainPage(loginViewModel));
     }
 
     private void UpdateNextButtonText()
@@ -124,13 +130,4 @@ public class OnboardingViewModel : BaseViewModel
     }
 }
 
-public class OnboardingStep
-{
-    public int StepNumber { get; set; }
-    public string Title { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
-    public string Icon { get; set; } = string.Empty;
-    public List<string> Features { get; set; } = new();
-    public bool IsNewsFeedStep { get; set; }
-}
 

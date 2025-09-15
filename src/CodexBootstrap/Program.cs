@@ -171,6 +171,9 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
         // Add SignalR services for RealtimeModule
         builder.Services.AddSignalR();
         
+        // Register RealtimeModule for SignalR Hub dependency injection
+        builder.Services.AddSingleton<RealtimeModule>();
+        
         
         // Add Swagger/OpenAPI services
         builder.Services.AddEndpointsApiExplorer();
@@ -456,6 +459,7 @@ app.MapPost("/edges", (Edge edge) => Results.Ok(coreApi.UpsertEdge(edge)));
 app.MapGet("/nodes/type/{typeId}", (string typeId) => coreApi.GetNodesByType(typeId));
 app.MapGet("/edges/from/{fromId}", (string fromId) => coreApi.GetEdgesFrom(fromId));
 app.MapGet("/edges/to/{toId}", (string toId) => coreApi.GetEdgesTo(toId));
+
 
 // Module discovery
 app.MapGet("/modules", () => coreApi.GetModules());

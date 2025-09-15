@@ -8,8 +8,10 @@ namespace LivingCodexMobile.ViewModels
     public class DashboardViewModel : BaseViewModel
     {
         private readonly IApiService _apiService;
+        private readonly IConceptService _conceptService;
         private readonly ISignalRService _signalRService;
         private readonly IAuthenticationService _authService;
+        private readonly IEnergyService _energyService;
         private bool _isConnected;
         private User? _currentUser;
         private double _collectiveEnergy;
@@ -17,11 +19,13 @@ namespace LivingCodexMobile.ViewModels
         private ObservableCollection<Concept> _recentConcepts = new();
         private ObservableCollection<Contribution> _recentContributions = new();
 
-        public DashboardViewModel(IApiService apiService, ISignalRService signalRService, IAuthenticationService authService)
+        public DashboardViewModel(IApiService apiService, IConceptService conceptService, ISignalRService signalRService, IAuthenticationService authService, IEnergyService energyService)
         {
             _apiService = apiService;
+            _conceptService = conceptService;
             _signalRService = signalRService;
             _authService = authService;
+            _energyService = energyService;
             Title = "Dashboard";
 
             RefreshCommand = new Command(async () => await RefreshDataAsync());
@@ -124,45 +128,31 @@ namespace LivingCodexMobile.ViewModels
 
             try
             {
-                // Load collective energy
-                var collectiveEnergyResponse = await _apiService.GetCollectiveEnergyAsync();
-                if (collectiveEnergyResponse.Success)
-                {
-                    CollectiveEnergy = collectiveEnergyResponse.Data;
-                }
+                // Load collective energy using real API
+                CollectiveEnergy = await _energyService.GetCollectiveEnergyAsync();
 
-                // Load contributor energy if user is logged in
+                // Load contributor energy if user is logged in using real API
                 if (CurrentUser != null)
                 {
-                    var contributorEnergyResponse = await _apiService.GetContributorEnergyAsync(CurrentUser.Id);
-                    if (contributorEnergyResponse.Success)
-                    {
-                        ContributorEnergy = contributorEnergyResponse.Data;
-                    }
+                    ContributorEnergy = await _energyService.GetContributorEnergyAsync(CurrentUser.Id);
                 }
 
-                // Load recent concepts
-                var conceptsResponse = await _apiService.GetConceptsAsync();
-                if (conceptsResponse.Success && conceptsResponse.Data != null)
+                // Load recent concepts using concept service
+                var concepts = await _conceptService.GetConceptsAsync();
+                RecentConcepts.Clear();
+                foreach (var concept in concepts.Take(5))
                 {
-                    RecentConcepts.Clear();
-                    foreach (var concept in conceptsResponse.Data.Take(5))
-                    {
-                        RecentConcepts.Add(concept);
-                    }
+                    RecentConcepts.Add(concept);
                 }
 
-                // Load recent contributions
+                // Load recent contributions using real API
                 if (CurrentUser != null)
                 {
-                    var contributionsResponse = await _apiService.GetUserContributionsAsync(CurrentUser.Id);
-                    if (contributionsResponse.Success && contributionsResponse.Data != null)
+                    var contributions = await _energyService.GetRecentContributionsAsync(CurrentUser.Id, 5);
+                    RecentContributions.Clear();
+                    foreach (var contribution in contributions)
                     {
-                        RecentContributions.Clear();
-                        foreach (var contribution in contributionsResponse.Data.Take(5))
-                        {
-                            RecentContributions.Add(contribution);
-                        }
+                        RecentContributions.Add(contribution);
                     }
                 }
             }

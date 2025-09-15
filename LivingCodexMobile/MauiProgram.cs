@@ -25,7 +25,7 @@ public static class MauiProgram
             httpClient.BaseAddress = new Uri("http://localhost:5002");
             return httpClient;
         });
-        builder.Services.AddSingleton<IApiService, ApiService>();
+        builder.Services.AddSingleton<IApiService, GenericApiService>();
         builder.Services.AddSingleton<IAuthenticationService, AuthenticationService>();
         builder.Services.AddSingleton<ISignalRService>(provider =>
             new SignalRService("http://localhost:5002/realtime-hub"));
@@ -39,6 +39,7 @@ public static class MauiProgram
         // Register Pages
         builder.Services.AddTransient<MainPage>();
         builder.Services.AddTransient<DashboardPage>();
+        builder.Services.AddTransient<FlyoutMenuPage>();
 
         // Register Converters
         builder.Services.AddSingleton<BoolToLoginTextConverter>();

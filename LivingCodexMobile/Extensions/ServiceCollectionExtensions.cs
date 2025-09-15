@@ -1,4 +1,5 @@
 using LivingCodexMobile.Services;
+using Microsoft.Extensions.Configuration;
 
 namespace LivingCodexMobile.Extensions;
 
@@ -7,7 +8,14 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddApiServices(this IServiceCollection services, IConfiguration configuration)
     {
         // Register API configuration
-        services.Configure<ApiConfiguration>(configuration.GetSection("Api"));
+        services.Configure<ApiConfiguration>(config => 
+        {
+            config.BaseUrl = configuration["Api:BaseUrl"] ?? "http://localhost:5002";
+            config.Timeout = TimeSpan.FromSeconds(int.Parse(configuration["Api:Timeout"] ?? "30"));
+            config.EnableLogging = bool.Parse(configuration["Api:EnableLogging"] ?? "true");
+            config.EnableRetry = bool.Parse(configuration["Api:EnableRetry"] ?? "true");
+            config.MaxRetryAttempts = int.Parse(configuration["Api:MaxRetryAttempts"] ?? "3");
+        });
         services.AddSingleton<IApiConfiguration, ApiConfiguration>();
 
         // Register HttpClient
@@ -25,6 +33,10 @@ public static class ServiceCollectionExtensions
         // Register services
         services.AddScoped<IAuthenticationService, AuthenticationService>();
         services.AddScoped<INewsFeedService, NewsFeedService>();
+        services.AddScoped<INodeExplorerService, NodeExplorerService>();
+        services.AddScoped<IConceptService, ConceptService>();
+        services.AddScoped<IEnergyService, EnergyService>();
+        services.AddSingleton<IMediaRendererService, MediaRendererService>();
 
         return services;
     }
@@ -56,6 +68,10 @@ public static class ServiceCollectionExtensions
         // Register services
         services.AddScoped<IAuthenticationService, AuthenticationService>();
         services.AddScoped<INewsFeedService, NewsFeedService>();
+        services.AddScoped<INodeExplorerService, NodeExplorerService>();
+        services.AddScoped<IConceptService, ConceptService>();
+        services.AddScoped<IEnergyService, EnergyService>();
+        services.AddSingleton<IMediaRendererService, MediaRendererService>();
 
         return services;
     }

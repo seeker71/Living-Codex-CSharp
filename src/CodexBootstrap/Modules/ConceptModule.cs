@@ -58,7 +58,200 @@ public class ConceptModule : IModule
     }
 
     /// <summary>
+    /// Get all concepts
+    /// </summary>
+    [Get("/concepts", "concepts-list", "Get all concepts", "codex.concept")]
+    [ApiResponse(200, "Success")]
+    public async Task<object> GetConcepts()
+    {
+        try
+        {
+            // Query the registry for all concept nodes
+            var conceptNodes = _registry.GetNodesByType("codex.concept");
+            
+            var concepts = conceptNodes.Select(node => new
+            {
+                id = node.Id,
+                name = node.Meta?.GetValueOrDefault("name")?.ToString() ?? node.Title ?? "Unknown",
+                description = node.Meta?.GetValueOrDefault("description")?.ToString() ?? node.Description ?? "",
+                domain = node.Meta?.GetValueOrDefault("domain")?.ToString() ?? "General",
+                complexity = int.TryParse(node.Meta?.GetValueOrDefault("complexity")?.ToString(), out var complexity) ? complexity : 0,
+                tags = node.Meta?.GetValueOrDefault("tags")?.ToString()?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? new string[0],
+                createdAt = node.Meta?.GetValueOrDefault("createdAt") is DateTime dt ? dt : DateTime.UtcNow,
+                updatedAt = node.Meta?.GetValueOrDefault("updatedAt") is DateTime ut ? ut : DateTime.UtcNow,
+                resonance = 0.75, // Default resonance - could be calculated from actual data
+                energy = 500.0,   // Default energy - could be calculated from actual data
+                isInterested = false, // This would come from user data
+                interestCount = 0     // This would come from user data
+            }).ToList();
+
+            return new { concepts = concepts };
+        }
+        catch (Exception ex)
+        {
+            return ResponseHelpers.CreateErrorResponse($"Failed to get concepts: {ex.Message}", "GET_CONCEPTS_ERROR");
+        }
+    }
+
+    /// <summary>
+    /// Get a specific concept by ID
+    /// </summary>
+    [Get("/concepts/{id}", "concept-get", "Get a specific concept", "codex.concept")]
+    [ApiResponse(200, "Success")]
+    [ApiResponse(404, "Not found")]
+    public async Task<object> GetConcept([ApiParameter("id", "Concept ID", Required = true, Location = "path")] string id)
+    {
+        try
+        {
+            var node = _registry.GetNode(id);
+            if (node == null || node.TypeId != "codex.concept")
+            {
+                return ResponseHelpers.CreateErrorResponse("Concept not found", "NOT_FOUND", 404);
+            }
+
+            var concept = new
+            {
+                id = node.Id,
+                name = node.Meta?.GetValueOrDefault("name")?.ToString() ?? node.Title ?? "Unknown",
+                description = node.Meta?.GetValueOrDefault("description")?.ToString() ?? node.Description ?? "",
+                domain = node.Meta?.GetValueOrDefault("domain")?.ToString() ?? "General",
+                complexity = int.TryParse(node.Meta?.GetValueOrDefault("complexity")?.ToString(), out var complexity) ? complexity : 0,
+                tags = node.Meta?.GetValueOrDefault("tags")?.ToString()?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? new string[0],
+                createdAt = node.Meta?.GetValueOrDefault("createdAt") is DateTime dt ? dt : DateTime.UtcNow,
+                updatedAt = node.Meta?.GetValueOrDefault("updatedAt") is DateTime ut ? ut : DateTime.UtcNow,
+                resonance = 0.75, // Default resonance - could be calculated from actual data
+                energy = 500.0,   // Default energy - could be calculated from actual data
+                isInterested = false, // This would come from user data
+                interestCount = 0     // This would come from user data
+            };
+
+            return concept;
+        }
+        catch (Exception ex)
+        {
+            return ResponseHelpers.CreateErrorResponse($"Failed to get concept: {ex.Message}", "GET_CONCEPT_ERROR");
+        }
+    }
+
+    /// <summary>
     /// Create a new concept
+    /// </summary>
+    [Post("/concepts", "concepts-create", "Create a new concept", "codex.concept")]
+    [ApiResponse(200, "Success")]
+    [ApiResponse(400, "Bad request")]
+    public async Task<object> CreateConceptPost([ApiParameter("request", "Concept creation request", Required = true, Location = "body")] ConceptCreateRequest request)
+    {
+        return await CreateConcept(request);
+    }
+
+    /// <summary>
+    /// Update a concept
+    /// </summary>
+    [Put("/concepts/{id}", "concepts-update", "Update a concept", "codex.concept")]
+    [ApiResponse(200, "Success")]
+    [ApiResponse(400, "Bad request")]
+    [ApiResponse(404, "Not found")]
+    public async Task<object> UpdateConcept(
+        [ApiParameter("id", "Concept ID", Required = true, Location = "path")] string id,
+        [ApiParameter("request", "Concept update request", Required = true, Location = "body")] ConceptCreateRequest request)
+    {
+        try
+        {
+            var existingNode = _registry.GetNode(id);
+            if (existingNode == null || existingNode.TypeId != "codex.concept")
+            {
+                return ResponseHelpers.CreateErrorResponse("Concept not found", "NOT_FOUND", 404);
+            }
+
+            // Update the concept node
+            var updatedMeta = new Dictionary<string, object>(existingNode.Meta ?? new Dictionary<string, object>())
+            {
+                ["name"] = request.Name,
+                ["description"] = request.Description,
+                ["domain"] = request.Domain,
+                ["complexity"] = request.Complexity,
+                ["tags"] = string.Join(",", request.Tags),
+                ["updatedAt"] = DateTime.UtcNow
+            };
+
+            var updatedNode = new Node(
+                Id: existingNode.Id,
+                TypeId: existingNode.TypeId,
+                State: existingNode.State,
+                Locale: existingNode.Locale,
+                Title: request.Name,
+                Description: request.Description,
+                Content: existingNode.Content,
+                Meta: updatedMeta
+            );
+
+            _registry.Upsert(updatedNode);
+
+            return new { 
+                id = updatedNode.Id, 
+                message = "Concept updated successfully" 
+            };
+        }
+        catch (Exception ex)
+        {
+            return ResponseHelpers.CreateErrorResponse($"Failed to update concept: {ex.Message}", "UPDATE_ERROR");
+        }
+    }
+
+    /// <summary>
+    /// Delete a concept
+    /// </summary>
+    [Delete("/concepts/{id}", "concepts-delete", "Delete a concept", "codex.concept")]
+    [ApiResponse(200, "Success")]
+    [ApiResponse(404, "Not found")]
+    public async Task<object> DeleteConcept([ApiParameter("id", "Concept ID", Required = true, Location = "path")] string id)
+    {
+        try
+        {
+            var node = _registry.GetNode(id);
+            if (node == null || node.TypeId != "codex.concept")
+            {
+                return ResponseHelpers.CreateErrorResponse("Concept not found", "NOT_FOUND", 404);
+            }
+
+            // Remove the node from the registry
+            if (_registry is PersistentNodeRegistry persistentRegistry)
+            {
+                await persistentRegistry.DeleteNodeAsync(id);
+            }
+            else
+            {
+                // For non-persistent registries, we can't actually delete, so we'll mark as deleted
+                var deletedNode = new Node(
+                    Id: node.Id,
+                    TypeId: "codex.concept.deleted",
+                    State: ContentState.Gas,
+                    Locale: node.Locale,
+                    Title: node.Title,
+                    Description: node.Description,
+                    Content: node.Content,
+                    Meta: new Dictionary<string, object>(node.Meta ?? new Dictionary<string, object>())
+                    {
+                        ["deletedAt"] = DateTime.UtcNow,
+                        ["deleted"] = true
+                    }
+                );
+                _registry.Upsert(deletedNode);
+            }
+
+            return new { 
+                id = id, 
+                message = "Concept deleted successfully" 
+            };
+        }
+        catch (Exception ex)
+        {
+            return ResponseHelpers.CreateErrorResponse($"Failed to delete concept: {ex.Message}", "DELETE_ERROR");
+        }
+    }
+
+    /// <summary>
+    /// Create a new concept (original method)
     /// </summary>
     [Post("/concept/create", "concept-create", "Create a new concept", "codex.concept")]
     [ApiResponse(200, "Success")]
