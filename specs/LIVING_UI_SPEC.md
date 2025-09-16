@@ -131,6 +131,23 @@ Summary: Each feature declares endpoint intents; adapters select concrete routes
   - Spec/Routes: `GET /spec/routes/all`, `GET /openapi`, `GET /spec/modules/with-specs`
   - Spec‑Driven: `POST /spec-driven/*`
 
+### 5.1 Feature–Lens Matrix (with primary endpoints and status)
+
+| Feature | Primary Lens | Core Endpoints | Status |
+|---|---|---|---|
+| Discover concepts | Stream, Swipe, Gallery | POST /concept/discover; POST /concept/search; GET /concepts | Simple |
+| Concept detail | Mini‑lenses | GET /concepts/{id}; GET /concept/ontology/explore/{id} | Simple |
+| Resonance compare | Resonance | POST /concepts/resonance/compare; POST /concepts/resonance/encode | Simple |
+| News stream | Stream, Threads | (TBD news endpoints); GET /events/stream (live); concept discovery fallback | Untested |
+| People discovery | Circles, Nearby | POST /users/discover; GET /concepts/{conceptId}/contributors | Simple |
+| Attune/Unattune | Actions | POST /concept/user/link; POST /concept/user/unlink | Simple |
+| Weave relation | Actions | POST /concept/relate; POST /storage-endpoints/edges | Untested |
+| Reflect/reply | Actions | POST /contributions/record (text); future threads endpoint | Untested |
+| Abundance dashboard | Making | GET /contributions/user/{userId}; GET /rewards/user/{userId} | Simple |
+| ETH wallet | Making | GET /ledger/balance/{address}; POST /ledger/transfer | Simple |
+| Graph explorer | Graph | /storage-endpoints/nodes*; /storage-endpoints/edges* | Simple |
+| Spec explorer | Meta | GET /spec/routes/all; POST /spec-driven/* | Untested |
+
 ---
 
 ## 6) RouteStatus Tracking (Level 2)
@@ -225,6 +242,121 @@ Summary: Minimal atoms that can deterministically generate Next.js pages/compone
     { "id": "serendipity", "type": "range", "min": 0, "max": 1 }
   ],
   "urlBinding": "querystring"
+}
+```
+
+### 7.6 Additional Lens Atoms
+
+Threads (Boards):
+```json
+{
+  "type": "codex.ui.lens",
+  "id": "lens.threads",
+  "name": "Threads Lens",
+  "projection": "thread-list",
+  "itemComponent": "ThreadCard",
+  "adapters": {
+    "topics": { "method": "POST", "path": "/concept/search" },
+    "neighbors": { "method": "GET", "path": "/concept/ontology/explore/${nodeId}" }
+  },
+  "actions": ["action.reflect", "action.weave", "action.attune"],
+  "status": "Simple"
+}
+```
+
+Gallery:
+```json
+{
+  "type": "codex.ui.lens",
+  "id": "lens.gallery",
+  "name": "Gallery Lens",
+  "projection": "masonry",
+  "itemComponent": "ConceptGalleryCard",
+  "adapters": {
+    "media": { "method": "GET", "path": "/image/generations" },
+    "concepts": { "method": "GET", "path": "/image/concepts" }
+  },
+  "actions": ["action.attune", "action.amplify"],
+  "status": "Simple"
+}
+```
+
+Swipe:
+```json
+{
+  "type": "codex.ui.lens",
+  "id": "lens.swipe",
+  "name": "Swipe Lens",
+  "projection": "swiper",
+  "itemComponent": "SwipeConceptCard",
+  "adapters": {
+    "queue": { "method": "POST", "path": "/concept/discover" }
+  },
+  "actions": ["action.attune"],
+  "status": "Simple"
+}
+```
+
+Nearby:
+```json
+{
+  "type": "codex.ui.lens",
+  "id": "lens.nearby",
+  "name": "Nearby Lens",
+  "projection": "map",
+  "itemComponent": "NearbyCard",
+  "adapters": {
+    "people": { "method": "POST", "path": "/users/discover" }
+  },
+  "status": "Simple"
+}
+```
+
+Making (Contributions):
+```json
+{
+  "type": "codex.ui.lens",
+  "id": "lens.making",
+  "name": "Making Lens",
+  "projection": "timeline",
+  "itemComponent": "ContributionCard",
+  "adapters": {
+    "contribs": { "method": "GET", "path": "/contributions/user/${userId}" },
+    "rewards": { "method": "GET", "path": "/rewards/user/${userId}" }
+  },
+  "status": "Simple"
+}
+```
+
+Graph:
+```json
+{
+  "type": "codex.ui.lens",
+  "id": "lens.graph",
+  "name": "Graph Lens",
+  "projection": "graph",
+  "itemComponent": "GraphViewport",
+  "adapters": {
+    "nodes": { "method": "GET", "path": "/storage-endpoints/nodes" },
+    "edges": { "method": "GET", "path": "/storage-endpoints/edges" }
+  },
+  "status": "Simple"
+}
+```
+
+Resonance Compare:
+```json
+{
+  "type": "codex.ui.lens",
+  "id": "lens.resonance-compare",
+  "name": "Resonance Compare",
+  "projection": "panel",
+  "itemComponent": "ResonanceCompare",
+  "adapters": {
+    "compare": { "method": "POST", "path": "/concepts/resonance/compare" },
+    "encode": { "method": "POST", "path": "/concepts/resonance/encode" }
+  },
+  "status": "Simple"
 }
 ```
 
