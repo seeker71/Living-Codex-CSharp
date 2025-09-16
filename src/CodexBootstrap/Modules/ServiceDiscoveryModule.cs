@@ -9,51 +9,43 @@ namespace CodexBootstrap.Modules;
 /// Service Discovery Module - Modular Fractal API Design
 /// Manages service registration, discovery, and health monitoring
 /// </summary>
-public class ServiceDiscoveryModule : IModule
+public class ServiceDiscoveryModule : ModuleBase
 {
     private readonly IApiRouter _apiRouter;
-    private readonly NodeRegistry _registry;
     private readonly Dictionary<string, ServiceInfo> _registeredServices = new();
     private readonly Dictionary<string, ServiceHealth> _serviceHealth = new();
     private CoreApiService? _coreApiService;
 
-    public ServiceDiscoveryModule()
+    public override string Name => "Service Discovery Module";
+    public override string Description => "Modular Fractal API Design - Manages service registration, discovery, and health monitoring";
+    public override string Version => "1.0.0";
+
+    public ServiceDiscoveryModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? apiRouter = null) 
+        : base(registry, logger)
     {
-        // Parameterless constructor for attribute discovery
-        _apiRouter = null!;
-        _registry = null!;
+        _apiRouter = apiRouter ?? new MockApiRouter();
     }
 
-    public ServiceDiscoveryModule(IApiRouter apiRouter, NodeRegistry registry)
-    {
-        _apiRouter = apiRouter;
-        _registry = registry;
-    }
 
-    public string ModuleId => "codex.service.discovery";
-    public string Name => "Service Discovery Module";
-    public string Version => "1.0.0";
-    public string Description => "Service Discovery Module - Self-contained fractal APIs for service registration and discovery";
-
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(ModuleId, Name, Version, Description,
-            capabilities: new[] { "service-registration", "service-discovery", "health-monitoring" },
+        return CreateModuleNode(
+            moduleId: "codex.service.discovery",
+            name: Name,
+            version: Version,
+            description: Description,
             tags: new[] { "service-discovery", "microservices", "registration" },
-            specReference: "codex.spec.service-discovery");
+            capabilities: new[] { "service-registration", "service-discovery", "health-monitoring" },
+            spec: "codex.spec.service-discovery"
+        );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        // Module registration is now handled automatically by the attribute discovery system
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // API handlers are now registered automatically by the attribute discovery system
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // Store CoreApiService reference for inter-module communication
         _coreApiService = coreApi;
@@ -67,7 +59,7 @@ public class ServiceDiscoveryModule : IModule
     /// <summary>
     /// Register all API Gateway related nodes for AI agent discovery and module generation
     /// </summary>
-    private void RegisterApiGatewayNodes(NodeRegistry registry)
+    private void RegisterApiGatewayNodes(INodeRegistry registry)
     {
         // Register API Gateway module node
         var apiGatewayNode = new Node(
@@ -113,7 +105,7 @@ public class ServiceDiscoveryModule : IModule
     /// <summary>
     /// Register API Gateway routes as discoverable nodes
     /// </summary>
-    private void RegisterApiGatewayRoutes(NodeRegistry registry)
+    private void RegisterApiGatewayRoutes(INodeRegistry registry)
     {
         var routes = new[]
         {
@@ -164,7 +156,7 @@ public class ServiceDiscoveryModule : IModule
     /// <summary>
     /// Register API Gateway DTOs as discoverable nodes
     /// </summary>
-    private void RegisterApiGatewayDTOs(NodeRegistry registry)
+    private void RegisterApiGatewayDTOs(INodeRegistry registry)
     {
         var dtos = new[]
         {
@@ -214,7 +206,7 @@ public class ServiceDiscoveryModule : IModule
     /// <summary>
     /// Register API Gateway classes as discoverable nodes
     /// </summary>
-    private void RegisterApiGatewayClasses(NodeRegistry registry)
+    private void RegisterApiGatewayClasses(INodeRegistry registry)
     {
         var classes = new[]
         {

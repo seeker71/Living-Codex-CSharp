@@ -9,71 +9,48 @@ namespace CodexBootstrap.Modules;
 /// Provides personalized news feeds based on user interests, location, and concept relationships
 /// </summary>
 [MetaNode(Id = "codex.news-feed", Name = "News Feed Module", Description = "Real news feed system based on user interests and actual news data")]
-public sealed class NewsFeedModule : IModule, IRegistryModule
+public sealed class NewsFeedModule : ModuleBase
 {
-    private readonly NodeRegistry _localRegistry;
-    private readonly ICodexLogger _logger;
     private readonly HttpClient _httpClient;
-    private NodeRegistry? _globalRegistry;
 
-    public NewsFeedModule(NodeRegistry registry, ICodexLogger logger, HttpClient httpClient)
+    public override string Name => "News Feed Module";
+    public override string Description => "Real news feed system based on user interests and actual news data";
+    public override string Version => "1.0.0";
+
+    public NewsFeedModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+        : base(registry, logger)
     {
-        _localRegistry = registry;
-        _logger = logger;
         _httpClient = httpClient;
     }
 
-
     /// <summary>
-    /// Gets the registry to use - global registry if set, otherwise local registry
-    /// This ensures the module uses the global registry when available
+    /// Gets the registry to use - now always the unified registry
     /// </summary>
-    private NodeRegistry Registry => _globalRegistry ?? _localRegistry;
+    private INodeRegistry Registry => _registry;
 
-    /// <summary>
-    /// Sets the global registry for this module
-    /// This ensures the module uses the global registry instead of a local one
-    /// </summary>
-    public void SetGlobalRegistry(NodeRegistry registry)
+    public override Node GetModuleNode()
     {
-        _globalRegistry = registry;
-    }
-
-    public Node GetModuleNode()
-    {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.news-feed",
-            name: "News Feed Module",
-            version: "1.0.0",
-            description: "Real news feed system based on user interests and actual news data",
+        return CreateModuleNode(
+            moduleId: "codex.news-feed",
+            name: Name,
+            version: Version,
+            description: Description,
+            tags: new[] { "news", "feed", "personalization", "content", "interests", "real-time" },
             capabilities: new[] { 
                 "news-feed", "personalization", "interest-matching", "news-aggregation", 
                 "content-filtering", "real-time-updates", "user-preferences" 
             },
-            tags: new[] { "news", "feed", "personalization", "content", "interests", "real-time" },
-            specReference: "codex.spec.news-feed"
+            spec: "codex.spec.news-feed"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        // Set the global registry if this is the first call
-        if (_globalRegistry == null)
-        {
-            SetGlobalRegistry(registry);
-        }
-        
-        Registry.Upsert(GetModuleNode());
-        _logger.Info("News Feed Module registered");
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // API handlers are registered via attribute-based routing
         _logger.Info("News Feed Module API handlers registered");
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry nodeRegistry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // HTTP endpoints are registered via attribute-based routing
         _logger.Info("News Feed Module HTTP endpoints registered");

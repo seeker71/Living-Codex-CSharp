@@ -78,53 +78,45 @@ public record FutureResponse(
     Description = "Configurable LLM integration for future knowledge retrieval",
     Tags = new[] { "LLM", "Future Knowledge", "AI", "Prediction", "Analysis" }
 )]
-public class LLMFutureKnowledgeModule : IModule
+public class LLMFutureKnowledgeModule : ModuleBase
 {
-    private readonly IApiRouter _apiRouter;
-    private readonly NodeRegistry _registry;
+    private IApiRouter _apiRouter;
     private readonly Dictionary<string, LLMConfig> _llmConfigs;
     private readonly Dictionary<string, (SimpleTranslationResponse response, DateTime cachedAt)> _translationCache = new();
     private readonly TimeSpan _cacheExpiry = TimeSpan.FromHours(24); // Cache translations for 24 hours
 
-    public LLMFutureKnowledgeModule(IApiRouter apiRouter, NodeRegistry registry)
+    public override string Name => "LLM-Enhanced Future Knowledge Module";
+    public override string Description => "Uses configurable local and remote LLMs for future knowledge retrieval and analysis";
+    public override string Version => "1.0.0";
+
+    public LLMFutureKnowledgeModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? apiRouter = null) 
+        : base(registry, logger)
     {
         _apiRouter = apiRouter;
-        _registry = registry;
         _llmConfigs = new Dictionary<string, LLMConfig>();
         InitializeDefaultConfigs();
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.llm.future",
+        return CreateModuleNode(
+            moduleId: "codex.llm.future",
             name: "LLM-Enhanced Future Knowledge Module",
             version: "1.0.0",
             description: "Uses configurable local and remote LLMs for future knowledge retrieval",
-            capabilities: new[] { "FutureKnowledge", "LLMIntegration", "ConfigurableProviders", "LocalAndRemote" },
             tags: new[] { "llm", "future-knowledge", "ai", "concepts" },
-            specReference: "codex.spec.llm-future-knowledge"
+            capabilities: new[] { "FutureKnowledge", "LLMIntegration", "ConfigurableProviders", "LocalAndRemote" },
+            spec: "codex.spec.llm-future-knowledge"
         );
     }
 
-    public void Register(NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
-        registry.Upsert(GetModuleNode());
-        
-        // Register default LLM configurations
-        foreach (var config in _llmConfigs.Values)
-        {
-            var configNode = CreateLLMConfigNode(config);
-            registry.Upsert(configNode);
-        }
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
-    {
+        _apiRouter = router;
         // API handlers are registered via attributes
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // HTTP endpoints are registered via attributes
         
@@ -1162,7 +1154,7 @@ Please provide a thoughtful translation that adapts the concept to the {request.
     /// <summary>
     /// Register all Cross-Service Translation related nodes for AI agent discovery and module generation
     /// </summary>
-    private void RegisterCrossServiceTranslationNodes(NodeRegistry registry)
+    private void RegisterCrossServiceTranslationNodes(INodeRegistry registry)
     {
         // Register Cross-Service Translation module node
         var crossServiceTranslationNode = new Node(
@@ -1208,7 +1200,7 @@ Please provide a thoughtful translation that adapts the concept to the {request.
     /// <summary>
     /// Register Cross-Service Translation routes as discoverable nodes
     /// </summary>
-    private void RegisterCrossServiceTranslationRoutes(NodeRegistry registry)
+    private void RegisterCrossServiceTranslationRoutes(INodeRegistry registry)
     {
         var routes = new[]
         {
@@ -1259,7 +1251,7 @@ Please provide a thoughtful translation that adapts the concept to the {request.
     /// <summary>
     /// Register Cross-Service Translation DTOs as discoverable nodes
     /// </summary>
-    private void RegisterCrossServiceTranslationDTOs(NodeRegistry registry)
+    private void RegisterCrossServiceTranslationDTOs(INodeRegistry registry)
     {
         var dtos = new[]
         {
@@ -1314,7 +1306,7 @@ Please provide a thoughtful translation that adapts the concept to the {request.
     /// <summary>
     /// Register Cross-Service Translation classes as discoverable nodes
     /// </summary>
-    private void RegisterCrossServiceTranslationClasses(NodeRegistry registry)
+    private void RegisterCrossServiceTranslationClasses(INodeRegistry registry)
     {
         var classes = new[]
         {

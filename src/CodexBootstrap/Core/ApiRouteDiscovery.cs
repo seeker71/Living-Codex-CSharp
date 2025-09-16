@@ -281,8 +281,14 @@ public static class ApiRouteDiscovery
         {
             return existingInstance;
         }
+        
+        // Debug: Check if registry is null
+        if (registry == null)
+        {
+            throw new InvalidOperationException($"Registry is null when creating instance of {moduleType.Name}");
+        }
 
-        // Single constructor pattern: (INodeRegistry, ICodexLogger, HttpClient)
+        // Single constructor pattern: (INodeRegistry, ICodexLogger, HttpClient) with optional parameters
         var constructor = moduleType.GetConstructor(new[] { typeof(INodeRegistry), typeof(ICodexLogger), typeof(HttpClient) });
         if (constructor != null)
         {
@@ -291,6 +297,37 @@ public static class ApiRouteDiscovery
             var instance = Activator.CreateInstance(moduleType, registry, logger, httpClient)!;
             _moduleInstances[moduleType] = instance;
             return instance;
+        }
+        
+        // Try to find constructor with optional parameters
+        var constructors = moduleType.GetConstructors();
+        foreach (var ctor in constructors)
+        {
+            var parameters = ctor.GetParameters();
+            if (parameters.Length >= 3 && 
+                parameters[0].ParameterType == typeof(INodeRegistry) &&
+                parameters[1].ParameterType == typeof(ICodexLogger) &&
+                parameters[2].ParameterType == typeof(HttpClient))
+            {
+                var logger = new Log4NetLogger(moduleType);
+                var httpClient = ServiceProvider?.GetService<HttpClient>() ?? new HttpClient();
+                
+                // Create instance with required parameters, optional parameters will use defaults
+                var args = new object[parameters.Length];
+                args[0] = registry;
+                args[1] = logger;
+                args[2] = httpClient;
+                
+                // Set optional parameters to default values
+                for (int i = 3; i < parameters.Length; i++)
+                {
+                    args[i] = parameters[i].HasDefaultValue ? parameters[i].DefaultValue! : GetDefaultValue(parameters[i].ParameterType);
+                }
+                
+                var instance = Activator.CreateInstance(moduleType, args)!;
+                _moduleInstances[moduleType] = instance;
+                return instance;
+            }
         }
         
         throw new InvalidOperationException($"Module {moduleType.Name} does not have required constructor(INodeRegistry, ICodexLogger, HttpClient)");
@@ -321,19 +358,45 @@ public static class ApiRouteDiscovery
                 var instance = CreateModuleInstance(method.DeclaringType!, router, registry);
                 var args = await BindParametersFromHttpContextAsync(method, context);
                 var result = method.Invoke(instance, args);
-                return Results.Ok(await UnwrapResultAsync(result));
+                var unwrappedResult = await UnwrapResultAsync(result);
+                
+                // If it's already an IResult, return it directly
+                if (unwrappedResult is IResult iResult)
+                {
+                    return iResult;
+                }
+                
+                // Handle ErrorResponse objects with appropriate status codes
+                if (unwrappedResult is ErrorResponse errorResponse)
+                {
+                    // Check if it's a "not found" error and return 404
+                    if (errorResponse.Error?.Contains("not found", StringComparison.OrdinalIgnoreCase) == true)
+                    {
+                        return Results.NotFound(errorResponse);
+                    }
+                    // Check if it's a "bad request" error and return 400
+                    if (errorResponse.Error?.Contains("required", StringComparison.OrdinalIgnoreCase) == true ||
+                        errorResponse.Error?.Contains("invalid", StringComparison.OrdinalIgnoreCase) == true)
+                    {
+                        return Results.BadRequest(errorResponse);
+                    }
+                    // Default to 500 for other errors
+                    return Results.Problem(errorResponse.Error, statusCode: 500);
+                }
+                
+                return Results.Ok(unwrappedResult);
             }
             catch (ApiBindingException bex)
             {
-                return Results.Ok(new ErrorResponse(bex.Message));
+                return Results.BadRequest(new ErrorResponse(bex.Message));
             }
             catch (JsonException jex)
             {
-                return Results.Ok(new ErrorResponse($"Invalid JSON: {jex.Message}"));
+                return Results.BadRequest(new ErrorResponse($"Invalid JSON: {jex.Message}"));
             }
             catch (Exception ex)
             {
-                return Results.Ok(new ErrorResponse($"Error executing {method.Name}: {ex.Message}"));
+                return Results.Problem($"Error executing {method.Name}: {ex.Message}", statusCode: 500);
             }
         }).WithName(attribute.Name);
     }
@@ -574,6 +637,9 @@ public static class ApiRouteDiscovery
 
     private static async Task<object> UnwrapResultAsync(object? result)
     {
+        // If it's already an IResult, return it directly without unwrapping
+        if (result is IResult iResult) return iResult;
+        
         if (result is Task<object> to) return await to;
         if (result is Task t)
         {

@@ -9,47 +9,42 @@ namespace CodexBootstrap.Modules;
 /// <summary>
 /// Identity management module for comprehensive user identity and credential management
 /// </summary>
-public sealed class IdentityManagementModule : IModule
+public sealed class IdentityManagementModule : ModuleBase
 {
-    private readonly Core.ICodexLogger _logger;
     private readonly Dictionary<string, IdentityProfile> _identityProfiles = new();
     private readonly Dictionary<string, List<Credential>> _userCredentials = new();
     private readonly Dictionary<string, List<IdentityClaim>> _userClaims = new();
     private readonly Dictionary<string, IdentityProof> _identityProofs = new();
 
-    public IdentityManagementModule()
+    public override string Name => "Identity Management Module";
+    public override string Description => "Comprehensive user identity and credential management";
+    public override string Version => "0.1.0";
+
+    public IdentityManagementModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+        : base(registry, logger)
     {
-        _logger = new Log4NetLogger(typeof(IdentityManagementModule));
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            "codex.identity-management",
-            "Identity Management Module",
-            "0.1.0",
-            "Comprehensive identity and credential management system",
-            new[] { "identity", "credentials", "claims", "authentication", "security" },
-            new[] { "create_identity", "update_identity", "delete_identity", "get_identity", "list_identities", "add_credential", "remove_credential", "verify_credential", "add_claim", "remove_claim", "verify_claim", "generate_identity_proof", "verify_identity_proof" },
-            "codex.spec.identity-management"
+        return CreateModuleNode(
+            moduleId: "codex.identity-management",
+            name: "Identity Management Module",
+            version: "0.1.0",
+            description: "Comprehensive identity and credential management system",
+            tags: new[] { "identity", "credentials", "claims", "authentication", "security" },
+            capabilities: new[] { "create_identity", "update_identity", "delete_identity", "get_identity", "list_identities", "add_credential", "remove_credential", "verify_credential", "add_claim", "remove_claim", "verify_claim", "generate_identity_proof", "verify_identity_proof" },
+            spec: "codex.spec.identity-management"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        // Register the module node
-        registry.Upsert(GetModuleNode());
-        
-        _logger.Info("Identity Management Module registered");
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // API handlers are registered via attribute-based routing
         _logger.Info("Identity Management API handlers registered");
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // HTTP endpoints will be registered via ApiRouteDiscovery
     }

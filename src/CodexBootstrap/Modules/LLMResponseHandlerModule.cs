@@ -22,41 +22,39 @@ namespace CodexBootstrap.Modules;
     Description = "Handles conversion of LLM responses to node-based diff patches",
     Tags = new[] { "LLM", "Response Handler", "Nodes", "Edges", "Diff Patch", "Bootstrap" }
 )]
-public class LLMResponseHandlerModule : IModule
+public class LLMResponseHandlerModule : ModuleBase
 {
     private readonly IApiRouter _apiRouter;
-    private readonly NodeRegistry _registry;
 
-    public LLMResponseHandlerModule(IApiRouter apiRouter, NodeRegistry registry)
+    public override string Name => "LLM Response Handler Module";
+    public override string Description => "Converts LLM responses into structured nodes and edges for bootstrap integration";
+    public override string Version => "1.0.0";
+
+    public LLMResponseHandlerModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? apiRouter = null) 
+        : base(registry, logger)
     {
-        _apiRouter = apiRouter;
-        _registry = registry;
+        _apiRouter = apiRouter ?? new MockApiRouter();
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.llm.response-handler",
-            name: "LLM Response Handler Module",
-            version: "1.0.0",
-            description: "Converts LLM responses into structured nodes and edges for bootstrap integration",
-            capabilities: new[] { "ResponseParsing", "NodeGeneration", "EdgeCreation", "DiffPatch", "BootstrapIntegration" },
+        return CreateModuleNode(
+            moduleId: "codex.llm.response-handler",
+            name: Name,
+            version: Version,
+            description: Description,
             tags: new[] { "llm", "response-handler", "parsing", "bootstrap" },
-            specReference: "codex.spec.llm-response-handler"
+            capabilities: new[] { "ResponseParsing", "NodeGeneration", "EdgeCreation", "DiffPatch", "BootstrapIntegration" },
+            spec: "codex.spec.llm-response-handler"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        registry.Upsert(GetModuleNode());
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // API handlers are registered via attributes
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // HTTP endpoints are registered via attributes
     }

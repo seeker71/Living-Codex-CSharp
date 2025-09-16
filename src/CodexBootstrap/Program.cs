@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using CodexBootstrap.Core;
 using CodexBootstrap.Core.Storage;
+using CodexBootstrap.Core.Security;
 using CodexBootstrap.Runtime;
 using CodexBootstrap.Modules;
 using log4net;
@@ -123,11 +124,22 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
 
         // Core services - Unified NodeRegistry with Ice and Water storage backends
         var persistenceEnabled = (Environment.GetEnvironmentVariable("PERSISTENCE_ENABLED") ?? "true").Equals("true", StringComparison.OrdinalIgnoreCase);
+        var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
+        
+        Console.WriteLine($"[DEBUG] Environment: {environment}, PersistenceEnabled: {persistenceEnabled}");
+        
         if (persistenceEnabled)
         {
             // Register Ice storage backend (high-performance, federated)
             builder.Services.AddSingleton<IIceStorageBackend>(sp =>
             {
+                // Use in-memory storage for Testing environment
+                if (environment.Equals("Testing", StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine("[DEBUG] Using InMemoryIceStorageBackend for Testing environment");
+                    return new InMemoryIceStorageBackend();
+                }
+                
                 var iceStorageType = Environment.GetEnvironmentVariable("ICE_STORAGE_TYPE") ?? "postgresql";
                 var iceConnectionString = Environment.GetEnvironmentVariable("ICE_CONNECTION_STRING") ?? 
                     "Host=localhost;Database=codex_ice;Username=codex;Password=codex";
@@ -135,6 +147,7 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
                 return iceStorageType.ToLowerInvariant() switch
                 {
                     "postgresql" => new PostgreSqlIceStorageBackend(iceConnectionString),
+                    "sqlite" => new SqliteIceStorageBackend(iceConnectionString),
                     _ => new PostgreSqlIceStorageBackend(iceConnectionString)
                 };
             });
@@ -142,6 +155,13 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
             // Register Water storage backend (semi-persistent, local cache)
             builder.Services.AddSingleton<IWaterStorageBackend>(sp =>
             {
+                // Use in-memory storage for Testing environment
+                if (environment.Equals("Testing", StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine("[DEBUG] Using InMemoryWaterStorageBackend for Testing environment");
+                    return new InMemoryWaterStorageBackend();
+                }
+                
                 var waterConnectionString = Environment.GetEnvironmentVariable("WATER_CONNECTION_STRING") ?? 
                     "Data Source=data/water_cache.db";
                 return new SqliteWaterStorageBackend(waterConnectionString);
@@ -158,19 +178,23 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
         }
         else
         {
+            // For development mode, use SQLite for both Ice and Water storage with separate databases
+            builder.Services.AddSingleton<IIceStorageBackend>(sp => new SqliteIceStorageBackend("Data Source=ice_dev.db"));
+            builder.Services.AddSingleton<IWaterStorageBackend>(sp => new SqliteWaterStorageBackend("Data Source=water_dev.db"));
             builder.Services.AddSingleton<INodeRegistry>(sp =>
             {
-                // Fallback to basic NodeRegistry for development
-                // This would need a basic implementation for development mode
-                throw new NotImplementedException("Development mode NodeRegistry not yet implemented");
+                var iceStorage = sp.GetRequiredService<IIceStorageBackend>();
+                var waterStorage = sp.GetRequiredService<IWaterStorageBackend>();
+                var logger = sp.GetRequiredService<CodexBootstrap.Core.ICodexLogger>();
+                return new NodeRegistry(iceStorage, waterStorage, logger);
             });
         }
-        builder.Services.AddSingleton<ApiRouter>();
-        builder.Services.AddSingleton<IApiRouter>(sp => sp.GetRequiredService<ApiRouter>());
-        
-        // Register INodeRegistry as the primary interface
-        builder.Services.AddSingleton<INodeRegistry>(sp => sp.GetRequiredService<INodeRegistry>());
+        builder.Services.AddSingleton<IApiRouter, MockApiRouter>();
         builder.Services.AddSingleton<ModuleCommunicationWrapper>();
+        builder.Services.AddSingleton<PerformanceProfiler>();
+        builder.Services.AddSingleton<IInputValidator, InputValidator>();
+        builder.Services.AddSingleton<CodexBootstrap.Core.Security.IUserRepository, CodexBootstrap.Core.Security.InMemoryUserRepository>();
+        builder.Services.AddSingleton<CodexBootstrap.Core.Security.IAuthenticationService, CodexBootstrap.Core.Security.AuthenticationService>();
 
         // Generic services with interface registration
         builder.Services.AddSingleton<ModuleLoader>(sp => 
@@ -317,7 +341,13 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
         
         // Register missing services for modules
         builder.Services.AddSingleton<DynamicAttributionSystem>();
-        builder.Services.AddSingleton<EndpointGenerator>();
+        builder.Services.AddSingleton<EndpointGenerator>(sp => 
+            new EndpointGenerator(
+                sp.GetRequiredService<IApiRouter>(), 
+                sp.GetRequiredService<INodeRegistry>(), 
+                sp.GetRequiredService<DynamicAttributionSystem>(), 
+                new object() // Placeholder for codeGenerator
+            ));
         builder.Services.AddSingleton<object>(sp => new object()); // Placeholder for UCoreResonanceEngine
 
         // Register HttpClient for SecurityModule REST API calls
@@ -325,6 +355,22 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
 
 // HTTP client for adapters
 builder.Services.AddHttpClient();
+
+// Register IStorageBackend and ICacheManager for StorageEndpointsModule
+builder.Services.AddSingleton<IStorageBackend>(sp =>
+{
+    var iceStorage = sp.GetRequiredService<IIceStorageBackend>();
+    var waterStorage = sp.GetRequiredService<IWaterStorageBackend>();
+    var logger = sp.GetRequiredService<CodexBootstrap.Core.ICodexLogger>();
+    return new UnifiedStorageBackend(iceStorage, waterStorage, logger);
+});
+
+builder.Services.AddSingleton<ICacheManager>(sp =>
+{
+    var storageBackend = sp.GetRequiredService<IStorageBackend>();
+    var logger = sp.GetRequiredService<CodexBootstrap.Core.ICodexLogger>();
+    return new NodeCacheManager(storageBackend, logger);
+});
 
 // Monitoring services
 builder.Services.AddSingleton<ErrorMetrics>();
@@ -342,13 +388,13 @@ try
 {
     if (persistenceEnabled)
     {
-        var storage = app.Services.GetRequiredService<IStorageBackend>();
-        storage.InitializeAsync().GetAwaiter().GetResult();
-        var reg = app.Services.GetRequiredService<NodeRegistry>();
-        if (reg is PersistentNodeRegistry preg)
-        {
-            preg.InitializeAsync().GetAwaiter().GetResult();
-        }
+        // Initialize individual storage backends
+        var iceStorage = app.Services.GetRequiredService<IIceStorageBackend>();
+        var waterStorage = app.Services.GetRequiredService<IWaterStorageBackend>();
+        
+        // Initialize the NodeRegistry (which will initialize the backends)
+        var reg = app.Services.GetRequiredService<INodeRegistry>();
+        reg.InitializeAsync().GetAwaiter().GetResult();
     }
 }
 catch (Exception ex)
@@ -403,7 +449,7 @@ app.UseAuthorization();
 
 
 // Add Swagger middleware
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName == "Testing")
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
@@ -415,7 +461,7 @@ if (app.Environment.IsDevelopment())
 }
 
 // Resolve services
-var registry = app.Services.GetRequiredService<NodeRegistry>();
+var registry = app.Services.GetRequiredService<INodeRegistry>();
 var router = app.Services.GetRequiredService<IApiRouter>();
 var coreApi = app.Services.GetRequiredService<CoreApiService>();
 var moduleLoader = app.Services.GetRequiredService<ModuleLoader>();
@@ -423,7 +469,10 @@ var routeDiscovery = app.Services.GetRequiredService<RouteDiscovery>();
 var healthService = app.Services.GetRequiredService<HealthService>();
 var codexLogger = app.Services.GetRequiredService<CodexBootstrap.Core.ICodexLogger>();
 
-// Initialize meta-node system
+// Initialize the registry first
+registry.InitializeAsync().GetAwaiter().GetResult();
+
+// Initialize meta-node system AFTER registry is initialized
 InitializeMetaNodeSystem(registry);
 
 // Initialize U-CORE foundational nodes (root + axes) before modules load
@@ -615,11 +664,8 @@ var url = $"http://localhost:{configuredPort}";
 
 Console.WriteLine($"Starting Living Codex on {url}");
 
-// Only run the server if not in test environment
-if (!Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")?.Equals("Testing", StringComparison.OrdinalIgnoreCase) == true)
-{
-    app.Run(url);
-}
+// Run the server
+app.Run(url);
 
 // Helper function to determine module status
 static string DetermineModuleStatus(IModule module)
@@ -726,7 +772,7 @@ static int GetModuleEndpoints(IModule module)
 }
 
 // Initialize meta-node system
-static void InitializeMetaNodeSystem(NodeRegistry registry)
+static void InitializeMetaNodeSystem(INodeRegistry registry)
 {
     // Register attribute-based meta-nodes
     var assembly = Assembly.GetExecutingAssembly();

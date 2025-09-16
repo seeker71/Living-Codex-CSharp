@@ -7,16 +7,17 @@ namespace CodexBootstrap.Modules;
 /// <summary>
 /// Storage management module that configures its own storage backend
 /// </summary>
-public sealed class StorageModule : IModule
+public sealed class StorageModule : ModuleBase
 {
-    private readonly NodeRegistry _registry;
     private readonly IStorageBackend? _storage;
-    private readonly Core.ICodexLogger _logger;
 
-    public StorageModule(NodeRegistry registry, ICodexLogger logger, IStorageBackend? storage = null)
+    public override string Name => "Storage Module";
+    public override string Description => "Storage management module that configures its own storage backend";
+    public override string Version => "1.0.0";
+
+    public StorageModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IStorageBackend? storage = null) 
+        : base(registry, logger)
     {
-        _registry = registry;
-        _logger = logger;
         _storage = storage ?? ConfigureDefaultStorageBackend();
     }
 
@@ -72,25 +73,20 @@ public sealed class StorageModule : IModule
         }
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.storage",
-            name: "Storage Management Module",
-            version: "0.1.0",
-            description: "Self-contained module for storage management operations using node-based storage",
-            capabilities: new[] { "storage", "management", "nodes", "edges", "statistics" },
+        return CreateModuleNode(
+            moduleId: "codex.storage",
+            name: Name,
+            version: Version,
+            description: Description,
             tags: new[] { "get_stats", "storage_operations", "data_management" },
-            specReference: "codex.spec.storage"
+            capabilities: new[] { "storage", "management", "nodes", "edges", "statistics" },
+            spec: "codex.spec.storage"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        registry.Upsert(GetModuleNode());
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // Removed manual registrations; now using attributes
     }
@@ -134,19 +130,13 @@ public sealed class StorageModule : IModule
                 return new ErrorResponse("No storage backend configured");
             }
 
-            if (_registry is PersistentNodeRegistry persistentRegistry)
+            // Since we unified the registry architecture, all registries now support storage sync
+            await _registry.InitializeAsync();
+            return new
             {
-                await persistentRegistry.SyncWithStorageAsync();
-                return new
-                {
-                    success = true,
-                    message = "Cache synchronized with storage"
-                };
-            }
-            else
-            {
-                return new ErrorResponse("Registry is not persistent");
-            }
+                success = true,
+                message = "Cache synchronized with storage"
+            };
         }
         catch (Exception ex)
         {
@@ -201,27 +191,20 @@ public sealed class StorageModule : IModule
     {
         try
         {
-            if (_registry is PersistentNodeRegistry persistentRegistry)
+            var stats = await _registry.GetStatsAsync();
+            return new
             {
-                var cacheStats = await persistentRegistry.GetCacheStatsAsync();
-                return new
+                success = true,
+                cache = new
                 {
-                    success = true,
-                    cache = new
-                    {
-                        iceNodeCount = cacheStats.IceNodeCount,
-                        waterNodeCount = cacheStats.WaterNodeCount,
-                        gasNodeCount = cacheStats.GasNodeCount,
-                        edgeCount = cacheStats.EdgeCount,
-                        totalMemoryUsage = cacheStats.TotalMemoryUsage,
-                        lastUpdated = cacheStats.LastUpdated
-                    }
-                };
-            }
-            else
-            {
-                return new ErrorResponse("Registry is not persistent");
-            }
+                    iceNodeCount = stats.IceStats.IceNodeCount,
+                    waterNodeCount = stats.WaterStats.WaterNodeCount,
+                    gasNodeCount = stats.GasNodeCount,
+                    edgeCount = stats.IceStats.EdgeCount,
+                    totalMemoryUsage = stats.TotalMemoryUsage,
+                    lastUpdated = stats.LastUpdated
+                }
+            };
         }
         catch (Exception ex)
         {
@@ -229,7 +212,7 @@ public sealed class StorageModule : IModule
         }
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // Discovery is handled globally
     }

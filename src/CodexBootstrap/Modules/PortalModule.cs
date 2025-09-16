@@ -10,52 +10,47 @@ namespace CodexBootstrap.Modules;
 /// Enables connection to websites, APIs, living entities, sensors, and other external systems
 /// through a unified portal interface that supports fractal exploration and contribution
 /// </summary>
-public sealed class PortalModule : IModule
+public sealed class PortalModule : ModuleBase
 {
-    private readonly Core.ICodexLogger _logger;
-    private readonly NodeRegistry _registry;
     private readonly ModuleCommunicationWrapper _communicationWrapper;
     private readonly ConcurrentDictionary<string, PortalConnection> _activePortals = new();
     private readonly ConcurrentDictionary<string, PortalExploration> _explorations = new();
     private readonly ConcurrentDictionary<string, PortalContribution> _contributions = new();
 
-    public PortalModule(NodeRegistry registry, ModuleCommunicationWrapper communicationWrapper)
+    public override string Name => "Portal Module";
+    public override string Description => "Fractal exploration and navigation of external worlds";
+    public override string Version => "1.0.0";
+
+    public PortalModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, ModuleCommunicationWrapper? communicationWrapper = null) 
+        : base(registry, logger)
     {
-        _logger = new Log4NetLogger(typeof(PortalModule));
-        _registry = registry;
-        _communicationWrapper = communicationWrapper;
+        _communicationWrapper = communicationWrapper ?? new ModuleCommunicationWrapper(logger, "PortalModule");
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.portal",
-            name: "Portal Module",
-            version: "1.0.0",
-            description: "Fractal exploration and navigation of external worlds - websites, APIs, living entities, sensors",
+        return CreateModuleNode(
+            moduleId: "codex.portal",
+            name: Name,
+            version: Version,
+            description: Description,
+            tags: new[] { "portal", "exploration", "external", "fractal", "navigation", "contribution" },
             capabilities: new[] { 
                 "portal_connection", "fractal_exploration", "external_navigation", 
                 "contribution_interface", "entity_interaction", "sensor_connection",
                 "api_gateway", "website_exploration", "living_entity_interface"
             },
-            tags: new[] { "portal", "exploration", "external", "fractal", "navigation", "contribution" },
-            specReference: "codex.spec.portal"
+            spec: "codex.spec.portal"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        registry.Upsert(GetModuleNode());
-        _logger.Info("Portal Module registered");
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // API handlers are registered via attribute-based routing
         _logger.Info("Portal API handlers registered");
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // HTTP endpoints will be registered via ApiRouteDiscovery
         _logger.Info("Portal HTTP endpoints registered");

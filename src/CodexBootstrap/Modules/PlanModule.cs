@@ -7,40 +7,31 @@ namespace CodexBootstrap.Modules;
 // Plan module specific response types
 public record PlanResponse(string ModuleId, object Plan, bool Success, string Message = "Plan generated successfully");
 
-public sealed class PlanModule : IModule
+public sealed class PlanModule : ModuleBase
 {
-    private readonly NodeRegistry _registry;
+    public override string Name => "Plan Generation Module";
+    public override string Description => "Self-contained module for generating topology plans using node-based storage";
+    public override string Version => "0.1.0";
 
-    public PlanModule(NodeRegistry registry)
+    public PlanModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+        : base(registry, logger)
     {
-        _registry = registry;
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.plan",
-            name: "Plan Generation Module",
-            version: "0.1.0",
-            description: "Self-contained module for generating topology plans using node-based storage",
-            capabilities: new[] { "plan-generation", "topology", "planning" },
+        return CreateModuleNode(
+            moduleId: "codex.plan",
+            name: Name,
+            version: Version,
+            description: Description,
             tags: new[] { "plan", "generation", "topology" },
-            specReference: "codex.spec.plan"
+            capabilities: new[] { "plan-generation", "topology", "planning" },
+            spec: "codex.spec.plan"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        // Register API nodes
-        var planApi = NodeStorage.CreateApiNode("codex.plan", "get-plan", "/plan/{id}", "Get topology plan for module");
-        
-        registry.Upsert(planApi);
-        
-        // Register edges
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.plan", "get-plan"));
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         router.Register("codex.plan", "get-plan", async args =>
         {
@@ -70,7 +61,7 @@ public sealed class PlanModule : IModule
         });
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // Plan generation endpoint
         app.MapGet("/plan/{id}", (string id) =>
@@ -88,7 +79,7 @@ public sealed class PlanModule : IModule
         });
     }
 
-    private Task<object> GenerateTopologyPlan(string moduleId, NodeRegistry registry)
+    private Task<object> GenerateTopologyPlan(string moduleId, INodeRegistry registry)
     {
         try
         {

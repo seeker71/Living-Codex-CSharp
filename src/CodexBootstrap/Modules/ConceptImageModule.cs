@@ -110,56 +110,43 @@ public record ImageGeneration(
     Description = "Configurable image generation for visualizing concepts",
     Tags = new[] { "Image Generation", "AI", "Visualization", "Concepts", "Art" }
 )]
-public class ConceptImageModule : IModule
+public class ConceptImageModule : ModuleBase
 {
-    private readonly IApiRouter _apiRouter;
-    private readonly NodeRegistry _registry;
+    private IApiRouter _apiRouter;
     private readonly Dictionary<string, ImageConfig> _imageConfigs;
 
-    public ConceptImageModule(IApiRouter apiRouter, NodeRegistry registry)
+    public override string Name => "Concept Image Generation Module";
+    public override string Description => "Renders concepts into images using configurable local and remote image generation models";
+    public override string Version => "1.0.0";
+
+    public ConceptImageModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? apiRouter = null) 
+        : base(registry, logger)
     {
         _apiRouter = apiRouter;
-        _registry = registry;
         _imageConfigs = new Dictionary<string, ImageConfig>();
         InitializeDefaultConfigs();
     }
 
-    public string ModuleId => "codex.image.concept";
-    public string Name => "Concept Image Generation Module";
-    public string Version => "1.0.0";
-    public string Description => "Configurable image generation for visualizing concepts";
-
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: ModuleId,
+        return CreateModuleNode(
+            moduleId: "codex.image.concept",
             name: Name,
             version: Version,
             description: Description,
-            capabilities: new[] { "image-generation", "concept-visualization", "ai-integration", "multi-provider-support" },
             tags: new[] { "image", "concept", "ai", "visualization" },
-            specReference: "codex.spec.concept-image"
+            capabilities: new[] { "image-generation", "concept-visualization", "ai-integration", "multi-provider-support" },
+            spec: "codex.spec.concept-image"
         );
     }
 
-    public void Register(NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
-        registry.Upsert(GetModuleNode());
-        
-        // Register default image configurations
-        foreach (var config in _imageConfigs.Values)
-        {
-            var configNode = CreateImageConfigNode(config);
-            registry.Upsert(configNode);
-        }
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
-    {
+        _apiRouter = router;
         // API handlers are registered via attributes
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // HTTP endpoints are registered via attributes
     }

@@ -23,43 +23,41 @@ namespace CodexBootstrap.Modules;
     Description = "Enhanced LLM response handler with U-CORE ontology integration",
     Tags = new[] { "U-CORE", "LLM", "Response Handler", "Ontology", "Resonance", "Bootstrap" }
 )]
-public class UCoreLLMResponseHandler : IModule
+public class UCoreLLMResponseHandler : ModuleBase
 {
     private readonly IApiRouter _apiRouter;
-    private readonly NodeRegistry _registry;
     private readonly object _resonanceEngine; // Temporarily using object until UCoreResonanceEngine is fixed
 
-    public UCoreLLMResponseHandler(IApiRouter apiRouter, NodeRegistry registry, object resonanceEngine)
+    public override string Name => "U-CORE LLM Response Handler";
+    public override string Description => "Enhanced LLM response handler with U-CORE ontology mapping and resonance optimization";
+    public override string Version => "1.0.0";
+
+    public UCoreLLMResponseHandler(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? apiRouter = null, object? resonanceEngine = null) 
+        : base(registry, logger)
     {
-        _apiRouter = apiRouter;
-        _registry = registry;
+        _apiRouter = apiRouter ?? new MockApiRouter();
         _resonanceEngine = resonanceEngine;
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.ucore.llm-response-handler",
-            name: "U-CORE LLM Response Handler",
-            version: "1.0.0",
-            description: "Enhanced LLM response handler with U-CORE ontology mapping and resonance optimization",
-            capabilities: new[] { "U-CORE Mapping", "Resonance Optimization", "Belief System Matching", "Node Generation", "Edge Creation", "Bootstrap Integration" },
+        return CreateModuleNode(
+            moduleId: "codex.ucore.llm-response-handler",
+            name: Name,
+            version: Version,
+            description: Description,
             tags: new[] { "ucore", "llm", "response-handler", "ontology" },
-            specReference: "codex.spec.ucore-llm-response-handler"
+            capabilities: new[] { "U-CORE Mapping", "Resonance Optimization", "Belief System Matching", "Node Generation", "Edge Creation", "Bootstrap Integration" },
+            spec: "codex.spec.ucore-llm-response-handler"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        registry.Upsert(GetModuleNode());
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // API handlers are registered via attributes
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // HTTP endpoints are registered via attributes
     }

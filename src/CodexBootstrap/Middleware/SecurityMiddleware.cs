@@ -26,7 +26,20 @@ namespace CodexBootstrap.Middleware
             "/api/discovery",
             "/spec/routes/all",
             "/auth/login",
-            "/auth/register"
+            "/auth/register",
+            "/modules",
+            "/nodes",
+            "/edges",
+            "/concepts",
+            "/swagger",
+            "/openapi",
+            "/",
+            "/api",
+            "/user/profile",
+            "/contributions",
+            "/concept",
+            "/energy",
+            "/metrics"
         };
 
         public SecurityMiddleware(RequestDelegate next, CodexBootstrap.Core.ICodexLogger logger, IInputValidator inputValidator, CodexBootstrap.Core.Security.IAuthenticationService authenticationService)

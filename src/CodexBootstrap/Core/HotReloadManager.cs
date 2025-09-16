@@ -17,7 +17,7 @@ namespace CodexBootstrap.Core
     {
         private readonly ILogger<HotReloadManager> _logger;
         private readonly ModuleLoader _moduleLoader;
-        private readonly NodeRegistry _nodeRegistry;
+        private readonly INodeRegistry _nodeRegistry;
         private readonly string _backupPath;
         private readonly Dictionary<string, ModuleBackup> _moduleBackups;
         private readonly Dictionary<string, Assembly> _loadedAssemblies;
@@ -25,7 +25,7 @@ namespace CodexBootstrap.Core
         public HotReloadManager(
             ILogger<HotReloadManager> logger,
             ModuleLoader moduleLoader,
-            NodeRegistry nodeRegistry,
+            INodeRegistry nodeRegistry,
             string backupPath = "./modules/backup")
         {
             _logger = logger;

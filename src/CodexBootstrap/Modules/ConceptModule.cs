@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Http;
 using CodexBootstrap.Core;
 using CodexBootstrap.Runtime;
 
@@ -10,53 +11,45 @@ namespace CodexBootstrap.Modules;
 /// Each API is self-contained with its own OpenAPI specification
 /// </summary>
 [ApiModule(Name = "ConceptModule", Version = "1.0.0", Description = "Concept Management Module - Self-contained fractal APIs", Tags = new[] { "concept", "management", "fractal" })]
-public class ConceptModule : IModule
+public class ConceptModule : ModuleBase
 {
-    private readonly IApiRouter _apiRouter;
-    private readonly INodeRegistry _registry;
-    private readonly ICodexLogger _logger;
+    private IApiRouter _apiRouter;
     private readonly HttpClient _httpClient;
 
+    public override string Name => "Concept Management Module";
+    public override string Version => "1.0.0";
+    public override string Description => "Concept Management Module - Self-contained fractal APIs";
+
     public ConceptModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient)
+        : base(registry, logger)
     {
-        _registry = registry;
-        _logger = logger;
         _httpClient = httpClient;
         _apiRouter = new MockApiRouter(); // Will be set during registration
     }
 
     public string ModuleId => "codex.concept";
-    public string Name => "Concept Management Module";
-    public string Version => "1.0.0";
-    public string Description => "Concept Management Module - Self-contained fractal APIs";
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            ModuleId, 
-            Name, 
-            Version, 
-            Description,
-            capabilities: new[] { "concepts", "management", "ontology", "knowledge" },
+        return CreateModuleNode(
+            moduleId: ModuleId,
+            name: Name,
+            version: Version,
+            description: Description,
             tags: new[] { "concept", "manage", "ontology", "knowledge" },
-            specReference: "codex.spec.concept"
+            capabilities: new[] { "concepts", "management", "ontology", "knowledge" },
+            spec: "codex.spec.concept"
         );
     }
 
-    public void Register(INodeRegistry registry)
-    {
-        // Module registration is now handled automatically by the attribute discovery system
-        // This method can be used for additional module-specific setup if needed
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         _apiRouter = router; // Set the actual router during registration
         // API handlers are now registered automatically by the attribute discovery system
         // This method can be used for additional manual registrations if needed
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // HTTP endpoints are now registered automatically by the attribute discovery system
         // This method can be used for additional manual registrations if needed
@@ -108,10 +101,9 @@ public class ConceptModule : IModule
     {
         try
         {
-            var node = _registry.GetNode(id);
-            if (node == null || node.TypeId != "codex.concept")
+            if (!_registry.TryGet(id, out var node) || node.TypeId != "codex.concept")
             {
-                return ResponseHelpers.CreateErrorResponse("Concept not found", "NOT_FOUND", 404);
+                return Results.NotFound("Concept not found");
             }
 
             var concept = new
@@ -162,10 +154,9 @@ public class ConceptModule : IModule
     {
         try
         {
-            var existingNode = _registry.GetNode(id);
-            if (existingNode == null || existingNode.TypeId != "codex.concept")
+            if (!_registry.TryGet(id, out var existingNode) || existingNode.TypeId != "codex.concept")
             {
-                return ResponseHelpers.CreateErrorResponse("Concept not found", "NOT_FOUND", 404);
+                return Results.NotFound("Concept not found");
             }
 
             // Update the concept node
@@ -209,27 +200,36 @@ public class ConceptModule : IModule
     [Delete("/concepts/{id}", "concepts-delete", "Delete a concept", "codex.concept")]
     [ApiResponse(200, "Success")]
     [ApiResponse(404, "Not found")]
-    public async Task<object> DeleteConcept([ApiParameter("id", "Concept ID", Required = true, Location = "path")] string id)
+    public IResult DeleteConcept([ApiParameter("id", "Concept ID", Required = true, Location = "path")] string id)
     {
         try
         {
             var node = _registry.GetNode(id);
-            if (node == null || node.TypeId != "codex.concept")
+            _logger.Debug($"DeleteConcept: Looking for concept with ID '{id}', found node: {node?.Id ?? "null"}");
+            
+            if (node == null)
             {
-                return ResponseHelpers.CreateErrorResponse("Concept not found", "NOT_FOUND", 404);
+                _logger.Debug($"DeleteConcept: Node with ID '{id}' not found, returning 404");
+                return Results.NotFound("Concept not found");
+            }
+            
+            if (node.TypeId != "codex.concept")
+            {
+                _logger.Debug($"DeleteConcept: Node with ID '{id}' has wrong TypeId '{node.TypeId}', returning 404");
+                return Results.NotFound(new ErrorResponse("Concept not found", "NOT_FOUND"));
             }
 
             // Remove the node from the registry
             _registry.RemoveNode(id);
 
-            return new { 
+            return Results.Ok(new { 
                 id = id, 
                 message = "Concept deleted successfully" 
-            };
+            });
         }
         catch (Exception ex)
         {
-            return ResponseHelpers.CreateErrorResponse($"Failed to delete concept: {ex.Message}", "DELETE_ERROR");
+            return Results.Problem($"Failed to delete concept: {ex.Message}", statusCode: 500);
         }
     }
 
@@ -243,6 +243,22 @@ public class ConceptModule : IModule
     {
         try
         {
+            // Validate required fields
+            if (string.IsNullOrWhiteSpace(request.Name))
+            {
+                return new ErrorResponse("Name is required", "VALIDATION_ERROR", 400);
+            }
+            
+            if (string.IsNullOrWhiteSpace(request.Description))
+            {
+                return new ErrorResponse("Description is required", "VALIDATION_ERROR", 400);
+            }
+            
+            if (string.IsNullOrWhiteSpace(request.Domain))
+            {
+                return new ErrorResponse("Domain is required", "VALIDATION_ERROR", 400);
+            }
+
             // Create concept node
             var conceptNode = new Node(
                 Id: $"concept.{request.Name}",
@@ -795,8 +811,7 @@ public class ConceptModule : IModule
 }
 
 // Request/Response DTOs for each API
-[ResponseType("codex.concept.create-request", "ConceptCreateRequest", "Request for concept creation")]
-public record ConceptCreateRequest(string Name, string Description, string Domain, string Complexity, string[] Tags);
+// Note: ConceptCreateRequest is defined in Core/RequestTypes.cs
 
 [ResponseType("codex.concept.create-response", "ConceptCreateResponse", "Response for concept creation")]
 public record ConceptCreateResponse(bool Success, string ConceptId, string Message);

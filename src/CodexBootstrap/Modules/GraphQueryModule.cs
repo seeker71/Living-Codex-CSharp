@@ -10,52 +10,43 @@ namespace CodexBootstrap.Modules;
 /// Graph Query Module - Provides graph-based querying and discovery using existing system infrastructure
 /// Reuses HydrateModule for file loading, SpecReflectionModule for meta-nodes, and CoreApiService for queries
 /// </summary>
-public class GraphQueryModule : IModule
+public class GraphQueryModule : ModuleBase
 {
-    private readonly IApiRouter _apiRouter;
-    private readonly NodeRegistry _registry;
+    private IApiRouter _apiRouter;
     private readonly IServiceProvider? _serviceProvider;
     private CoreApiService? _coreApiService;
 
-    public GraphQueryModule()
-    {
-        // Parameterless constructor for attribute discovery
-        _apiRouter = null!;
-        _registry = null!;
-        _serviceProvider = null;
-    }
+    public override string Name => "Graph Query Module";
+    public override string Description => "Provides graph-based querying and discovery using existing system infrastructure";
+    public override string Version => "1.0.0";
 
-    public GraphQueryModule(IApiRouter apiRouter, NodeRegistry registry, IServiceProvider? serviceProvider = null)
+    public GraphQueryModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IServiceProvider? serviceProvider = null) 
+        : base(registry, logger)
     {
-        _apiRouter = apiRouter;
-        _registry = registry;
         _serviceProvider = serviceProvider;
     }
 
-    public string ModuleId => "codex.graph.query";
-    public string Name => "Graph Query Module";
-    public string Version => "1.0.0";
-    public string Description => "Graph Query Module - Provides graph-based querying and discovery using existing system infrastructure";
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(ModuleId, Name, Version, Description,
-            capabilities: new[] { "graph-querying", "node-discovery", "relationship-analysis" },
+        return CreateModuleNode(
+            moduleId: "codex.graph.query",
+            name: Name,
+            version: Version,
+            description: Description,
             tags: new[] { "graph", "query", "discovery" },
-            specReference: "codex.spec.graph-query");
+            capabilities: new[] { "graph-querying", "node-discovery", "relationship-analysis" },
+            spec: "codex.spec.graph-query"
+        );
     }
 
-    public void Register(NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
-        // Module registration is now handled automatically by the attribute discovery system
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
-    {
+        _apiRouter = router;
         // API handlers are now registered automatically by the attribute discovery system
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // Store CoreApiService reference for inter-module communication
         _coreApiService = coreApi;

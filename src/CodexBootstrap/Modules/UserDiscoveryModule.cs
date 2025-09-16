@@ -10,72 +10,50 @@ namespace CodexBootstrap.Modules;
 /// and concept contributor discovery with generic relationship support
 /// </summary>
 [MetaNode(Id = "codex.user-discovery", Name = "User Discovery Module", Description = "Advanced user discovery system with interest matching, geo-location, and concept relationships")]
-public sealed class UserDiscoveryModule : IModule, IRegistryModule
+public sealed class UserDiscoveryModule : ModuleBase
 {
-    private readonly NodeRegistry _localRegistry;
-    private readonly ICodexLogger _logger;
     private readonly HttpClient _httpClient;
-    private NodeRegistry? _globalRegistry;
 
-    public UserDiscoveryModule(NodeRegistry registry, ICodexLogger logger, HttpClient httpClient)
+    public override string Name => "User Discovery Module";
+    public override string Description => "Advanced user discovery system with interest matching, geo-location, and concept relationships";
+    public override string Version => "1.0.0";
+
+    public UserDiscoveryModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+        : base(registry, logger)
     {
-        _localRegistry = registry;
-        _logger = logger;
         _httpClient = httpClient;
     }
 
     // Parameterless constructor for module loader
 
     /// <summary>
-    /// Gets the registry to use - global registry if set, otherwise local registry
-    /// This ensures the module uses the global registry when available
+    /// Gets the registry to use - now always the unified registry
     /// </summary>
-    private NodeRegistry Registry => _globalRegistry ?? _localRegistry;
+    private INodeRegistry Registry => _registry;
 
-    /// <summary>
-    /// Sets the global registry for this module
-    /// This ensures the module uses the global registry instead of a local one
-    /// </summary>
-    public void SetGlobalRegistry(NodeRegistry registry)
+    public override Node GetModuleNode()
     {
-        _globalRegistry = registry;
-    }
-
-    public Node GetModuleNode()
-    {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.user-discovery",
-            name: "User Discovery Module",
-            version: "1.0.0",
-            description: "Advanced user discovery system with interest matching, geo-location, and concept relationships",
+        return CreateModuleNode(
+            moduleId: "codex.user-discovery",
+            name: Name,
+            version: Version,
+            description: Description,
+            tags: new[] { "discovery", "users", "geo", "concepts", "relationships", "matching" },
             capabilities: new[] { 
                 "user-discovery", "interest-matching", "geo-location", "concept-relationships", 
                 "contributor-discovery", "ontology-search", "relationship-queries" 
             },
-            tags: new[] { "discovery", "users", "geo", "concepts", "relationships", "matching" },
-            specReference: "codex.spec.user-discovery"
+            spec: "codex.spec.user-discovery"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        // Set the global registry if this is the first call
-        if (_globalRegistry == null)
-        {
-            SetGlobalRegistry(registry);
-        }
-        
-        Registry.Upsert(GetModuleNode());
-        _logger.Info("User Discovery Module registered");
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // API handlers are registered via attribute-based routing
         _logger.Info("User Discovery Module API handlers registered");
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry nodeRegistry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // HTTP endpoints are registered via attribute-based routing
         _logger.Info("User Discovery Module HTTP endpoints registered");
@@ -385,7 +363,7 @@ public sealed class UserDiscoveryModule : IModule, IRegistryModule
         try
         {
             // Find edges from this concept
-            var outgoingEdges = Registry.GetEdges(fromId: conceptId);
+            var outgoingEdges = Registry.GetEdgesFrom(conceptId);
             foreach (var edge in outgoingEdges)
             {
                 if (!relatedConcepts.Contains(edge.ToId))
@@ -395,7 +373,7 @@ public sealed class UserDiscoveryModule : IModule, IRegistryModule
             }
             
             // Find edges to this concept
-            var incomingEdges = Registry.GetEdges(toId: conceptId);
+            var incomingEdges = Registry.GetEdgesTo(conceptId);
             foreach (var edge in incomingEdges)
             {
                 if (!relatedConcepts.Contains(edge.FromId))
@@ -434,7 +412,7 @@ public sealed class UserDiscoveryModule : IModule, IRegistryModule
             foreach (var conceptId in conceptIds)
             {
                 // Find users who have contributed to this concept
-                var contributionEdges = Registry.GetEdges(toId: conceptId, edgeType: "contribution");
+                var contributionEdges = Registry.GetEdgesTo(conceptId).Where(e => e.Role == "contribution");
                 foreach (var edge in contributionEdges)
                 {
                     if (Registry.TryGet(edge.FromId, out var userNode) && 
@@ -445,7 +423,7 @@ public sealed class UserDiscoveryModule : IModule, IRegistryModule
                 }
                 
                 // Find users who are subscribed to this concept
-                var subscriptionEdges = Registry.GetEdges(toId: conceptId, edgeType: "subscription");
+                var subscriptionEdges = Registry.GetEdgesTo(conceptId).Where(e => e.Role == "subscription");
                 foreach (var edge in subscriptionEdges)
                 {
                     if (Registry.TryGet(edge.FromId, out var userNode) && 
@@ -456,7 +434,7 @@ public sealed class UserDiscoveryModule : IModule, IRegistryModule
                 }
                 
                 // Find users who have invested in this concept
-                var investmentEdges = Registry.GetEdges(toId: conceptId, edgeType: "investment");
+                var investmentEdges = Registry.GetEdgesTo(conceptId).Where(e => e.Role == "investment");
                 foreach (var edge in investmentEdges)
                 {
                     if (Registry.TryGet(edge.FromId, out var userNode) && 
@@ -484,19 +462,19 @@ public sealed class UserDiscoveryModule : IModule, IRegistryModule
             foreach (var relatedConceptId in relatedConcepts)
             {
                 // Check for direct contributions
-                var contributionEdges = Registry.GetEdges(fromId: userId, toId: relatedConceptId, edgeType: "contribution");
+                var contributionEdges = Registry.GetEdgesFrom(userId).Where(e => e.ToId == relatedConceptId && e.Role == "contribution");
                 score += contributionEdges.Count() * 1.0;
                 
                 // Check for subscriptions (lower weight)
-                var subscriptionEdges = Registry.GetEdges(fromId: userId, toId: relatedConceptId, edgeType: "subscription");
+                var subscriptionEdges = Registry.GetEdgesFrom(userId).Where(e => e.ToId == relatedConceptId && e.Role == "subscription");
                 score += subscriptionEdges.Count() * 0.3;
                 
                 // Check for investments (higher weight)
-                var investmentEdges = Registry.GetEdges(fromId: userId, toId: relatedConceptId, edgeType: "investment");
+                var investmentEdges = Registry.GetEdgesFrom(userId).Where(e => e.ToId == relatedConceptId && e.Role == "investment");
                 score += investmentEdges.Count() * 2.0;
                 
                 // Check for comments/feedback (medium weight)
-                var feedbackEdges = Registry.GetEdges(fromId: userId, toId: relatedConceptId, edgeType: "feedback");
+                var feedbackEdges = Registry.GetEdgesFrom(userId).Where(e => e.ToId == relatedConceptId && e.Role == "feedback");
                 score += feedbackEdges.Count() * 0.5;
             }
             

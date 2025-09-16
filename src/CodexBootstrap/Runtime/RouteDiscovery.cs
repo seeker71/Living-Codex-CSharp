@@ -6,10 +6,10 @@ namespace CodexBootstrap.Runtime;
 public sealed class RouteDiscovery
 {
     private readonly IApiRouter _router;
-    private readonly NodeRegistry _registry;
+    private readonly INodeRegistry _registry;
     private readonly Core.ICodexLogger _logger;
 
-    public RouteDiscovery(IApiRouter router, NodeRegistry registry)
+    public RouteDiscovery(IApiRouter router, INodeRegistry registry)
     {
         _router = router;
         _registry = registry;

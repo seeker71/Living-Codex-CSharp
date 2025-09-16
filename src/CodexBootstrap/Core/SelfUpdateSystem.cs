@@ -17,7 +17,7 @@ namespace CodexBootstrap.Core
     {
         private readonly ILogger<SelfUpdateSystem> _logger;
         private readonly ModuleLoader _moduleLoader;
-        private readonly NodeRegistry _nodeRegistry;
+        private readonly INodeRegistry _nodeRegistry;
         private readonly string _modulesSourcePath;
         private readonly string _modulesCompiledPath;
         private readonly string _modulesBackupPath;
@@ -27,7 +27,7 @@ namespace CodexBootstrap.Core
         public SelfUpdateSystem(
             ILogger<SelfUpdateSystem> logger,
             ModuleLoader moduleLoader,
-            NodeRegistry nodeRegistry,
+            INodeRegistry nodeRegistry,
             string modulesSourcePath = "./src/CodexBootstrap/Modules",
             string modulesCompiledPath = "./modules/compiled",
             string modulesBackupPath = "./modules/backup")

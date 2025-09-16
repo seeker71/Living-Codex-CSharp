@@ -8,9 +8,8 @@ namespace CodexBootstrap.Modules;
 /// Load Balancing and Performance Optimization Module
 /// Implements load balancing strategies, performance monitoring, and auto-scaling recommendations
 /// </summary>
-public class LoadBalancingModule : IModule
+public class LoadBalancingModule : ModuleBase
 {
-    private readonly NodeRegistry _registry;
     private readonly Dictionary<string, ServiceInstance> _serviceInstances = new();
     private readonly Dictionary<string, LoadBalancingStrategy> _strategies = new();
     private readonly List<PerformanceMetric> _performanceMetrics = new();
@@ -18,38 +17,35 @@ public class LoadBalancingModule : IModule
     private CoreApiService? _coreApiService;
     private readonly object _metricsLock = new();
 
-    public LoadBalancingModule(NodeRegistry registry)
+    public override string Name => "Load Balancing Module";
+    public override string Description => "Load Balancing and Performance Optimization Module";
+    public override string Version => "1.0.0";
+
+    public LoadBalancingModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+        : base(registry, logger)
     {
-        _registry = registry;
         InitializeLoadBalancingStrategies();
     }
 
-    public LoadBalancingModule() : this(new NodeRegistry()) { }
-
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.load-balancing",
-            name: "Load Balancing and Performance Optimization Module",
-            version: "1.0.0",
-            description: "Advanced load balancing, performance monitoring, and auto-scaling for distributed services",
-            capabilities: new[] { "load-balancing", "performance-monitoring", "auto-scaling", "resource-optimization", "health-monitoring" },
+        return CreateModuleNode(
+            moduleId: "codex.load-balancing",
+            name: Name,
+            version: Version,
+            description: Description,
             tags: new[] { "load-balancing", "performance", "scaling", "optimization" },
-            specReference: "codex.spec.load-balancing"
+            capabilities: new[] { "load-balancing", "performance-monitoring", "auto-scaling", "resource-optimization", "health-monitoring" },
+            spec: "codex.spec.load-balancing"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        registry.Upsert(GetModuleNode());
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // API handlers are now registered automatically by the attribute discovery system
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         _coreApiService = coreApi;
         
@@ -60,7 +56,7 @@ public class LoadBalancingModule : IModule
     /// <summary>
     /// Register all Load Balancing related nodes for AI agent discovery and module generation
     /// </summary>
-    private void RegisterLoadBalancingNodes(NodeRegistry registry)
+    private void RegisterLoadBalancingNodes(INodeRegistry registry)
     {
         // Register Load Balancing module node
         var loadBalancingNode = new Node(
@@ -103,7 +99,7 @@ public class LoadBalancingModule : IModule
     /// <summary>
     /// Register Load Balancing routes as discoverable nodes
     /// </summary>
-    private void RegisterLoadBalancingRoutes(NodeRegistry registry)
+    private void RegisterLoadBalancingRoutes(INodeRegistry registry)
     {
         var routes = new[]
         {
@@ -157,7 +153,7 @@ public class LoadBalancingModule : IModule
     /// <summary>
     /// Register Load Balancing DTOs as discoverable nodes
     /// </summary>
-    private void RegisterLoadBalancingDTOs(NodeRegistry registry)
+    private void RegisterLoadBalancingDTOs(INodeRegistry registry)
     {
         var dtos = new[]
         {

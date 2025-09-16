@@ -36,41 +36,39 @@ public record OneshotResponse(
     string Message
 );
 
-public sealed class BreathModule : IModule
+public sealed class BreathModule : ModuleBase
 {
-    private readonly IApiRouter _apiRouter;
-    private readonly NodeRegistry _registry;
+    private IApiRouter _apiRouter;
 
-    public BreathModule(IApiRouter apiRouter, NodeRegistry registry)
+    public override string Name => "Breath Module";
+    public override string Description => "Breath loop implementation for compose → expand → validate → (melt/patch/refreeze) → contract";
+    public override string Version => "1.0.0";
+
+    public BreathModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+        : base(registry, logger)
     {
-        _apiRouter = apiRouter;
-        _registry = registry;
     }
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.breath",
+        return CreateModuleNode(
+            moduleId: "codex.breath",
             name: "Breath Engine Module",
             version: "0.1.0",
             description: "Self-contained module for breath loop operations (expand, validate, contract) using node-based storage",
-            capabilities: new[] { "breath-loop", "expand", "validate", "contract", "lifecycle" },
             tags: new[] { "breath", "loop", "expand", "validate", "contract" },
-            specReference: "codex.spec.breath"
+            capabilities: new[] { "breath-loop", "expand", "validate", "contract", "lifecycle" },
+            spec: "codex.spec.breath"
         );
     }
 
 
-    public void Register(NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
-        registry.Upsert(GetModuleNode());
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
-    {
+        _apiRouter = router;
         // This method is now handled by attribute-based discovery
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // This method is now handled by attribute-based discovery
     }

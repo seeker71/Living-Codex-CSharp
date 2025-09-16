@@ -8,9 +8,8 @@ namespace CodexBootstrap.Modules;
 /// Intelligent Caching Module - Advanced caching with predictive pre-loading
 /// Implements smart caching strategies, usage pattern analysis, and performance optimization
 /// </summary>
-public class IntelligentCachingModule : IModule
+public class IntelligentCachingModule : ModuleBase
 {
-    private readonly NodeRegistry _registry;
     private readonly Dictionary<string, CacheEntry> _cache = new();
     private readonly Dictionary<string, UsagePattern> _usagePatterns = new();
     private readonly Dictionary<string, PreloadPrediction> _predictions = new();
@@ -18,37 +17,34 @@ public class IntelligentCachingModule : IModule
     private CoreApiService? _coreApiService;
     private readonly object _cacheLock = new();
 
-    public IntelligentCachingModule(NodeRegistry registry)
+    public override string Name => "Intelligent Caching Module";
+    public override string Description => "Advanced caching with predictive pre-loading and performance optimization";
+    public override string Version => "1.0.0";
+
+    public IntelligentCachingModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+        : base(registry, logger)
     {
-        _registry = registry;
     }
 
-    public IntelligentCachingModule() : this(new NodeRegistry()) { }
-
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.intelligent-caching",
+        return CreateModuleNode(
+            moduleId: "codex.intelligent-caching",
             name: "Intelligent Caching Module",
             version: "1.0.0",
             description: "Advanced caching system with predictive pre-loading and performance optimization",
-            capabilities: new[] { "predictive-preloading", "usage-pattern-analysis", "cache-optimization", "performance-monitoring", "smart-invalidation" },
             tags: new[] { "caching", "performance", "optimization", "intelligent" },
-            specReference: "codex.spec.intelligent-caching"
+            capabilities: new[] { "predictive-preloading", "usage-pattern-analysis", "cache-optimization", "performance-monitoring", "smart-invalidation" },
+            spec: "codex.spec.intelligent-caching"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        registry.Upsert(GetModuleNode());
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // API handlers are now registered automatically by the attribute discovery system
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         _coreApiService = coreApi;
         
@@ -59,7 +55,7 @@ public class IntelligentCachingModule : IModule
     /// <summary>
     /// Register all Intelligent Caching related nodes for AI agent discovery and module generation
     /// </summary>
-    private void RegisterIntelligentCachingNodes(NodeRegistry registry)
+    private void RegisterIntelligentCachingNodes(INodeRegistry registry)
     {
         // Register Intelligent Caching module node
         var intelligentCachingNode = new Node(
@@ -102,7 +98,7 @@ public class IntelligentCachingModule : IModule
     /// <summary>
     /// Register Intelligent Caching routes as discoverable nodes
     /// </summary>
-    private void RegisterIntelligentCachingRoutes(NodeRegistry registry)
+    private void RegisterIntelligentCachingRoutes(INodeRegistry registry)
     {
         var routes = new[]
         {
@@ -156,7 +152,7 @@ public class IntelligentCachingModule : IModule
     /// <summary>
     /// Register Intelligent Caching DTOs as discoverable nodes
     /// </summary>
-    private void RegisterIntelligentCachingDTOs(NodeRegistry registry)
+    private void RegisterIntelligentCachingDTOs(INodeRegistry registry)
     {
         var dtos = new[]
         {

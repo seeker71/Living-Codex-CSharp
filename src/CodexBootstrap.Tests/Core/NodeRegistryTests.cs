@@ -16,7 +16,12 @@ namespace CodexBootstrap.Tests.Core
         public NodeRegistryTests()
         {
             _mockLogger = new Mock<CodexBootstrap.Core.ICodexLogger>();
-            _registry = new NodeRegistry();
+            var mockIceStorage = new Mock<CodexBootstrap.Core.Storage.IIceStorageBackend>();
+            var mockWaterStorage = new Mock<CodexBootstrap.Core.Storage.IWaterStorageBackend>();
+            _registry = new NodeRegistry(mockIceStorage.Object, mockWaterStorage.Object, _mockLogger.Object);
+            
+            // Initialize the registry for testing
+            _registry.InitializeAsync().Wait();
         }
 
         [Fact]

@@ -11,41 +11,38 @@ public record CoreAtomsResponse(object Atoms, bool Success, string Message = "Co
 [ResponseType("codex.core.spec-response", "CoreSpecResponse", "Core spec response")]
 public record CoreSpecResponse(object Spec, bool Success, string Message = "Core spec retrieved successfully");
 
-public sealed class CoreModule : IModule
+public sealed class CoreModule : ModuleBase
 {
-    private readonly IApiRouter _apiRouter;
-    private readonly NodeRegistry _registry;
+    private IApiRouter _apiRouter;
 
-    public CoreModule(IApiRouter apiRouter, NodeRegistry registry)
+    public override string Name => "Core System Module";
+    public override string Description => "Core system functionality and atoms management";
+    public override string Version => "0.1.0";
+
+    public CoreModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+        : base(registry, logger)
     {
-        _apiRouter = apiRouter;
-        _registry = registry;
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.core",
+        return CreateModuleNode(
+            moduleId: "codex.core",
             name: "Core System Module",
             version: "0.1.0",
             description: "Self-contained module for core system operations (atoms, spec) using node-based storage",
-            capabilities: new[] { "core", "atoms", "spec", "storage", "system" },
             tags: new[] { "get_atoms", "get_spec", "core_operations" },
-            specReference: "codex.spec.core"
+            capabilities: new[] { "core", "atoms", "spec", "storage", "system" },
+            spec: "codex.spec.core"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        registry.Upsert(GetModuleNode());
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // This method is now handled by attribute-based discovery
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // This method is now handled by attribute-based discovery
     }

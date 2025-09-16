@@ -30,7 +30,9 @@ public static class ModuleHelpers
                     Description = description
                 }),
                 InlineBytes: null,
-                ExternalUri: null
+                ExternalUri: null,
+                AuthRef: null,
+                CacheKey: null
             ),
             Meta: new Dictionary<string, object>
             {

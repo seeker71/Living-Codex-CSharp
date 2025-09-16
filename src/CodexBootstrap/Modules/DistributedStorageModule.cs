@@ -6,62 +6,38 @@ namespace CodexBootstrap.Modules;
 /// <summary>
 /// Distributed storage management module
 /// </summary>
-public sealed class DistributedStorageModule : IModule
+public sealed class DistributedStorageModule : ModuleBase
 {
-    private readonly NodeRegistry _registry;
     private readonly IDistributedStorageBackend? _distributedStorage;
     private readonly DistributedCacheManager? _distributedCacheManager;
-    private readonly Core.ICodexLogger _logger;
 
-    public DistributedStorageModule(NodeRegistry registry, ICodexLogger logger, IDistributedStorageBackend? distributedStorage = null)
+    public override string Name => "Distributed Storage Management Module";
+    public override string Description => "Distributed storage management module";
+    public override string Version => "0.1.0";
+
+    public DistributedStorageModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IDistributedStorageBackend? distributedStorage = null) 
+        : base(registry, logger)
     {
-        _registry = registry;
         _distributedStorage = distributedStorage;
         _distributedCacheManager = distributedStorage != null ? 
             new DistributedCacheManager(distributedStorage, new NodeCacheManager(distributedStorage, logger), logger) : null;
-        _logger = logger;
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.distributed-storage",
+        return CreateModuleNode(
+            moduleId: "codex.distributed-storage",
             name: "Distributed Storage Management Module",
             version: "0.1.0",
             description: "Module for managing distributed storage clusters and replication",
-            capabilities: new[] { "distributed-storage", "clusters", "replication", "management" },
             tags: new[] { "distributed", "storage", "cluster", "replication" },
-            specReference: "codex.spec.distributed-storage"
+            capabilities: new[] { "distributed-storage", "clusters", "replication", "management" },
+            spec: "codex.spec.distributed-storage"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        // Register API nodes
-        var clusterHealthApi = NodeStorage.CreateApiNode("codex.distributed-storage", "cluster-health", "/cluster/health", "Get cluster health status");
-        var clusterNodesApi = NodeStorage.CreateApiNode("codex.distributed-storage", "cluster-nodes", "/cluster/nodes", "Get cluster nodes");
-        var joinClusterApi = NodeStorage.CreateApiNode("codex.distributed-storage", "join-cluster", "/cluster/join", "Join a cluster");
-        var leaveClusterApi = NodeStorage.CreateApiNode("codex.distributed-storage", "leave-cluster", "/cluster/leave", "Leave the cluster");
-        var repairClusterApi = NodeStorage.CreateApiNode("codex.distributed-storage", "repair-cluster", "/cluster/repair", "Repair cluster data");
-        var syncClusterApi = NodeStorage.CreateApiNode("codex.distributed-storage", "sync-cluster", "/cluster/sync", "Sync with cluster");
-        
-        registry.Upsert(clusterHealthApi);
-        registry.Upsert(clusterNodesApi);
-        registry.Upsert(joinClusterApi);
-        registry.Upsert(leaveClusterApi);
-        registry.Upsert(repairClusterApi);
-        registry.Upsert(syncClusterApi);
-        
-        // Register edges
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.distributed-storage", "cluster-health"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.distributed-storage", "cluster-nodes"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.distributed-storage", "join-cluster"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.distributed-storage", "leave-cluster"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.distributed-storage", "repair-cluster"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.distributed-storage", "sync-cluster"));
-    }
 
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // Handled by attribute discovery
     }
@@ -230,7 +206,7 @@ public sealed class DistributedStorageModule : IModule
         }
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // Discovery is handled globally
     }

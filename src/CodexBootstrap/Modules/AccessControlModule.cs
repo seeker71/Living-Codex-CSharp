@@ -9,9 +9,8 @@ namespace CodexBootstrap.Modules;
 /// <summary>
 /// Comprehensive access control and permissions module using Microsoft.AspNetCore.Authorization
 /// </summary>
-public sealed class AccessControlModule : IModule
+public sealed class AccessControlModule : ModuleBase
 {
-    private readonly Core.ICodexLogger _logger;
     private readonly Dictionary<string, Permission> _permissions = new();
     private readonly Dictionary<string, Role> _roles = new();
     private readonly Dictionary<string, List<string>> _userRoles = new();
@@ -19,41 +18,36 @@ public sealed class AccessControlModule : IModule
     private readonly Dictionary<string, List<AccessPolicy>> _resourcePolicies = new();
     private readonly Dictionary<string, List<AccessRule>> _accessRules = new();
 
-    public AccessControlModule()
+    public override string Name => "Access Control Module";
+    public override string Description => "Comprehensive access control and permissions module using Microsoft.AspNetCore.Authorization";
+    public override string Version => "1.0.0";
+
+    public AccessControlModule(INodeRegistry registry, ICodexLogger logger) : base(registry, logger)
     {
-        _logger = new Log4NetLogger(typeof(AccessControlModule));
         InitializeDefaultPermissions();
         InitializeDefaultRoles();
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            "codex.access-control",
-            "Access Control Module",
-            "0.1.0",
-            "Comprehensive access control and permissions management system",
-            new[] { "access-control", "permissions", "roles", "security", "authorization" },
-            new[] { "create_permission", "update_permission", "delete_permission", "get_permission", "list_permissions", "create_role", "update_role", "delete_role", "get_role", "list_roles", "assign_role", "remove_role", "check_permission", "check_access", "create_policy", "update_policy", "delete_policy", "evaluate_policy", "create_rule", "update_rule", "delete_rule", "evaluate_rule" },
-            "codex.spec.access-control"
+        return CreateModuleNode(
+            moduleId: "codex.access-control",
+            name: "Access Control Module",
+            version: "1.0.0",
+            description: "Comprehensive access control and permissions management system",
+            tags: new[] { "access-control", "permissions", "roles", "security", "authorization" },
+            capabilities: new[] { "create_permission", "update_permission", "delete_permission", "get_permission", "list_permissions", "create_role", "update_role", "delete_role", "get_role", "list_roles", "assign_role", "remove_role", "check_permission", "check_access", "create_policy", "update_policy", "delete_policy", "evaluate_policy", "create_rule", "update_rule", "delete_rule", "evaluate_rule" },
+            spec: "codex.spec.access-control"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        // Register the module node
-        registry.Upsert(GetModuleNode());
-        
-        _logger.Info("Access Control Module registered");
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // API handlers are registered via attribute-based routing
         _logger.Info("Access Control API handlers registered");
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // HTTP endpoints will be registered via ApiRouteDiscovery
     }

@@ -45,9 +45,9 @@ namespace CodexBootstrap.Core
     [MetaNodeAttribute("codex.core.prompt-template-repository", "codex.meta/type", "PromptTemplateRepository", "Repository for managing prompt templates as nodes")]
     public class PromptTemplateRepository
     {
-        private readonly NodeRegistry _registry;
+        private readonly INodeRegistry _registry;
 
-        public PromptTemplateRepository(NodeRegistry registry)
+        public PromptTemplateRepository(INodeRegistry registry)
         {
             _registry = registry;
         }

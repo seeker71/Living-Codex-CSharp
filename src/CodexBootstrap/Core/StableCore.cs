@@ -18,7 +18,7 @@ namespace CodexBootstrap.Core
         private readonly SelfUpdateSystem _selfUpdateSystem;
         private readonly ModuleCompiler _moduleCompiler;
         private readonly HotReloadManager _hotReloadManager;
-        private readonly NodeRegistry _nodeRegistry;
+        private readonly INodeRegistry _nodeRegistry;
         private readonly ModuleLoader _moduleLoader;
         private readonly string _coreVersion;
         private readonly Dictionary<string, CoreModule> _coreModules;
@@ -29,7 +29,7 @@ namespace CodexBootstrap.Core
             SelfUpdateSystem selfUpdateSystem,
             ModuleCompiler moduleCompiler,
             HotReloadManager hotReloadManager,
-            NodeRegistry nodeRegistry,
+            INodeRegistry nodeRegistry,
             ModuleLoader moduleLoader)
         {
             _logger = logger;

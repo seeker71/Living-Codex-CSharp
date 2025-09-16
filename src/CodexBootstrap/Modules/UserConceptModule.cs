@@ -11,64 +11,44 @@ namespace CodexBootstrap.Modules;
 /// User-Concept Relationship Module - Modular Fractal API Design
 /// Manages relationships between users and concepts using edges
 /// </summary>
-    public class UserConceptModule : IModule
+    public class UserConceptModule : ModuleBase
     {
         private readonly IApiRouter _apiRouter;
-        private readonly NodeRegistry _registry;
-        private readonly ICodexLogger _logger;
         private readonly HttpClient _httpClient;
+
+        public override string Name => "User Concept Module";
+        public override string Description => "Manages relationships between users and concepts using edges";
+        public override string Version => "1.0.0";
         private readonly Dictionary<string, UserBeliefSystem> _userBeliefSystems = new();
         private readonly Dictionary<string, ConceptTranslationCache> _translationCache = new();
         private CoreApiService? _coreApiService;
         private readonly IServiceProvider? _serviceProvider;
 
-    public UserConceptModule(NodeRegistry registry, ICodexLogger logger, HttpClient httpClient)
+    public UserConceptModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient)
+        : base(registry, logger)
     {
-        _registry = registry;
-        _logger = logger;
         _httpClient = httpClient;
         _apiRouter = new MockApiRouter(); // Will be set during registration
         _serviceProvider = null;
     }
 
-    public string ModuleId => "codex.userconcept";
-    public string Name => "User-Concept Relationship Module";
-    public string Version => "1.0.0";
-    public string Description => "User-Concept Relationship Module - Self-contained fractal APIs";
-
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            ModuleId, 
-            Name, 
-            Version, 
-            Description,
-            capabilities: new[] { "user-concepts", "concept-management", "user-specific" },
+        return CreateModuleNode(
+            moduleId: "codex.userconcept",
+            name: Name,
+            version: Version,
+            description: Description,
             tags: new[] { "user", "concept", "management" },
-            specReference: "codex.spec.user-concept"
+            capabilities: new[] { "user-concepts", "concept-management", "user-specific" },
+            spec: "codex.spec.user-concept"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        // Module registration is now handled automatically by the attribute discovery system
-        // This method can be used for additional module-specific setup if needed
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
-    {
-        _apiRouter = router; // Set the actual router during registration
-        // API handlers are now registered automatically by the attribute discovery system
-        // This method can be used for additional manual registrations if needed
-    }
-
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // Store CoreApiService reference for inter-module communication
         _coreApiService = coreApi;
-        
-        // HTTP endpoints are now registered automatically by the attribute discovery system
-        // This method can be used for additional manual registrations if needed
     }
 
     /// <summary>

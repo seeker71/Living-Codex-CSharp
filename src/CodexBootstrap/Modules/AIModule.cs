@@ -147,55 +147,41 @@ namespace CodexBootstrap.Modules
     /// Refactored AI Module - Concise, configurable, and pattern-driven
     /// </summary>
     [MetaNodeAttribute("codex.ai.module", "codex.meta/module", "AIModule", "AI Module for concept extraction, fractal transformation, and future queries")]
-    public class AIModule : IModule
+    public class AIModule : ModuleBase
     {
-        private readonly NodeRegistry _registry;
-        private readonly Core.ICodexLogger _logger;
         private readonly LLMOrchestrator _llmOrchestrator;
         private readonly PromptTemplateRepository _promptRepo;
 
-        public AIModule() : this(new NodeRegistry(), new Log4NetLogger(typeof(AIModule)))
-        {
-        }
+        public override string Name => "AI Module (Refactored)";
+        public override string Description => "Streamlined AI functionality with configurable prompts and reusable patterns";
+        public override string Version => "2.0.0";
 
-        public AIModule(NodeRegistry registry, Core.ICodexLogger logger)
+        public AIModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+            : base(registry, logger)
         {
-            _registry = registry;
-            _logger = logger;
-            
             // Initialize LLM infrastructure
-            var httpClient = new HttpClient();
-            var llmClient = new LLMClient(httpClient, _logger);
+            var llmClient = new LLMClient(httpClient, logger);
             _promptRepo = new PromptTemplateRepository(registry);
-            _llmOrchestrator = new LLMOrchestrator(llmClient, _promptRepo, _logger);
+            _llmOrchestrator = new LLMOrchestrator(llmClient, _promptRepo, logger);
             
             // Register default prompt templates
             RegisterPromptTemplates();
         }
 
-        public string Name => "AI Module (Refactored)";
-        public string Description => "Streamlined AI functionality with configurable prompts and reusable patterns";
-        public string Version => "2.0.0";
-
-        public Node GetModuleNode()
+        public override Node GetModuleNode()
         {
-            return NodeStorage.CreateModuleNode(
-                id: "ai-module",
+            return CreateModuleNode(
+                moduleId: "ai-module",
                 name: Name,
                 version: Version,
                 description: Description,
-                capabilities: new[] { "concept-extraction", "llm-integration", "fractal-transformation", "analysis" },
                 tags: new[] { "ai", "concepts", "llm", "analysis", "refactored" },
-                specReference: "codex.spec.ai"
+                capabilities: new[] { "concept-extraction", "llm-integration", "fractal-transformation", "analysis" },
+                spec: "codex.spec.ai"
             );
         }
 
-        public void Register(NodeRegistry registry)
-        {
-            registry.Upsert(GetModuleNode());
-        }
-
-        public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+        public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
         {
             // Register AI handlers for internal module communication
             router.Register("ai", "extract-concepts", async (JsonElement? json) => 
@@ -219,7 +205,7 @@ namespace CodexBootstrap.Modules
             _logger.Info("AI module API handlers registered for internal communication");
         }
 
-        public void RegisterHttpEndpoints(Microsoft.AspNetCore.Builder.WebApplication app, NodeRegistry registry, Runtime.CoreApiService coreApiService, Runtime.ModuleLoader moduleLoader)
+        public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApiService, ModuleLoader moduleLoader)
         {
             // HTTP endpoints registration - not needed for this module
         }

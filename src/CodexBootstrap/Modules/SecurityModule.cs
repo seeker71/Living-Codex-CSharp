@@ -10,48 +10,41 @@ using System.Text.Json.Serialization;
 namespace CodexBootstrap.Modules
 {
     [ApiModule(Name = "SecurityModule", Version = "1.0.0", Description = "Authentication and authorization services via REST API")]
-    public class SecurityModule : IModule
+    public class SecurityModule : ModuleBase
     {
-        private readonly HttpClient _httpClient;
-        private readonly Core.ICodexLogger _logger;
         private readonly string _userModuleBaseUrl;
+        private readonly HttpClient _httpClient;
 
-        public SecurityModule(HttpClient httpClient, Core.ICodexLogger logger)
+        public override string Name => "Security Module";
+        public override string Description => "Authentication and authorization via REST API calls";
+        public override string Version => "1.0.0";
+
+        public SecurityModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+            : base(registry, logger)
         {
-            _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _httpClient = httpClient;
             _userModuleBaseUrl = "http://localhost:5002"; // Same server, different module
         }
 
-        public string ModuleId => "codex.security";
-        public string Name => "Security Module";
-        public string Version => "1.0.0";
-        public string Description => "Authentication and authorization via REST API calls";
-
-        public Node GetModuleNode()
+        public override Node GetModuleNode()
         {
-            return NodeStorage.CreateModuleNode(
-                id: ModuleId,
+            return CreateModuleNode(
+                moduleId: "codex.security",
                 name: Name,
                 version: Version,
                 description: Description,
-                capabilities: new[] { "authentication", "authorization", "registration", "rest-api" },
                 tags: new[] { "security", "auth", "rest", "api" },
-                specReference: "codex.spec.security"
+                capabilities: new[] { "authentication", "authorization", "registration", "rest-api" },
+                spec: "codex.spec.security"
             );
         }
 
-        public void Register(NodeRegistry registry)
-        {
-            registry.Upsert(GetModuleNode());
-        }
-
-        public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+        public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
         {
             // API handlers are registered via attribute-based routing
         }
 
-        public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+        public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
         {
             // HTTP endpoints are registered via attribute-based routing
         }

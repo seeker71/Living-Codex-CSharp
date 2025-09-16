@@ -179,51 +179,43 @@ public record ExtractedEdge(
     Description = "Configurable image analysis for extracting structured data",
     Tags = new[] { "Image Analysis", "AI", "Computer Vision", "Node Extraction", "Edge Detection" }
 )]
-public class ImageAnalysisModule : IModule
+public class ImageAnalysisModule : ModuleBase
 {
-    private readonly IApiRouter _apiRouter;
-    private readonly NodeRegistry _registry;
+    private IApiRouter _apiRouter;
     private readonly Dictionary<string, AnalysisConfig> _analysisConfigs;
 
-    public ImageAnalysisModule(IApiRouter apiRouter, NodeRegistry registry)
+    public override string Name => "Image Analysis Module";
+    public override string Description => "Analyzes images to extract nodes and edges for integration with the node-based system";
+    public override string Version => "1.0.0";
+
+    public ImageAnalysisModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? apiRouter = null) 
+        : base(registry, logger)
     {
         _apiRouter = apiRouter;
-        _registry = registry;
         _analysisConfigs = new Dictionary<string, AnalysisConfig>();
         InitializeDefaultConfigs();
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.analysis.image",
+        return CreateModuleNode(
+            moduleId: "codex.analysis.image",
             name: "Image Analysis Module",
             version: "1.0.0",
             description: "Analyzes images to extract nodes and edges for the node-based system",
-            capabilities: new[] { "image-analysis", "node-extraction", "edge-extraction", "ai-integration" },
             tags: new[] { "image", "analysis", "extraction", "ai" },
-            specReference: "codex.spec.image-analysis"
+            capabilities: new[] { "image-analysis", "node-extraction", "edge-extraction", "ai-integration" },
+            spec: "codex.spec.image-analysis"
         );
     }
 
-    public void Register(NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
-        registry.Upsert(GetModuleNode());
-        
-        // Register default analysis configurations
-        foreach (var config in _analysisConfigs.Values)
-        {
-            var configNode = CreateAnalysisConfigNode(config);
-            registry.Upsert(configNode);
-        }
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
-    {
+        _apiRouter = router;
         // API handlers are registered via attributes
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // HTTP endpoints are registered via attributes
     }

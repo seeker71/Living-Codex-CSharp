@@ -7,7 +7,7 @@ namespace CodexBootstrap.Core
 {
     public static class UCoreInitializer
     {
-        public static void SeedIfMissing(NodeRegistry registry, ICodexLogger logger)
+        public static void SeedIfMissing(INodeRegistry registry, ICodexLogger logger)
         {
             try
             {

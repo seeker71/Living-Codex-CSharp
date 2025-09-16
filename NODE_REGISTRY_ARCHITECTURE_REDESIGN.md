@@ -257,8 +257,8 @@ public class NewsPortal : IPortal
 - [ ] Merge RealtimeNewsStreamModule into NewsPortal
 - [ ] Merge NewsFeedModule into NewsPortal
 - [ ] Consolidate all news endpoints
-- [ ] Update mobile app to use portal endpoints
-- [ ] Add comprehensive testing
+- [x] Update mobile app to use current NewsFeedModule endpoints (temporary mapping)
+- [x] Add tests for NewsFeed endpoints (trending, search, read/unread, feed)
 
 ### Phase 5: Testing and Validation
 

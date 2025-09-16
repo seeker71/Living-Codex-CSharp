@@ -8,52 +8,42 @@ namespace CodexBootstrap.Modules;
 /// Concept Registry Module - Central registry for all concepts across services
 /// Manages concept registration, discovery, versioning, and cross-service synchronization
 /// </summary>
-public class ConceptRegistryModule : IModule
+public class ConceptRegistryModule : ModuleBase
 {
-    private readonly NodeRegistry _registry;
     private readonly Dictionary<string, ConceptRegistryEntry> _conceptRegistry = new();
     private readonly Dictionary<string, List<string>> _serviceConcepts = new();
     private readonly Dictionary<string, ConceptVersion> _conceptVersions = new();
     private readonly Dictionary<string, List<ConceptRelationship>> _conceptRelationships = new();
     private CoreApiService? _coreApiService;
-    private readonly Core.ICodexLogger _logger;
 
-    public ConceptRegistryModule(NodeRegistry registry)
+    public override string Name => "Concept Registry Module";
+    public override string Description => "Central registry for all concepts across services";
+    public override string Version => "1.0.0";
+
+    public ConceptRegistryModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+        : base(registry, logger)
     {
-        _registry = registry;
-        _logger = new Log4NetLogger(typeof(ConceptRegistryModule));
     }
 
-
-    public string ModuleId => "codex.concept-registry";
-    public string Name => "Concept Registry Module";
-    public string Version => "1.0.0";
-    public string Description => "Central registry for all concepts across services with version management and cross-service synchronization";
-
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            ModuleId, 
-            Name, 
-            Version, 
-            Description,
-            new[] { "concept-registry", "ontology", "discovery", "quality-assessment", "u-core" },
-            new[] { "concept-registration", "concept-discovery", "version-management", "cross-service-sync", "quality-assessment", "ontology-integration" },
-            "codex.spec.concept-registry"
+        return CreateModuleNode(
+            moduleId: "codex.concept-registry",
+            name: Name,
+            version: Version,
+            description: Description,
+            tags: new[] { "concept-registry", "ontology", "discovery", "quality-assessment", "u-core" },
+            capabilities: new[] { "concept-registration", "concept-discovery", "version-management", "cross-service-sync", "quality-assessment", "ontology-integration" },
+            spec: "codex.spec.concept-registry"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        registry.Upsert(GetModuleNode());
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // API handlers are now registered automatically by the attribute discovery system
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         _coreApiService = coreApi;
         
@@ -64,17 +54,17 @@ public class ConceptRegistryModule : IModule
     /// <summary>
     /// Register all Concept Registry related nodes for AI agent discovery and module generation
     /// </summary>
-    private void RegisterConceptRegistryNodes(NodeRegistry registry)
+    private void RegisterConceptRegistryNodes(INodeRegistry registry)
     {
         // Register Concept Registry module node
-        var conceptRegistryNode = NodeStorage.CreateModuleNode(
-            id: "codex.concept-registry",
+        var conceptRegistryNode = CreateModuleNode(
+            moduleId: "codex.concept-registry",
             name: "Concept Registry Module",
             version: "1.0.0",
             description: "Central registry for all concepts across services with version management and cross-service synchronization",
-            capabilities: new[] { "concept-registration", "concept-discovery", "version-management", "cross-service-sync", "relationship-management", "quality-assessment" },
             tags: new[] { "concept", "registry", "cross-service", "version-management", "quality-assessment" },
-            specReference: "codex.spec.concept-registry"
+            capabilities: new[] { "concept-registration", "concept-discovery", "version-management", "cross-service-sync", "relationship-management", "quality-assessment" },
+            spec: "codex.spec.concept-registry"
         );
         registry.Upsert(conceptRegistryNode);
 
@@ -88,7 +78,7 @@ public class ConceptRegistryModule : IModule
     /// <summary>
     /// Register Quality Assessment routes as discoverable nodes
     /// </summary>
-    private void RegisterQualityAssessmentRoutes(NodeRegistry registry)
+    private void RegisterQualityAssessmentRoutes(INodeRegistry registry)
     {
         var routes = new[]
         {
@@ -138,7 +128,7 @@ public class ConceptRegistryModule : IModule
     /// <summary>
     /// Register Quality Assessment DTOs as discoverable nodes
     /// </summary>
-    private void RegisterQualityAssessmentDTOs(NodeRegistry registry)
+    private void RegisterQualityAssessmentDTOs(INodeRegistry registry)
     {
         var dtos = new[]
         {

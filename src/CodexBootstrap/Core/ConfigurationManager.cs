@@ -12,7 +12,7 @@ namespace CodexBootstrap.Core
     /// </summary>
     public class ConfigurationManager
     {
-        private readonly NodeRegistry _registry;
+        private readonly INodeRegistry _registry;
         private readonly ICodexLogger _logger;
         private readonly string _configPath;
         private const string CONFIG_NODE_TYPE = "codex.config.seed";
@@ -20,7 +20,7 @@ namespace CodexBootstrap.Core
         private const string LLM_CONFIG_ID = "llm-config";
         private const string SYSTEM_CONFIG_ID = "system-config";
 
-        public ConfigurationManager(NodeRegistry registry, ICodexLogger logger, string configPath = "config")
+        public ConfigurationManager(INodeRegistry registry, ICodexLogger logger, string configPath = "config")
         {
             _registry = registry;
             _logger = logger;

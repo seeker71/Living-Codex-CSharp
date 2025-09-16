@@ -11,16 +11,19 @@ namespace CodexBootstrap.Tests.Modules
 {
     public class CoreModuleTests
     {
-        private readonly Mock<NodeRegistry> _mockRegistry;
+        private readonly Mock<CodexBootstrap.Core.ICodexLogger> _mockLogger;
+        private readonly Mock<INodeRegistry> _mockRegistry;
         private readonly Mock<IApiRouter> _mockApiRouter;
         private readonly CodexBootstrap.Modules.CoreModule _module;
 
         public CoreModuleTests()
         {
-            _mockRegistry = new Mock<NodeRegistry>();
+            _mockLogger = new Mock<CodexBootstrap.Core.ICodexLogger>();
+            _mockRegistry = new Mock<INodeRegistry>();
             _mockApiRouter = new Mock<IApiRouter>();
+            var mockHttpClient = new Mock<HttpClient>();
             
-            _module = new CodexBootstrap.Modules.CoreModule(_mockApiRouter.Object, _mockRegistry.Object);
+            _module = new CodexBootstrap.Modules.CoreModule(_mockRegistry.Object, _mockLogger.Object, mockHttpClient.Object);
         }
 
         [Fact]

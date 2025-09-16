@@ -47,7 +47,7 @@ public sealed class ModuleLoader
         }
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi)
+    public void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi)
     {
         foreach (var module in _loadedModules)
         {
@@ -214,18 +214,11 @@ public sealed class ModuleLoader
             var moduleNode = module.GetModuleNode();
             _logger.Info($"Module node ID: {moduleNode.Id}");
             
-            // Set global registry for modules that support it
-            if (module is IRegistryModule registryModule)
-            {
-                registryModule.SetGlobalRegistry(_registry);
-                _logger.Info($"Set global registry for module: {module.GetType().Name}");
-            }
-            
             // Use enhanced module registration with spec tracking
             try
             {
                 // Register the module and its meta nodes with spec tracking
-                NodeStorage.RegisterModuleWithMetaNodes(_registry, module);
+                module.Register(_registry);
                 _logger.Info($"Successfully registered module {module.GetType().Name} with enhanced registration");
             }
             catch (Exception ex)

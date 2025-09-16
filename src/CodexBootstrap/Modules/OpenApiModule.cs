@@ -39,25 +39,27 @@ public record OpenApiSpecInfo(
 );
 
 [MetaNode(Id = "codex.openapi", Name = "OpenAPI Module", Description = "Module for generating comprehensive OpenAPI 3.0 specifications from meta-node attributes")]
-public sealed class OpenApiModule : IModule
+public sealed class OpenApiModule : ModuleBase
 {
-    private readonly NodeRegistry _registry;
+    public override string Name => "OpenAPI Module";
+    public override string Description => "Module for generating comprehensive OpenAPI 3.0 specifications from meta-node attributes";
+    public override string Version => "1.0.0";
 
-    public OpenApiModule(NodeRegistry registry)
+    public OpenApiModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+        : base(registry, logger)
     {
-        _registry = registry;
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.openapi",
+        return CreateModuleNode(
+            moduleId: "codex.openapi",
             name: "OpenAPI Module",
             version: "0.1.0",
             description: "Module for generating deterministic OpenAPI specifications from module types and APIs.",
-            capabilities: new[] { "openapi", "specification", "generation", "documentation" },
             tags: new[] { "openapi", "spec", "generation", "documentation" },
-            specReference: "codex.spec.openapi"
+            capabilities: new[] { "openapi", "specification", "generation", "documentation" },
+            spec: "codex.spec.openapi"
         );
     }
 
@@ -203,58 +205,8 @@ public sealed class OpenApiModule : IModule
 
     // Simplified - using built-in ASP.NET Core OpenAPI support
 
-    public void Register(NodeRegistry registry)
-    {
-        // Register the module node
-        registry.Upsert(GetModuleNode());
 
-        // Register OpenApiDocument type definition as node
-        var openApiType = new Node(
-            Id: "codex.openapi/document",
-            TypeId: "codex.meta/type",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "OpenApiDocument Type",
-            Description: "Represents an OpenAPI 3.0 specification document",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    name = "OpenApiDocument",
-                    fields = new[]
-                    {
-                        new { name = "openApi", type = "string", required = true, description = "OpenAPI version" },
-                        new { name = "info", type = "OpenApiInfo", required = true, description = "API information" },
-                        new { name = "components", type = "object", required = false, description = "Reusable components" },
-                        new { name = "paths", type = "object", required = false, description = "API paths and operations" }
-                    }
-                }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.openapi",
-                ["typeName"] = "OpenApiDocument"
-            }
-        );
-        registry.Upsert(openApiType);
-
-        // API nodes are registered via NodeStorage.CreateApiNode() below
-
-        // Register API nodes for RouteDiscovery
-        var generateApi = NodeStorage.CreateApiNode("codex.openapi", "generate", "/openapi/generate", "Generate OpenAPI specification for a module");
-        var listSpecsApi = NodeStorage.CreateApiNode("codex.openapi", "list-specs", "/openapi/list-specs", "List all available OpenAPI specifications");
-        
-        registry.Upsert(generateApi);
-        registry.Upsert(listSpecsApi);
-
-        // Register edges
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.openapi", "generate"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.openapi", "list-specs"));
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         router.Register("codex.openapi", "generate", args =>
         {
@@ -318,7 +270,7 @@ public sealed class OpenApiModule : IModule
         });
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // Swagger UI is automatically configured in Program.cs
         // This module provides additional OpenAPI endpoints for module-specific specs

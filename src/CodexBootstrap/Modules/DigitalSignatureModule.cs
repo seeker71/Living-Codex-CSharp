@@ -9,48 +9,43 @@ namespace CodexBootstrap.Modules;
 /// <summary>
 /// Digital signature module for cryptographic signing and verification of nodes and edges
 /// </summary>
-public sealed class DigitalSignatureModule : IModule
+public sealed class DigitalSignatureModule : ModuleBase
 {
-    private readonly Core.ICodexLogger _logger;
     private const string SignatureKey = "digitalSignature";
     private const string PublicKeyKey = "publicKey";
     private const string AlgorithmKey = "signatureAlgorithm";
     private const string TimestampKey = "signatureTimestamp";
     private const string Algorithm = "ECDSA-P256";
 
-    public DigitalSignatureModule()
+    public override string Name => "Digital Signature Module";
+    public override string Description => "Digital signature module for cryptographic signing and verification of nodes and edges";
+    public override string Version => "1.0.0";
+
+    public DigitalSignatureModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+        : base(registry, logger)
     {
-        _logger = new Log4NetLogger(typeof(DigitalSignatureModule));
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            "codex.digital-signature",
-            "Digital Signature Module",
-            "0.1.0",
-            "Cryptographic signing and verification for nodes and edges",
-            new[] { "cryptography", "digital-signature", "security", "verification" },
-            new[] { "sign_node", "verify_node", "sign_edge", "verify_edge", "generate_keypair", "extract_public_key" },
-            "codex.spec.digital-signature"
+        return CreateModuleNode(
+            moduleId: "codex.digital-signature",
+            name: "Digital Signature Module",
+            version: "0.1.0",
+            description: "Cryptographic signing and verification for nodes and edges",
+            tags: new[] { "cryptography", "digital-signature", "security", "verification" },
+            capabilities: new[] { "sign_node", "verify_node", "sign_edge", "verify_edge", "generate_keypair", "extract_public_key" },
+            spec: "codex.spec.digital-signature"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        // Register the module node
-        registry.Upsert(GetModuleNode());
-        
-        _logger.Info("Digital Signature Module registered");
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // API handlers are registered via attribute-based routing
         _logger.Info("Digital Signature API handlers registered");
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // HTTP endpoints will be registered via ApiRouteDiscovery
     }

@@ -13,10 +13,8 @@ namespace CodexBootstrap.Modules;
 /// <summary>
 /// User contributions module with ETH ledger, change tracking, attribution, and reward sharing
 /// </summary>
-public sealed class UserContributionsModule : IModule
+public sealed class UserContributionsModule : ModuleBase
 {
-    private readonly Core.ICodexLogger _logger;
-    private readonly NodeRegistry _registry;
     private readonly Web3? _web3;
     private readonly ConcurrentDictionary<string, Contribution> _contributions = new();
     private readonly ConcurrentDictionary<string, UserReward> _userRewards = new();
@@ -30,10 +28,13 @@ public sealed class UserContributionsModule : IModule
     private int _maxHistorySize = 1000;
     private CoreApiService? _coreApiService;
 
-    public UserContributionsModule(NodeRegistry registry, string? ethereumRpcUrl = null)
+    public override string Name => "User Contributions Module";
+    public override string Description => "User contributions module with ETH ledger, change tracking, attribution, and reward sharing";
+    public override string Version => "1.0.0";
+
+    public UserContributionsModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, string? ethereumRpcUrl = null) 
+        : base(registry, logger)
     {
-        _logger = new Log4NetLogger(typeof(UserContributionsModule));
-        _registry = registry;
         
         if (!string.IsNullOrEmpty(ethereumRpcUrl))
         {
@@ -41,32 +42,26 @@ public sealed class UserContributionsModule : IModule
         }
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.user-contributions",
-            name: "User Contributions Module",
-            version: "0.1.0",
-            description: "Manages user contributions with ETH ledger, change tracking, attribution, and reward sharing",
-            capabilities: new[] { "contribution_tracking", "eth_ledger", "attribution_system", "reward_sharing", "change_tracking", "contribution_validation", "reward_calculation", "attribution_verification" },
+        return CreateModuleNode(
+            moduleId: "codex.user-contributions",
+            name: Name,
+            version: Version,
+            description: Description,
             tags: new[] { "contributions", "eth", "ledger", "rewards", "attribution" },
-            specReference: "codex.spec.user-contributions"
+            capabilities: new[] { "contribution_tracking", "eth_ledger", "attribution_system", "reward_sharing", "change_tracking", "contribution_validation", "reward_calculation", "attribution_verification" },
+            spec: "codex.spec.user-contributions"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        registry.Upsert(GetModuleNode());
-        _logger.Info("User Contributions Module registered");
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // API handlers are registered via attribute-based routing
         _logger.Info("User Contributions API handlers registered");
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         _coreApiService = coreApi;
         // HTTP endpoints will be registered via ApiRouteDiscovery

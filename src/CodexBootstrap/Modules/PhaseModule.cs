@@ -26,109 +26,30 @@ public sealed record ResonanceProposal(
     string Justification
 );
 
-public sealed class PhaseModule : IModule
+public sealed class PhaseModule : ModuleBase
 {
-    private readonly NodeRegistry _registry;
+    public override string Name => "Phase Module";
+    public override string Description => "Manages node state transitions between Ice, Water, and Gas states";
+    public override string Version => "1.0.0";
 
-    public PhaseModule(NodeRegistry registry)
+    public PhaseModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+        : base(registry, logger)
     {
-        _registry = registry;
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.phase",
-            name: "Phase Module",
-            version: "0.1.0",
-            description: "Module for managing node phase transitions (melt, refreeze) and resonance checking.",
-            capabilities: new[] { "phase-transitions", "melt", "refreeze", "resonance" },
+        return CreateModuleNode(
+            moduleId: "codex.phase",
+            name: Name,
+            version: Version,
+            description: Description,
             tags: new[] { "phase", "transition", "melt", "refreeze", "resonance" },
-            specReference: "codex.spec.phase"
+            capabilities: new[] { "phase-transitions", "melt", "refreeze", "resonance" },
+            spec: "codex.spec.phase"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        // Register the module node
-        registry.Upsert(GetModuleNode());
-
-        // Register PhaseChange and ResonanceProposal type definitions as nodes
-        var phaseChangeType = new Node(
-            Id: "codex.phase/phasechange",
-            TypeId: "codex.meta/type",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "PhaseChange",
-            Description: "Represents a phase transition between node states",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    fields = new[]
-                    {
-                        new { name = "NodeId", type = "string", required = true },
-                        new { name = "FromState", type = "string", required = true },
-                        new { name = "ToState", type = "string", required = true },
-                        new { name = "Timestamp", type = "datetime", required = true },
-                        new { name = "Reason", type = "string", required = true }
-                    }
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.phase",
-                ["typeName"] = "PhaseChange"
-            }
-        );
-        registry.Upsert(phaseChangeType);
-
-        var resonanceProposalType = new Node(
-            Id: "codex.phase/resonanceproposal",
-            TypeId: "codex.meta/type",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "ResonanceProposal",
-            Description: "Represents a proposal for changes that need resonance checking",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    fields = new[]
-                    {
-                        new { name = "NodeId", type = "string", required = true },
-                        new { name = "Anchors", type = "array", required = true },
-                        new { name = "Changes", type = "object", required = true },
-                        new { name = "Justification", type = "string", required = true }
-                    }
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.phase",
-                ["typeName"] = "ResonanceProposal"
-            }
-        );
-        registry.Upsert(resonanceProposalType);
-
-        // Register API nodes for RouteDiscovery
-        var meltApi = NodeStorage.CreateApiNode("codex.phase", "melt", "/phase/melt", "Convert an ice node to water state for editing");
-        var refreezeApi = NodeStorage.CreateApiNode("codex.phase", "refreeze", "/phase/refreeze", "Convert a water node back to ice state after editing");
-        var resonanceApi = NodeStorage.CreateApiNode("codex.phase", "resonance", "/phase/resonance", "Check if proposed changes resonate with anchor nodes");
-        
-        registry.Upsert(meltApi);
-        registry.Upsert(refreezeApi);
-        registry.Upsert(resonanceApi);
-
-        // Register edges
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.phase", "melt"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.phase", "refreeze"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.phase", "resonance"));
-    }
 
     [ApiRoute("POST", "/phase/melt/{id}", "phase-melt", "Convert an ice node to water state for editing", "codex.phase")]
     public async Task<object> MeltNode([ApiParameter("id", "Node ID to melt", Required = true, Location = "path")] string id)
@@ -355,13 +276,13 @@ public sealed class PhaseModule : IModule
         return false;
     }
 
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // Phase module uses ApiRoute attributes for endpoint registration
         // No additional API handlers needed
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // Phase module doesn't need any custom HTTP endpoints
         // All functionality is exposed through the ApiRoute attributes

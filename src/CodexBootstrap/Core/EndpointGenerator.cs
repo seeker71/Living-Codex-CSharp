@@ -26,12 +26,12 @@ namespace CodexBootstrap.Core;
 public class EndpointGenerator
 {
     private readonly IApiRouter _apiRouter;
-    private readonly NodeRegistry _registry;
+    private readonly INodeRegistry _registry;
     // private readonly DynamicAttributionSystem _attributionSystem;
     // private readonly ReflectionCodeGenerator _codeGenerator;
     private readonly List<UcoreDelta> _deltaDiffs;
 
-    public EndpointGenerator(IApiRouter apiRouter, NodeRegistry registry, object attributionSystem, object codeGenerator)
+    public EndpointGenerator(IApiRouter apiRouter, INodeRegistry registry, object attributionSystem, object codeGenerator)
     {
         _apiRouter = apiRouter;
         _registry = registry;

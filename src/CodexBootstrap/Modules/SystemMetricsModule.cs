@@ -12,52 +12,44 @@ namespace CodexBootstrap.Modules;
 /// System Metrics Module - Provides comprehensive system metrics and monitoring
 /// </summary>
 [ApiModule(Name = "SystemMetricsModule", Version = "1.0.0", Description = "System Metrics Module - Comprehensive system monitoring and metrics", Tags = new[] { "metrics", "monitoring", "system", "health" })]
-public class SystemMetricsModule : IModule
+public class SystemMetricsModule : ModuleBase
 {
-    private readonly NodeRegistry _registry;
-    private readonly CodexBootstrap.Core.ICodexLogger _logger;
     private readonly Dictionary<string, object> _metrics = new();
     private readonly DateTime _startTime = DateTime.UtcNow;
 
-    public SystemMetricsModule(NodeRegistry registry)
+    public override string Name => "System Metrics Module";
+    public override string Version => "1.0.0";
+    public override string Description => "System Metrics Module - Comprehensive system monitoring and metrics";
+
+    public SystemMetricsModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient)
+        : base(registry, logger)
     {
-        _registry = registry;
-        _logger = new Log4NetLogger(typeof(SystemMetricsModule));
         InitializeMetrics();
     }
 
-    public string ModuleId => "codex.system.metrics";
-    public string Name => "System Metrics Module";
-    public string Version => "1.0.0";
-    public string Description => "System Metrics Module - Comprehensive system monitoring and metrics";
-
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(ModuleId, Name, Version, Description, 
-            capabilities: new[] { "system-monitoring", "metrics-collection", "performance-tracking" },
+        return CreateModuleNode(
+            moduleId: "codex.system.metrics",
+            name: Name,
+            version: Version,
+            description: Description,
             tags: new[] { "metrics", "monitoring", "system" },
-            specReference: "codex.spec.system-metrics");
+            capabilities: new[] { "system-monitoring", "metrics-collection", "performance-tracking" },
+            spec: "codex.spec.system-metrics"
+        );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        // Register module node
-        var moduleNode = GetModuleNode();
-        registry.Upsert(moduleNode);
-        
-        _logger.Info("SystemMetricsModule registered with node registry");
-    }
-
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
-    {
-        // HTTP endpoints are registered via the API router
-        _logger.Info("SystemMetricsModule HTTP endpoints registered via API router");
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // API handlers are registered via attributes, not here
         _logger.Info("SystemMetricsModule API handlers registered via attributes");
+    }
+
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    {
+        // HTTP endpoints are registered via the API router
+        _logger.Info("SystemMetricsModule HTTP endpoints registered via API router");
     }
 
     private void InitializeMetrics()

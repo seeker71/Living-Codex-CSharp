@@ -21,10 +21,11 @@ public record ResonanceCompareRequest(ConceptSymbol S1, ConceptSymbol S2, double
 public record ResonanceCompareResponse(double CRK, double Dres, double DOTPhi, double Coherence, double DCodex, bool UsedOtPhi);
 
 [MetaNode(Id = "codex.resonance", Name = "Concept Resonance Module", Description = "Harmonic symbols and resonance metrics (CRK + optional OT-phi)")]
-public sealed class ConceptResonanceModule : IModule
+public sealed class ConceptResonanceModule : ModuleBase
 {
-    private readonly NodeRegistry _registry;
-    private readonly CodexBootstrap.Core.ICodexLogger _logger;
+    public override string Name => "Concept Resonance Module";
+    public override string Description => "Harmonic symbols and resonance metrics (CRK + optional OT-phi)";
+    public override string Version => "1.0.0";
 
     // ====== Tunables: CRK tolerant kernels ======
     private const double SigmaOmega = 1e-2;   // frequency tolerance
@@ -38,43 +39,25 @@ public sealed class ConceptResonanceModule : IModule
     private const double OtStabilityFloor = 1e-12;
     private const double OtConvergenceTol = 1e-6;
 
-    public ConceptResonanceModule(NodeRegistry registry, CodexBootstrap.Core.ICodexLogger logger /* HttpClient removed */)
-    {
-        _registry = registry;
-        _logger = logger;
-    }
-    
-    // Parameterless constructor for module loader
-    public ConceptResonanceModule() : this(new NodeRegistry(), new Log4NetLogger(typeof(ConceptResonanceModule)))
+    public ConceptResonanceModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+        : base(registry, logger)
     {
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.resonance",
+        return CreateModuleNode(
+            moduleId: "codex.resonance",
             name: "Concept Resonance Module",
             version: "1.2.0",
             description: "Compare concepts via harmonic symbols using CRK and inline OT-phi",
-            capabilities: new[] { "resonance", "harmonics", "similarity" },
             tags: new[] { "crk", "ot-phi", "concepts" },
-            specReference: "codex.spec.concepts.resonance"
+            capabilities: new[] { "resonance", "harmonics", "similarity" },
+            spec: "codex.spec.concepts.resonance"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        registry.Upsert(GetModuleNode());
-
-        var compareApi = NodeStorage.CreateApiNode("codex.resonance", "compare", "/concepts/resonance/compare", "Compare two concept symbols (CRK + OT-phi)");
-        var encodeApi = NodeStorage.CreateApiNode("codex.resonance", "encode", "/concepts/resonance/encode", "Store a concept symbol as a node");
-        registry.Upsert(compareApi);
-        registry.Upsert(encodeApi);
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.resonance", "compare"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.resonance", "encode"));
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         router.Register("codex.resonance", "compare", async args =>
         {
@@ -145,7 +128,7 @@ public sealed class ConceptResonanceModule : IModule
         }
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // Endpoints are automatically registered via ApiRoute attributes
     }

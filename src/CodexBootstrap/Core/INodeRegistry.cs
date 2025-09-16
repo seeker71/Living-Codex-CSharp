@@ -92,4 +92,44 @@ public interface INodeRegistry
     /// Clean up expired Water nodes
     /// </summary>
     Task CleanupExpiredWaterNodesAsync();
+
+    /// <summary>
+    /// Get all edges from a specific node
+    /// </summary>
+    IEnumerable<Edge> GetEdgesFrom(string fromId);
+
+    /// <summary>
+    /// Get all edges to a specific node
+    /// </summary>
+    IEnumerable<Edge> GetEdgesTo(string toId);
+
+    /// <summary>
+    /// Get all edges in the system
+    /// </summary>
+    IEnumerable<Edge> GetEdges();
+
+    /// <summary>
+    /// Get a specific edge by ID
+    /// </summary>
+    Edge? GetEdge(string edgeId);
+
+    /// <summary>
+    /// Get a specific edge by from and to IDs
+    /// </summary>
+    Edge? GetEdge(string fromId, string toId);
+
+    /// <summary>
+    /// Remove an edge from all storage
+    /// </summary>
+    void RemoveEdge(string edgeId);
+
+    /// <summary>
+    /// Remove an edge by from and to IDs
+    /// </summary>
+    void RemoveEdge(string fromId, string toId);
+
+    /// <summary>
+    /// Clears all nodes and edges from the registry (for testing purposes)
+    /// </summary>
+    void Clear();
 }

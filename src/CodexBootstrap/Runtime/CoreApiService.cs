@@ -10,11 +10,11 @@ public record ModuleInfo(string Id, string Name, string Version, string? Descrip
 
 public sealed class CoreApiService
 {
-    private readonly NodeRegistry _registry;
+    private readonly INodeRegistry _registry;
     private readonly IApiRouter _router;
     private readonly Core.ICodexLogger _logger;
 
-    public CoreApiService(NodeRegistry registry, IApiRouter router)
+    public CoreApiService(INodeRegistry registry, IApiRouter router)
     {
         _registry = registry;
         _router = router;
@@ -23,13 +23,13 @@ public sealed class CoreApiService
 
     public List<ModuleInfo> GetModules()
     {
-        var moduleNodes = _registry.GetNodesByType("module");
+        var moduleNodes = _registry.GetNodesByType("codex.meta/module");
         return moduleNodes.Select(ExtractModuleInfo).ToList();
     }
 
     public ModuleInfo? GetModule(string id)
     {
-        if (_registry.TryGet(id, out var node) && node.TypeId == "module")
+        if (_registry.TryGet(id, out var node) && node.TypeId == "codex.meta/module")
         {
             return ExtractModuleInfo(node);
         }

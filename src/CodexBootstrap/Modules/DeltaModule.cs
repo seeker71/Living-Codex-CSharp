@@ -27,100 +27,31 @@ public sealed record PatchDoc(
     IReadOnlyList<PatchOp> Ops
 );
 
-public sealed class DeltaModule : IModule
+public sealed class DeltaModule : ModuleBase
 {
-    private readonly NodeRegistry _registry;
+    public override string Name => "Delta Module";
+    public override string Description => "Delta operations and patch management";
+    public override string Version => "1.0.0";
 
-    public DeltaModule(NodeRegistry registry)
+    public DeltaModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+        : base(registry, logger)
     {
-        _registry = registry;
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.delta",
+        return CreateModuleNode(
+            moduleId: "codex.delta",
             name: "Delta Module",
             version: "0.1.0",
             description: "Module for git-like patches and diffs on nodes and edges.",
-            capabilities: new[] { "delta", "patch", "diff", "versioning", "git-like" },
             tags: new[] { "delta", "patch", "diff", "version", "change" },
-            specReference: "codex.spec.delta"
+            capabilities: new[] { "delta", "patch", "diff", "versioning", "git-like" },
+            spec: "codex.spec.delta"
         );
     }
 
 
-    public void Register(NodeRegistry registry)
-    {
-        registry.Upsert(GetModuleNode());
-
-        // Register PatchOp and PatchDoc type definitions as nodes
-        var patchOpType = new Node(
-            Id: "codex.delta/patchop",
-            TypeId: "codex.meta/type",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "PatchOp Type",
-            Description: "Represents a single patch operation",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    name = "PatchOp",
-                    fields = new[]
-                    {
-                        new { name = "op", type = "string", required = true, description = "Operation type" },
-                        new { name = "path", type = "string", required = true, description = "JSON pointer path" },
-                        new { name = "value", type = "object", required = false, description = "Value for add/replace" },
-                        new { name = "from", type = "string", required = false, description = "Source path for move/copy" }
-                    }
-                }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.delta",
-                ["typeName"] = "PatchOp"
-            }
-        );
-        registry.Upsert(patchOpType);
-
-        var patchDocType = new Node(
-            Id: "codex.delta/patchdoc",
-            TypeId: "codex.meta/type",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "PatchDoc Type",
-            Description: "Represents a complete patch document",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    name = "PatchDoc",
-                    fields = new[]
-                    {
-                        new { name = "targetId", type = "string", required = true, description = "Target node ID" },
-                        new { name = "ops", type = "array", required = true, description = "List of patch operations" }
-                    }
-                }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.delta",
-                ["typeName"] = "PatchDoc"
-            }
-        );
-        registry.Upsert(patchDocType);
-
-        // API nodes are registered via NodeStorage.CreateApiNode() below
-
-        // Register edges
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.delta", "diff"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.delta", "patch"));
-    }
 
     [ApiRoute("GET", "/diff/{id}", "delta-diff", "Generate diff between two nodes", "codex.delta")]
     public async Task<object> DiffNodes([ApiParameter("id", "Source node ID", Required = true, Location = "path")] string id, [ApiParameter("against", "Base node ID to compare against", Required = true, Location = "query")] string against)
@@ -187,7 +118,7 @@ public sealed class DeltaModule : IModule
         }
     }
 
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // Delta module uses ApiRoute attributes for endpoint registration
         // No additional API handlers needed
@@ -322,7 +253,7 @@ public sealed class DeltaModule : IModule
         return true;
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // Delta module doesn't need any custom HTTP endpoints
         // All functionality is exposed through the generic /route endpoint

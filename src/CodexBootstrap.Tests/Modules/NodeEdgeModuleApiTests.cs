@@ -7,6 +7,29 @@ using Xunit;
 
 namespace CodexBootstrap.Tests.Modules;
 
+// Response models for API testing
+public class NodeListResponse
+{
+    public bool Success { get; set; }
+    public List<object> Nodes { get; set; } = new();
+    public int TotalCount { get; set; }
+    public int PageSize { get; set; }
+    public int PageNumber { get; set; }
+}
+
+public class NodeResponse
+{
+    public bool Success { get; set; }
+    public object? Node { get; set; }
+    public string? Error { get; set; }
+}
+
+public class ErrorResponse
+{
+    public bool Success { get; set; }
+    public string? Error { get; set; }
+}
+
 /// <summary>
 /// Comprehensive API tests for Node/Edge Management endpoints
 /// Tests all mobile app API calls for node and edge operations
@@ -37,9 +60,10 @@ public class NodeEdgeModuleApiTests : IClassFixture<TestServerFixture>
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var content = await response.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<dynamic>(content, _jsonOptions);
+        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content, _jsonOptions);
         
         result.Should().NotBeNull();
+        result.Should().ContainKey("success");
     }
 
     [Fact]
@@ -51,9 +75,10 @@ public class NodeEdgeModuleApiTests : IClassFixture<TestServerFixture>
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var content = await response.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<dynamic>(content, _jsonOptions);
+        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content, _jsonOptions);
         
         result.Should().NotBeNull();
+        result.Should().ContainKey("success");
     }
 
     #endregion
@@ -78,24 +103,30 @@ public class NodeEdgeModuleApiTests : IClassFixture<TestServerFixture>
         if (nodesResponse.StatusCode == HttpStatusCode.OK)
         {
             var nodesContent = await nodesResponse.Content.ReadAsStringAsync();
-            var nodesResult = JsonSerializer.Deserialize<dynamic>(nodesContent, _jsonOptions);
+            var nodesResult = JsonSerializer.Deserialize<Dictionary<string, object>>(nodesContent, _jsonOptions);
             
             // If there are nodes, try to get the first one
-            var nodes = nodesResult?.GetProperty("nodes");
-            if (nodes != null && nodes.GetArrayLength() > 0)
+            if (nodesResult.ContainsKey("nodes") && nodesResult["nodes"] is JsonElement nodesElement)
             {
-                var firstNode = nodes[0];
-                var nodeId = firstNode.GetProperty("id").GetString();
+                var nodes = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(nodesElement.GetRawText(), _jsonOptions);
+                if (nodes != null && nodes.Count > 0)
+                {
+                    var firstNode = nodes[0];
+                    var nodeId = firstNode["id"]?.ToString();
 
-                // Act
-                var response = await _client.GetAsync($"/storage-endpoints/nodes/{nodeId}");
+                    if (!string.IsNullOrEmpty(nodeId))
+                    {
+                        // Act
+                        var response = await _client.GetAsync($"/storage-endpoints/nodes/{nodeId}");
 
-                // Assert
-                response.StatusCode.Should().Be(HttpStatusCode.OK);
-                var content = await response.Content.ReadAsStringAsync();
-                var result = JsonSerializer.Deserialize<dynamic>(content, _jsonOptions);
-                
-                result.Should().NotBeNull();
+                        // Assert
+                        response.StatusCode.Should().Be(HttpStatusCode.OK);
+                        var content = await response.Content.ReadAsStringAsync();
+                        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content, _jsonOptions);
+                        
+                        result.Should().NotBeNull();
+                    }
+                }
             }
         }
     }
@@ -105,7 +136,7 @@ public class NodeEdgeModuleApiTests : IClassFixture<TestServerFixture>
     #region Missing Endpoint Tests (These should return 404 until implemented)
 
     [Fact]
-    public async Task SearchNodes_ShouldReturnNotFound_WhenNotImplemented()
+    public async Task SearchNodes_ShouldReturnSearchResults_WhenImplemented()
     {
         // Arrange
         var request = new
@@ -124,7 +155,13 @@ public class NodeEdgeModuleApiTests : IClassFixture<TestServerFixture>
         var response = await _client.PostAsync("/storage-endpoints/nodes/search", content);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var responseContent = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(responseContent, _jsonOptions);
+        result.Should().NotBeNull();
+        result.Should().ContainKey("success");
+        var successElement = (JsonElement)result!["success"];
+        successElement.GetBoolean().Should().Be(true);
     }
 
     [Fact]
@@ -138,13 +175,19 @@ public class NodeEdgeModuleApiTests : IClassFixture<TestServerFixture>
     }
 
     [Fact]
-    public async Task GetEdges_ShouldReturnNotFound_WhenNotImplemented()
+    public async Task GetEdges_ShouldReturnEdgesList_WhenImplemented()
     {
         // Act
         var response = await _client.GetAsync("/storage-endpoints/edges");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var responseContent = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(responseContent, _jsonOptions);
+        result.Should().NotBeNull();
+        result.Should().ContainKey("success");
+        var successElement = (JsonElement)result!["success"];
+        successElement.GetBoolean().Should().Be(true);
     }
 
     #endregion
@@ -205,34 +248,6 @@ public class NodeEdgeModuleApiTests : IClassFixture<TestServerFixture>
     #endregion
 
     #region Future Implementation Tests (Placeholder for when endpoints are implemented)
-
-    [Fact(Skip = "Endpoint not yet implemented")]
-    public async Task SearchNodes_ShouldReturnSearchResults_WhenImplemented()
-    {
-        // This test will be enabled when the endpoint is implemented
-        var request = new
-        {
-            query = "artificial intelligence",
-            filters = new { typeId = "codex.concept" },
-            limit = 10
-        };
-
-        var content = new StringContent(
-            JsonSerializer.Serialize(request, _jsonOptions),
-            Encoding.UTF8,
-            "application/json");
-
-        var response = await _client.PostAsync("/storage-endpoints/nodes/search", content);
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-    }
-
-    [Fact(Skip = "Endpoint not yet implemented")]
-    public async Task GetEdges_ShouldReturnEdgesList_WhenImplemented()
-    {
-        // This test will be enabled when the endpoint is implemented
-        var response = await _client.GetAsync("/storage-endpoints/edges");
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-    }
 
     [Fact(Skip = "Endpoint not yet implemented")]
     public async Task GetEdge_ShouldReturnEdge_WhenImplemented()

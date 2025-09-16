@@ -8,14 +8,14 @@ namespace CodexBootstrap.Runtime;
 /// </summary>
 public sealed class HealthService
 {
-    private readonly NodeRegistry _registry;
+    private readonly INodeRegistry _registry;
     private readonly Core.ICodexLogger _logger;
     private readonly DateTime _startTime;
     private long _requestCount;
     private readonly object _lock = new object();
     private ModuleLoader? _moduleLoader;
 
-    public HealthService(NodeRegistry registry)
+    public HealthService(INodeRegistry registry)
     {
         _registry = registry;
         _logger = new Log4NetLogger(typeof(HealthService));

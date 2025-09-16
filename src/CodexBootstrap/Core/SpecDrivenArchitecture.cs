@@ -17,8 +17,8 @@ namespace CodexBootstrap.Core
     /// </summary>
     public class SpecDrivenArchitecture
     {
-        private readonly ILogger<SpecDrivenArchitecture> _logger;
-        private readonly NodeRegistry _registry;
+        private readonly ICodexLogger _logger;
+        private readonly INodeRegistry _registry;
         private readonly ModuleCompiler _moduleCompiler;
         private readonly HotReloadManager _hotReloadManager;
         private readonly string _specsDirectory;
@@ -26,8 +26,8 @@ namespace CodexBootstrap.Core
         private readonly string _compiledDllsDirectory;
 
         public SpecDrivenArchitecture(
-            ILogger<SpecDrivenArchitecture> logger,
-            NodeRegistry registry,
+            ICodexLogger logger,
+            INodeRegistry registry,
             ModuleCompiler moduleCompiler,
             HotReloadManager hotReloadManager)
         {
@@ -105,7 +105,7 @@ namespace CodexBootstrap.Core
         {
             try
             {
-                _logger.LogInformation("Starting complete regeneration from specs (ice)");
+                _logger.Info("Starting complete regeneration from specs (ice)");
                 
                 var result = new RegenerationResult
                 {
@@ -178,14 +178,13 @@ namespace CodexBootstrap.Core
                 result.Success = loadResult.Success;
                 result.EndTime = DateTime.UtcNow;
 
-                _logger.LogInformation("Complete regeneration from specs completed in {Duration}ms", 
-                    result.TotalDuration.TotalMilliseconds);
+                _logger.Info($"Complete regeneration from specs completed in {(int)result.TotalDuration.TotalMilliseconds}ms");
 
                 return result;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during complete regeneration from specs");
+                _logger.Error("Error during complete regeneration from specs", ex);
                 return new RegenerationResult
                 {
                     Success = false,
@@ -220,7 +219,7 @@ namespace CodexBootstrap.Core
                         await File.WriteAllTextAsync(outputPath, generatedCode);
                         generatedFiles.Add(outputPath);
                         
-                        _logger.LogInformation("Generated code for spec: {SpecName}", specName);
+                        _logger.Info($"Generated code for spec: {specName}");
                     }
                 }
 
@@ -233,7 +232,7 @@ namespace CodexBootstrap.Core
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error generating code from specs");
+                _logger.Error("Error generating code from specs", ex);
                 return new CodeGenerationResult
                 {
                     Success = false,
@@ -264,12 +263,11 @@ namespace CodexBootstrap.Core
                     if (compileResult.Success)
                     {
                         compiledDlls.Add(compileResult.DllPath);
-                        _logger.LogInformation("Compiled module: {ModuleName}", fileName);
+                        _logger.Info($"Compiled module: {fileName}");
                     }
                     else
                     {
-                        _logger.LogWarning("Failed to compile module {ModuleName}: {Error}", 
-                            fileName, compileResult.ErrorMessage);
+                        _logger.Warn($"Failed to compile module {fileName}: {compileResult.ErrorMessage}");
                     }
                 }
 
@@ -282,7 +280,7 @@ namespace CodexBootstrap.Core
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error compiling generated code");
+                _logger.Error("Error compiling generated code", ex);
                 return new SpecCompilationResult
                 {
                     Success = false,
@@ -308,8 +306,7 @@ namespace CodexBootstrap.Core
                     // For now, just log that we would load the module
                     // In a full implementation, this would use the ModuleLoader
                     loadedModules.Add(Path.GetFileNameWithoutExtension(dllPath));
-                    _logger.LogInformation("Would load module: {ModuleName}", 
-                        Path.GetFileNameWithoutExtension(dllPath));
+                    _logger.Info($"Would load module: {Path.GetFileNameWithoutExtension(dllPath)}");
                 }
 
                 return new LoadResult
@@ -321,7 +318,7 @@ namespace CodexBootstrap.Core
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error loading compiled modules");
+                _logger.Error("Error loading compiled modules", ex);
                 return new LoadResult
                 {
                     Success = false,
@@ -381,7 +378,7 @@ namespace CodexBootstrap.Core
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error generating code from spec {SpecName}", specName);
+                _logger.Error($"Error generating code from spec {specName}", ex);
                 return string.Empty;
             }
         }

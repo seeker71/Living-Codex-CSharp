@@ -68,110 +68,33 @@ public sealed record ValidationRequest(
     bool IncludeWarnings = true
 );
 
-public sealed class RelationsModule : IModule
+public sealed class RelationsModule : ModuleBase
 {
-    private readonly NodeRegistry _registry;
+    public override string Name => "Relations Module";
+    public override string Description => "Self-contained module for managing node relationships and validation";
+    public override string Version => "1.0.0";
 
-    public RelationsModule(NodeRegistry registry)
+    public RelationsModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+        : base(registry, logger)
     {
-        _registry = registry;
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.relations",
+        return CreateModuleNode(
+            moduleId: "codex.relations",
             name: "Relations Module",
             version: "0.1.0",
             description: "Module for modeling relations, constraints, and validation rules.",
-            capabilities: new[] { "relations", "constraints", "validation", "modeling" },
             tags: new[] { "relations", "constraints", "validation", "modeling" },
-            specReference: "codex.spec.relations"
+            capabilities: new[] { "relations", "constraints", "validation", "modeling" },
+            spec: "codex.spec.relations"
         );
     }
 
 
-    public void Register(NodeRegistry registry)
-    {
-        // Register the module node
-        registry.Upsert(GetModuleNode());
 
-        // Register Relation type definition as node
-        var relationType = new Node(
-            Id: "codex.relations/relation",
-            TypeId: "codex.meta/type",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Relation Type",
-            Description: "Represents a relationship between two types with cardinality constraints",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    name = "Relation",
-                    fields = new[]
-                    {
-                        new { name = "fromType", type = "string", required = true, description = "Source type identifier" },
-                        new { name = "toType", type = "string", required = true, description = "Target type identifier" },
-                        new { name = "role", type = "string", required = true, description = "Relationship role" },
-                        new { name = "cardinality", type = "Cardinality", required = true, description = "Relationship cardinality" },
-                        new { name = "description", type = "string", required = false, description = "Relationship description" },
-                        new { name = "constraints", type = "object", required = false, description = "Additional constraints" }
-                    }
-                }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.relations",
-                ["typeName"] = "Relation"
-            }
-        );
-        registry.Upsert(relationType);
-
-        // Register ValidationRule type definition as node
-        var validationRuleType = new Node(
-            Id: "codex.relations/validationrule",
-            TypeId: "codex.meta/type",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "ValidationRule Type",
-            Description: "Represents a validation rule with expression and severity",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    name = "ValidationRule",
-                    fields = new[]
-                    {
-                        new { name = "name", type = "string", required = true, description = "Rule name" },
-                        new { name = "description", type = "string", required = true, description = "Rule description" },
-                        new { name = "expression", type = "string", required = true, description = "Validation expression" },
-                        new { name = "severity", type = "ValidationSeverity", required = true, description = "Rule severity" }
-                    }
-                }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.relations",
-                ["typeName"] = "ValidationRule"
-            }
-        );
-        registry.Upsert(validationRuleType);
-
-        // Register API nodes for RouteDiscovery
-        var registerRelationApi = NodeStorage.CreateApiNode("codex.relations", "register-relation", "/relations/register", "Register a new relation between types");
-        var validateApi = NodeStorage.CreateApiNode("codex.relations", "validate", "/relations/validate", "Validate a node against registered relations and constraints");
-
-        // Register edges
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.relations", "register-relation"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.relations", "validate"));
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         router.Register("codex.relations", "register-relation", async args =>
         {
@@ -296,7 +219,7 @@ public sealed class RelationsModule : IModule
         });
     }
 
-    private async Task<RelationsValidationResult> ValidateNode(Node node, NodeRegistry registry)
+    private async Task<RelationsValidationResult> ValidateNode(Node node, INodeRegistry registry)
     {
         var issues = new List<RelationsValidationIssue>();
 
@@ -365,7 +288,7 @@ public sealed class RelationsModule : IModule
         }
     }
 
-    private void ValidateRelations(Node node, List<Edge> relations, NodeRegistry registry, List<RelationsValidationIssue> issues)
+    private void ValidateRelations(Node node, List<Edge> relations, INodeRegistry registry, List<RelationsValidationIssue> issues)
     {
         foreach (var relation in relations)
         {
@@ -383,7 +306,7 @@ public sealed class RelationsModule : IModule
         }
     }
 
-    private void ValidateCardinality(Node node, Edge relation, RelationsCardinality cardinality, NodeRegistry registry, List<RelationsValidationIssue> issues)
+    private void ValidateCardinality(Node node, Edge relation, RelationsCardinality cardinality, INodeRegistry registry, List<RelationsValidationIssue> issues)
     {
         var relatedNodes = registry.GetEdgesFrom(node.Id)
             .Where(e => e.Role == relation.Role)
@@ -417,7 +340,7 @@ public sealed class RelationsModule : IModule
         }
     }
 
-    private void ValidateRoleConstraints(Node node, Edge relation, NodeRegistry registry, List<RelationsValidationIssue> issues)
+    private void ValidateRoleConstraints(Node node, Edge relation, INodeRegistry registry, List<RelationsValidationIssue> issues)
     {
         // Add role-specific validation logic here
         // For now, just check that the role is not empty
@@ -432,7 +355,7 @@ public sealed class RelationsModule : IModule
         }
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // Relations module doesn't need any custom HTTP endpoints
         // All functionality is exposed through the generic /route endpoint

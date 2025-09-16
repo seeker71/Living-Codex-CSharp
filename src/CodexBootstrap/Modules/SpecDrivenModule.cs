@@ -11,49 +11,39 @@ namespace CodexBootstrap.Modules
     /// Module that provides spec-driven architecture functionality
     /// </summary>
     [ApiModule(Name = "SpecDrivenModule", Version = "1.0.0", Description = "Provides spec-driven architecture with ice/water/gas states", Tags = new[] { "spec-driven", "architecture", "ice-water-gas" })]
-    public class SpecDrivenModule : IModule
+    public class SpecDrivenModule : ModuleBase
     {
-        private readonly ILogger<SpecDrivenModule> _logger;
         private readonly SpecDrivenArchitecture _specDrivenArchitecture;
 
-        public SpecDrivenModule()
+        public override string Name => "Spec Driven Module";
+        public override string Description => "Provides spec-driven architecture with ice/water/gas states";
+        public override string Version => "1.0.0";
+
+        public SpecDrivenModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, SpecDrivenArchitecture? specDrivenArchitecture = null) 
+            : base(registry, logger)
         {
-            // Parameterless constructor for module loading
-            _logger = null!;
-            _specDrivenArchitecture = null!;
+            _specDrivenArchitecture = specDrivenArchitecture ?? new SpecDrivenArchitecture(logger, registry, null, null);
         }
 
-        public SpecDrivenModule(ILogger<SpecDrivenModule> logger, SpecDrivenArchitecture specDrivenArchitecture)
+        public override Node GetModuleNode()
         {
-            _logger = logger;
-            _specDrivenArchitecture = specDrivenArchitecture;
-        }
-
-        public Node GetModuleNode()
-        {
-            return NodeStorage.CreateModuleNode(
-                id: "spec-driven-module",
-                name: "Spec-Driven Architecture Module",
-                version: "1.0.0",
-                description: "Provides spec-driven architecture with ice/water/gas states",
-                capabilities: new[] { "Spec-Driven Architecture", "Ice/Water/Gas States", "Dynamic Generation" },
+            return CreateModuleNode(
+                moduleId: "spec-driven-module",
+                name: Name,
+                version: Version,
+                description: Description,
                 tags: new[] { "spec-driven", "architecture", "ice-water-gas" },
-                specReference: "codex.spec.spec-driven"
+                capabilities: new[] { "Spec-Driven Architecture", "Ice/Water/Gas States", "Dynamic Generation" },
+                spec: "codex.spec.spec-driven"
             );
         }
 
-        public void Register(NodeRegistry registry)
-        {
-            var moduleNode = GetModuleNode();
-            registry.Upsert(moduleNode);
-        }
-
-        public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+        public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
         {
             // API handlers are registered via attributes, no additional registration needed
         }
 
-        public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+        public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
         {
             // HTTP endpoints are registered via attributes, no additional registration needed
         }
@@ -118,7 +108,7 @@ namespace CodexBootstrap.Modules
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Error getting architecture state");
+                _logger?.Error("Error getting architecture state", ex);
                 return new { success = false, error = ex.Message };
             }
         }
@@ -136,7 +126,7 @@ namespace CodexBootstrap.Modules
                     return new { success = false, error = "Spec-driven architecture not initialized" };
                 }
 
-                _logger?.LogInformation("Starting complete regeneration from specs");
+                _logger?.Info("Starting complete regeneration from specs");
                 
                 var result = await _specDrivenArchitecture.RegenerateFromSpecsAsync();
                 
@@ -158,7 +148,7 @@ namespace CodexBootstrap.Modules
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Error during regeneration from specs");
+                _logger?.Error("Error during regeneration from specs", ex);
                 return new { success = false, error = ex.Message };
             }
         }
@@ -176,7 +166,7 @@ namespace CodexBootstrap.Modules
                     return new { success = false, error = "Spec-driven architecture not initialized" };
                 }
 
-                _logger?.LogInformation("Starting code generation from specs");
+                _logger?.Info("Starting code generation from specs");
                 
                 var result = await _specDrivenArchitecture.GenerateCodeFromSpecsAsync();
                 
@@ -192,7 +182,7 @@ namespace CodexBootstrap.Modules
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Error during code generation from specs");
+                _logger?.Error("Error during code generation from specs", ex);
                 return new { success = false, error = ex.Message };
             }
         }
@@ -210,7 +200,7 @@ namespace CodexBootstrap.Modules
                     return new { success = false, error = "Spec-driven architecture not initialized" };
                 }
 
-                _logger?.LogInformation("Starting code compilation to DLLs");
+                _logger?.Info("Starting code compilation to DLLs");
                 
                 var result = await _specDrivenArchitecture.CompileGeneratedCodeAsync();
                 
@@ -226,7 +216,7 @@ namespace CodexBootstrap.Modules
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Error during code compilation");
+                _logger?.Error("Error during code compilation", ex);
                 return new { success = false, error = ex.Message };
             }
         }
@@ -244,7 +234,7 @@ namespace CodexBootstrap.Modules
                     return new { success = false, error = "Spec-driven architecture not initialized" };
                 }
 
-                _logger?.LogInformation("Starting module loading");
+                _logger?.Info("Starting module loading");
                 
                 var result = await _specDrivenArchitecture.LoadCompiledModulesAsync();
                 
@@ -260,7 +250,7 @@ namespace CodexBootstrap.Modules
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Error during module loading");
+                _logger?.Error("Error during module loading", ex);
                 return new { success = false, error = ex.Message };
             }
         }

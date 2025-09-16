@@ -8,44 +8,36 @@ namespace CodexBootstrap.Modules;
 /// Hello Demo Module - Shows dynamic API registration, type exposure, and node creation
 /// </summary>
 [ApiModule(Name = "HelloModule", Version = "0.1.0", Description = "Hello Demo Module - Shows dynamic API registration, type exposure, and node creation", Tags = new[] { "hello", "demo", "example" })]
-public sealed class HelloModule : IModule
+public sealed class HelloModule : ModuleBase
 {
-    private readonly NodeRegistry _registry;
+    public override string Name => "Hello Demo Module";
+    public override string Description => "Shows dynamic API registration, type exposure, and node creation.";
+    public override string Version => "0.1.0";
 
-    public HelloModule(NodeRegistry registry)
+    public HelloModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+        : base(registry, logger)
     {
-        _registry = registry;
     }
 
-    public string ModuleId => "codex.hello";
-    public string Name => "Hello Demo Module";
-    public string Version => "0.1.0";
-    public string Description => "Shows dynamic API registration, type exposure, and node creation.";
-
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: ModuleId,
+        return CreateModuleNode(
+            moduleId: "codex.hello",
             name: Name,
             version: Version,
             description: Description,
-            capabilities: new[] { "echo", "greeting", "node-creation" },
             tags: new[] { "hello", "demo", "example" },
-            specReference: "codex.spec.hello"
+            capabilities: new[] { "echo", "greeting", "node-creation" },
+            spec: "codex.spec.hello"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        registry.Upsert(GetModuleNode());
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // API handlers are now registered via attribute-based routing
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // HTTP endpoints are now registered via attribute-based routing
     }

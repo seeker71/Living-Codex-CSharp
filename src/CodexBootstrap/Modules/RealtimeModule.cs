@@ -11,46 +11,41 @@ namespace CodexBootstrap.Modules;
 /// <summary>
 /// Real-time communication module providing WebSocket and SignalR support
 /// </summary>
-public sealed class RealtimeModule : IModule
+public sealed class RealtimeModule : ModuleBase
 {
-    private readonly Core.ICodexLogger _logger;
-    private readonly NodeRegistry _registry;
     private readonly ConcurrentDictionary<string, WebSocket> _webSockets = new();
     private readonly ConcurrentDictionary<string, HashSet<string>> _subscriptions = new();
     private readonly ConcurrentDictionary<string, RealtimeSession> _sessions = new();
 
-    public RealtimeModule(NodeRegistry registry)
+    public override string Name => "Realtime Module";
+    public override string Description => "Real-time communication module providing WebSocket and SignalR support";
+    public override string Version => "1.0.0";
+
+    public RealtimeModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+        : base(registry, logger)
     {
-        _logger = new Log4NetLogger(typeof(RealtimeModule));
-        _registry = registry;
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.realtime",
-            name: "Real-time Communication Module",
-            version: "0.1.0",
-            description: "Provides WebSocket and SignalR support for real-time bidirectional communication",
-            capabilities: new[] { "websocket_connection", "signalr_hub", "event_streaming", "push_notifications", "collaborative_editing", "subscription_management", "session_management" },
+        return CreateModuleNode(
+            moduleId: "codex.realtime",
+            name: Name,
+            version: Version,
+            description: Description,
             tags: new[] { "realtime", "websocket", "signalr", "communication" },
-            specReference: "codex.spec.realtime"
+            capabilities: new[] { "websocket_connection", "signalr_hub", "event_streaming", "push_notifications", "collaborative_editing", "subscription_management", "session_management" },
+            spec: "codex.spec.realtime"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        registry.Upsert(GetModuleNode());
-        _logger.Info("Real-time Communication Module registered");
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // API handlers are registered via attribute-based routing
         _logger.Info("Real-time Communication API handlers registered");
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // Register WebSocket endpoint
         app.MapGet("/ws", async (HttpContext context) =>

@@ -14,32 +14,32 @@ using CodexBootstrap.Core;
 using CodexBootstrap.Runtime;
 using Microsoft.AspNetCore.Builder;
 
-// Mock API Router for parameterless constructor
-public class MockApiRouter : IApiRouter
-{
-    public void Register(string moduleId, string api, Func<JsonElement?, Task<object>> handler) { }
-    public bool TryGetHandler(string moduleId, string api, out Func<JsonElement?, Task<object>> handler) 
-    { 
-        handler = null!; 
-        return false; 
-    }
-    public NodeRegistry GetRegistry() => new NodeRegistry();
-}
-
 namespace CodexBootstrap.Modules
 {
+    // Mock API Router for parameterless constructor
+    public class MockApiRouter : IApiRouter
+    {
+        public void Register(string moduleId, string api, Func<JsonElement?, Task<object>> handler) { }
+        public bool TryGetHandler(string moduleId, string api, out Func<JsonElement?, Task<object>> handler) 
+        { 
+            handler = null!; 
+            return false; 
+        }
+        public INodeRegistry GetRegistry() => throw new NotImplementedException("MockApiRouter should not be used in production");
+    }
     /// <summary>
     /// Real-time fractal news streaming module that ingests external news sources
     /// and transforms them through fractal analysis aligned with belief systems
     /// </summary>
-    public class RealtimeNewsStreamModule : IModule, IRegistryModule
+    public class RealtimeNewsStreamModule : ModuleBase
     {
-        private readonly Core.ICodexLogger _logger;
-        private readonly NodeRegistry _localRegistry;
-        private NodeRegistry? _globalRegistry;
         private readonly HttpClient _httpClient;
         private readonly Core.ConfigurationManager _configManager;
         private readonly IApiRouter _apiRouter;
+
+        public override string Name => "Realtime News Stream Module";
+        public override string Description => "Real-time fractal news streaming module that ingests external news sources and transforms them through fractal analysis aligned with belief systems";
+        public override string Version => "1.0.0";
         private readonly Timer _ingestionTimer;
         private readonly Timer _cleanupTimer;
         private CrossModuleCommunicator? _moduleCommunicator;
@@ -57,19 +57,9 @@ namespace CodexBootstrap.Modules
         private const string NEWS_SUBSCRIPTION_NODE_TYPE = "codex.news.subscription";
 
         /// <summary>
-        /// Gets the registry to use - global registry if set, otherwise local registry
-        /// This ensures the module uses the global registry when available
+        /// Gets the registry to use - now always the unified registry
         /// </summary>
-        private NodeRegistry Registry => _globalRegistry ?? _localRegistry;
-
-        /// <summary>
-        /// Sets the global registry for this module
-        /// This ensures the module uses the global registry instead of a local one
-        /// </summary>
-        public void SetGlobalRegistry(NodeRegistry registry)
-        {
-            _globalRegistry = registry;
-        }
+        private INodeRegistry Registry => _registry;
 
         // Lazy-loaded cross-module communicator
         private CrossModuleCommunicator ModuleCommunicator => _moduleCommunicator ??= new CrossModuleCommunicator(_logger);
@@ -249,13 +239,12 @@ namespace CodexBootstrap.Modules
         private record OntologyAxis(string Name, List<string> Keywords);
         private List<OntologyAxis> _ontologyAxes = new();
 
-        public RealtimeNewsStreamModule(NodeRegistry registry, ICodexLogger logger, HttpClient? httpClient = null, Core.ConfigurationManager? configManager = null, IApiRouter? apiRouter = null)
+        public RealtimeNewsStreamModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient)
+            : base(registry, logger)
         {
-            _logger = logger;
-            _localRegistry = registry;
-            _httpClient = httpClient ?? new HttpClient();
-            _configManager = configManager ?? new Core.ConfigurationManager(_localRegistry, logger);
-            _apiRouter = apiRouter ?? throw new ArgumentNullException(nameof(apiRouter), "IApiRouter is required for AI module integration");
+            _httpClient = httpClient;
+            _configManager = new Core.ConfigurationManager(_registry, logger);
+            _apiRouter = new MockApiRouter();
             _aiTemplates = new AIModuleTemplates(_apiRouter, _logger);
             
             // Cross-module communicator will be initialized lazily
@@ -266,10 +255,6 @@ namespace CodexBootstrap.Modules
         }
 
         // Parameterless constructor for module loader
-
-        public string Name => "Real-Time News Stream";
-        public string Description => "Ingests external news sources and transforms them through fractal analysis";
-        public string Version => "1.0.0";
 
         public void Initialize()
         {
@@ -284,58 +269,52 @@ namespace CodexBootstrap.Modules
             InitializeNewsSources();
         }
 
-        public Node GetModuleNode()
+        public override Node GetModuleNode()
         {
-            return NodeStorage.CreateModuleNode(
-                id: "realtime-news-stream-module",
-                name: "Real-Time News Stream Module",
+            return CreateModuleNode(
+                moduleId: "realtime-news-stream-module",
+                name: Name,
                 version: Version,
-                description: "Ingests external news sources and transforms them through fractal analysis",
-                capabilities: new[] { "rss-ingestion", "api-ingestion", "fractal-analysis", "real-time-streaming" },
+                description: Description,
                 tags: new[] { "news", "streaming", "realtime", "fractal" },
-                specReference: "codex.spec.realtime-news-stream"
+                capabilities: new[] { "rss-ingestion", "api-ingestion", "fractal-analysis", "real-time-streaming" },
+                spec: "codex.spec.realtime-news-stream"
             );
         }
 
-    public void Register(NodeRegistry registry)
-    {
-        _logger.Info("Registering Real-Time News Stream Module with NodeRegistry");
-        
-        // Set the global registry if this is the first call
-        if (_globalRegistry == null)
+        public override void Register(INodeRegistry registry)
         {
-            SetGlobalRegistry(registry);
-        }
-        
-        Initialize();
-        
-        // Gate ingestion via environment flag (default: enabled)
-        var enabledEnv = Environment.GetEnvironmentVariable("NEWS_INGESTION_ENABLED");
-        var ingestionEnabled = string.IsNullOrWhiteSpace(enabledEnv) || enabledEnv.Equals("true", StringComparison.OrdinalIgnoreCase) || enabledEnv == "1";
-
-        if (ingestionEnabled)
-        {
-            // Start the timers when module is registered
-            _ingestionTimer.Change(TimeSpan.Zero, TimeSpan.FromMinutes(_ingestionIntervalMinutes));
-            _cleanupTimer.Change(TimeSpan.FromHours(1), TimeSpan.FromHours(_cleanupIntervalHours));
+            base.Register(registry);
             
-            // Start initial news ingestion
-            _ = Task.Run(async () => await IngestNewsFromSources(null));
-            _logger.Info("RealtimeNewsStreamModule ingestion enabled (NEWS_INGESTION_ENABLED=true)");
-        }
-        else
-        {
-            _logger.Warn("RealtimeNewsStreamModule ingestion disabled via NEWS_INGESTION_ENABLED=false");
-        }
-    }
+            Initialize();
+            
+            // Gate ingestion via environment flag (default: enabled)
+            var enabledEnv = Environment.GetEnvironmentVariable("NEWS_INGESTION_ENABLED");
+            var ingestionEnabled = string.IsNullOrWhiteSpace(enabledEnv) || enabledEnv.Equals("true", StringComparison.OrdinalIgnoreCase) || enabledEnv == "1";
 
-        public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+            if (ingestionEnabled)
+            {
+                // Start the timers when module is registered
+                _ingestionTimer.Change(TimeSpan.Zero, TimeSpan.FromMinutes(_ingestionIntervalMinutes));
+                _cleanupTimer.Change(TimeSpan.FromHours(1), TimeSpan.FromHours(_cleanupIntervalHours));
+                
+                // Start initial news ingestion
+                _ = Task.Run(async () => await IngestNewsFromSources(null));
+                _logger.Info("RealtimeNewsStreamModule ingestion enabled (NEWS_INGESTION_ENABLED=true)");
+            }
+            else
+            {
+                _logger.Warn("RealtimeNewsStreamModule ingestion disabled via NEWS_INGESTION_ENABLED=false");
+            }
+        }
+
+        public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
         {
             _logger.Info("Registering API handlers for Real-Time News Stream Module");
             // API handlers are registered via ApiRoute attributes
         }
 
-        public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+        public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
         {
             _logger.Info("Registering HTTP endpoints for Real-Time News Stream Module");
             // HTTP endpoints are registered via ApiRoute attributes

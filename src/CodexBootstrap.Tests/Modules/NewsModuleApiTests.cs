@@ -37,13 +37,10 @@ public class NewsModuleApiTests : IClassFixture<TestServerFixture>
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var content = await response.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<dynamic>(content, _jsonOptions);
+        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content, _jsonOptions);
         
         result.Should().NotBeNull();
-        
-        // Should have topics array
-        var topics = result?.GetProperty("topics");
-        topics.Should().NotBeNull();
+        result.Should().ContainKey("topics");
     }
 
     [Fact]
@@ -55,7 +52,7 @@ public class NewsModuleApiTests : IClassFixture<TestServerFixture>
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var content = await response.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<dynamic>(content, _jsonOptions);
+        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content, _jsonOptions);
         
         result.Should().NotBeNull();
     }
@@ -69,27 +66,31 @@ public class NewsModuleApiTests : IClassFixture<TestServerFixture>
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var content = await response.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<dynamic>(content, _jsonOptions);
+        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content, _jsonOptions);
         
         result.Should().NotBeNull();
     }
 
     #endregion
 
-    #region Missing Endpoint Tests (These should return 404 until implemented)
+    #region Implemented Endpoint Tests (These return 200 with empty results)
 
     [Fact]
-    public async Task GetNewsFeed_ShouldReturnNotFound_WhenNotImplemented()
+    public async Task GetNewsFeed_ShouldReturnEmptyResults_WhenNoNewsAvailable()
     {
         // Act
         var response = await _client.GetAsync("/news/feed/test-user");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var content = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content, _jsonOptions);
+        result.Should().NotBeNull();
+        result.Should().ContainKey("items");
     }
 
     [Fact]
-    public async Task SearchNews_ShouldReturnNotFound_WhenNotImplemented()
+    public async Task SearchNews_ShouldReturnEmptyResults_WhenNoNewsAvailable()
     {
         // Arrange
         var request = new
@@ -107,31 +108,43 @@ public class NewsModuleApiTests : IClassFixture<TestServerFixture>
         var response = await _client.PostAsync("/news/search", content);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var responseContent = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(responseContent, _jsonOptions);
+        result.Should().NotBeNull();
+        result.Should().ContainKey("items");
     }
 
     [Fact]
-    public async Task GetNewsItem_ShouldReturnNotFound_WhenNotImplemented()
+    public async Task GetNewsItem_ShouldReturnNotFound_WhenNewsItemNotFound()
     {
         // Act
         var response = await _client.GetAsync("/news/item/test-news-id");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        var content = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content, _jsonOptions);
+        result.Should().NotBeNull();
+        result.Should().ContainKey("error");
     }
 
     [Fact]
-    public async Task GetRelatedNews_ShouldReturnNotFound_WhenNotImplemented()
+    public async Task GetRelatedNews_ShouldReturnNotFound_WhenNewsItemNotFound()
     {
         // Act
         var response = await _client.GetAsync("/news/related/test-news-id");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        var content = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content, _jsonOptions);
+        result.Should().NotBeNull();
+        result.Should().ContainKey("error");
     }
 
     [Fact]
-    public async Task MarkNewsAsRead_ShouldReturnNotFound_WhenNotImplemented()
+    public async Task MarkNewsAsRead_ShouldReturnSuccess_WhenCalled()
     {
         // Arrange
         var request = new
@@ -149,27 +162,38 @@ public class NewsModuleApiTests : IClassFixture<TestServerFixture>
         var response = await _client.PostAsync("/news/read", content);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var responseContent = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(responseContent, _jsonOptions);
+        result.Should().NotBeNull();
     }
 
     [Fact]
-    public async Task GetReadNews_ShouldReturnNotFound_WhenNotImplemented()
+    public async Task GetReadNews_ShouldReturnEmptyResults_WhenNoReadNews()
     {
         // Act
         var response = await _client.GetAsync("/news/read/test-user");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var content = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content, _jsonOptions);
+        result.Should().NotBeNull();
+        result.Should().ContainKey("items");
     }
 
     [Fact]
-    public async Task GetUnreadNews_ShouldReturnNotFound_WhenNotImplemented()
+    public async Task GetUnreadNews_ShouldReturnEmptyResults_WhenNoUnreadNews()
     {
         // Act
         var response = await _client.GetAsync("/news/unread/test-user");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var content = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content, _jsonOptions);
+        result.Should().NotBeNull();
+        result.Should().ContainKey("items");
     }
 
     #endregion

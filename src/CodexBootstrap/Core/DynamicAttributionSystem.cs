@@ -29,12 +29,12 @@ namespace CodexBootstrap.Core;
 public class DynamicAttributionSystem
 {
     private readonly IApiRouter _apiRouter;
-    private readonly NodeRegistry _registry;
+    private readonly INodeRegistry _registry;
     private readonly Dictionary<string, CachedResponse> _responseCache;
     private readonly string _llmProvider;
     private readonly string _joyfulEngine;
 
-    public DynamicAttributionSystem(IApiRouter apiRouter, NodeRegistry registry, string llmProvider = "ollama-local", string joyfulEngine = "ucore-joy")
+    public DynamicAttributionSystem(IApiRouter apiRouter, INodeRegistry registry, string llmProvider = "ollama-local", string joyfulEngine = "ucore-joy")
     {
         _apiRouter = apiRouter;
         _registry = registry;

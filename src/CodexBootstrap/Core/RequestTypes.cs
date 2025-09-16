@@ -21,8 +21,8 @@ public class ConceptCreateRequest
     [MetaNodeFieldAttribute("domain", "string", Required = true, Description = "Concept domain")]
     public string Domain { get; set; } = string.Empty;
 
-    [MetaNodeFieldAttribute("complexity", "string", Required = true, Description = "Concept complexity")]
-    public string Complexity { get; set; } = string.Empty;
+    [MetaNodeFieldAttribute("complexity", "int", Required = true, Description = "Concept complexity")]
+    public int Complexity { get; set; } = 0;
 
     [MetaNodeFieldAttribute("tags", "array", Required = true, Description = "Concept tags", Kind = "Array", ArrayItemType = "string")]
     public string[] Tags { get; set; } = Array.Empty<string>();

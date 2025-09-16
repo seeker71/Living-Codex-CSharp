@@ -10,51 +10,42 @@ namespace CodexBootstrap.Modules;
 /// <summary>
 /// Direct HTTP endpoints module for storage operations with comprehensive validation and error handling
 /// </summary>
-public sealed class StorageEndpointsModule : IModule
+public sealed class StorageEndpointsModule : ModuleBase
 {
-    private readonly Core.ICodexLogger _logger;
-    private readonly NodeRegistry _registry;
     private readonly IStorageBackend? _storageBackend;
     private readonly ICacheManager? _cacheManager;
 
-    public StorageEndpointsModule(NodeRegistry registry, IStorageBackend? storageBackend = null, ICacheManager? cacheManager = null)
+    public override string Name => "Storage Endpoints Module";
+    public override string Description => "Direct HTTP endpoints module for storage operations with comprehensive validation and error handling";
+    public override string Version => "1.0.0";
+
+    public StorageEndpointsModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IStorageBackend? storageBackend = null, ICacheManager? cacheManager = null) 
+        : base(registry, logger)
     {
-        _logger = new Log4NetLogger(typeof(StorageEndpointsModule));
-        _registry = registry;
         _storageBackend = storageBackend;
         _cacheManager = cacheManager;
     }
-    
-    // Parameterless constructor for module loader
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            "codex.storage-endpoints",
-            "Storage Endpoints Module",
-            "0.1.0",
-            "Direct HTTP endpoints for storage operations with comprehensive validation",
-            new[] { "storage", "endpoints", "validation", "http", "data-management" },
-            new[] { "get_node", "create_node", "update_node", "delete_node", "list_nodes", "search_nodes", "get_edge", "create_edge", "update_edge", "delete_edge", "list_edges", "search_edges", "get_storage_stats", "backup_storage", "restore_storage", "validate_storage", "optimize_storage" },
-            "codex.spec.storage-endpoints"
+        return CreateModuleNode(
+            moduleId: "codex.storage-endpoints",
+            name: "Storage Endpoints Module",
+            version: "0.1.0",
+            description: "Direct HTTP endpoints for storage operations with comprehensive validation",
+            tags: new[] { "storage", "endpoints", "validation", "http", "data-management" },
+            capabilities: new[] { "get_node", "create_node", "update_node", "delete_node", "list_nodes", "search_nodes", "get_edge", "create_edge", "update_edge", "delete_edge", "list_edges", "search_edges", "get_storage_stats", "backup_storage", "restore_storage", "validate_storage", "optimize_storage" },
+            spec: "codex.spec.storage-endpoints"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        // Register the module node
-        registry.Upsert(GetModuleNode());
-        
-        _logger.Info("Storage Endpoints Module registered");
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // API handlers are registered via attribute-based routing
         _logger.Info("Storage Endpoints API handlers registered");
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // HTTP endpoints will be registered via ApiRouteDiscovery
     }
@@ -211,10 +202,19 @@ public sealed class StorageEndpointsModule : IModule
     }
 
     [ApiRoute("GET", "/storage-endpoints/nodes", "ListNodes", "List nodes with optional filtering", "codex.storage-endpoints")]
-    public async Task<object> ListNodesAsync([ApiParameter("query", "Query parameters")] NodeListQuery query)
+    public async Task<object> ListNodesAsync([ApiParameter("query", "Query parameters")] NodeListQuery? query = null)
     {
         try
         {
+            // Debug: Check if _registry is null
+            if (_registry == null)
+            {
+                return new ErrorResponse("Registry is null in StorageEndpointsModule");
+            }
+            
+            // Handle null query parameter
+            query ??= new NodeListQuery();
+            
             var nodes = _registry.AllNodes().AsEnumerable();
 
             // Apply filters
@@ -509,10 +509,13 @@ public sealed class StorageEndpointsModule : IModule
     }
 
     [ApiRoute("GET", "/storage-endpoints/edges", "ListEdges", "List edges with optional filtering", "codex.storage-endpoints")]
-    public async Task<object> ListEdgesAsync([ApiParameter("query", "Query parameters")] EdgeListQuery query)
+    public async Task<object> ListEdgesAsync([ApiParameter("query", "Query parameters")] EdgeListQuery? query = null)
     {
         try
         {
+            // Handle null query parameter
+            query ??= new EdgeListQuery();
+            
             var edges = _registry.AllEdges().AsEnumerable();
 
             // Apply filters

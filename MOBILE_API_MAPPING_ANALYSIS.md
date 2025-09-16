@@ -43,20 +43,20 @@ After analyzing the existing 350+ server endpoints and the mobile app's API requ
 - `GET /concepts/trending` - **MISSING** - Need to implement or map to existing trending system
 - `GET /concepts/recommendations/{userId}` - **MISSING** - Need to implement or map to existing recommendation system
 
-### 3. News & Content Management ✅ **PARTIALLY COVERED**
+### 3. News & Content Management ✅ **FULLY COVERED**
 
 | Mobile App Endpoint | Required | Existing Server Endpoint | Status | Notes |
 |---------------------|----------|--------------------------|--------|-------|
 | `GET /news/feed/{userId}` | ✅ | `GET /news/feed/{userId}` | ✅ **EXACT MATCH** | NewsFeedModule |
 | `POST /news/search` | ✅ | `POST /news/search` | ✅ **EXACT MATCH** | NewsFeedModule |
 | `GET /news/trending` | ✅ | `GET /news/trending` | ✅ **EXACT MATCH** | NewsFeedModule |
+| `GET /news/item/{id}` | ✅ | `GET /news/item/{id}` | ✅ **EXACT MATCH** | NewsFeedModule |
+| `GET /news/related/{id}` | ✅ | `GET /news/related/{id}` | ✅ **EXACT MATCH** | NewsFeedModule |
+| `POST /news/read` | ✅ | `POST /news/read` | ✅ **EXACT MATCH** | NewsFeedModule |
+| `GET /news/read/{userId}` | ✅ | `GET /news/read/{userId}` | ✅ **EXACT MATCH** | NewsFeedModule |
+| `GET /news/unread/{userId}` | ✅ | `GET /news/unread/{userId}` | ✅ **EXACT MATCH** | NewsFeedModule |
 
-**Missing Mobile App Endpoints (Need Analysis):**
-- `GET /news/item/{id}` - **MISSING** - Need to implement or map to existing news system
-- `GET /news/related/{id}` - **MISSING** - Need to implement or map to existing related content system
-- `POST /news/read` - **MISSING** - Need to implement or map to existing read tracking
-- `GET /news/read/{userId}` - **MISSING** - Need to implement or map to existing read history
-- `GET /news/unread/{userId}` - **MISSING** - Need to implement or map to existing unread tracking
+**Notes:** All News endpoints required by the mobile app are available in `NewsFeedModule` and verified via tests. When no news exists in the registry, endpoints return valid empty results with HTTP 200, as seen in the tests.
 
 ### 4. Node & Edge Management ✅ **FULLY COVERED**
 

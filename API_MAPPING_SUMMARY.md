@@ -31,11 +31,14 @@
 - `GET /concepts/recommendations/{userId}` → `POST /users/discover` (with recommendation type)
 
 #### NewsFeedService.cs
-- `GET /news/item/{id}` → `GET /storage-endpoints/nodes/{id}` (with news type)
-- `GET /news/related/{id}` → `GET /graph/relationships/{nodeId}` (for related content)
-- `POST /news/read` → `POST /contributions/record` (for read tracking)
-- `GET /news/read/{userId}` → `GET /contributions/user/{userId}` (with read type filter)
-- `GET /news/unread/{userId}` → Combined logic using feed and read tracking
+- `GET /news/feed/{userId}` → `GET /news/feed/{userId}` (NewsFeedModule)
+- `POST /news/search` → `POST /news/search` (NewsFeedModule)
+- `GET /news/trending` → `GET /news/trending` (NewsFeedModule)
+- `GET /news/item/{id}` → `GET /news/item/{id}` (NewsFeedModule)
+- `GET /news/related/{id}` → `GET /news/related/{id}` (NewsFeedModule)
+- `POST /news/read` → `POST /news/read` (NewsFeedModule)
+- `GET /news/read/{userId}` → `GET /news/read/{userId}` (NewsFeedModule)
+- `GET /news/unread/{userId}` → `GET /news/unread/{userId}` (NewsFeedModule)
 
 ### 3. **Leveraged Advanced Existing Features** ✅
 

@@ -8,45 +8,34 @@ namespace CodexBootstrap.Modules;
 public record OneShotApplyResponse(string ModuleId, object Result, bool Success, string Message = "One-shot applied successfully");
 public record OneShotExecuteResponse(string ModuleId, object Result, bool Success, string Message = "One-shot executed successfully");
 
-public sealed class OneShotModule : IModule
+public sealed class OneShotModule : ModuleBase
 {
-    private readonly NodeRegistry _registry;
     private readonly IApiRouter _router;
 
-    public OneShotModule(NodeRegistry registry, IApiRouter router)
+    public override string Name => "One-Shot Operations Module";
+    public override string Description => "Self-contained module for one-shot operations (apply, execute) using node-based storage";
+    public override string Version => "0.1.0";
+
+    public OneShotModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? router = null) 
+        : base(registry, logger)
     {
-        _registry = registry;
-        _router = router;
+        _router = router ?? new MockApiRouter();
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.oneshot",
-            name: "One-Shot Operations Module",
-            version: "0.1.0",
-            description: "Self-contained module for one-shot operations (apply, execute) using node-based storage",
-            capabilities: new[] { "one-shot", "apply", "execute", "operations" },
+        return CreateModuleNode(
+            moduleId: "codex.oneshot",
+            name: Name,
+            version: Version,
+            description: Description,
             tags: new[] { "oneshot", "apply", "execute", "operations" },
-            specReference: "codex.spec.oneshot"
+            capabilities: new[] { "one-shot", "apply", "execute", "operations" },
+            spec: "codex.spec.oneshot"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        // Register API nodes
-        var applyApi = NodeStorage.CreateApiNode("codex.oneshot", "apply", "/oneshot/apply", "Apply atoms to prototype");
-        var executeApi = NodeStorage.CreateApiNode("codex.oneshot", "execute", "/oneshot/{id}", "Execute one-shot on existing atoms");
-        
-        registry.Upsert(applyApi);
-        registry.Upsert(executeApi);
-        
-        // Register edges
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.oneshot", "apply"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.oneshot", "execute"));
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         router.Register("codex.oneshot", "apply", async args =>
         {
@@ -191,7 +180,7 @@ public sealed class OneShotModule : IModule
         });
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // One-shot operation endpoints
         app.MapPost("/oneshot/apply", (JsonElement request) =>

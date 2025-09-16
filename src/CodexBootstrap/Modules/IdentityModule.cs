@@ -22,74 +22,48 @@ namespace CodexBootstrap.Modules;
 /// Provides generic identity services including authentication, authorization, user management, and access control
 /// </summary>
 [MetaNode(Id = "codex.identity", Name = "Identity Module", Description = "Unified identity, authentication, and access management system")]
-public sealed class IdentityModule : IModule, IRegistryModule
+public sealed class IdentityModule : ModuleBase
 {
-    private readonly NodeRegistry _localRegistry;
-    private readonly ICodexLogger _logger;
-    private readonly HttpClient _httpClient;
     private readonly IdentityProviderRegistry _providerRegistry;
-    private NodeRegistry? _globalRegistry;
 
-    public IdentityModule(NodeRegistry registry, ICodexLogger logger, HttpClient httpClient)
+    public override string Name => "Identity Module";
+    public override string Description => "Unified identity, authentication, and access management system";
+    public override string Version => "1.0.0";
+
+    public IdentityModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+        : base(registry, logger)
     {
-        _localRegistry = registry;
-        _logger = logger;
-        _httpClient = httpClient;
         _providerRegistry = new IdentityProviderRegistry(logger);
     }
 
-    // Parameterless constructor for module loader
-
     /// <summary>
-    /// Gets the registry to use - global registry if set, otherwise local registry
-    /// This ensures the module uses the global registry when available
+    /// Gets the registry to use - now always the unified registry
     /// </summary>
-    private NodeRegistry Registry => _globalRegistry ?? _localRegistry;
+    private INodeRegistry Registry => _registry;
 
-    /// <summary>
-    /// Sets the global registry for this module
-    /// This ensures the module uses the global registry instead of a local one
-    /// </summary>
-    public void SetGlobalRegistry(NodeRegistry registry)
+    public override Node GetModuleNode()
     {
-        _globalRegistry = registry;
-    }
-
-    public Node GetModuleNode()
-    {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.identity",
+        return CreateModuleNode(
+            moduleId: "codex.identity",
             name: "Identity Module",
             version: "1.0.0",
             description: "Unified identity, authentication, and access management system",
+            tags: new[] { "identity", "auth", "access", "users", "security", "permissions" },
             capabilities: new[] { 
                 "identity", "authentication", "authorization", "user-management", 
                 "access-control", "session-management", "permissions", "providers" 
             },
-            tags: new[] { "identity", "auth", "access", "users", "security", "permissions" },
-            specReference: "codex.spec.identity"
+            spec: "codex.spec.identity"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        // Set the global registry if this is the first call
-        if (_globalRegistry == null)
-        {
-            SetGlobalRegistry(registry);
-        }
-        
-        registry.Upsert(GetModuleNode());
-        _logger.Info("Identity Module registered");
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // API handlers are registered via attribute-based routing
         _logger.Info("Identity Module API handlers registered");
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // HTTP endpoints are registered via attribute-based routing
         _logger.Info("Identity Module HTTP endpoints registered");

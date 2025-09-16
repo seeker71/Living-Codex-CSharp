@@ -32,13 +32,15 @@ namespace CodexBootstrap.Tests
             // Assert
             result.Should().NotBeNull();
             var resultJson = JsonSerializer.Serialize(result);
-            var resultObj = JsonSerializer.Deserialize<JsonElement>(resultJson);
+            var resultObj = JsonSerializer.Deserialize<Dictionary<string, object>>(resultJson);
             
             // The result is wrapped in a Task, so we need to access the Result property
-            var actualResult = resultObj.GetProperty("Result");
-            actualResult.GetProperty("success").GetBoolean().Should().BeTrue();
-            actualResult.GetProperty("loginUrl").GetString().Should().NotBeNullOrEmpty();
-            actualResult.GetProperty("state").GetString().Should().NotBeNullOrEmpty();
+            resultObj.Should().ContainKey("Result");
+            var actualResult = resultObj["Result"] as JsonElement?;
+            actualResult.Should().NotBeNull();
+            actualResult.Value.GetProperty("success").GetBoolean().Should().BeTrue();
+            actualResult.Value.GetProperty("loginUrl").GetString().Should().NotBeNullOrEmpty();
+            actualResult.Value.GetProperty("state").GetString().Should().NotBeNullOrEmpty();
         }
 
         [Fact]
@@ -181,9 +183,12 @@ namespace CodexBootstrap.Tests
                 var content = await response.Content.ReadAsStringAsync();
                 content.Should().NotBeNullOrEmpty();
                 
-                var result = JsonSerializer.Deserialize<JsonElement>(content);
-                result.GetProperty("success").GetBoolean().Should().BeTrue();
-                result.GetProperty("loginUrl").GetString().Should().NotBeNullOrEmpty();
+                var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content);
+                result.Should().NotBeNull();
+                result.Should().ContainKey("success");
+                result.Should().ContainKey("loginUrl");
+                (result["success"] as JsonElement?)?.GetBoolean().Should().BeTrue();
+                (result["loginUrl"] as JsonElement?)?.GetString().Should().NotBeNullOrEmpty();
             }
             catch (HttpRequestException)
             {
@@ -205,9 +210,12 @@ namespace CodexBootstrap.Tests
                 var content = await response.Content.ReadAsStringAsync();
                 content.Should().NotBeNullOrEmpty();
                 
-                var result = JsonSerializer.Deserialize<JsonElement>(content);
-                result.GetProperty("provider").GetString().Should().Be("mock");
-                result.GetProperty("success").GetBoolean().Should().BeTrue();
+                var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content);
+                result.Should().NotBeNull();
+                result.Should().ContainKey("provider");
+                result.Should().ContainKey("success");
+                (result["provider"] as JsonElement?)?.GetString().Should().Be("mock");
+                (result["success"] as JsonElement?)?.GetBoolean().Should().BeTrue();
             }
             catch (HttpRequestException)
             {
@@ -235,16 +243,19 @@ namespace CodexBootstrap.Tests
                 var responseContent = await response.Content.ReadAsStringAsync();
                 responseContent.Should().NotBeNullOrEmpty();
                 
-                var result = JsonSerializer.Deserialize<JsonElement>(responseContent);
+                var result = JsonSerializer.Deserialize<Dictionary<string, object>>(responseContent);
+                result.Should().NotBeNull();
                 // Accept success true OR message indicating existing user for idempotency
-                if (result.TryGetProperty("success", out var successProp) && successProp.GetBoolean())
+                if (result.ContainsKey("success") && result["success"] is JsonElement successProp && successProp.GetBoolean())
                 {
                     successProp.GetBoolean().Should().BeTrue();
                 }
                 else
                 {
-                    result.TryGetProperty("message", out var messageProp).Should().BeTrue();
-                    messageProp.GetString().Should().Contain("exists");
+                    result.Should().ContainKey("message");
+                    var messageProp = result["message"] as JsonElement?;
+                    messageProp.Should().NotBeNull();
+                    messageProp.Value.GetString().Should().Contain("exists");
                 }
             }
             catch (HttpRequestException)
@@ -278,9 +289,12 @@ namespace CodexBootstrap.Tests
                 var responseContent = await response.Content.ReadAsStringAsync();
                 responseContent.Should().NotBeNullOrEmpty();
                 
-                var result = JsonSerializer.Deserialize<JsonElement>(responseContent);
-                result.GetProperty("success").GetBoolean().Should().BeTrue();
-                result.GetProperty("token").GetString().Should().NotBeNullOrEmpty();
+                var result = JsonSerializer.Deserialize<Dictionary<string, object>>(responseContent);
+                result.Should().NotBeNull();
+                result.Should().ContainKey("success");
+                result.Should().ContainKey("token");
+                (result["success"] as JsonElement?)?.GetBoolean().Should().BeTrue();
+                (result["token"] as JsonElement?)?.GetString().Should().NotBeNullOrEmpty();
             }
             catch (HttpRequestException)
             {
@@ -311,11 +325,16 @@ namespace CodexBootstrap.Tests
                 var content = await response.Content.ReadAsStringAsync();
                 content.Should().NotBeNullOrEmpty();
                 
-                var result = JsonSerializer.Deserialize<JsonElement>(content);
-                result.GetProperty("userId").GetString().Should().Be(userId);
-                result.GetProperty("username").GetString().Should().Be(username);
-                result.GetProperty("email").GetString().Should().Contain("@example.com");
-                result.GetProperty("displayName").GetString().Should().NotBeNullOrEmpty();
+                var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content);
+                result.Should().NotBeNull();
+                result.Should().ContainKey("userId");
+                result.Should().ContainKey("username");
+                result.Should().ContainKey("email");
+                result.Should().ContainKey("displayName");
+                (result["userId"] as JsonElement?)?.GetString().Should().Be(userId);
+                (result["username"] as JsonElement?)?.GetString().Should().Be(username);
+                (result["email"] as JsonElement?)?.GetString().Should().Contain("@example.com");
+                (result["displayName"] as JsonElement?)?.GetString().Should().NotBeNullOrEmpty();
             }
             catch (HttpRequestException)
             {
@@ -342,9 +361,12 @@ namespace CodexBootstrap.Tests
                 var responseContent = await response.Content.ReadAsStringAsync();
                 responseContent.Should().NotBeNullOrEmpty();
                 
-                var result = JsonSerializer.Deserialize<JsonElement>(responseContent);
-                result.GetProperty("success").GetBoolean().Should().BeTrue();
-                result.GetProperty("sessionToken").GetString().Should().NotBeNullOrEmpty();
+                var result = JsonSerializer.Deserialize<Dictionary<string, object>>(responseContent);
+                result.Should().NotBeNull();
+                result.Should().ContainKey("success");
+                result.Should().ContainKey("sessionToken");
+                (result["success"] as JsonElement?)?.GetBoolean().Should().BeTrue();
+                (result["sessionToken"] as JsonElement?)?.GetString().Should().NotBeNullOrEmpty();
             }
             catch (HttpRequestException)
             {
@@ -373,8 +395,10 @@ namespace CodexBootstrap.Tests
                 var sessionContent = new StringContent(sessionJson, Encoding.UTF8, "application/json");
                 var createSessionResponse = await _httpClient.PostAsync("/identity/sessions", sessionContent);
                 createSessionResponse.IsSuccessStatusCode.Should().BeTrue();
-                var createSessionPayload = JsonSerializer.Deserialize<JsonElement>(await createSessionResponse.Content.ReadAsStringAsync());
-                var token = createSessionPayload.GetProperty("sessionToken").GetString();
+                var createSessionPayload = JsonSerializer.Deserialize<Dictionary<string, object>>(await createSessionResponse.Content.ReadAsStringAsync());
+                createSessionPayload.Should().NotBeNull();
+                createSessionPayload.Should().ContainKey("sessionToken");
+                var token = (createSessionPayload["sessionToken"] as JsonElement?)?.GetString();
                 token.Should().NotBeNullOrEmpty();
 
                 // Act
@@ -385,8 +409,10 @@ namespace CodexBootstrap.Tests
                 var content = await response.Content.ReadAsStringAsync();
                 content.Should().NotBeNullOrEmpty();
                 
-                var result = JsonSerializer.Deserialize<JsonElement>(content);
-                result.GetProperty("success").GetBoolean().Should().BeTrue();
+                var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content);
+                result.Should().NotBeNull();
+                result.Should().ContainKey("success");
+                (result["success"] as JsonElement?)?.GetBoolean().Should().BeTrue();
             }
             catch (HttpRequestException)
             {

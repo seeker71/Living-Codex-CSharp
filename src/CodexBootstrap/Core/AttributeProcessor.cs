@@ -12,10 +12,10 @@ namespace CodexBootstrap.Core
     /// </summary>
     public class AttributeProcessor
     {
-        private readonly NodeRegistry _nodeRegistry;
+        private readonly INodeRegistry _nodeRegistry;
         private readonly Dictionary<string, Node> _generatedNodes = new();
 
-        public AttributeProcessor(NodeRegistry nodeRegistry)
+        public AttributeProcessor(INodeRegistry nodeRegistry)
         {
             _nodeRegistry = nodeRegistry ?? throw new ArgumentNullException(nameof(nodeRegistry));
         }

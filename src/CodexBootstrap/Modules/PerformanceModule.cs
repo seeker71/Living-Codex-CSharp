@@ -7,55 +7,40 @@ namespace CodexBootstrap.Modules;
 /// Performance monitoring module - provides performance metrics and optimization insights
 /// </summary>
 [ApiModule(Name = "PerformanceModule", Version = "0.1.0", Description = "Performance monitoring and optimization insights", Tags = new[] { "performance", "monitoring", "optimization" })]
-public sealed class PerformanceModule : IModule
+public sealed class PerformanceModule : ModuleBase
 {
-    private readonly NodeRegistry _registry;
     private readonly PerformanceProfiler _profiler;
-    private readonly CodexBootstrap.Core.ICodexLogger _logger;
 
-    public PerformanceModule(NodeRegistry registry, PerformanceProfiler profiler, CodexBootstrap.Core.ICodexLogger logger)
+    public override string Name => "Performance Module";
+    public override string Description => "Performance monitoring and optimization insights";
+    public override string Version => "0.1.0";
+
+    public PerformanceModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, PerformanceProfiler? profiler = null) 
+        : base(registry, logger)
     {
-        _registry = registry;
-        _profiler = profiler;
-        _logger = logger;
+        _profiler = profiler ?? new PerformanceProfiler(logger);
     }
 
-    // Parameterless constructor for dynamic instantiation
-    public PerformanceModule() : this(null!, null!, null!)
-    {
-        // This is a fallback constructor for dynamic instantiation
-        // The actual dependencies should be injected by the DI container
-    }
 
-    public string ModuleId => "codex.performance";
-    public string Name => "Performance Module";
-    public string Version => "0.1.0";
-    public string Description => "Performance monitoring and optimization insights.";
-
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: ModuleId,
+        return CreateModuleNode(
+            moduleId: "codex.performance",
             name: Name,
             version: Version,
             description: Description,
-            capabilities: new[] { "performance-monitoring", "metrics", "optimization", "profiling" },
             tags: new[] { "performance", "monitoring", "optimization" },
-            specReference: "codex.spec.performance"
+            capabilities: new[] { "performance-monitoring", "metrics", "optimization", "profiling" },
+            spec: "codex.spec.performance"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        registry.Upsert(GetModuleNode());
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // API handlers are now registered via attribute-based routing
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // HTTP endpoints are now registered via attribute-based routing
     }

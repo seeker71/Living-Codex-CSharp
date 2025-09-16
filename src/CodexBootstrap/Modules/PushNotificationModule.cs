@@ -9,10 +9,8 @@ namespace CodexBootstrap.Modules;
 /// <summary>
 /// Push notification module for client notification system
 /// </summary>
-public sealed class PushNotificationModule : IModule
+public sealed class PushNotificationModule : ModuleBase
 {
-    private readonly Core.ICodexLogger _logger;
-    private readonly NodeRegistry _registry;
     private readonly RealtimeModule? _realtimeModule;
     private readonly ConcurrentDictionary<string, NotificationSubscription> _subscriptions = new();
     private readonly ConcurrentQueue<Notification> _notificationHistory = new();
@@ -20,40 +18,37 @@ public sealed class PushNotificationModule : IModule
     private readonly object _lock = new object();
     private int _maxHistorySize = 1000;
 
-    public PushNotificationModule(NodeRegistry registry, RealtimeModule? realtimeModule = null)
+    public override string Name => "Push Notification Module";
+    public override string Description => "Push notification module for client notification system";
+    public override string Version => "1.0.0";
+
+    public PushNotificationModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, RealtimeModule? realtimeModule = null) 
+        : base(registry, logger)
     {
-        _logger = new Log4NetLogger(typeof(PushNotificationModule));
-        _registry = registry;
         _realtimeModule = realtimeModule;
         InitializeDefaultTemplates();
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.push-notifications",
-            name: "Push Notification Module",
-            version: "0.1.0",
-            description: "Provides push notification system for client notifications",
-            capabilities: new[] { "push_notifications", "notification_templates", "notification_subscriptions", "notification_history", "notification_scheduling", "notification_delivery" },
+        return CreateModuleNode(
+            moduleId: "codex.push-notifications",
+            name: Name,
+            version: Version,
+            description: Description,
             tags: new[] { "push-notifications", "notifications", "messaging", "client" },
-            specReference: "codex.spec.push-notifications"
+            capabilities: new[] { "push_notifications", "notification_templates", "notification_subscriptions", "notification_history", "notification_scheduling", "notification_delivery" },
+            spec: "codex.spec.push-notifications"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        registry.Upsert(GetModuleNode());
-        _logger.Info("Push Notification Module registered");
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // API handlers are registered via attribute-based routing
         _logger.Info("Push Notification API handlers registered");
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // HTTP endpoints will be registered via ApiRouteDiscovery
     }

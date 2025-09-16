@@ -13,76 +13,52 @@ namespace CodexBootstrap.Modules
     /// Module that provides self-updating functionality via API endpoints
     /// </summary>
     [ApiModule(Name = "SelfUpdateModule", Version = "1.0.0", Description = "Provides self-updating functionality for dynamic modules", Tags = new[] { "self-update", "hot-reload", "modules" })]
-    public class SelfUpdateModule : IModule
+    public class SelfUpdateModule : ModuleBase
     {
-        private readonly ILogger<SelfUpdateModule> _logger;
         private readonly StableCore _stableCore;
         private readonly SelfUpdateSystem _selfUpdateSystem;
         private readonly ModuleCompiler _moduleCompiler;
         private readonly HotReloadManager _hotReloadManager;
 
-        public SelfUpdateModule()
-        {
-            // Parameterless constructor for module loading
-            // Dependencies will be injected by the service provider
-            _logger = null!;
-            _stableCore = null!;
-            _selfUpdateSystem = null!;
-            _moduleCompiler = null!;
-            _hotReloadManager = null!;
-        }
+        public override string Name => "Self Update Module";
+        public override string Description => "Provides self-updating functionality for dynamic modules";
+        public override string Version => "1.0.0";
 
-        public SelfUpdateModule(
-            ILogger<SelfUpdateModule> logger,
-            StableCore stableCore,
-            SelfUpdateSystem selfUpdateSystem,
-            ModuleCompiler moduleCompiler,
-            HotReloadManager hotReloadManager)
+        public SelfUpdateModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, 
+            StableCore? stableCore = null, SelfUpdateSystem? selfUpdateSystem = null, 
+            ModuleCompiler? moduleCompiler = null, HotReloadManager? hotReloadManager = null) 
+            : base(registry, logger)
         {
-            _logger = logger;
-            _stableCore = stableCore;
-            _selfUpdateSystem = selfUpdateSystem;
+            // For now, set these to null to avoid circular dependencies
+            // They should be injected properly through dependency injection
             _moduleCompiler = moduleCompiler;
             _hotReloadManager = hotReloadManager;
+            _selfUpdateSystem = selfUpdateSystem;
+            _stableCore = stableCore;
         }
 
         /// <summary>
         /// Gets the module node for this module
         /// </summary>
-        public Node GetModuleNode()
+        public override Node GetModuleNode()
         {
-            return NodeStorage.CreateModuleNode(
-                id: "self-update-module",
-                name: "Self Update Module",
-                version: "1.0.0",
-                description: "Provides self-updating functionality for dynamic modules",
-                capabilities: new[] { "Hot Reload", "Module Compilation", "Dynamic Loading", "Rollback" },
+            return CreateModuleNode(
+                moduleId: "self-update-module",
+                name: Name,
+                version: Version,
+                description: Description,
                 tags: new[] { "self-update", "hot-reload", "modules" },
-                specReference: "codex.spec.self-update"
+                capabilities: new[] { "Hot Reload", "Module Compilation", "Dynamic Loading", "Rollback" },
+                spec: "codex.spec.self-update"
             );
         }
 
-        /// <summary>
-        /// Registers the module with the node registry
-        /// </summary>
-        public void Register(NodeRegistry registry)
-        {
-            var moduleNode = GetModuleNode();
-            registry.Upsert(moduleNode);
-        }
-
-        /// <summary>
-        /// Registers API handlers
-        /// </summary>
-        public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+        public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
         {
             // API handlers are registered via attributes, no additional registration needed
         }
 
-        /// <summary>
-        /// Registers HTTP endpoints
-        /// </summary>
-        public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+        public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
         {
             // HTTP endpoints are registered via attributes, no additional registration needed
         }
@@ -131,7 +107,7 @@ namespace CodexBootstrap.Modules
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting system status");
+                _logger.Error("Error getting system status", ex);
                 return new { success = false, error = ex.Message };
             }
         }
@@ -165,7 +141,7 @@ namespace CodexBootstrap.Modules
                     return new { success = false, error = "Cannot update stable core modules" };
                 }
 
-                _logger.LogInformation("Updating module {ModuleName} from source code", request.ModuleName);
+                _logger.Info($"Updating module {request.ModuleName} from source code");
 
                 var updateResult = await _stableCore.UpdateModuleAsync(request.ModuleName, request.SourceCode);
                 
@@ -193,7 +169,7 @@ namespace CodexBootstrap.Modules
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating module {ModuleName}", request.ModuleName);
+                _logger.Error($"Error updating module {request.ModuleName}", ex);
                 return new { success = false, error = ex.Message };
             }
         }
@@ -216,7 +192,7 @@ namespace CodexBootstrap.Modules
                     return new { success = false, error = "Source code is required" };
                 }
 
-                _logger.LogInformation("Compiling module {ModuleName}", request.ModuleName);
+                _logger.Info($"Compiling module {request.ModuleName}");
 
                 var compilationResult = await _moduleCompiler.CompileModuleAsync(request.ModuleName, request.SourceCode);
                 
@@ -244,7 +220,7 @@ namespace CodexBootstrap.Modules
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error compiling module {ModuleName}", request.ModuleName);
+                _logger.Error($"Error compiling module {request.ModuleName}", ex);
                 return new { success = false, error = ex.Message };
             }
         }
@@ -267,7 +243,7 @@ namespace CodexBootstrap.Modules
                     return new { success = false, error = "DLL file not found" };
                 }
 
-                _logger.LogInformation("Validating module {DllPath}", request.DllPath);
+                _logger.Info($"Validating module {request.DllPath}");
 
                 var validationResult = await _moduleCompiler.ValidateCompiledModuleAsync(request.DllPath);
                 
@@ -294,7 +270,7 @@ namespace CodexBootstrap.Modules
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error validating module {DllPath}", request.DllPath);
+                _logger.Error($"Error validating module {request.DllPath}", ex);
                 return new { success = false, error = ex.Message };
             }
         }
@@ -333,7 +309,7 @@ namespace CodexBootstrap.Modules
                     return new { success = false, error = "Cannot hot reload stable core modules" };
                 }
 
-                _logger.LogInformation("Hot reloading module {ModuleName} from {DllPath}", request.ModuleName, request.DllPath);
+                _logger.Info($"Hot reloading module {request.ModuleName} from {request.DllPath}");
 
                 var hotReloadResult = await _hotReloadManager.HotReloadModuleAsync(request.ModuleName, request.DllPath);
                 
@@ -361,7 +337,7 @@ namespace CodexBootstrap.Modules
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error hot reloading module {ModuleName}", request.ModuleName);
+                _logger.Error($"Error hot reloading module {request.ModuleName}", ex);
                 return new { success = false, error = ex.Message };
             }
         }
@@ -400,7 +376,7 @@ namespace CodexBootstrap.Modules
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting module backups");
+                _logger.Error("Error getting module backups", ex);
                 return new { success = false, error = ex.Message };
             }
         }
@@ -439,7 +415,7 @@ namespace CodexBootstrap.Modules
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting core modules");
+                _logger.Error("Error getting core modules", ex);
                 return new { success = false, error = ex.Message };
             }
         }
@@ -473,7 +449,7 @@ namespace CodexBootstrap.Modules
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting dynamic modules");
+                _logger.Error("Error getting dynamic modules", ex);
                 return new { success = false, error = ex.Message };
             }
         }

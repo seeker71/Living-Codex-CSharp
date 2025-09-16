@@ -154,80 +154,39 @@ public sealed class HttpAdapter : IContentAdapter
     }
 }
 
-public sealed class AdapterModule : IModule
+public sealed class AdapterModule : ModuleBase
 {
     private readonly Dictionary<string, IContentAdapter> _adapters = new();
     private readonly HttpClient _httpClient;
 
-    public AdapterModule() : this(null)
-    {
-    }
+    public override string Name => "Adapter Module";
+    public override string Description => "Module for managing content adapters and external resource linking.";
+    public override string Version => "0.1.0";
 
-    public AdapterModule(HttpClient? httpClient)
+    public AdapterModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+        : base(registry, logger)
     {
-        _httpClient = httpClient ?? new HttpClient();
-        
+        _httpClient = httpClient;
         // Register built-in adapters
         RegisterBuiltInAdapters();
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.adapters",
+        return CreateModuleNode(
+            moduleId: "codex.adapters",
             name: "Adapter Module",
             version: "0.1.0",
             description: "Module for managing content adapters and external resource linking.",
-            capabilities: new[] { "adapters", "content", "external-resources", "linking" },
             tags: new[] { "adapter", "content", "external", "link" },
-            specReference: "codex.spec.adapters"
+            capabilities: new[] { "adapters", "content", "external-resources", "linking" },
+            spec: "codex.spec.adapters"
         );
     }
 
 
-    public void Register(NodeRegistry registry)
-    {
-        // Register the module node
-        registry.Upsert(GetModuleNode());
 
-        // Register AdapterInfo type definition as node
-        var adapterInfoType = new Node(
-            Id: "codex.adapters/adapterinfo",
-            TypeId: "codex.meta/type",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "AdapterInfo Type",
-            Description: "Represents information about a registered content adapter",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    name = "AdapterInfo",
-                    fields = new[]
-                    {
-                        new { name = "id", type = "string", required = true, description = "Adapter identifier" },
-                        new { name = "scheme", type = "string", required = true, description = "URI scheme handled" },
-                        new { name = "name", type = "string", required = true, description = "Adapter name" },
-                        new { name = "description", type = "string", required = true, description = "Adapter description" },
-                        new { name = "supportedMediaTypes", type = "array", required = true, description = "Supported media types" },
-                        new { name = "configuration", type = "object", required = false, description = "Adapter configuration" }
-                    }
-                }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["moduleId"] = "codex.adapters",
-                ["typeName"] = "AdapterInfo"
-            }
-        );
-        registry.Upsert(adapterInfoType);
-
-        // API nodes are now registered via attribute-based routing
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         router.Register("codex.adapters", "register", async args =>
         {
@@ -349,7 +308,7 @@ public sealed class AdapterModule : IModule
         return _adapters.Values;
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // Adapter module doesn't need any custom HTTP endpoints
         // All functionality is exposed through the generic /route endpoint

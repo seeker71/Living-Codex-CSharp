@@ -8,36 +8,31 @@ namespace CodexBootstrap.Modules;
 [ResponseType("codex.hydrate.node-response", "HydrateNodeResponse", "Response for node hydration")]
 public record HydrateNodeResponse(string NodeId, object Content, bool Success, string Message = "Node hydrated successfully");
 
-public sealed class HydrateModule : IModule
+public sealed class HydrateModule : ModuleBase
 {
-    private readonly NodeRegistry _registry;
-    private readonly Core.ICodexLogger _logger;
+    public override string Name => "Content Hydration Module";
+    public override string Description => "Self-contained module for content hydration operations using node-based storage";
+    public override string Version => "0.1.0";
 
-    public HydrateModule(NodeRegistry registry)
+    public HydrateModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+        : base(registry, logger)
     {
-        _registry = registry;
-        _logger = new Log4NetLogger(typeof(HydrateModule));
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.hydrate",
+        return CreateModuleNode(
+            moduleId: "codex.hydrate",
             name: "Content Hydration Module",
             version: "0.1.0",
             description: "Self-contained module for content hydration operations using node-based storage",
-            capabilities: new[] { "hydration", "content", "processing", "transformation" },
             tags: new[] { "hydrate", "content", "process", "transform" },
-            specReference: "codex.spec.hydrate"
+            capabilities: new[] { "hydration", "content", "processing", "transformation" },
+            spec: "codex.spec.hydrate"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        registry.Upsert(GetModuleNode());
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         router.Register("codex.hydrate", "hydrate", async args =>
         {
@@ -118,13 +113,13 @@ public sealed class HydrateModule : IModule
         });
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // Hydrate module doesn't need any custom HTTP endpoints
         // All functionality is exposed through the generic /route endpoint and RouteDiscovery
     }
 
-    private async Task<object> HydrateNodeContent(Node node, NodeRegistry registry)
+    private async Task<object> HydrateNodeContent(Node node, INodeRegistry registry)
     {
         try
         {
@@ -211,7 +206,7 @@ public sealed class HydrateModule : IModule
         return supportedTypes.Contains(nodeTypeId) || supportedTypes.Contains("*");
     }
 
-    private Task<object?> TryAdapterHydration(Node node, Node adapter, NodeRegistry registry)
+    private Task<object?> TryAdapterHydration(Node node, Node adapter, INodeRegistry registry)
     {
         // This would call the adapter's hydration logic
         // For now, return null to indicate adapter couldn't handle this node

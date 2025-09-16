@@ -18,76 +18,39 @@ public record SpecExportResponse(string ModuleId, object Atoms, bool Success, st
 public record SpecImportResponse(string ModuleId, bool Success, string Message = "Atoms imported successfully");
 
 [MetaNodeAttribute("codex.spec.module", "codex.meta/module", "SpecModule", "Specification management module")]
-public sealed class SpecModule : IModule
+public sealed class SpecModule : ModuleBase
 {
     private readonly IApiRouter _apiRouter;
-    private readonly NodeRegistry _registry;
-    private readonly Core.ICodexLogger _logger;
 
-    public SpecModule(IApiRouter apiRouter, NodeRegistry registry)
+    public override string Name => "Spec Module";
+    public override string Description => "Specification management module";
+    public override string Version => "1.0.0";
+
+    public SpecModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? apiRouter = null) 
+        : base(registry, logger)
     {
-        _apiRouter = apiRouter;
-        _registry = registry;
-        _logger = new Log4NetLogger(typeof(SpecModule));
+        _apiRouter = apiRouter ?? new MockApiRouter();
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.spec",
-            name: "Spec Management Module",
-            version: "0.1.0",
-            description: "Self-contained module for spec management operations (atoms, compose, export, import) using node-based storage",
-            capabilities: new[] { "spec-management", "atoms", "compose", "export", "import" },
+        return CreateModuleNode(
+            moduleId: "codex.spec",
+            name: Name,
+            version: Version,
+            description: Description,
             tags: new[] { "spec", "management", "atoms", "compose" },
-            specReference: "codex.spec.spec-management"
+            capabilities: new[] { "spec-management", "atoms", "compose", "export", "import" },
+            spec: "codex.spec.spec-management"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        // Register API nodes
-        var atomsApi = NodeStorage.CreateApiNode("codex.spec", "atoms", "/spec/atoms", "Submit module atoms");
-        var composeApi = NodeStorage.CreateApiNode("codex.spec", "compose", "/spec/compose", "Compose spec from atoms");
-        var exportApi = NodeStorage.CreateApiNode("codex.spec", "export", "/spec/export/{id}", "Export module atoms");
-        var importApi = NodeStorage.CreateApiNode("codex.spec", "import", "/spec/import", "Import module atoms");
-        var getAtomsApi = NodeStorage.CreateApiNode("codex.spec", "get-atoms", "/spec/atoms/{id}", "Get module atoms");
-        var getSpecApi = NodeStorage.CreateApiNode("codex.spec", "get-spec", "/spec/{id}", "Get module spec");
-        var getAllModulesApi = NodeStorage.CreateApiNode("codex.spec", "get-all-modules", "/spec/modules/all", "Get all modules catalog");
-        var getAllRoutesApi = NodeStorage.CreateApiNode("codex.spec", "get-all-routes", "/spec/routes/all", "Get all routes catalog");
-        var getFeaturesMapApi = NodeStorage.CreateApiNode("codex.spec", "get-features-map", "/spec/features/map", "Get modules mapped to features");
-        var getStatusOverviewApi = NodeStorage.CreateApiNode("codex.spec", "get-status-overview", "/spec/status/overview", "Get comprehensive system status overview");
-        
-        registry.Upsert(atomsApi);
-        registry.Upsert(composeApi);
-        registry.Upsert(exportApi);
-        registry.Upsert(importApi);
-        registry.Upsert(getAtomsApi);
-        registry.Upsert(getSpecApi);
-        registry.Upsert(getAllModulesApi);
-        registry.Upsert(getAllRoutesApi);
-        registry.Upsert(getFeaturesMapApi);
-        registry.Upsert(getStatusOverviewApi);
-        
-        // Register edges
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.spec", "atoms"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.spec", "compose"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.spec", "export"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.spec", "import"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.spec", "get-atoms"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.spec", "get-spec"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.spec", "get-all-modules"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.spec", "get-all-routes"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.spec", "get-features-map"));
-        registry.Upsert(NodeStorage.CreateModuleApiEdge("codex.spec", "get-status-overview"));
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // This method is now handled by attribute-based discovery
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // This method is now handled by attribute-based discovery
     }

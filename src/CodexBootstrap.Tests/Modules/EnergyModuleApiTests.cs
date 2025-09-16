@@ -49,13 +49,19 @@ public class EnergyModuleApiTests : IClassFixture<TestServerFixture>
     }
 
     [Fact]
-    public async Task GetUserContributions_ShouldReturnNotFound_WhenNotImplemented()
+    public async Task GetUserContributions_ShouldReturnOk_WhenImplemented()
     {
         // Act
         var response = await _client.GetAsync("/contributions/user/test-user?limit=10");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        
+        var content = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content, _jsonOptions);
+        
+        result.Should().NotBeNull();
+        result.Should().ContainKey("contributions");
     }
 
     [Fact]
@@ -105,10 +111,11 @@ public class EnergyModuleApiTests : IClassFixture<TestServerFixture>
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
         var content = await response.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<dynamic>(content, _jsonOptions);
+        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content, _jsonOptions);
         
         result.Should().NotBeNull();
-        result?.GetProperty("energy").GetDouble().Should().BeGreaterOrEqualTo(0);
+        var energy = Convert.ToDouble(result?["energy"]);
+        energy.Should().BeGreaterOrEqualTo(0);
     }
 
     [Fact(Skip = "Endpoint not yet implemented")]
@@ -119,10 +126,11 @@ public class EnergyModuleApiTests : IClassFixture<TestServerFixture>
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
         var content = await response.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<dynamic>(content, _jsonOptions);
+        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content, _jsonOptions);
         
         result.Should().NotBeNull();
-        result?.GetProperty("energy").GetDouble().Should().BeGreaterOrEqualTo(0);
+        var energy = Convert.ToDouble(result?["energy"]);
+        energy.Should().BeGreaterOrEqualTo(0);
     }
 
     [Fact(Skip = "Endpoint not yet implemented")]
@@ -133,11 +141,10 @@ public class EnergyModuleApiTests : IClassFixture<TestServerFixture>
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
         var content = await response.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<dynamic>(content, _jsonOptions);
+        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content, _jsonOptions);
         
         result.Should().NotBeNull();
-        var contributions = result?.GetProperty("contributions");
-        contributions.Should().NotBeNull();
+        result.Should().ContainKey("contributions");
     }
 
     [Fact(Skip = "Endpoint not yet implemented")]
@@ -148,10 +155,10 @@ public class EnergyModuleApiTests : IClassFixture<TestServerFixture>
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
         var content = await response.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<dynamic>(content, _jsonOptions);
+        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content, _jsonOptions);
         
         result.Should().NotBeNull();
-        result?.GetProperty("stats").Should().NotBeNull();
+        result.Should().ContainKey("stats");
     }
 
     [Fact(Skip = "Endpoint not yet implemented")]
@@ -176,10 +183,10 @@ public class EnergyModuleApiTests : IClassFixture<TestServerFixture>
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
         var responseContent = await response.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<dynamic>(responseContent, _jsonOptions);
+        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(responseContent, _jsonOptions);
         
         result.Should().NotBeNull();
-        result?.GetProperty("contribution").Should().NotBeNull();
+        result.Should().ContainKey("contribution");
     }
 
     #endregion

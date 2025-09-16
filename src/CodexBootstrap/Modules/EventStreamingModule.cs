@@ -8,10 +8,8 @@ namespace CodexBootstrap.Modules;
 /// <summary>
 /// Event streaming module for live updates on node/edge changes
 /// </summary>
-public sealed class EventStreamingModule : IModule
+public sealed class EventStreamingModule : ModuleBase
 {
-    private readonly Core.ICodexLogger _logger;
-    private readonly NodeRegistry _registry;
     private readonly RealtimeModule? _realtimeModule;
     private readonly ConcurrentQueue<StreamEvent> _eventHistory = new();
     private readonly ConcurrentDictionary<string, EventSubscription> _subscriptions = new();
@@ -20,39 +18,36 @@ public sealed class EventStreamingModule : IModule
     private int _maxHistorySize = 1000;
     private CoreApiService? _coreApiService;
 
-    public EventStreamingModule(NodeRegistry registry, RealtimeModule? realtimeModule = null)
+    public override string Name => "Event Streaming Module";
+    public override string Description => "Event streaming module for live updates on node/edge changes";
+    public override string Version => "1.0.0";
+
+    public EventStreamingModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, RealtimeModule? realtimeModule = null) 
+        : base(registry, logger)
     {
-        _logger = new Log4NetLogger(typeof(EventStreamingModule));
-        _registry = registry;
         _realtimeModule = realtimeModule;
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.event-streaming",
+        return CreateModuleNode(
+            moduleId: "codex.event-streaming",
             name: "Event Streaming Module",
             version: "0.1.0",
             description: "Provides event streaming for live updates on node/edge changes",
-            capabilities: new[] { "event_streaming", "event_history", "event_subscription", "event_filtering", "event_aggregation", "event_replay" },
             tags: new[] { "event-streaming", "real-time", "updates", "subscription" },
-            specReference: "codex.spec.event-streaming"
+            capabilities: new[] { "event_streaming", "event_history", "event_subscription", "event_filtering", "event_aggregation", "event_replay" },
+            spec: "codex.spec.event-streaming"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        registry.Upsert(GetModuleNode());
-        _logger.Info("Event Streaming Module registered");
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // API handlers are registered via attribute-based routing
         _logger.Info("Event Streaming API handlers registered");
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // Store CoreApiService reference for cross-service communication
         _coreApiService = coreApi;

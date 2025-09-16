@@ -10,49 +10,44 @@ namespace CodexBootstrap.Modules;
 /// Enables consciousness to navigate, explore, and contribute across temporal dimensions
 /// through unified temporal portals that connect past, present, and future
 /// </summary>
-public sealed class TemporalConsciousnessModule : IModule
+public sealed class TemporalConsciousnessModule : ModuleBase
 {
-    private readonly Core.ICodexLogger _logger;
-    private readonly NodeRegistry _registry;
     private readonly ModuleCommunicationWrapper _communicationWrapper;
 
-    public TemporalConsciousnessModule(NodeRegistry registry, ModuleCommunicationWrapper communicationWrapper)
+    public override string Name => "Temporal Consciousness Module";
+    public override string Description => "Fractal exploration of time and temporality";
+    public override string Version => "1.0.0";
+
+    public TemporalConsciousnessModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, ModuleCommunicationWrapper? communicationWrapper = null) 
+        : base(registry, logger)
     {
-        _logger = new Log4NetLogger(typeof(TemporalConsciousnessModule));
-        _registry = registry;
-        _communicationWrapper = communicationWrapper;
+        _communicationWrapper = communicationWrapper ?? new ModuleCommunicationWrapper(logger, "TemporalConsciousnessModule");
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.temporal",
-            name: "Temporal Consciousness Module",
-            version: "1.0.0",
-            description: "Fractal exploration of time and temporality - past, present, future, and eternal moments",
+        return CreateModuleNode(
+            moduleId: "codex.temporal",
+            name: Name,
+            version: Version,
+            description: Description,
+            tags: new[] { "temporal", "time", "consciousness", "fractal", "exploration", "causality" },
             capabilities: new[] { 
                 "temporal_portal", "time_exploration", "temporal_navigation", 
                 "temporal_contribution", "causality_mapping", "sacred_time_frequencies",
                 "eternal_now", "temporal_resonance", "time_consciousness"
             },
-            tags: new[] { "temporal", "time", "consciousness", "fractal", "exploration", "causality" },
-            specReference: "codex.spec.temporal"
+            spec: "codex.spec.temporal"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        registry.Upsert(GetModuleNode());
-        _logger.Info("Temporal Consciousness Module registered");
-    }
-
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // API handlers are registered via attribute-based routing
         _logger.Info("Temporal Consciousness API handlers registered");
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // HTTP endpoints will be registered via ApiRouteDiscovery
         _logger.Info("Temporal Consciousness HTTP endpoints registered");

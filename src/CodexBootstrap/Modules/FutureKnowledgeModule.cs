@@ -7,30 +7,31 @@ namespace CodexBootstrap.Modules;
 /// <summary>
 /// Future Knowledge Module - Retrieves and applies knowledge from future states
 /// </summary>
-public class FutureKnowledgeModule : IModule
+public class FutureKnowledgeModule : ModuleBase
 {
     private readonly IApiRouter _apiRouter;
-    private readonly NodeRegistry _registry;
     private CoreApiService? _coreApiService;
-    private readonly CodexBootstrap.Core.ICodexLogger _logger;
 
-    public FutureKnowledgeModule(IApiRouter apiRouter, NodeRegistry registry)
+    public override string Name => "Future Knowledge Module";
+    public override string Description => "Retrieves and applies knowledge from future states";
+    public override string Version => "1.0.0";
+
+    public FutureKnowledgeModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? apiRouter = null) 
+        : base(registry, logger)
     {
-        _apiRouter = apiRouter;
-        _registry = registry;
-        _logger = new Log4NetLogger(typeof(FutureKnowledgeModule));
+        _apiRouter = apiRouter ?? new MockApiRouter();
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.future",
-            name: "Future Knowledge",
-            version: "1.0.0",
-            description: "Retrieves and applies knowledge from future states",
-            capabilities: new[] { "future-knowledge", "pattern-recognition", "prediction" },
+        return CreateModuleNode(
+            moduleId: "codex.future",
+            name: Name,
+            version: Version,
+            description: Description,
             tags: new[] { "future", "knowledge", "prediction", "patterns" },
-            specReference: "codex.spec.future-knowledge"
+            capabilities: new[] { "future-knowledge", "pattern-recognition", "prediction" },
+            spec: "codex.spec.future-knowledge"
         );
     }
 
@@ -38,22 +39,14 @@ public class FutureKnowledgeModule : IModule
     {
         _coreApiService = coreApiService;
         _logger.Info("Future Knowledge Module initialized");
-        
-        // Register the module node
-        _registry.Upsert(GetModuleNode());
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        registry.Upsert(GetModuleNode());
-    }
-
-    public void RegisterApiHandlers(IApiRouter apiRouter, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter apiRouter, INodeRegistry registry)
     {
         // API handlers are registered via attributes
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApiService, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApiService, ModuleLoader moduleLoader)
     {
         // HTTP endpoints are registered via attributes
     }

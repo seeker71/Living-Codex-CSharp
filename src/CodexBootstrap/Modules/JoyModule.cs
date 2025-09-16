@@ -13,51 +13,37 @@ namespace CodexBootstrap.Modules;
 /// Combines functionality from JoyCalculatorModule, ResonanceJoyModule, UcoreJoyModule, and UCoreResonanceEngine
 /// </summary>
 [ApiModule(Name = "JoyModule", Version = "1.0.0", Description = "Consolidated Joy and Resonance Module - Self-contained fractal APIs", Tags = new[] { "joy", "resonance", "ucore", "fractal" })]
-public class JoyModule : IModule
+public class JoyModule : ModuleBase
 {
-    private readonly NodeRegistry _registry;
-    private readonly CodexBootstrap.Core.ICodexLogger _logger;
+    public override string Name => "Joy and Resonance Module";
+    public override string Description => "Consolidated Joy and Resonance Module - Self-contained fractal APIs";
+    public override string Version => "1.0.0";
 
-    public JoyModule(NodeRegistry registry)
+    public JoyModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+        : base(registry, logger)
     {
-        _registry = registry;
-        _logger = new Log4NetLogger(typeof(JoyModule));
     }
 
-    public string ModuleId => "codex.joy";
-    public string Name => "Joy and Resonance Module";
-    public string Version => "1.0.0";
-    public string Description => "Consolidated Joy and Resonance Module - Self-contained fractal APIs";
-
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            ModuleId, 
-            Name, 
-            Version, 
-            Description,
-            capabilities: new[] { "joy", "amplification", "resonance", "energy" },
+        return CreateModuleNode(
+            moduleId: "codex.joy",
+            name: Name,
+            version: Version,
+            description: Description,
             tags: new[] { "joy", "amplify", "resonance", "energy" },
-            specReference: "codex.spec.joy"
+            capabilities: new[] { "joy", "amplification", "resonance", "energy" },
+            spec: "codex.spec.joy"
         );
     }
 
-    public void Register(NodeRegistry registry)
-    {
-        // Register module node
-        var moduleNode = GetModuleNode();
-        registry.Upsert(moduleNode);
-        
-        _logger.Info("JoyModule registered with node registry");
-    }
-
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // HTTP endpoints are registered via the API router
         _logger.Info("JoyModule HTTP endpoints registered via API router");
     }
 
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // API handlers are registered via attributes, not here
         _logger.Info("JoyModule API handlers registered via attributes");

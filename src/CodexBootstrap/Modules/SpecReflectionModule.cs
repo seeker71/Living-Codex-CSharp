@@ -10,39 +10,32 @@ public record ReflectResponse(List<Node> MetaNodes, string SpecId);
 
 public record IngestResponse(ModuleSpec Spec, bool Success, string Message);
 
-public sealed class SpecReflectionModule : IModule
+public sealed class SpecReflectionModule : ModuleBase
 {
-    private readonly NodeRegistry _registry;
-    private readonly Core.ICodexLogger _logger;
+    public override string Name => "Spec Reflection Module";
+    public override string Description => "Converts specs to meta-nodes and back, enabling self-describing system architecture";
+    public override string Version => "0.1.0";
 
-    public SpecReflectionModule(NodeRegistry registry)
+    public SpecReflectionModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+        : base(registry, logger)
     {
-        _registry = registry;
-        _logger = new Log4NetLogger(typeof(SpecReflectionModule));
     }
 
-    public Node GetModuleNode()
+    public override Node GetModuleNode()
     {
-        return NodeStorage.CreateModuleNode(
-            id: "codex.reflect",
+        return CreateModuleNode(
+            moduleId: "codex.reflect",
             name: "Spec Reflection Module",
             version: "0.1.0",
             description: "Converts specs to meta-nodes and back, enabling self-describing system architecture",
-            capabilities: new[] { "reflection", "spec-conversion", "meta-nodes", "self-describing" },
             tags: new[] { "reflection", "spec", "meta-nodes", "self-describing" },
-            specReference: "codex.spec.reflection"
+            capabilities: new[] { "reflection", "spec-conversion", "meta-nodes", "self-describing" },
+            spec: "codex.spec.reflection"
         );
     }
 
 
-    public void Register(NodeRegistry registry)
-    {
-        // Register the module node
-        registry.Upsert(GetModuleNode());
-
-        // Register API nodes for reflection endpoints
-        RegisterApiNodes(registry);
-    }
+    // Register method removed - handled by base class
 
     private static void RegisterApiNodes(NodeRegistry registry)
     {
@@ -166,13 +159,13 @@ public sealed class SpecReflectionModule : IModule
         }
     }
 
-    public void RegisterApiHandlers(IApiRouter router, NodeRegistry registry)
+    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         // Spec Reflection module uses ApiRoute attributes for endpoint registration
         // No additional API handlers needed
     }
 
-    private static List<Node> ReflectSpecToMetaNodes(Node specNode, NodeRegistry registry)
+    private static List<Node> ReflectSpecToMetaNodes(Node specNode, INodeRegistry registry)
     {
         var metaNodes = new List<Node>();
 
@@ -445,7 +438,7 @@ public sealed class SpecReflectionModule : IModule
         }
     }
 
-    public void RegisterHttpEndpoints(WebApplication app, NodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
+    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // Spec Reflection module doesn't need any custom HTTP endpoints
         // All functionality is exposed through the generic /route endpoint

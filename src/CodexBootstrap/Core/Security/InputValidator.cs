@@ -20,7 +20,7 @@ namespace CodexBootstrap.Core.Security
         private static readonly Regex AlphanumericPattern = new(@"^[a-zA-Z0-9]+$", RegexOptions.Compiled);
         private static readonly Regex SafeStringPattern = new(@"^[a-zA-Z0-9\s\-_.,!?()]+$", RegexOptions.Compiled);
         private static readonly Regex NodeIdPattern = new(@"^[a-zA-Z0-9\-_.]+$", RegexOptions.Compiled);
-        private static readonly Regex SqlInjectionPattern = new(@"(?i)(\b(ALTER|CREATE|DELETE|DROP|EXEC(UTE)?|INSERT( +INTO)?|MERGE|SELECT|UPDATE|UNION( +ALL)?)\b)|(\b(OR|AND)\b.*(=|>|<|\bLIKE\b))|(\b(SCRIPT|JAVASCRIPT|VBSCRIPT|ONLOAD|ONERROR)\b)", RegexOptions.Compiled);
+        private static readonly Regex SqlInjectionPattern = new(@"(?i)(\b(ALTER|CREATE|DELETE|DROP|EXEC(UTE)?|INSERT( +INTO)?|MERGE|SELECT|UPDATE|UNION( +ALL)?)\b.*\b(TABLE|DATABASE|INDEX|VIEW|PROCEDURE|FUNCTION|TRIGGER|SCHEMA)\b)|(\b(OR|AND)\b.*(=|>|<|\bLIKE\b))|(\b(SCRIPT|JAVASCRIPT|VBSCRIPT|ONLOAD|ONERROR)\b)|(\b(ALTER|CREATE|DELETE|DROP|EXEC(UTE)?|INSERT( +INTO)?|MERGE|SELECT|UPDATE|UNION( +ALL)?)\b.*\b(FROM|INTO|WHERE|SET|VALUES)\b)|(\b(ALTER|CREATE|DELETE|DROP|EXEC(UTE)?|INSERT( +INTO)?|MERGE|SELECT|UPDATE|UNION( +ALL)?)\b.*\b(.*\b(OR|AND)\b.*=.*\b(OR|AND)\b.*=.*))", RegexOptions.Compiled);
         private static readonly Regex XssPattern = new(@"(?i)(<script|</script|javascript:|vbscript:|onload=|onerror=|onclick=|onmouseover=)", RegexOptions.Compiled);
 
         public InputValidator(ICodexLogger logger)
@@ -47,7 +47,21 @@ namespace CodexBootstrap.Core.Security
                 return new ValidationResult($"{fieldName} exceeds maximum length of {maxLength} characters");
             }
 
-            // Check for SQL injection patterns
+            // Check for SQL injection patterns (but skip for legitimate API endpoints)
+            if (fieldName == "PathSegment")
+            {
+                _logger.Info($"[DEBUG] Validating PathSegment: '{input}'");
+                if (IsLegitimateApiEndpoint(input))
+                {
+                    _logger.Info($"[DEBUG] PathSegment '{input}' is legitimate, skipping SQL injection check");
+                    return ValidationResult.Success;
+                }
+                else
+                {
+                    _logger.Info($"[DEBUG] PathSegment '{input}' is not legitimate, checking for SQL injection");
+                }
+            }
+            
             if (SqlInjectionPattern.IsMatch(input))
             {
                 _logger.Warn($"Potential SQL injection detected in {fieldName}: {input.Substring(0, Math.Min(50, input.Length))}...");
@@ -62,6 +76,24 @@ namespace CodexBootstrap.Core.Security
             }
 
             return ValidationResult.Success;
+        }
+
+        /// <summary>
+        /// Checks if a path segment is a legitimate API endpoint that should be excluded from SQL injection checks
+        /// </summary>
+        private bool IsLegitimateApiEndpoint(string pathSegment)
+        {
+            var legitimateEndpoints = new[]
+            {
+                "create", "update", "delete", "get", "list", "search", "find", "add", "remove", "edit", "modify",
+                "concept", "concepts", "energy", "identity", "user", "users", "node", "nodes", "edge", "edges",
+                "auth", "login", "register", "logout", "profile", "settings", "config", "health", "status",
+                "api", "swagger", "openapi", "docs", "metrics", "performance", "cache", "storage"
+            };
+
+            var isLegitimate = legitimateEndpoints.Contains(pathSegment.ToLowerInvariant());
+            _logger.Debug($"IsLegitimateApiEndpoint check: pathSegment='{pathSegment}' (lowered='{pathSegment.ToLowerInvariant()}'), result={isLegitimate}");
+            return isLegitimate;
         }
 
         /// <summary>
