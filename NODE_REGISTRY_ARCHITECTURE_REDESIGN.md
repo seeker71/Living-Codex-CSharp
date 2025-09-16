@@ -259,6 +259,12 @@ public class NewsPortal : IPortal
 - [ ] Consolidate all news endpoints
 - [x] Update mobile app to use current NewsFeedModule endpoints (temporary mapping)
 - [x] Add tests for NewsFeed endpoints (trending, search, read/unread, feed)
+- [x] Verify News endpoints at runtime against live server (curl) and document mapping
+
+#### 4.5 Authentication & Security Integration (Week 4)
+- [x] Always register authentication services to satisfy middleware dependencies
+- [x] Implement identity providers fallback when OAuth env vars are missing
+- [ ] Configure environment-specific auth schemes via nodes (spec-driven)
 
 ### Phase 5: Testing and Validation
 
