@@ -148,8 +148,9 @@ public class ApiServiceTests
             ?.SetValue(_apiService, httpClient);
 
         // Act & Assert
-        await Assert.ThrowsAsync<JsonException>(() => 
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => 
             _apiService.PostAsync<UserCreateRequest, ApiResponse<User>>("/users", new UserCreateRequest()));
+        ex.InnerException.Should().BeOfType<JsonException>();
     }
 }
 

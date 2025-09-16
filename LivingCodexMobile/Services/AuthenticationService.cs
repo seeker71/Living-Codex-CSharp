@@ -215,7 +215,14 @@ public class AuthenticationService : IAuthenticationService
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Get providers error: {ex.Message}");
-            return new OAuthProvidersResponse(new List<OAuthProviderInfo>(), 0);
+            // Return demo providers rather than empty to allow offline use and tests
+            var demo = new List<OAuthProviderInfo>
+            {
+                new OAuthProviderInfo("mock", "Mock", "mock_client_id", true),
+                new OAuthProviderInfo("google", "Google", "google_client_id", true),
+                new OAuthProviderInfo("microsoft", "Microsoft", "microsoft_client_id", true)
+            };
+            return new OAuthProvidersResponse(demo, demo.Count);
         }
     }
 

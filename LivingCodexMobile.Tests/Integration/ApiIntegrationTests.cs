@@ -99,8 +99,16 @@ public class ApiIntegrationTests
     [Fact]
     public async Task ApiService_WithInvalidEndpoint_ShouldHandleError()
     {
-        // Arrange
-        var apiService = _serviceProvider.GetRequiredService<IApiService>();
+        // Arrange: use a real GenericApiService with a handler returning 404
+        var handler = new LivingCodexMobile.Tests.Helpers.TestHttpMessageHandler((req, ct) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)
+        {
+            Content = new StringContent("Not Found", Encoding.UTF8, "text/plain")
+        }));
+        var httpClient = new HttpClient(handler);
+        var logger = _serviceProvider.GetRequiredService<ILogger<GenericApiService>>();
+        var logging = _serviceProvider.GetRequiredService<ILoggingService>();
+        var errors = _serviceProvider.GetRequiredService<IErrorHandlingService>();
+        var apiService = new GenericApiService(httpClient, logger, logging, errors);
 
         // Act & Assert
         await Assert.ThrowsAsync<HttpRequestException>(() => 
