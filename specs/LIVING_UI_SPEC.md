@@ -459,10 +459,59 @@ Storage endpoints: `/storage-endpoints/nodes*`, `/storage-endpoints/edges*` for 
 - Collect `codex.ui.feedback` nodes linked to page/lens/action with ratings and notes (human + AI summaries).
 - On next breath, generator updates atoms (copy, ranking weights, adapters) deterministically.
 
-### 13.6 Minimal “Hello Lens” One‑Shot
+### 13.6 Minimal "Hello Lens" One‑Shot
 - Atom: `codex.ui.page` `/hello` with lens `lens.stream` and controls `controls.resonance`.
 - Validate: List concepts via `POST /concept/discover` and render.
 - Contract: Persist page atom as Ice; mark routes Simple.
+
+---
+
+## 14) UI Orchestration System (Self‑Evolving UI Generation)
+Summary: The system can generate, test, and evolve UI components through natural language prompts using the existing AI module, breath loop, and spec-driven architecture.
+
+### 14.1 Orchestration Flow
+```mermaid
+graph TD
+    A[User Intent: "Create Resonance Page"] --> B[Compose: Create UI Atoms]
+    B --> C[Expand: Generate Components via AI]
+    C --> D[Validate: Test Endpoints & Render]
+    D --> E[Melt/Patch: Apply Feedback]
+    E --> F[Refreeze: Update Atoms]
+    F --> G[Contract: Promote to Ice]
+    
+    B --> B1[POST /ui-orchestration/compose-page]
+    C --> C1[POST /ai/extract-concepts]
+    C --> C2[POST /ui-orchestration/expand-components]
+    D --> D1[GET /spec/routes/all]
+    E --> E1[POST /ui-orchestration/patch-component]
+    G --> G1[POST /breath/contract/{id}]
+```
+
+### 14.2 UI Generation Prompts (AI Module Extension)
+- **ui-page-generation**: Generate Next.js page components from UI atoms
+- **ui-component-generation**: Generate React components from lens specifications  
+- **ui-feedback-analysis**: Analyze user feedback and suggest improvements
+- **ui-pattern-evolution**: Evolve successful patterns into reusable templates
+
+### 14.3 Orchestration Module API
+- `POST /ui-orchestration/compose-page` — Create minimal UI page atoms from intent
+- `POST /ui-orchestration/expand-components` — Generate components via AI
+- `POST /ui-orchestration/validate-components` — Test generated components
+- `POST /ui-orchestration/patch-component` — Apply user feedback
+- `POST /ui-orchestration/evolve-pattern` — Promote successful patterns
+
+### 14.4 Natural Language Prompts
+- "Create a resonance comparison page" → Full breath loop for visual resonance comparison
+- "Improve the concept discovery flow" → A/B test enhanced discovery components
+- "Add a new lens type for temporal exploration" → Generate temporal lens with time-based interactions
+
+### 14.5 Feedback Integration
+- User interactions automatically collected as `codex.ui.feedback` nodes
+- AI analysis of feedback patterns drives component evolution
+- Successful patterns promoted to reusable templates
+- Failed patterns trigger alternative generation approaches
+
+Implementation status: Design complete. Next step: Extend AI module with UI generation prompts.
 
 
 

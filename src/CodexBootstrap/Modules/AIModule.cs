@@ -202,6 +202,30 @@ namespace CodexBootstrap.Modules
                 return await HandleFractalTransformAsync(request);
             });
             
+            router.Register("ai", "generate-ui-page", async (JsonElement? json) => 
+            {
+                var request = JsonSerializer.Deserialize<UIPageGenerationRequest>(json?.GetRawText() ?? "{}");
+                return await HandleUIPageGenerationAsync(request);
+            });
+            
+            router.Register("ai", "generate-ui-component", async (JsonElement? json) => 
+            {
+                var request = JsonSerializer.Deserialize<UIComponentGenerationRequest>(json?.GetRawText() ?? "{}");
+                return await HandleUIComponentGenerationAsync(request);
+            });
+            
+            router.Register("ai", "analyze-ui-feedback", async (JsonElement? json) => 
+            {
+                var request = JsonSerializer.Deserialize<UIFeedbackAnalysisRequest>(json?.GetRawText() ?? "{}");
+                return await HandleUIFeedbackAnalysisAsync(request);
+            });
+            
+            router.Register("ai", "evolve-ui-pattern", async (JsonElement? json) => 
+            {
+                var request = JsonSerializer.Deserialize<UIPatternEvolutionRequest>(json?.GetRawText() ?? "{}");
+                return await HandleUIPatternEvolutionAsync(request);
+            });
+            
             _logger.Info("AI module API handlers registered for internal communication");
         }
 
@@ -340,6 +364,175 @@ Response:",
                     },
                     DefaultLLMConfig: defaultLLMConfig,
                     Category: "future"
+                ),
+
+                new PromptTemplate(
+                    Id: "ui-page-generation",
+                    Name: "UI Page Generation",
+                    Template: @"Generate a Next.js page component from this UI atom specification.
+
+UI Atom: {uiAtom}
+
+Requirements:
+- Use TypeScript and Tailwind CSS
+- Implement the specified lenses and controls
+- Connect to the declared API endpoints
+- Follow the Living Codex design principles (resonance, joy, unity)
+- Use React Query for data fetching
+- Include proper error handling and loading states
+
+IMPORTANT: Return ONLY valid TypeScript code, no markdown, no explanations, no additional text.
+
+```typescript
+{generatedCode}
+```",
+                    DefaultParameters: new Dictionary<string, object> 
+                    { 
+                        ["uiAtom"] = "",
+                        ["generatedCode"] = ""
+                    },
+                    DefaultLLMConfig: defaultLLMConfig,
+                    Category: "ui-generation"
+                ),
+
+                new PromptTemplate(
+                    Id: "ui-component-generation",
+                    Name: "UI Component Generation",
+                    Template: @"Generate a React component from this lens specification.
+
+Lens Spec: {lensSpec}
+Component Type: {componentType}
+Requirements: {requirements}
+
+Requirements:
+- Use the specified projection type (list, masonry, thread, etc.)
+- Implement the declared actions (attune, amplify, weave, reflect, invite)
+- Connect to the adapter endpoints
+- Follow resonance-driven design principles
+- Use TypeScript and Tailwind CSS
+- Include proper TypeScript interfaces
+
+IMPORTANT: Return ONLY valid TypeScript code, no markdown, no explanations, no additional text.
+
+```typescript
+{generatedCode}
+```",
+                    DefaultParameters: new Dictionary<string, object> 
+                    { 
+                        ["lensSpec"] = "",
+                        ["componentType"] = "list",
+                        ["requirements"] = "",
+                        ["generatedCode"] = ""
+                    },
+                    DefaultLLMConfig: defaultLLMConfig,
+                    Category: "ui-generation"
+                ),
+
+                new PromptTemplate(
+                    Id: "ui-feedback-analysis",
+                    Name: "UI Feedback Analysis",
+                    Template: @"Analyze user feedback on this UI component and suggest specific improvements.
+
+Component ID: {componentId}
+Component Code: {componentCode}
+User Feedback: {feedback}
+Usage Metrics: {metrics}
+
+Analyze and suggest improvements to:
+1. Copy and messaging (resonance, joy, clarity)
+2. Interaction patterns (attune, amplify, weave, reflect, invite)
+3. Visual design (resonance-driven, inviting, not overwhelming)
+4. API integration (endpoint bindings, error handling)
+5. Performance and accessibility
+
+IMPORTANT: Return ONLY a valid JSON object, no markdown, no explanations, no additional text.
+
+{{
+  ""analysis"": {{
+    ""strengths"": [""strength1"", ""strength2""],
+    ""weaknesses"": [""weakness1"", ""weakness2""],
+    ""suggestions"": [
+      {{
+        ""area"": ""copy"",
+        ""priority"": ""high"",
+        ""suggestion"": ""specific improvement"",
+        ""reasoning"": ""why this helps""
+      }}
+    ],
+    ""resonanceScore"": 0.0-1.0,
+    ""joyScore"": 0.0-1.0,
+    ""unityScore"": 0.0-1.0
+  }},
+  ""recommendedChanges"": [
+    {{
+      ""type"": ""copy"",
+      ""change"": ""specific change to make"",
+      ""impact"": ""expected improvement""
+    }}
+  ]
+}}",
+                    DefaultParameters: new Dictionary<string, object> 
+                    { 
+                        ["componentId"] = "",
+                        ["componentCode"] = "",
+                        ["feedback"] = "",
+                        ["metrics"] = ""
+                    },
+                    DefaultLLMConfig: defaultLLMConfig,
+                    Category: "ui-feedback"
+                ),
+
+                new PromptTemplate(
+                    Id: "ui-pattern-evolution",
+                    Name: "UI Pattern Evolution",
+                    Template: @"Evolve this successful UI pattern into a reusable template for future components.
+
+Original Pattern: {originalPattern}
+Success Metrics: {successMetrics}
+Evolution Context: {evolutionContext}
+
+Create an evolved template that:
+1. Generalizes the successful elements
+2. Maintains the resonance-driven principles
+3. Adds flexibility for different use cases
+4. Preserves the joy and unity aspects
+5. Includes proper TypeScript interfaces
+6. Documents the pattern's purpose and usage
+
+IMPORTANT: Return ONLY a valid JSON object with the evolved template, no markdown, no explanations, no additional text.
+
+{{
+  ""templateId"": ""evolved-pattern-id"",
+  ""name"": ""Evolved Pattern Name"",
+  ""description"": ""What this pattern does"",
+  ""category"": ""lens|page|component|action"",
+  ""template"": {{
+    ""code"": ""evolved TypeScript code"",
+    ""interfaces"": ""TypeScript interfaces"",
+    ""props"": [""prop1"", ""prop2""],
+    ""endpoints"": [""endpoint1"", ""endpoint2""],
+    ""actions"": [""attune"", ""amplify"", ""weave""]
+  }},
+  ""usage"": {{
+    ""whenToUse"": ""when to apply this pattern"",
+    ""variations"": [""variation1"", ""variation2""],
+    ""customization"": [""customization1"", ""customization2""]
+  }},
+  ""resonanceFactors"": {{
+    ""joy"": 0.0-1.0,
+    ""unity"": 0.0-1.0,
+    ""clarity"": 0.0-1.0,
+    ""engagement"": 0.0-1.0
+  }}
+}}",
+                    DefaultParameters: new Dictionary<string, object> 
+                    { 
+                        ["originalPattern"] = "",
+                        ["successMetrics"] = "",
+                        ["evolutionContext"] = ""
+                    },
+                    DefaultLLMConfig: defaultLLMConfig,
+                    Category: "ui-evolution"
                 )
             };
 
@@ -498,6 +691,169 @@ Response:",
             catch (Exception ex)
             {
                 _logger.Error($"Error in future query: {ex.Message}", ex);
+                return new { success = false, error = ex.Message };
+            }
+        }
+
+        [ApiRoute("POST", "/ai/generate-ui-page", "ai-generate-ui-page", "Generate UI page component from atom specification", "ai-module")]
+        public async Task<object> HandleUIPageGenerationAsync([ApiParameter("request", "UI page generation request", Required = true, Location = "body")] UIPageGenerationRequest request)
+        {
+            try
+            {
+                if (request == null || string.IsNullOrEmpty(request.UiAtom))
+                {
+                    return new { success = false, error = "UI atom specification is required" };
+                }
+
+                var config = LLMConfigurations.GetConfigForTask("ui-page-generation", request.Provider, request.Model);
+                var result = await _llmOrchestrator.ExecuteAsync("ui-page-generation", new Dictionary<string, object>
+                {
+                    ["uiAtom"] = request.UiAtom,
+                    ["generatedCode"] = ""
+                }, config);
+
+                if (!result.Success)
+                {
+                    return new { success = false, error = result.Error };
+                }
+
+                return new
+                {
+                    success = true,
+                    data = new
+                    {
+                        pageId = request.PageId,
+                        generatedCode = result.Content,
+                        confidence = result.Confidence,
+                        timestamp = result.Timestamp,
+                        tracking = new
+                        {
+                            templateId = result.TemplateId,
+                            provider = result.Provider,
+                            model = result.Model,
+                            executionTimeMs = result.ExecutionTime.TotalMilliseconds
+                        }
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in UI page generation: {ex.Message}", ex);
+                return new { success = false, error = ex.Message };
+            }
+        }
+
+        [ApiRoute("POST", "/ai/generate-ui-component", "ai-generate-ui-component", "Generate UI component from lens specification", "ai-module")]
+        public async Task<object> HandleUIComponentGenerationAsync([ApiParameter("request", "UI component generation request", Required = true, Location = "body")] UIComponentGenerationRequest request)
+        {
+            try
+            {
+                if (request == null || string.IsNullOrEmpty(request.LensSpec))
+                {
+                    return new { success = false, error = "Lens specification is required" };
+                }
+
+                var config = LLMConfigurations.GetConfigForTask("ui-component-generation", request.Provider, request.Model);
+                var result = await _llmOrchestrator.ExecuteAsync("ui-component-generation", new Dictionary<string, object>
+                {
+                    ["lensSpec"] = request.LensSpec,
+                    ["componentType"] = request.ComponentType ?? "list",
+                    ["requirements"] = request.Requirements ?? "",
+                    ["generatedCode"] = ""
+                }, config);
+
+                if (!result.Success)
+                {
+                    return new { success = false, error = result.Error };
+                }
+
+                return new
+                {
+                    success = true,
+                    data = new
+                    {
+                        componentId = request.ComponentId,
+                        generatedCode = result.Content,
+                        confidence = result.Confidence,
+                        timestamp = result.Timestamp,
+                        tracking = new
+                        {
+                            templateId = result.TemplateId,
+                            provider = result.Provider,
+                            model = result.Model,
+                            executionTimeMs = result.ExecutionTime.TotalMilliseconds
+                        }
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in UI component generation: {ex.Message}", ex);
+                return new { success = false, error = ex.Message };
+            }
+        }
+
+        [ApiRoute("POST", "/ai/analyze-ui-feedback", "ai-analyze-ui-feedback", "Analyze UI feedback and suggest improvements", "ai-module")]
+        public async Task<object> HandleUIFeedbackAnalysisAsync([ApiParameter("request", "UI feedback analysis request", Required = true, Location = "body")] UIFeedbackAnalysisRequest request)
+        {
+            try
+            {
+                if (request == null || string.IsNullOrEmpty(request.ComponentId) || string.IsNullOrEmpty(request.Feedback))
+                {
+                    return new { success = false, error = "Component ID and feedback are required" };
+                }
+
+                var config = LLMConfigurations.GetConfigForTask("ui-feedback-analysis", request.Provider, request.Model);
+                var result = await _llmOrchestrator.ExecuteAsync("ui-feedback-analysis", new Dictionary<string, object>
+                {
+                    ["componentId"] = request.ComponentId,
+                    ["componentCode"] = request.ComponentCode ?? "",
+                    ["feedback"] = request.Feedback,
+                    ["metrics"] = request.Metrics ?? ""
+                }, config);
+
+                if (!result.Success)
+                {
+                    return new { success = false, error = result.Error };
+                }
+
+                return _llmOrchestrator.ParseStructuredResponse<UIFeedbackAnalysisResult>(result, "UI feedback analysis");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in UI feedback analysis: {ex.Message}", ex);
+                return new { success = false, error = ex.Message };
+            }
+        }
+
+        [ApiRoute("POST", "/ai/evolve-ui-pattern", "ai-evolve-ui-pattern", "Evolve successful UI pattern into reusable template", "ai-module")]
+        public async Task<object> HandleUIPatternEvolutionAsync([ApiParameter("request", "UI pattern evolution request", Required = true, Location = "body")] UIPatternEvolutionRequest request)
+        {
+            try
+            {
+                if (request == null || string.IsNullOrEmpty(request.OriginalPattern))
+                {
+                    return new { success = false, error = "Original pattern is required" };
+                }
+
+                var config = LLMConfigurations.GetConfigForTask("ui-pattern-evolution", request.Provider, request.Model);
+                var result = await _llmOrchestrator.ExecuteAsync("ui-pattern-evolution", new Dictionary<string, object>
+                {
+                    ["originalPattern"] = request.OriginalPattern,
+                    ["successMetrics"] = request.SuccessMetrics ?? "",
+                    ["evolutionContext"] = request.EvolutionContext ?? ""
+                }, config);
+
+                if (!result.Success)
+                {
+                    return new { success = false, error = result.Error };
+                }
+
+                return _llmOrchestrator.ParseStructuredResponse<UIPatternEvolutionResult>(result, "UI pattern evolution");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in UI pattern evolution: {ex.Message}", ex);
                 return new { success = false, error = ex.Message };
             }
         }
@@ -715,6 +1071,110 @@ Response:",
         LLMConfig Config,
         string Message,
         DateTimeOffset Timestamp
+    );
+
+    // UI Generation Request/Response Types
+    [RequestType("codex.ai.ui-page-generation-request", "UIPageGenerationRequest", "Request for UI page generation")]
+    public record UIPageGenerationRequest(
+        string PageId,
+        string UiAtom,
+        string? Provider = null,
+        string? Model = null
+    );
+
+    [RequestType("codex.ai.ui-component-generation-request", "UIComponentGenerationRequest", "Request for UI component generation")]
+    public record UIComponentGenerationRequest(
+        string ComponentId,
+        string LensSpec,
+        string? ComponentType = null,
+        string? Requirements = null,
+        string? Provider = null,
+        string? Model = null
+    );
+
+    [RequestType("codex.ai.ui-feedback-analysis-request", "UIFeedbackAnalysisRequest", "Request for UI feedback analysis")]
+    public record UIFeedbackAnalysisRequest(
+        string ComponentId,
+        string Feedback,
+        string? ComponentCode = null,
+        string? Metrics = null,
+        string? Provider = null,
+        string? Model = null
+    );
+
+    [RequestType("codex.ai.ui-pattern-evolution-request", "UIPatternEvolutionRequest", "Request for UI pattern evolution")]
+    public record UIPatternEvolutionRequest(
+        string OriginalPattern,
+        string? SuccessMetrics = null,
+        string? EvolutionContext = null,
+        string? Provider = null,
+        string? Model = null
+    );
+
+    [ResponseType("codex.ai.ui-feedback-analysis-result", "UIFeedbackAnalysisResult", "Result from UI feedback analysis")]
+    public record UIFeedbackAnalysisResult(
+        [property: JsonPropertyName("analysis")] UIFeedbackAnalysis Analysis,
+        [property: JsonPropertyName("recommendedChanges")] List<UIRecommendedChange> RecommendedChanges
+    );
+
+    [ResponseType("codex.ai.ui-feedback-analysis", "UIFeedbackAnalysis", "UI feedback analysis data")]
+    public record UIFeedbackAnalysis(
+        [property: JsonPropertyName("strengths")] List<string> Strengths,
+        [property: JsonPropertyName("weaknesses")] List<string> Weaknesses,
+        [property: JsonPropertyName("suggestions")] List<UIFeedbackSuggestion> Suggestions,
+        [property: JsonPropertyName("resonanceScore")] double ResonanceScore,
+        [property: JsonPropertyName("joyScore")] double JoyScore,
+        [property: JsonPropertyName("unityScore")] double UnityScore
+    );
+
+    [ResponseType("codex.ai.ui-feedback-suggestion", "UIFeedbackSuggestion", "UI feedback suggestion")]
+    public record UIFeedbackSuggestion(
+        [property: JsonPropertyName("area")] string Area,
+        [property: JsonPropertyName("priority")] string Priority,
+        [property: JsonPropertyName("suggestion")] string Suggestion,
+        [property: JsonPropertyName("reasoning")] string Reasoning
+    );
+
+    [ResponseType("codex.ai.ui-recommended-change", "UIRecommendedChange", "UI recommended change")]
+    public record UIRecommendedChange(
+        [property: JsonPropertyName("type")] string Type,
+        [property: JsonPropertyName("change")] string Change,
+        [property: JsonPropertyName("impact")] string Impact
+    );
+
+    [ResponseType("codex.ai.ui-pattern-evolution-result", "UIPatternEvolutionResult", "Result from UI pattern evolution")]
+    public record UIPatternEvolutionResult(
+        [property: JsonPropertyName("templateId")] string TemplateId,
+        [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("description")] string Description,
+        [property: JsonPropertyName("category")] string Category,
+        [property: JsonPropertyName("template")] UIPatternTemplate Template,
+        [property: JsonPropertyName("usage")] UIPatternUsage Usage,
+        [property: JsonPropertyName("resonanceFactors")] UIPatternResonanceFactors ResonanceFactors
+    );
+
+    [ResponseType("codex.ai.ui-pattern-template", "UIPatternTemplate", "UI pattern template")]
+    public record UIPatternTemplate(
+        [property: JsonPropertyName("code")] string Code,
+        [property: JsonPropertyName("interfaces")] string Interfaces,
+        [property: JsonPropertyName("props")] List<string> Props,
+        [property: JsonPropertyName("endpoints")] List<string> Endpoints,
+        [property: JsonPropertyName("actions")] List<string> Actions
+    );
+
+    [ResponseType("codex.ai.ui-pattern-usage", "UIPatternUsage", "UI pattern usage information")]
+    public record UIPatternUsage(
+        [property: JsonPropertyName("whenToUse")] string WhenToUse,
+        [property: JsonPropertyName("variations")] List<string> Variations,
+        [property: JsonPropertyName("customization")] List<string> Customization
+    );
+
+    [ResponseType("codex.ai.ui-pattern-resonance-factors", "UIPatternResonanceFactors", "UI pattern resonance factors")]
+    public record UIPatternResonanceFactors(
+        [property: JsonPropertyName("joy")] double Joy,
+        [property: JsonPropertyName("unity")] double Unity,
+        [property: JsonPropertyName("clarity")] double Clarity,
+        [property: JsonPropertyName("engagement")] double Engagement
     );
 
 
