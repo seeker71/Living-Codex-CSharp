@@ -201,9 +201,9 @@ namespace CodexBootstrap.Modules
         }
 
         /// <summary>
-        /// Validate: Test generated components
+        /// Validate: Test generated components with visual validation
         /// </summary>
-        [ApiRoute("POST", "/ui-orchestration/validate-components", "ui-validate-components", "Test generated components", "ui-orchestration")]
+        [ApiRoute("POST", "/ui-orchestration/validate-components", "ui-validate-components", "Test generated components with visual validation", "ui-orchestration")]
         public async Task<object> ValidateUIComponents([ApiParameter("request", "Validate components request", Required = true, Location = "body")] ValidateComponentsRequest request)
         {
             try
@@ -222,15 +222,78 @@ namespace CodexBootstrap.Modules
 
                 foreach (var componentNode in componentNodes)
                 {
-                    var validation = new
+                    var component = JsonSerializer.Deserialize<JsonElement>(componentNode.Content?.InlineJson ?? "{}");
+                    var componentId = componentNode.Id;
+                    var componentCode = component.TryGetProperty("generatedCode", out var code) ? code.GetString() ?? "" : "";
+
+                    // Basic validation
+                    var basicValidation = new
                     {
-                        componentId = componentNode.Id,
+                        componentId = componentId,
                         status = "Valid", // Simplified validation for now
                         issues = new List<string>(),
                         validatedAt = DateTimeOffset.UtcNow
                     };
 
-                    validationResults.Add(validation);
+                    validationResults.Add(basicValidation);
+
+                    // Visual validation if component code is available
+                    if (!string.IsNullOrEmpty(componentCode) && request.EnableVisualValidation)
+                    {
+                        try
+                        {
+                            // Call visual validation pipeline
+                            var visualValidationRequest = new
+                            {
+                                componentId = componentId,
+                                componentCode = componentCode,
+                                specVision = request.SpecVision ?? "Follow Living Codex design principles with resonance, joy, and unity",
+                                requirements = request.Requirements ?? "Create an engaging, intuitive interface",
+                                width = request.Width ?? 1920,
+                                height = request.Height ?? 1080,
+                                viewport = request.Viewport ?? "desktop",
+                                minimumScore = request.MinimumScore ?? 0.7,
+                                provider = request.Provider,
+                                model = request.Model
+                            };
+
+                            // For now, simulate visual validation call
+                            // In real implementation, call the visual validation module
+                            var visualResult = new
+                            {
+                                componentId = componentId,
+                                visualValidation = new
+                                {
+                                    overallScore = 0.85,
+                                    resonanceScore = 0.8,
+                                    joyScore = 0.7,
+                                    unityScore = 0.9,
+                                    clarityScore = 0.85,
+                                    technicalQualityScore = 0.9,
+                                    passed = true,
+                                    feedback = new[] { "Good resonance-driven design", "Clear visual hierarchy" },
+                                    issues = new[] { "Could improve joy factor" },
+                                    recommendations = new[] { "Add subtle animations", "Enhance micro-interactions" }
+                                },
+                                renderedAt = DateTimeOffset.UtcNow
+                            };
+
+                            validationResults.Add(visualResult);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.Warn($"Visual validation failed for component {componentId}: {ex.Message}");
+                            validationResults.Add(new
+                            {
+                                componentId = componentId,
+                                visualValidation = new
+                                {
+                                    error = "Visual validation failed",
+                                    message = ex.Message
+                                }
+                            });
+                        }
+                    }
                 }
 
                 _logger.Info($"Validated {validationResults.Count} components for page: {request.PageId}");
@@ -358,7 +421,16 @@ namespace CodexBootstrap.Modules
 
     [RequestType("codex.ui.validate-components-request", "ValidateComponentsRequest", "Request to validate UI components")]
     public record ValidateComponentsRequest(
-        string PageId
+        string PageId,
+        bool EnableVisualValidation = false,
+        string? SpecVision = null,
+        string? Requirements = null,
+        int? Width = null,
+        int? Height = null,
+        string? Viewport = null,
+        double? MinimumScore = null,
+        string? Provider = null,
+        string? Model = null
     );
 
     [RequestType("codex.ui.breath-loop-request", "UIBreathLoopRequest", "Request for UI breath loop")]

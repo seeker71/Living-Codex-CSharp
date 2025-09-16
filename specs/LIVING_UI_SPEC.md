@@ -513,5 +513,58 @@ graph TD
 
 Implementation status: Design complete. Next step: Extend AI module with UI generation prompts.
 
+---
+
+## 15) Visual Validation System (Automated Quality Assurance)
+Summary: The system can render UI components to images and analyze them against spec vision using AI to ensure they meet the Living Codex design principles.
+
+### 15.1 Visual Validation Flow
+```mermaid
+graph TD
+    A[UI Component Generated] --> B[Render to Image]
+    B --> C[Store Image as Node]
+    C --> D[AI Visual Analysis]
+    D --> E[Compare Against Spec Vision]
+    E --> F[Generate Quality Metrics]
+    F --> G[Update Component Status]
+    G --> H[Trigger Re-generation if Needed]
+    
+    B --> B1[Puppeteer/Playwright]
+    C --> C1[codex.ui.rendered-image]
+    D --> D1[Vision AI Analysis]
+    E --> E1[Resonance/Joy/Unity Scoring]
+    F --> F1[Quality Dashboard]
+```
+
+### 15.2 Visual Validation API
+- `POST /visual-validation/render-component` — Render UI component to image
+- `POST /visual-validation/analyze-image` — Analyze rendered image against spec vision
+- `POST /visual-validation/validate-component` — Validate component against spec requirements
+- `POST /visual-validation/pipeline` — Execute full visual validation pipeline
+
+### 15.3 Quality Metrics
+- **Resonance Score** (0.0-1.0) — Visual harmony and connection
+- **Joy Score** (0.0-1.0) — Emotional engagement and excitement
+- **Unity Score** (0.0-1.0) — Cohesion and integration
+- **Clarity Score** (0.0-1.0) — Interface clarity and intuitiveness
+- **Technical Quality Score** (0.0-1.0) — Visual bugs and technical issues
+- **Overall Score** (0.0-1.0) — Weighted combination of all metrics
+
+### 15.4 Integration with Breath Loop
+- **Compose** → Create UI atoms with visual validation requirements
+- **Expand** → Generate components with visual validation enabled
+- **Validate** → Render components to images and analyze against spec
+- **Melt/Patch** → Apply visual feedback and regenerate if needed
+- **Refreeze** → Promote visually validated patterns to Ice
+
+### 15.5 Visual Analysis Capabilities
+- Screenshot capture at multiple viewport sizes
+- AI-powered visual analysis using vision models
+- Comparison against Living Codex design principles
+- Automated quality scoring and feedback generation
+- Integration with UI orchestration breath loop
+
+Implementation status: Design complete. Next step: Implement real screenshot capture with Puppeteer/Playwright.
+
 
 
