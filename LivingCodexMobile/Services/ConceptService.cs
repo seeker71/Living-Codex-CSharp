@@ -225,9 +225,12 @@ public class ConceptService : IConceptService
             return new ConceptQualityAssessment
             {
                 ConceptId = conceptId,
-                QualityScore = response?.Analysis?.GetValueOrDefault("qualityScore", 0.0),
-                AssessmentDate = DateTime.UtcNow,
-                Factors = response?.Analysis?.GetValueOrDefault("factors", new List<string>())
+                OverallScore = response?.Analysis != null && response.Analysis.TryGetValue("qualityScore", out var scoreObj) && scoreObj is double scoreVal ? scoreVal : 0.0,
+                AssessedAt = DateTime.UtcNow,
+                Strengths = response?.Analysis != null && response.Analysis.TryGetValue("strengths", out var strengthsObj) && strengthsObj is List<string> strengths ? strengths : new List<string>(),
+                Weaknesses = response?.Analysis != null && response.Analysis.TryGetValue("weaknesses", out var weaknessesObj) && weaknessesObj is List<string> weaknesses ? weaknesses : new List<string>(),
+                Recommendation = response?.Analysis != null && response.Analysis.TryGetValue("recommendation", out var recObj) ? recObj?.ToString() ?? string.Empty : string.Empty,
+                Metrics = response?.Analysis != null && response.Analysis.TryGetValue("metrics", out var metricsObj) && metricsObj is Dictionary<string, double> metrics ? metrics : new Dictionary<string, double>()
             };
         }
         catch (Exception ex)
@@ -314,7 +317,7 @@ public class ConceptService : IConceptService
             Description = node.Meta?.GetValueOrDefault("description")?.ToString() ?? node.Description ?? "",
             Domain = node.Meta?.GetValueOrDefault("domain")?.ToString() ?? "General",
             Complexity = int.TryParse(node.Meta?.GetValueOrDefault("complexity")?.ToString(), out var complexity) ? complexity : 0,
-            Tags = node.Meta?.GetValueOrDefault("tags")?.ToString()?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? new string[0],
+            Tags = node.Meta?.GetValueOrDefault("tags")?.ToString()?.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToList() ?? new List<string>(),
             CreatedAt = node.Meta?.GetValueOrDefault("createdAt") is DateTime created ? created : DateTime.UtcNow,
             UpdatedAt = node.Meta?.GetValueOrDefault("updatedAt") is DateTime updated ? updated : DateTime.UtcNow,
             Resonance = 0.75, // Default resonance

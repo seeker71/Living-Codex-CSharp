@@ -187,7 +187,11 @@ public class NewsFeedService : INewsFeedService
             if (direct?.Items != null && direct.Items.Count > 0) return direct.Items;
             // Fallback to contributions endpoint for read news tracking
             var response = await _apiService.GetAsync<ContributionsResponse>($"/contributions/user/{userId}?type=news-read&limit={limit}");
-            var newsIds = response?.Contributions?.Select(c => c.Metadata?.GetValueOrDefault("entityId")?.ToString()).Where(id => !string.IsNullOrEmpty(id)).ToList() ?? new List<string>();
+            var newsIds = response?.Contributions?
+                .Select(c => c.Metadata != null && c.Metadata.TryGetValue("entityId", out var v) ? v?.ToString() : null)
+                .Where(id => !string.IsNullOrEmpty(id))
+                .Select(id => id!)
+                .ToList() ?? new List<string>();
             var newsItems = new List<NewsItem>();
             
             foreach (var newsId in newsIds)
@@ -232,13 +236,11 @@ public class NewsFeedService : INewsFeedService
             Title = node.Title ?? "Unknown",
             Description = node.Description ?? "",
             Content = node.Content?.InlineJson ?? "",
-            Author = node.Meta?.GetValueOrDefault("author")?.ToString() ?? "Unknown",
             PublishedAt = node.Meta?.GetValueOrDefault("publishedAt") is DateTime published ? published : DateTime.UtcNow,
             Source = node.Meta?.GetValueOrDefault("source")?.ToString() ?? "Unknown",
             Url = node.Meta?.GetValueOrDefault("url")?.ToString() ?? "",
             ImageUrl = node.Meta?.GetValueOrDefault("imageUrl")?.ToString() ?? "",
-            Tags = node.Meta?.GetValueOrDefault("tags")?.ToString()?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? new string[0],
-            Category = node.Meta?.GetValueOrDefault("category")?.ToString() ?? "General",
+            Tags = node.Meta?.GetValueOrDefault("tags")?.ToString()?.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToList() ?? new List<string>(),
             IsRead = false, // Default to unread
             RelevanceScore = 0.5 // Default relevance
         };
