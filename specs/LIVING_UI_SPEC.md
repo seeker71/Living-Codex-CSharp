@@ -420,4 +420,49 @@ Non‑exhaustive selection relevant to UI v0:
 
 End of v0 of the Living UI Spec. This file is a node (Ice) indexing Water/Gas projections.
 
+---
+
+## 13) Bootstrap Architecture (Next.js self‑hosting from atoms)
+Summary: The UI is generated and maintained as nodes. The server stores atoms and artifacts; the Next.js app boots by fetching atoms, composing pages, and materializing components. Changes flow back via deltas.
+
+### 13.1 Asset Node Types (Ice atoms → Water/Gas projections)
+- `codex.ui.module` — module descriptor (routes, dependencies)
+- `codex.ui.page` — page spec (path, lenses, controls, copy)
+- `codex.ui.lens` — projection spec (adapters, actions, ranking)
+- `codex.ui.action` — action descriptor (effect, undo)
+- `codex.ui.controls` — control schema (fields, bindings)
+- `codex.ui.asset.file` — file artifact (path, content, hash, meta)
+- `codex.ui.asset.bundle` — build outputs (hash, files, map)
+- `codex.ui.feedback` — user/AI feedback linked to atoms
+
+Storage endpoints: `/storage-endpoints/nodes*`, `/storage-endpoints/edges*` for CRUD; spec endpoints for composition.
+
+### 13.2 Breath Loop Mapping (compose → expand → validate → melt/patch/refreeze → contract)
+- Compose: Create minimal `codex.ui.page` atom (Ice). Endpoint: `POST /spec/atoms` then `POST /spec/compose`.
+- Expand: Generate Water projections: draft components/files as `codex.ui.asset.file` nodes. Endpoint: `POST /spec-driven/generate-code`.
+- Validate: Run quick checks (schema, bindings) and preview. Endpoints: `GET /spec/routes/all`, dry‑run adapter pings.
+- Melt/Patch/Refreeze: Apply deltas based on feedback/tests. Endpoints: `POST /patch/{targetId}`, `POST /spec-driven/regenerate`.
+- Contract: Promote stable artifacts: mark page/lens/action atoms with updated status; optionally persist bundle manifest as Ice.
+
+### 13.3 Runtime Boot (Next.js)
+1) Preload: Fetch `codex.ui.module` and `codex.ui.page` for public routes.
+2) Compose routes: Dynamically register app routes (Next.js app dir can host dynamic catch‑all and render from atoms).
+3) Resolve lenses: For each page, load `codex.ui.lens`, `codex.ui.controls`, bind adapters to endpoints.
+4) Render: Use generic components (`List`, `Masonry`, `Thread`, `Map`, `Graph`) with item components referenced by atoms.
+5) Persist: User actions create deltas; store reflections/amplifications as contributions/edges.
+
+### 13.4 Build‑time Materialization (optional)
+- Generator fetches atoms → writes `/app/*/page.tsx`, `/components/*`, config files; records each file as `codex.ui.asset.file` with content address (hash).
+- Compile: Records `codex.ui.asset.bundle` with file hashes; links bundle ↔ atoms.
+
+### 13.5 Feedback Loop
+- Collect `codex.ui.feedback` nodes linked to page/lens/action with ratings and notes (human + AI summaries).
+- On next breath, generator updates atoms (copy, ranking weights, adapters) deterministically.
+
+### 13.6 Minimal “Hello Lens” One‑Shot
+- Atom: `codex.ui.page` `/hello` with lens `lens.stream` and controls `controls.resonance`.
+- Validate: List concepts via `POST /concept/discover` and render.
+- Contract: Persist page atom as Ice; mark routes Simple.
+
+
 
