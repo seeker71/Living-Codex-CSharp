@@ -253,7 +253,7 @@ public class ConceptService : IConceptService
                 Description = t.Description,
                 Domain = t.Domain,
                 Complexity = t.Complexity,
-                Tags = t.Tags,
+                Tags = t.Tags?.ToList() ?? new List<string>(),
                 CreatedAt = t.CreatedAt,
                 UpdatedAt = t.UpdatedAt,
                 Resonance = t.Resonance,
