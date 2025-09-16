@@ -12,19 +12,20 @@ namespace LivingCodexMobile.Tests.Services;
 
 public class ApiServiceTests
 {
-    private readonly Mock<HttpClient> _httpClientMock;
+    private readonly Mock<HttpMessageHandler> _httpMessageHandlerMock;
     private readonly Mock<ILoggingService> _loggingServiceMock;
     private readonly Mock<IErrorHandlingService> _errorHandlingServiceMock;
     private readonly GenericApiService _apiService;
 
     public ApiServiceTests()
     {
-        _httpClientMock = new Mock<HttpClient>();
+        _httpMessageHandlerMock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
+        var httpClient = new HttpClient(_httpMessageHandlerMock.Object);
         _loggingServiceMock = new Mock<ILoggingService>();
         _errorHandlingServiceMock = new Mock<IErrorHandlingService>();
         
         _apiService = new GenericApiService(
-            _httpClientMock.Object,
+            httpClient,
             Mock.Of<ILogger<GenericApiService>>(),
             _loggingServiceMock.Object,
             _errorHandlingServiceMock.Object);
@@ -54,8 +55,12 @@ public class ApiServiceTests
             Content = new StringContent(responseJson, Encoding.UTF8, "application/json")
         };
 
-        _httpClientMock.Setup(x => x.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(httpResponse);
+        _httpMessageHandlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync", 
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(httpResponse)
+            .Verifiable();
 
         // Act
         var result = await _apiService.GetAsync<ApiResponse<User>>("/users/123");
@@ -97,8 +102,12 @@ public class ApiServiceTests
             Content = new StringContent(responseJson, Encoding.UTF8, "application/json")
         };
 
-        _httpClientMock.Setup(x => x.PostAsync(It.IsAny<string>(), It.IsAny<HttpContent>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(httpResponse);
+        _httpMessageHandlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync",
+                ItExpr.Is<HttpRequestMessage>(m => m.Method == HttpMethod.Post),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(httpResponse)
+            .Verifiable();
 
         // Act
         var result = await _apiService.PostAsync<UserCreateRequest, ApiResponse<User>>("/users", request);
@@ -113,7 +122,10 @@ public class ApiServiceTests
     public async Task GetAsync_WithHttpError_ShouldHandleError()
     {
         // Arrange
-        _httpClientMock.Setup(x => x.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _httpMessageHandlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
             .ThrowsAsync(new HttpRequestException("Network error"));
 
         // Act & Assert
@@ -130,7 +142,10 @@ public class ApiServiceTests
             Content = new StringContent("invalid json", Encoding.UTF8, "application/json")
         };
 
-        _httpClientMock.Setup(x => x.PostAsync(It.IsAny<string>(), It.IsAny<HttpContent>(), It.IsAny<CancellationToken>()))
+        _httpMessageHandlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync",
+                ItExpr.Is<HttpRequestMessage>(m => m.Method == HttpMethod.Post),
+                ItExpr.IsAny<CancellationToken>())
             .ReturnsAsync(httpResponse);
 
         // Act & Assert

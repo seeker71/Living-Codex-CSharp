@@ -64,6 +64,15 @@ public static class TestEnvironmentSetup
             return configuration;
         });
 
+        // Add HttpClient factory and default client
+        services.AddHttpClient();
+        services.AddSingleton<HttpClient>(sp =>
+        {
+            var client = new HttpClient();
+            client.Timeout = TimeSpan.FromSeconds(30);
+            return client;
+        });
+
         // Add mock services
         services.AddSingleton(Mock.Of<IApiService>());
         services.AddSingleton(Mock.Of<IAuthenticationService>());

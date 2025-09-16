@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net6.0-maccatalyst15.4</TargetFramework>
+    <TargetFrameworks>net6.0;net6.0-maccatalyst15.4</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
@@ -26,9 +26,16 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.9" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.9" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.9" />
+    <PackageReference Condition=" '$(TargetFramework)' == 'net6.0' " Include="Microsoft.Extensions.Configuration" Version="7.0.0" />
+    <PackageReference Condition=" '$(TargetFramework)' == 'net6.0' " Include="Microsoft.Extensions.Configuration.Json" Version="7.0.0" />
   </ItemGroup>
 
-  <ItemGroup>
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net6.0' ">
+    <ProjectReference Include="..\LivingCodexMobile.Core\LivingCodexMobile.Core.csproj" />
+    <Compile Remove="UI\**\*.cs" />
+    <Compile Remove="ViewModels\**\*.cs" />
+  </ItemGroup>
+  <ItemGroup Condition=" '$(TargetFramework)' != 'net6.0' ">
     <ProjectReference Include="..\LivingCodexMobile\LivingCodexMobile.csproj" />
   </ItemGroup>
 

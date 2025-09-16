@@ -32,6 +32,8 @@ public class ApiIntegrationTests
 
         _services.AddSingleton<ILoggingService, LoggingService>();
         _services.AddSingleton<IErrorHandlingService, ErrorHandlingService>();
+        _services.AddHttpClient();
+        _services.AddSingleton<HttpClient>(sp => new HttpClient { Timeout = TimeSpan.FromSeconds(30) });
         _services.AddSingleton<IApiService, GenericApiService>();
         _services.AddSingleton<IAuthenticationService, AuthenticationService>();
         _services.AddSingleton<INewsFeedService, NewsFeedService>();
