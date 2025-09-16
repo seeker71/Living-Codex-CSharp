@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using CodexBootstrap.Core;
 using CodexBootstrap.Runtime;
+using PuppeteerSharp;
 
 namespace CodexBootstrap.Modules
 {
@@ -63,8 +64,8 @@ namespace CodexBootstrap.Modules
                 var htmlContent = GenerateTestHTML(request.ComponentCode, request.ComponentId);
                 var htmlPath = await WriteTempHTML(htmlContent, request.ComponentId);
 
-                // Capture screenshot using Puppeteer/Playwright (simplified for now)
-                var screenshotData = await CaptureScreenshot(htmlPath, request.ComponentId);
+                // Capture screenshot using Puppeteer
+                var screenshotData = await CaptureScreenshot(htmlPath, request.ComponentId, request.Width, request.Height, request.Viewport);
 
                 // Store rendered image as node
                 var imageNode = new Node(
@@ -432,16 +433,66 @@ Return your analysis as JSON with scores and detailed feedback.
     <title>Component Test - {componentId}</title>
     <script src=""https://cdn.tailwindcss.com""></script>
     <style>
-        body {{ margin: 0; padding: 20px; background: #f8fafc; }}
-        .component-container {{ max-width: 1200px; margin: 0 auto; }}
+        body {{ 
+            margin: 0; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }}
+        .component-container {{ 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            overflow: hidden;
+        }}
+        .header {{ 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 24px;
+            text-align: center;
+        }}
+        .content {{ 
+            padding: 32px;
+        }}
+        .component-root {{
+            min-height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 2px dashed #e2e8f0;
+        }}
+        .resonance-indicator {{
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 12px;
+            height: 12px;
+            background: #10b981;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }}
+        @keyframes pulse {{
+            0%, 100% {{ opacity: 1; }}
+            50% {{ opacity: 0.5; }}
+        }}
     </style>
 </head>
 <body>
     <div class=""component-container"">
-        <h1 class=""text-2xl font-bold mb-4"">Component Test: {componentId}</h1>
-        <div id=""component-root"">
-            <!-- Component will be rendered here -->
-            {componentCode}
+        <div class=""header"">
+            <h1 class=""text-3xl font-bold mb-2"">Living Codex Component Test</h1>
+            <p class=""text-lg opacity-90"">{componentId}</p>
+            <div class=""resonance-indicator""></div>
+        </div>
+        <div class=""content"">
+            <div class=""component-root"">
+                {componentCode}
+            </div>
         </div>
     </div>
 </body>
@@ -459,12 +510,95 @@ Return your analysis as JSON with scores and detailed feedback.
             return htmlPath;
         }
 
-        private async Task<byte[]> CaptureScreenshot(string htmlPath, string componentId)
+        private async Task<byte[]> CaptureScreenshot(string htmlPath, string componentId, int? width = null, int? height = null, string? viewport = null)
         {
-            // Simplified implementation - in real implementation, use Puppeteer/Playwright
-            // For now, return a placeholder image
-            var placeholderImage = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }; // PNG header
-            return await Task.FromResult(placeholderImage);
+            try
+            {
+                // Download Chromium if not already downloaded
+                await new BrowserFetcher().DownloadAsync();
+
+                // Launch browser
+                using var browser = await Puppeteer.LaunchAsync(new LaunchOptions
+                {
+                    Headless = true,
+                    Args = new[] { "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage" }
+                });
+
+                // Create new page
+                using var page = await browser.NewPageAsync();
+
+                // Set viewport size based on device type
+                var viewportOptions = GetViewportOptions(width ?? 1920, height ?? 1080, viewport ?? "desktop");
+                await page.SetViewportAsync(viewportOptions);
+
+                // Navigate to the HTML file
+                var fileUri = new Uri(htmlPath).AbsoluteUri;
+                await page.GoToAsync(fileUri);
+
+                // Wait for any dynamic content to load
+                await Task.Delay(2000);
+
+                // Take screenshot
+                var screenshot = await page.ScreenshotDataAsync();
+
+                _logger.Info($"Captured screenshot for component {componentId}, size: {screenshot.Length} bytes, viewport: {viewportOptions.Width}x{viewportOptions.Height}");
+                return screenshot;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error capturing screenshot for component {componentId}: {ex.Message}", ex);
+                
+                // Return a placeholder image on error
+                var placeholderImage = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }; // PNG header
+                return placeholderImage;
+            }
+        }
+
+        private ViewPortOptions GetViewportOptions(int width, int height, string viewport)
+        {
+            return viewport.ToLower() switch
+            {
+                "mobile" => new ViewPortOptions
+                {
+                    Width = 375,
+                    Height = 667,
+                    DeviceScaleFactor = 2,
+                    IsMobile = true,
+                    HasTouch = true
+                },
+                "tablet" => new ViewPortOptions
+                {
+                    Width = 768,
+                    Height = 1024,
+                    DeviceScaleFactor = 2,
+                    IsMobile = true,
+                    HasTouch = true
+                },
+                "desktop" => new ViewPortOptions
+                {
+                    Width = width,
+                    Height = height,
+                    DeviceScaleFactor = 1,
+                    IsMobile = false,
+                    HasTouch = false
+                },
+                "large-desktop" => new ViewPortOptions
+                {
+                    Width = 1920,
+                    Height = 1080,
+                    DeviceScaleFactor = 1,
+                    IsMobile = false,
+                    HasTouch = false
+                },
+                _ => new ViewPortOptions
+                {
+                    Width = width,
+                    Height = height,
+                    DeviceScaleFactor = 1,
+                    IsMobile = false,
+                    HasTouch = false
+                }
+            };
         }
     }
 
