@@ -3,7 +3,7 @@ using LivingCodexMobile.Models;
 using LivingCodexMobile.Services;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Moq.Protected;
+using LivingCodexMobile.Tests.Helpers;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -13,15 +13,15 @@ namespace LivingCodexMobile.Tests.Services;
 
 public class ApiServiceTests
 {
-    private readonly Mock<HttpMessageHandler> _httpMessageHandlerMock;
+    private TestHttpMessageHandler _handler = null!;
     private readonly Mock<ILoggingService> _loggingServiceMock;
     private readonly Mock<IErrorHandlingService> _errorHandlingServiceMock;
     private readonly GenericApiService _apiService;
 
     public ApiServiceTests()
     {
-        _httpMessageHandlerMock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
-        var httpClient = new HttpClient(_httpMessageHandlerMock.Object);
+        _handler = TestHttpMessageHandler.FromResponse(new HttpResponseMessage(HttpStatusCode.OK));
+        var httpClient = new HttpClient(_handler);
         _loggingServiceMock = new Mock<ILoggingService>();
         _errorHandlingServiceMock = new Mock<IErrorHandlingService>();
         
@@ -56,12 +56,11 @@ public class ApiServiceTests
             Content = new StringContent(responseJson, Encoding.UTF8, "application/json")
         };
 
-        _httpMessageHandlerMock.Protected()
-            .Setup<Task<HttpResponseMessage>>("SendAsync", 
-                ItExpr.IsAny<HttpRequestMessage>(),
-                ItExpr.IsAny<CancellationToken>())
-            .ReturnsAsync(httpResponse)
-            .Verifiable();
+        _handler = TestHttpMessageHandler.FromResponse(httpResponse);
+        var httpClient = new HttpClient(_handler);
+        typeof(GenericApiService)
+            .GetField("_httpClient", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+            ?.SetValue(_apiService, httpClient);
 
         // Act
         var result = await _apiService.GetAsync<ApiResponse<User>>("/users/123");
@@ -103,12 +102,11 @@ public class ApiServiceTests
             Content = new StringContent(responseJson, Encoding.UTF8, "application/json")
         };
 
-        _httpMessageHandlerMock.Protected()
-            .Setup<Task<HttpResponseMessage>>("SendAsync",
-                ItExpr.Is<HttpRequestMessage>(m => m.Method == HttpMethod.Post),
-                ItExpr.IsAny<CancellationToken>())
-            .ReturnsAsync(httpResponse)
-            .Verifiable();
+        _handler = TestHttpMessageHandler.FromResponse(httpResponse);
+        var httpClient = new HttpClient(_handler);
+        typeof(GenericApiService)
+            .GetField("_httpClient", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+            ?.SetValue(_apiService, httpClient);
 
         // Act
         var result = await _apiService.PostAsync<UserCreateRequest, ApiResponse<User>>("/users", request);
@@ -123,11 +121,11 @@ public class ApiServiceTests
     public async Task GetAsync_WithHttpError_ShouldHandleError()
     {
         // Arrange
-        _httpMessageHandlerMock.Protected()
-            .Setup<Task<HttpResponseMessage>>("SendAsync",
-                ItExpr.IsAny<HttpRequestMessage>(),
-                ItExpr.IsAny<CancellationToken>())
-            .ThrowsAsync(new HttpRequestException("Network error"));
+        _handler = TestHttpMessageHandler.Throws(new HttpRequestException("Network error"));
+        var httpClient = new HttpClient(_handler);
+        typeof(GenericApiService)
+            .GetField("_httpClient", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+            ?.SetValue(_apiService, httpClient);
 
         // Act & Assert
         await Assert.ThrowsAsync<HttpRequestException>(() => 
@@ -143,11 +141,11 @@ public class ApiServiceTests
             Content = new StringContent("invalid json", Encoding.UTF8, "application/json")
         };
 
-        _httpMessageHandlerMock.Protected()
-            .Setup<Task<HttpResponseMessage>>("SendAsync",
-                ItExpr.Is<HttpRequestMessage>(m => m.Method == HttpMethod.Post),
-                ItExpr.IsAny<CancellationToken>())
-            .ReturnsAsync(httpResponse);
+        _handler = TestHttpMessageHandler.FromResponse(httpResponse);
+        var httpClient = new HttpClient(_handler);
+        typeof(GenericApiService)
+            .GetField("_httpClient", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+            ?.SetValue(_apiService, httpClient);
 
         // Act & Assert
         await Assert.ThrowsAsync<JsonException>(() => 
