@@ -35,8 +35,9 @@ public class NodeExplorerExamples
     {
         var request = new NodeSearchRequest 
         { 
-            SearchTerm = searchTerm,
-            Take = 50
+            Query = searchTerm,
+            Limit = 50,
+            Skip = 0
         };
         return await _nodeExplorerService.SearchNodesAsync(request);
     }
@@ -164,7 +165,7 @@ public class NodeExplorerExamples
     {
         var request = new NodeSearchRequest
         {
-            MetaFilters = new[] { new Dictionary<string, string> { [key] = value } }
+            Filters = new Dictionary<string, object> { [key] = value }
         };
         return await _nodeExplorerService.SearchNodesAsync(request);
     }

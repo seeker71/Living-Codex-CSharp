@@ -96,7 +96,10 @@ public class NewsFeedService : INewsFeedService
     {
         try
         {
-            // Map to existing node endpoint for news items
+            // Prefer dedicated news item endpoint if available
+            var direct = await _apiService.GetAsync<NewsItemResponse>($"/news/item/{newsId}");
+            if (direct?.Item != null) return direct.Item;
+            // Fallback to node endpoint
             var response = await _apiService.GetAsync<NodeResponse>($"/storage-endpoints/nodes/{newsId}");
             return response?.Node != null ? MapNodeToNewsItem(response.Node) : null;
         }
@@ -133,9 +136,12 @@ public class NewsFeedService : INewsFeedService
     {
         try
         {
-            // Map to existing graph relationships endpoint for related content
+            // Prefer dedicated related news endpoint if available
+            var direct = await _apiService.GetAsync<NewsFeedResponse>($"/news/related/{newsId}?limit={limit}");
+            if (direct?.Items != null && direct.Items.Count > 0) return direct.Items;
+            // Fallback to graph relationships endpoint
             var response = await _apiService.GetAsync<GraphRelationshipsResponse>($"/graph/relationships/{newsId}");
-            return response?.RelatedNodes?.Where(n => n.TypeId == "codex.news").Take(limit).Select(n => MapNodeToNewsItem(n)).ToList() ?? new List<NewsItem>();
+            return response?.RelatedNodes?.Where(n => n.TypeId == "codex.news.item").Take(limit).Select(n => MapNodeToNewsItem(n)).ToList() ?? new List<NewsItem>();
         }
         catch (Exception ex)
         {
@@ -148,15 +154,18 @@ public class NewsFeedService : INewsFeedService
     {
         try
         {
-            // Map to existing contribution recording for read tracking
+            // Prefer dedicated read tracking endpoint if available
+            var readRequest = new NewsReadRequest { UserId = userId, NewsId = newsId };
+            var direct = await _apiService.PostAsync<NewsReadRequest, ApiResponse>("/news/read", readRequest);
+            if (direct?.Success == true) return true;
+            // Fallback to contribution recording
             var request = new ContributionRequest
             {
                 UserId = userId,
                 Title = $"Read news: {newsId}",
                 Description = "User read a news item",
                 Type = "news-read",
-                Energy = 10.0,
-                EntityId = newsId
+                Metadata = new Dictionary<string, object> { ["entityId"] = newsId, ["energy"] = 10.0 }
             };
             await _apiService.PostAsync<ContributionRequest, ContributionResponse>("/contributions/record", request);
             return true;
@@ -173,8 +182,12 @@ public class NewsFeedService : INewsFeedService
         try
         {
             // Map to existing contributions endpoint for read news tracking
+            // Prefer dedicated read list endpoint if available
+            var direct = await _apiService.GetAsync<NewsFeedResponse>($"/news/read/{userId}?limit={limit}");
+            if (direct?.Items != null && direct.Items.Count > 0) return direct.Items;
+            // Fallback to contributions endpoint for read news tracking
             var response = await _apiService.GetAsync<ContributionsResponse>($"/contributions/user/{userId}?type=news-read&limit={limit}");
-            var newsIds = response?.Contributions?.Select(c => c.EntityId).Where(id => !string.IsNullOrEmpty(id)).ToList() ?? new List<string>();
+            var newsIds = response?.Contributions?.Select(c => c.Metadata?.GetValueOrDefault("entityId")?.ToString()).Where(id => !string.IsNullOrEmpty(id)).ToList() ?? new List<string>();
             var newsItems = new List<NewsItem>();
             
             foreach (var newsId in newsIds)

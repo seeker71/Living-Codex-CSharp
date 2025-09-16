@@ -89,9 +89,10 @@ public class ConceptService : IConceptService
             // Map to existing node search with concept type filter
             var nodeSearchRequest = new NodeSearchRequest
             {
-                Query = request.Query,
+                Query = request.SearchTerm ?? string.Empty,
                 Filters = new Dictionary<string, object> { ["typeId"] = "codex.concept" },
-                Limit = request.Limit
+                Limit = request.Take ?? 10,
+                Skip = request.Skip ?? 0
             };
             var response = await _apiService.PostAsync<NodeSearchRequest, NodeSearchResponse>("/storage-endpoints/nodes/search", nodeSearchRequest);
             return response?.Nodes?.Select(n => MapNodeToConcept(n)).ToList() ?? new List<Concept>();
@@ -107,16 +108,16 @@ public class ConceptService : IConceptService
     {
         try
         {
-            // Map to existing user discovery with concept-based discovery
-            var userDiscoveryRequest = new UserDiscoveryRequest
+            // Fallback: use node search against content text to discover concepts
+            var nodeSearchRequest = new NodeSearchRequest
             {
-                UserId = request.UserId,
-                DiscoveryType = "concept",
-                Interests = request.Interests,
-                Limit = request.Limit
+                Query = request.Content,
+                Filters = new Dictionary<string, object> { ["typeId"] = "codex.concept" },
+                Limit = request.MaxConcepts ?? 10,
+                Skip = 0
             };
-            var response = await _apiService.PostAsync<UserDiscoveryRequest, UserDiscoveryResult>("/users/discover", userDiscoveryRequest);
-            return response?.Concepts?.Select(c => MapNodeToConcept(c)).ToList() ?? new List<Concept>();
+            var response = await _apiService.PostAsync<NodeSearchRequest, NodeSearchResponse>("/storage-endpoints/nodes/search", nodeSearchRequest);
+            return response?.Nodes?.Select(n => MapNodeToConcept(n)).ToList() ?? new List<Concept>();
         }
         catch (Exception ex)
         {
@@ -135,13 +136,8 @@ public class ConceptService : IConceptService
                 FromId = request.FromConceptId,
                 ToId = request.ToConceptId,
                 Role = request.RelationshipType,
-                Weight = request.Strength,
-                Meta = new Dictionary<string, object>
-                {
-                    ["relationshipType"] = request.RelationshipType,
-                    ["strength"] = request.Strength,
-                    ["description"] = request.Description ?? ""
-                }
+                Weight = request.Weight,
+                Meta = request.Metadata
             };
             var response = await _apiService.PostAsync<CreateEdgeRequest, EdgeResponse>("/storage-endpoints/edges", edgeRequest);
             return new ConceptRelationship
@@ -149,8 +145,8 @@ public class ConceptService : IConceptService
                 FromConceptId = request.FromConceptId,
                 ToConceptId = request.ToConceptId,
                 RelationshipType = request.RelationshipType,
-                Strength = request.Strength,
-                Description = request.Description
+                Weight = request.Weight,
+                Metadata = request.Metadata
             };
         }
         catch (Exception ex)
@@ -197,12 +193,12 @@ public class ConceptService : IConceptService
             // Map to existing user-concept link/unlink endpoints
             if (interested)
             {
-                var linkRequest = new UserConceptLinkRequest(userId, conceptId, "interest");
+                var linkRequest = new UserConceptLinkRequest { UserId = userId, ConceptId = conceptId, RelationshipType = "interest" };
                 await _apiService.PostAsync<UserConceptLinkRequest, object>("/userconcept/link", linkRequest);
             }
             else
             {
-                var unlinkRequest = new UserConceptUnlinkRequest(userId, conceptId);
+                var unlinkRequest = new UserConceptUnlinkRequest { UserId = userId, ConceptId = conceptId };
                 await _apiService.PostAsync<UserConceptUnlinkRequest, object>("/userconcept/unlink", unlinkRequest);
             }
             return true;
