@@ -3,6 +3,7 @@ using LivingCodexMobile.Models;
 using LivingCodexMobile.Services;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Moq.Protected;
 using System.Net;
 using System.Text;
 using System.Text.Json;
