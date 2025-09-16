@@ -1,0 +1,291 @@
+# Living UI Spec — Fractal, Spec‑First, Resonance‑Driven
+
+Short intent: A modular Next.js UI whose pages and views are generated from spec atoms. Everything is a Node; pages, lenses, actions, copy, and endpoint bindings are meta‑nodes that round‑trip to code and back. The spec is hierarchical (spiral); each section has a summary, deeper detail, implementation status, and endpoint mapping.
+
+---
+
+## 1) High‑Level Summary (Spiral Level 0)
+- **Purpose**: Invite curiosity and joyful exploration of concepts, people, news, and time through resonance — not static friend lists or opaque AI feeds.
+- **Principles**: Everything is a Node; Adapters over Features; Keep Ice Tiny; Tiny Deltas; One‑Shot First; Deterministic Projections.
+- **UX Primitives**: Attune (soft subscribe), Amplify (boost with care), Weave (connect nodes with intent), Reflect (kind reply), Invite (consentful joining).
+- **Global Controls**: Resonance Compass (axes emphasis), Joy Tuner (uplift vs challenge), Serendipity Dial (novelty), Curiosity Prompts.
+- **Lenses (Views)**: Stream, Threads, Gallery, Chats, Circles, Swipe, Nearby, Live, Making, Graph. Lenses are projections over the same node graph.
+- **Outcome**: A spec‑driven UI that can generate routes, components, and bindings, track RouteStatus, and evolve from within the system.
+
+Implementation status: Untested (spec only). Route coverage: Partial. Generation hooks: Draft.
+
+---
+
+## 2) Information Architecture (Level 1)
+Summary: Top‑level routes are stable anchors. Each route hosts one or more lenses. All content derives from nodes and edges via adapters.
+
+- `/` Home: Hero, quick actions, “Now Resonating”, learn‑more links.
+- `/discover`: Tabs → Stream, Threads, Gallery, Nearby, Swipe.
+- `/resonance`: Primer + Compare concepts.
+- `/news`: Resonant news stream (personalized or global).
+- `/ontology`: U‑CORE axes browser, boards (Threads lens).
+- `/people`: Discover by resonance overlap and place.
+- `/portals`: External/world/time portals overview and demos.
+- `/create`: Guided concept creation (optional AI assist).
+- `/about`: What/why resonance, how news flows, joy & abundance, how built.
+- `/node/[id]`: Node detail with mini‑lenses and actions.
+- `/graph`: Interactive graph with lens layouts.
+- `/u/[id]`: Profile with resonance overlap and contributions.
+- `/auth/*`: Sign‑in and callbacks.
+
+Implementation status: Untested. Endpoint mappings: Partial (see Section 5).
+
+---
+
+## 3) Lenses (Level 1 → Level 2)
+Summary: Lenses are reusable projections; each declares purpose, inputs, actions, ranking, and endpoint adapters.
+
+### 3.1 Stream Lens
+- **Intent**: Short, kind updates across concepts/people you attune to, plus serendipity.
+- **Inputs**: concept nodes, user nodes, news items; compass/joy/serendipity.
+- **Actions**: attune, amplify, reflect, weave, compare resonance.
+- **Ranking**: resonance × joy × recency; penalize outrage.
+- **Endpoints**: news, concept discovery, user discovery.
+- **Status**: Untested.
+
+### 3.2 Threads Lens (Boards)
+- Topic‑first conversations bound to ontology subgraphs.
+- Endpoints: `POST /concept/search`, `GET /concept/ontology/explore/{id}`.
+
+### 3.3 Gallery Lens (Visual)
+- Visual first cards; axis badges; joy streaks.
+- Endpoints: `/image/*`, concept detail.
+
+### 3.4 Chats Lens (Conversational fields)
+- Consentful chats scoped to concepts; summaries are Water.
+- Endpoints: events stream (SSE), future chat module (TBD).
+
+### 3.5 Circles Lens (Shared fields)
+- Groupings by overlap; “unity moments” when circles converge.
+- Endpoints: user discovery, user‑concept relations.
+
+### 3.6 Swipe Lens (Fast mapping)
+- Binary attune/skip for onboarding and exploration.
+- Endpoints: discover concepts, link/unlink user‑concept.
+
+### 3.7 Nearby Lens (Geo resonance)
+- Map overlay by axes; local concepts and gatherings.
+- Endpoints: user discovery (geo), concept search (geo: later).
+
+### 3.8 Live Lens (Rooms)
+- Live rooms (audio/text) with joy/unity indicators.
+- Endpoints: events streaming; live module (TBD).
+
+### 3.9 Making Lens (Contributions)
+- Abundance timeline of contributions, amplifications, edges.
+- Endpoints: `/contributions/*`, `/rewards/*`, `/ledger/*`.
+
+### 3.10 Graph Lens (Structure)
+- Graph explorer: nodes/edges with lens layouts.
+- Endpoints: `/storage-endpoints/*` or `/graph/*` when available.
+
+---
+
+## 4) Global Controls & Primitives (Level 2)
+Summary: Reusable components connect to the same adapter API across lenses.
+
+- ResonanceControls: compass, joy, serendipity, prompts → query params hashed to URL.
+- AttuneButton → create/update edge user→node (soft subscribe).
+- AmplifyButton → record contribution/amplification.
+- WeaveComposer → propose edge with reason; submit for moderation (later).
+- ReflectInline → short replies; kind defaults.
+
+Implementation status: Untested.
+
+---
+
+## 5) Endpoint Map (Feature ⇄ API) (Level 2)
+Summary: Each feature declares endpoint intents; adapters select concrete routes. RouteStatus tracks integration maturity.
+
+- Concepts
+  - List/Search: `GET /concepts`, `POST /concept/search`, `POST /concept/discover`
+  - Detail/Relations: `GET /concepts/{id}`, `GET /concept/ontology/explore/{id}`
+  - Create/Update: `POST /concepts`, `PUT /concepts/{id}`, `POST /concept/create`, `POST /concept/relate`
+  - User links: `POST /concept/user/link`, `POST /concept/user/unlink`, `GET /concept/{conceptId}/users`, `GET /concept/user/{userId}`
+
+- Resonance
+  - Compare/Encode: `POST /concepts/resonance/compare`, `POST /concepts/resonance/encode`
+  - U‑CORE axes: `GET /concept/ontology/frequencies`
+
+- News
+  - Stream/Search: (module exposes news via Concept/Events; for MVP use concept discovery + events) — when available, bind `/news/*`
+
+- People / Discovery
+  - Discover/Geo/Contributors: `POST /users/discover`, `GET /concepts/{conceptId}/contributors`
+  - User‑concept relations: `GET /userconcept/*`, `POST /userconcept/*`
+
+- Contributions / Abundance / Ledger
+  - Contributions/Rewards: `POST /contributions/record`, `GET /contributions/user/{userId}`, `GET /rewards/user/{userId}`, `POST /rewards/claim`
+  - ETH: `GET /ledger/balance/{address}`, `POST /ledger/transfer`
+
+- Storage / Graph
+  - Nodes: `GET/POST/PUT/DELETE /storage-endpoints/nodes*`
+  - Edges: `GET/POST/PUT/DELETE /storage-endpoints/edges*`
+
+- Spec / Open API / Meta
+  - Spec/Routes: `GET /spec/routes/all`, `GET /openapi`, `GET /spec/modules/with-specs`
+  - Spec‑Driven: `POST /spec-driven/*`
+
+---
+
+## 6) RouteStatus Tracking (Level 2)
+Summary: Each UI feature declares status per route based on backend maturity.
+
+- Allowed values: Stub, Simple, Simulated, Fallback, AiEnabled, ExternalInfo, Untested, PartiallyTested, FullyTested.
+- Example:
+
+```json
+{
+  "featureId": "lens.stream",
+  "routes": [
+    { "method": "POST", "path": "/concept/discover", "status": "Simple" },
+    { "method": "POST", "path": "/users/discover", "status": "Simple" },
+    { "method": "GET", "path": "/spec/routes/all", "status": "Untested" }
+  ]
+}
+```
+
+---
+
+## 7) Generation Atoms (Spec → UI) (Level 2)
+Summary: Minimal atoms that can deterministically generate Next.js pages/components.
+
+### 7.1 UI Module Atom
+```json
+{
+  "type": "codex.ui.module",
+  "id": "ui.module.core",
+  "name": "Core UI Module",
+  "routes": ["/", "/discover", "/resonance", "/news", "/ontology", "/people", "/portals", "/create", "/about", "/graph", "/node/[id]", "/u/[id]"]
+}
+```
+
+### 7.2 Page Atom
+```json
+{
+  "type": "codex.ui.page",
+  "path": "/discover",
+  "title": "Discover",
+  "lenses": ["lens.stream", "lens.threads", "lens.gallery", "lens.nearby", "lens.swipe"],
+  "controls": ["controls.resonance"],
+  "status": "Untested"
+}
+```
+
+### 7.3 Lens Atom
+```json
+{
+  "type": "codex.ui.lens",
+  "id": "lens.stream",
+  "name": "Stream Lens",
+  "projection": "list",
+  "itemComponent": "ConceptStreamCard",
+  "adapters": {
+    "list": { "method": "POST", "path": "/concept/discover" },
+    "people": { "method": "POST", "path": "/users/discover" }
+  },
+  "actions": ["action.attune", "action.amplify", "action.reflect", "action.weave"],
+  "ranking": "resonance*joy*recency",
+  "status": "Simple"
+}
+```
+
+### 7.4 Action Atom
+```json
+{
+  "type": "codex.ui.action",
+  "id": "action.attune",
+  "label": "Attune",
+  "effect": {
+    "method": "POST",
+    "path": "/concept/user/link",
+    "bodyTemplate": { "userId": "${session.userId}", "conceptId": "${item.id}", "relation": "attuned" }
+  },
+  "undo": {
+    "method": "POST",
+    "path": "/concept/user/unlink",
+    "bodyTemplate": { "userId": "${session.userId}", "conceptId": "${item.id}" }
+  }
+}
+```
+
+### 7.5 Control Atom
+```json
+{
+  "type": "codex.ui.controls",
+  "id": "controls.resonance",
+  "fields": [
+    { "id": "axes", "type": "multi", "options": ["abundance","unity","resonance","innovation","science","consciousness","impact"] },
+    { "id": "joy", "type": "range", "min": 0, "max": 1 },
+    { "id": "serendipity", "type": "range", "min": 0, "max": 1 }
+  ],
+  "urlBinding": "querystring"
+}
+```
+
+---
+
+## 8) Copy Blocks (Level 2 → Level 3)
+Short, inviting copy to avoid overwhelm; longer content linked.
+
+- Home hero: "Find ideas that resonate. Meet people who amplify them. See the world’s news through a living ontology."
+- Subtext: "Everything is a Node. Explore concepts, people, and moments connected by resonance."
+
+Atoms can carry i18n variants later via `meta.lang`.
+
+---
+
+## 9) Deterministic Projection Rules (Level 2)
+- Page composition = sum(lens.render(query(params ⊗ controls)))
+- Water only: lists, cards, summaries, rankings; Ice remains ontology/spec atoms.
+- Gas: live room states, cursors, hovers; never persisted.
+
+---
+
+## 10) Generation Hooks (Spec → Next.js) (Level 2)
+Summary: From UI atoms, generate app directory, routes, providers, and components with typed adapters.
+
+- Hook A: Read `codex.ui.module` + `codex.ui.page` → create `/app/{route}/page.tsx` with tabs for lenses.
+- Hook B: For each `codex.ui.lens` → generate `components/{ItemComponent}.tsx` and data adapter with endpoint bindings.
+- Hook C: For each `codex.ui.action` → generate hooks `useAttune`, `useAmplify` calling declared endpoints.
+- Hook D: Controls atoms → `components/ResonanceControls.tsx` with URL bindings.
+- Hook E: RouteStatus badges render per feature.
+
+Implementation status: Draft. Next step: build a small generator that converts these atoms into a Next.js scaffold.
+
+---
+
+## 11) One‑Shot Validation (Level 1)
+- A new user can: open Discover → Stream Lens → Attune to 3 concepts → open Resonance Compare → see mapped endpoints.
+- Verify endpoints respond for list/search (`/concept/discover`, `/concepts`, `/users/discover`).
+
+Status: Untested.
+
+---
+
+## 12) Appendices
+
+### A. Minimal Endpoint Inventory (live)
+Non‑exhaustive selection relevant to UI v0:
+- Concepts: `GET /concepts`, `GET /concepts/{id}`, `POST /concepts`, `POST /concept/search`, `POST /concept/discover`, `POST /concept/relate`
+- Resonance: `POST /concepts/resonance/compare`, `POST /concepts/resonance/encode`, `GET /concept/ontology/frequencies`
+- User Discovery: `POST /users/discover`, `GET /concepts/{conceptId}/contributors`
+- User‑Concept: `POST /concept/user/link`, `POST /concept/user/unlink`, `GET /concept/user/{userId}`, `GET /concept/{conceptId}/users`
+- Contributions/Abundance: `POST /contributions/record`, `GET /rewards/user/{userId}`, `GET /contributions/user/{userId}`
+- Ledger: `GET /ledger/balance/{address}`, `POST /ledger/transfer`
+- Storage/Graph: `/storage-endpoints/nodes*`, `/storage-endpoints/edges*`
+- Spec/Meta: `GET /spec/routes/all`, `GET /openapi`, `POST /spec-driven/*`
+
+### B. Node Typing for UI Atoms
+- `codex.ui.module`, `codex.ui.page`, `codex.ui.lens`, `codex.ui.action`, `codex.ui.controls` with `meta` for status, owner, and spec refs.
+
+---
+
+End of v0 of the Living UI Spec. This file is a node (Ice) indexing Water/Gas projections.
+
+
