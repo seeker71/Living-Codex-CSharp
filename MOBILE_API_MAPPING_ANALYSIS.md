@@ -56,7 +56,7 @@ After analyzing the existing 350+ server endpoints and the mobile app's API requ
 | `GET /news/read/{userId}` | ✅ | `GET /news/read/{userId}` | ✅ **EXACT MATCH** | NewsFeedModule |
 | `GET /news/unread/{userId}` | ✅ | `GET /news/unread/{userId}` | ✅ **EXACT MATCH** | NewsFeedModule |
 
-**Notes:** All News endpoints required by the mobile app are available in `NewsFeedModule` and verified via tests. When no news exists in the registry, endpoints return valid empty results with HTTP 200, as seen in the tests.
+**Notes:** All News endpoints required by the mobile app are available in `NewsFeedModule` and verified via tests and live runtime checks. When no news exists in the registry, endpoints return valid empty results with HTTP 200, confirmed via curl against a running server.
 
 ### 4. Node & Edge Management ✅ **FULLY COVERED**
 
