@@ -134,6 +134,41 @@ namespace CodexBootstrap.Core.Security
         }
 
         /// <summary>
+        /// Issues a JWT token for an existing active user by email (used after external OAuth sign-in).
+        /// </summary>
+        public async Task<AuthenticationResult> IssueTokenForEmailAsync(string email)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(email))
+                    return AuthenticationResult.Failure("Email is required");
+
+                var user = await _userRepository.GetByEmailAsync(email);
+                if (user == null || !user.IsActive)
+                    return AuthenticationResult.Failure("User not found or inactive");
+
+                // Create session
+                var session = new UserSession
+                {
+                    UserId = user.Id,
+                    Email = user.Email,
+                    CreatedAt = DateTime.UtcNow,
+                    ExpiresAt = DateTime.UtcNow.AddMinutes(_jwtExpirationMinutes),
+                    IsActive = true
+                };
+
+                var token = GenerateJwtToken(user);
+                _activeSessions[token] = session;
+                return AuthenticationResult.Success(token, user);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"IssueTokenForEmailAsync error for {email}: {ex.Message}", ex);
+                return AuthenticationResult.Failure("Token issuance failed");
+            }
+        }
+
+        /// <summary>
         /// Registers a new user
         /// </summary>
         public async Task<AuthenticationResult> RegisterAsync(string email, string password, string displayName = null)
