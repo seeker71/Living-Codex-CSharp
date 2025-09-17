@@ -5,17 +5,28 @@ import { Navigation } from '@/components/ui/Navigation';
 import { endpoints } from '@/lib/api';
 
 interface ResonanceData {
+  success: boolean;
   collectiveResonance: number;
-  totalContributions: number;
-  energyLevel: number;
-  amplificationFactor: number;
+  totalContributors: number;
+  totalAbundanceEvents: number;
+  recentAbundanceEvents: number;
+  averageAbundanceMultiplier: number;
+  totalCollectiveValue: number;
+  timestamp: string;
 }
 
 interface ContributorEnergy {
+  success: boolean;
   userId: string;
   energyLevel: number;
-  totalContributions: number;
+  baseEnergy: number;
+  amplifiedEnergy: number;
   resonanceLevel: number;
+  totalContributions: number;
+  totalValue: number;
+  totalCollectiveValue: number;
+  averageAbundanceMultiplier: number;
+  lastUpdated: string;
 }
 
 export default function ResonancePage() {
@@ -135,28 +146,28 @@ export default function ResonancePage() {
                   <div className="bg-blue-50 rounded-lg p-4">
                     <div className="text-sm text-blue-600 font-medium">Resonance Level</div>
                     <div className="text-2xl font-bold text-blue-900">
-                      {(collectiveData.collectiveResonance * 100).toFixed(1)}%
+                      {collectiveData.collectiveResonance.toFixed(1)}%
                     </div>
                   </div>
                   <div className="bg-purple-50 rounded-lg p-4">
-                    <div className="text-sm text-purple-600 font-medium">Energy Level</div>
+                    <div className="text-sm text-purple-600 font-medium">Abundance Events</div>
                     <div className="text-2xl font-bold text-purple-900">
-                      {collectiveData.energyLevel.toFixed(2)}
+                      {collectiveData.totalAbundanceEvents}
                     </div>
                   </div>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-green-50 rounded-lg p-4">
-                    <div className="text-sm text-green-600 font-medium">Total Contributions</div>
+                    <div className="text-sm text-green-600 font-medium">Total Contributors</div>
                     <div className="text-2xl font-bold text-green-900">
-                      {collectiveData.totalContributions.toLocaleString()}
+                      {collectiveData.totalContributors.toLocaleString()}
                     </div>
                   </div>
                   <div className="bg-orange-50 rounded-lg p-4">
                     <div className="text-sm text-orange-600 font-medium">Amplification</div>
                     <div className="text-2xl font-bold text-orange-900">
-                      {collectiveData.amplificationFactor.toFixed(2)}x
+                      {collectiveData.averageAbundanceMultiplier.toFixed(2)}x
                     </div>
                   </div>
                 </div>
@@ -164,12 +175,12 @@ export default function ResonancePage() {
                 <div className="mt-6">
                   <div className="flex justify-between text-sm text-gray-600 mb-2">
                     <span>Resonance Strength</span>
-                    <span>{(collectiveData.collectiveResonance * 100).toFixed(1)}%</span>
+                    <span>{collectiveData.collectiveResonance.toFixed(1)}%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3">
                     <div 
                       className="bg-gradient-to-r from-blue-500 to-purple-600 h-3 rounded-full transition-all duration-500"
-                      style={{ width: `${collectiveData.collectiveResonance * 100}%` }}
+                      style={{ width: `${Math.min(collectiveData.collectiveResonance, 100)}%` }}
                     ></div>
                   </div>
                 </div>
@@ -201,19 +212,19 @@ export default function ResonancePage() {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Resonance Level</span>
-                    <span className="font-medium">{(contributorData.resonanceLevel * 100).toFixed(1)}%</span>
+                    <span className="font-medium">{contributorData.resonanceLevel.toFixed(1)}%</span>
                   </div>
                 </div>
 
                 <div className="mt-6">
                   <div className="flex justify-between text-sm text-gray-600 mb-2">
                     <span>Personal Resonance</span>
-                    <span>{(contributorData.resonanceLevel * 100).toFixed(1)}%</span>
+                    <span>{contributorData.resonanceLevel.toFixed(1)}%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3">
                     <div 
                       className="bg-gradient-to-r from-indigo-500 to-pink-500 h-3 rounded-full transition-all duration-500"
-                      style={{ width: `${contributorData.resonanceLevel * 100}%` }}
+                      style={{ width: `${Math.min(contributorData.resonanceLevel, 100)}%` }}
                     ></div>
                   </div>
                 </div>

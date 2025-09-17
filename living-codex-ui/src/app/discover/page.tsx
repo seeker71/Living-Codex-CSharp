@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { ResonanceControls } from '@/components/ui/ResonanceControls';
 import { StreamLens } from '@/components/lenses/StreamLens';
 import { Navigation } from '@/components/ui/Navigation';
@@ -27,6 +27,11 @@ export default function DiscoverPage() {
   const { data: lenses, isLoading: lensesLoading } = useLenses();
 
   const currentLens = lenses?.find(l => l.id === activeLens) || defaultAtoms.lenses[0];
+
+  // Memoize the controls change handler to prevent infinite re-renders
+  const handleControlsChange = useCallback((newControls: any) => {
+    setControls(prev => ({...prev, ...newControls}));
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -59,7 +64,7 @@ export default function DiscoverPage() {
           {/* Controls Sidebar */}
           <div className="lg:col-span-1">
             <ResonanceControls
-              onControlsChange={(newControls) => setControls(prev => ({...prev, ...newControls}))}
+              onControlsChange={handleControlsChange}
               className="sticky top-8"
             />
           </div>

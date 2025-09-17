@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ResonanceControls } from '@/components/ui/ResonanceControls';
 import { StreamLens } from '@/components/lenses/StreamLens';
 import { Navigation } from '@/components/ui/Navigation';
@@ -29,6 +29,11 @@ export default function HomePage() {
 
   // Use server data if available, otherwise use defaults
   const streamLens = lenses?.find(l => l.id === 'lens.stream') || defaultAtoms.lenses[0];
+
+  // Memoize the controls change handler to prevent infinite re-renders
+  const handleControlsChange = useCallback((newControls: any) => {
+    setControls(prev => ({...prev, ...newControls}));
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -66,7 +71,7 @@ export default function HomePage() {
           {/* Resonance Controls */}
           <div className="lg:col-span-1">
             <ResonanceControls
-              onControlsChange={(newControls) => setControls(prev => ({...prev, ...newControls}))}
+              onControlsChange={handleControlsChange}
               className="sticky top-8"
             />
           </div>

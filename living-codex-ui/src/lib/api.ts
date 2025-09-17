@@ -229,6 +229,11 @@ export const endpoints = {
   health: () => api.get('/health'),
   storageStats: () => api.get('/storage-endpoints/stats'),
   
+  // Authentication
+  login: (username: string, password: string) => api.post('/identity/authenticate', { username, password }),
+  register: (username: string, email: string, password: string) => api.post('/identity/users', { username, email, password }),
+  validateToken: (token: string) => api.post('/identity/validate', { token }),
+  
   // Concepts
   getConcepts: () => api.get('/concepts'),
   createConcept: (concept: Record<string, unknown>) => api.post('/concepts', concept),
@@ -239,12 +244,25 @@ export const endpoints = {
   getCollectiveEnergy: () => api.get('/contributions/abundance/collective-energy'),
   getContributorEnergy: (userId: string) => api.get(`/contributions/abundance/contributor-energy/${userId}`),
   
+  // User-concept interactions
+  attuneToConcept: (userId: string, conceptId: string) => 
+    api.post('/concept/user/link', { userId, conceptId, relation: 'attuned' }),
+  unattuneConcept: (userId: string, conceptId: string) => 
+    api.post('/concept/user/unlink', { userId, conceptId }),
+  recordContribution: (userId: string, entityId: string, contribution: string, type = 'amplification') =>
+    api.post('/contributions/record', { userId, entityId, contribution, type }),
+  
   // News
   getTrendingTopics: (limit = 10, hoursBack = 24) => 
     api.get(`/news/trending?limit=${limit}&hoursBack=${hoursBack}`),
   getNewsFeed: (userId: string, limit = 20, hoursBack = 24) =>
     api.get(`/news/feed/${userId}?limit=${limit}&hoursBack=${hoursBack}`),
+  getPersonalNewsStream: (userId: string, limit = 20) =>
+    api.get(`/news/stream/feed/${userId}?limit=${limit}`),
   searchNews: (query: Record<string, unknown>) => api.post('/news/search', query),
+  
+  // User-concept relationships
+  getUserConcepts: (userId: string) => api.get(`/concept/user/${userId}`),
   
   // Storage and nodes
   getNodes: (typeId?: string, limit?: number) => {

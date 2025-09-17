@@ -145,15 +145,23 @@ export default function AboutPage() {
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <div className="text-gray-600">Total Nodes</div>
-                      <div className="font-medium">{Number(healthStatus.totalNodes)?.toLocaleString() || 'N/A'}</div>
+                      <div className="font-medium">{Number(healthStatus.nodeCount)?.toLocaleString() || 'N/A'}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-600">Total Edges</div>
+                      <div className="font-medium">{Number(healthStatus.edgeCount)?.toLocaleString() || 'N/A'}</div>
                     </div>
                     <div>
                       <div className="text-gray-600">Modules Loaded</div>
-                      <div className="font-medium">{String(healthStatus.modulesLoaded) || 'N/A'}</div>
+                      <div className="font-medium">{Number(healthStatus.moduleCount) || 'N/A'}</div>
                     </div>
                     <div>
                       <div className="text-gray-600">API Routes</div>
-                      <div className="font-medium">{String(healthStatus.apiRoutes) || 'N/A'}</div>
+                      <div className="font-medium">{Number((healthStatus as any)?.registrationMetrics?.totalRoutesRegistered)?.toLocaleString() || 'N/A'}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-600">Request Count</div>
+                      <div className="font-medium">{Number(healthStatus.requestCount)?.toLocaleString() || 'N/A'}</div>
                     </div>
                     <div>
                       <div className="text-gray-600">Uptime</div>

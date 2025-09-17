@@ -84,14 +84,16 @@ export function useAttune() {
   
   return useMutation({
     mutationFn: async ({ userId, conceptId }: { userId: string; conceptId: string }) => {
-      return apiAdapter.call(
-        { method: 'POST', path: '/concept/user/link' },
-        { userId, conceptId, relation: 'attuned' }
-      );
+      const response = await endpoints.attuneToConcept(userId, conceptId);
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to attune to concept');
+      }
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['concepts'] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['energy'] });
     },
   });
 }
@@ -106,14 +108,17 @@ export function useAmplify() {
       conceptId: string; 
       contribution: string;
     }) => {
-      return apiAdapter.call(
-        { method: 'POST', path: '/contributions/record' },
-        { userId, entityId: conceptId, contribution, type: 'amplification' }
-      );
+      const response = await endpoints.recordContribution(userId, conceptId, contribution, 'amplification');
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to amplify concept');
+      }
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['concepts'] });
       queryClient.invalidateQueries({ queryKey: ['contributions'] });
+      queryClient.invalidateQueries({ queryKey: ['energy'] });
+      queryClient.invalidateQueries({ queryKey: ['news', 'feed'] });
     },
   });
 }
@@ -194,5 +199,24 @@ export function useNodes(typeId?: string, limit?: number) {
     queryKey: ['nodes', typeId, limit],
     queryFn: () => endpoints.getNodes(typeId, limit),
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useUserConcepts(userId: string) {
+  return useQuery({
+    queryKey: ['user', 'concepts', userId],
+    queryFn: () => endpoints.getUserConcepts(userId),
+    enabled: !!userId,
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function usePersonalNewsStream(userId: string, limit = 20) {
+  return useQuery({
+    queryKey: ['news', 'stream', userId, limit],
+    queryFn: () => endpoints.getPersonalNewsStream(userId, limit),
+    enabled: !!userId,
+    refetchInterval: 30000, // Refresh every 30 seconds for real-time updates
+    staleTime: 1 * 60 * 1000, // 1 minute
   });
 }
