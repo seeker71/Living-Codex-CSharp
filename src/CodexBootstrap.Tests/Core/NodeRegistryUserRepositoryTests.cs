@@ -47,6 +47,9 @@ public sealed class NodeRegistryUserRepositoryTests
         var user = CreateUser(email: "CaseUser@example.com");
         await _repository.CreateAsync(user);
 
+        // Wait a bit for async storage to complete
+        await Task.Delay(100);
+
         var result = await _repository.GetByEmailAsync("caseuser@EXAMPLE.com");
 
         result.Should().NotBeNull();
