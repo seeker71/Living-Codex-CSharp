@@ -83,7 +83,7 @@ public sealed class ModuleLoader
             try
             {
                 _logger.Info($"Attempting to load module: {moduleType.Name}");
-                var module = ActivatorUtilities.CreateInstance(_serviceProvider, moduleType) as IModule;
+                var module = CreateModule(moduleType);
                 if (module != null)
                 {
                     _logger.Info($"Successfully created module: {moduleType.Name}");
@@ -186,6 +186,7 @@ public sealed class ModuleLoader
             {
                 var logger = _serviceProvider.GetRequiredService<ICodexLogger>();
                 var httpClient = _serviceProvider.GetService<HttpClient>() ?? new HttpClient();
+                _logger.Info($"Creating module {moduleType.Name} with NodeRegistry instance: {_registry.GetHashCode()}");
                 return (IModule)constructor.Invoke(new object[] { _registry, logger, httpClient });
             }
             

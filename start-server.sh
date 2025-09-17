@@ -80,7 +80,7 @@ wait_for_server() {
         fi
         
         # Check if server is responding
-        if curl -s "http://localhost:$PORT/health" >/dev/null 2>&1; then
+        if curl -s "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
             echo "✅ Server is ready!"
             return 0
         fi
@@ -100,7 +100,7 @@ test_server() {
     
     # Test health endpoint
     echo "Testing /health..."
-    if curl -s "http://localhost:$PORT/health" | jq '.registrationMetrics' >/dev/null 2>&1; then
+    if curl -s "http://127.0.0.1:$PORT/health" | jq '.registrationMetrics' >/dev/null 2>&1; then
         echo "✅ Health endpoint working"
     else
         echo "❌ Health endpoint failed"
@@ -109,7 +109,7 @@ test_server() {
     
     # Test AI health endpoint
     echo "Testing /ai/health..."
-    if curl -s "http://localhost:$PORT/ai/health" >/dev/null 2>&1; then
+    if curl -s "http://127.0.0.1:$PORT/ai/health" >/dev/null 2>&1; then
         echo "✅ AI health endpoint working"
     else
         echo "❌ AI health endpoint failed"
@@ -118,7 +118,7 @@ test_server() {
     
     # Test spec endpoints
     echo "Testing /spec/modules..."
-    if curl -s "http://localhost:$PORT/spec/modules" >/dev/null 2>&1; then
+    if curl -s "http://127.0.0.1:$PORT/spec/modules" >/dev/null 2>&1; then
         echo "✅ Spec modules endpoint working"
     else
         echo "❌ Spec modules endpoint failed"
@@ -284,7 +284,8 @@ main() {
     echo "📺 Logs will also be displayed on screen"
     
     # Start server with hot-reload and dual logging (file + screen)
-    dotnet watch run --hot-reload --urls "http://localhost:$PORT" --configuration Release 2>&1 | tee "$LOG_FILE" &
+    # Explicitly bind to IPv4 localhost to avoid IPv6 issues
+    dotnet watch run --hot-reload --urls "http://127.0.0.1:$PORT" --configuration Release 2>&1 | tee "$LOG_FILE" &
     SERVER_PID=$!
     
     echo "🆔 Server PID: $SERVER_PID"
@@ -301,10 +302,11 @@ main() {
         if test_server; then
             echo ""
             echo "🎉 Living Codex Server is running!"
-            echo "🌐 URL: http://localhost:$PORT"
-            echo "📊 Health: http://localhost:$PORT/health"
-            echo "🤖 AI Health: http://localhost:$PORT/ai/health"
-            echo "📋 Spec: http://localhost:$PORT/spec/modules"
+            echo "🌐 URL: http://127.0.0.1:$PORT"
+            echo "📊 Health: http://127.0.0.1:$PORT/health"
+            echo "🤖 AI Health: http://127.0.0.1:$PORT/ai/health"
+            echo "📋 Spec: http://127.0.0.1:$PORT/spec/modules"
+            echo "📖 Swagger: http://127.0.0.1:$PORT/swagger"
             echo "📝 Logs: $LOG_FILE"
             echo ""
             echo "To stop the server: kill $SERVER_PID"

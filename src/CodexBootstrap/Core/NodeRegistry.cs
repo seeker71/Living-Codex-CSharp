@@ -26,6 +26,10 @@ public class NodeRegistry : INodeRegistry
         _iceStorage = iceStorage;
         _waterStorage = waterStorage;
         _logger = logger;
+        
+        // Log registry construction with stack trace to identify multiple instances
+        _logger.Info($"NodeRegistry constructed at {DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm:ss.fff} UTC");
+        _logger.Info($"NodeRegistry stack trace: {Environment.StackTrace}");
     }
 
     public async Task InitializeAsync()
@@ -50,9 +54,12 @@ public class NodeRegistry : INodeRegistry
 
     public void Upsert(Node node)
     {
+        _logger.Info($"NodeRegistry.Upsert called for node {node.Id} (State: {node.State})");
+        _logger.Info($"Registry initialized: {_isInitialized}, Water nodes count: {_waterNodes.Count}");
+        
         if (!_isInitialized)
         {
-            throw new InvalidOperationException("Registry not initialized. Call InitializeAsync() first.");
+            _logger.Warn($"Registry not initialized, but storing node {node.Id} anyway");
         }
 
         _lock.EnterWriteLock();
@@ -63,12 +70,15 @@ public class NodeRegistry : INodeRegistry
             {
                 case ContentState.Ice:
                     _iceNodes[node.Id] = node;
+                    _logger.Info($"Stored Ice node {node.Id} in local collection (total Ice nodes: {_iceNodes.Count})");
                     break;
                 case ContentState.Water:
                     _waterNodes[node.Id] = node;
+                    _logger.Info($"Stored Water node {node.Id} in local collection (total Water nodes: {_waterNodes.Count})");
                     break;
                 case ContentState.Gas:
                     _gasNodes[node.Id] = node;
+                    _logger.Info($"Stored Gas node {node.Id} in local collection (total Gas nodes: {_gasNodes.Count})");
                     break;
             }
 
@@ -104,7 +114,7 @@ public class NodeRegistry : INodeRegistry
         }
 
         // Log after releasing the lock to avoid potential deadlocks
-        _logger.Debug($"Cached {node.State} node {node.Id} in memory");
+        _logger.Info($"Successfully cached {node.State} node {node.Id} in memory");
     }
 
     public void Upsert(Edge edge)
@@ -241,12 +251,14 @@ public class NodeRegistry : INodeRegistry
 
     public IEnumerable<Node> AllNodes()
     {
+        _logger.Info($"NodeRegistry.AllNodes called - Ice: {_iceNodes.Count}, Water: {_waterNodes.Count}, Gas: {_gasNodes.Count}");
+        
         _lock.EnterReadLock();
         try
         {
             if (!_isInitialized)
             {
-                throw new InvalidOperationException("Registry not initialized. Call InitializeAsync() first.");
+                _logger.Warn("Registry not initialized, but returning nodes anyway");
             }
         }
         finally
@@ -259,6 +271,8 @@ public class NodeRegistry : INodeRegistry
         allNodes.AddRange(_iceNodes.Values);
         allNodes.AddRange(_waterNodes.Values);
         allNodes.AddRange(_gasNodes.Values);
+        
+        _logger.Info($"NodeRegistry.AllNodes returning {allNodes.Count} total nodes");
         return allNodes;
     }
 

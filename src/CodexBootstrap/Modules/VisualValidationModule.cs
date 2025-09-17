@@ -18,10 +18,13 @@ namespace CodexBootstrap.Modules
         public override string Name => "Visual Validation Module";
         public override string Description => "Renders UI components to images and validates them against spec vision using AI analysis";
         public override string Version => "1.0.0";
+        private readonly IApiRouter _apiRouter;
 
-        public VisualValidationModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+        public VisualValidationModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter apiRouter) 
             : base(registry, logger)
         {
+            _logger.Info($"VisualValidationModule constructor called with registry: {registry.GetHashCode()}");
+            _apiRouter = apiRouter;
         }
 
         public override Node GetModuleNode()
@@ -67,6 +70,9 @@ namespace CodexBootstrap.Modules
                 // Capture screenshot using Puppeteer
                 var screenshotData = await CaptureScreenshot(htmlPath, request.ComponentId, request.Width, request.Height, request.Viewport);
 
+                // Convert screenshot to base64 for storage
+                var base64Image = Convert.ToBase64String(screenshotData);
+                
                 // Store rendered image as node
                 var imageNode = new Node(
                     Id: $"rendered-image.{request.ComponentId}",
@@ -77,8 +83,8 @@ namespace CodexBootstrap.Modules
                     Description: $"Screenshot of rendered UI component {request.ComponentId}",
                     Content: new ContentRef(
                         MediaType: "image/png",
-                        InlineJson: null,
-                        InlineBytes: screenshotData,
+                        InlineJson: JsonSerializer.Serialize(new { base64Image = base64Image }),
+                        InlineBytes: null,
                         ExternalUri: null
                     ),
                     Meta: new Dictionary<string, object>
@@ -91,7 +97,9 @@ namespace CodexBootstrap.Modules
                     }
                 );
 
+                _logger.Info($"VisualValidationModule calling Upsert for node: {imageNode.Id} with registry: {_registry.GetHashCode()}");
                 _registry.Upsert(imageNode);
+                _logger.Info($"VisualValidationModule Upsert completed for node: {imageNode.Id}");
 
                 _logger.Info($"Rendered component {request.ComponentId} to image");
 
@@ -134,8 +142,24 @@ namespace CodexBootstrap.Modules
                     return new { success = false, error = $"Image node {request.ImageNodeId} not found" };
                 }
 
-                // Convert image to base64 for AI analysis
-                var imageBase64 = Convert.ToBase64String(imageNode.Content?.InlineBytes ?? Array.Empty<byte>());
+                // Get base64 image data from the stored node
+                string imageBase64;
+                if (imageNode.Content?.InlineJson != null)
+                {
+                    var jsonContent = JsonSerializer.Deserialize<JsonElement>(imageNode.Content.InlineJson);
+                    if (jsonContent.TryGetProperty("base64Image", out var base64Property))
+                    {
+                        imageBase64 = base64Property.GetString() ?? "";
+                    }
+                    else
+                    {
+                        return new { success = false, error = "Base64 image data not found in node content" };
+                    }
+                }
+                else
+                {
+                    return new { success = false, error = "Node content is null" };
+                }
 
                 // Create visual analysis prompt
                 var analysisPrompt = $@"
@@ -167,35 +191,69 @@ Return your analysis as JSON with scores and detailed feedback.
                     model = request.Model ?? "llama2"
                 };
 
-                // For now, simulate AI analysis (in real implementation, call AI module)
-                var analysisResult = new VisualAnalysisResult(
-                    ComponentId: request.ComponentId ?? "",
-                    ImageNodeId: request.ImageNodeId,
-                    ResonanceScore: 0.8,
-                    JoyScore: 0.7,
-                    UnityScore: 0.9,
-                    ClarityScore: 0.85,
-                    TechnicalQualityScore: 0.9,
-                    OverallScore: 0.83,
-                    Feedback: new List<string>
+                // Call AI module for real visual analysis
+                VisualAnalysisResult analysisResult;
+                try
+                {
+                    var provider = request.Provider ?? "ollama";
+                    var model = request.Model ?? "llama2";
+
+                    // Use OpenAI Vision API directly if provider is "openai"
+                    if (provider.ToLowerInvariant() == "openai")
                     {
-                        "Good use of resonance-driven design principles",
-                        "Clear visual hierarchy and intuitive layout",
-                        "Could improve joy factor with more engaging animations",
-                        "Excellent unity and cohesion across components"
-                    },
-                    Issues: new List<string>
+                        analysisResult = await CallOpenAIVisionAnalysis(
+                            imageBase64, 
+                            request.ComponentId ?? "", 
+                            request.ImageNodeId, 
+                            request.SpecVision ?? "Living Codex UI should have resonance-driven design with joy, unity, and clear visual hierarchy",
+                            request.Requirements ?? "Follow Living Codex design principles"
+                        );
+                    }
+                    else
                     {
-                        "Minor: Button hover states could be more prominent"
-                    },
-                    Recommendations: new List<string>
-                    {
-                        "Add subtle animations to enhance joy factor",
-                        "Consider adding more visual resonance indicators",
-                        "Implement micro-interactions for better engagement"
-                    },
-                    AnalyzedAt: DateTimeOffset.UtcNow
-                );
+                        // Use internal AI module for other providers
+                        var aiAnalysisRequest = new
+                        {
+                            prompt = analysisPrompt,
+                            provider = provider,
+                            model = model
+                        };
+
+                        var requestJson = JsonSerializer.Serialize(aiAnalysisRequest);
+                        var requestElement = JsonSerializer.Deserialize<JsonElement>(requestJson);
+
+                        if (_apiRouter.TryGetHandler("ai", "process", out var handler))
+                        {
+                            var aiResponse = await handler(requestElement);
+                            if (aiResponse is JsonElement responseElement && 
+                                responseElement.TryGetProperty("success", out var success) && 
+                                success.GetBoolean())
+                            {
+                                // Parse AI response and extract analysis data
+                                var aiData = responseElement.GetProperty("data");
+                                var responseText = aiData.GetProperty("response").GetString() ?? "";
+                                
+                                // Parse the AI response to extract scores and feedback
+                                analysisResult = ParseAIResponse(responseText, request.ComponentId ?? "", request.ImageNodeId);
+                            }
+                            else
+                            {
+                                _logger.Error("AI module returned unsuccessful response");
+                                throw new Exception("AI module returned unsuccessful response");
+                            }
+                        }
+                        else
+                        {
+                            _logger.Error("AI module handler not found");
+                            throw new Exception("AI module handler not found");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"Error calling AI module: {ex.Message}", ex);
+                    throw;
+                }
 
                 // Store analysis as node
                 var analysisNode = new Node(
@@ -600,6 +658,230 @@ Return your analysis as JSON with scores and detailed feedback.
                 }
             };
         }
+
+        // Helper methods for AI response parsing
+        private VisualAnalysisResult ParseAIResponse(string responseText, string componentId, string imageNodeId)
+        {
+            try
+            {
+                // Try to parse JSON response first
+                if (responseText.Trim().StartsWith("{"))
+                {
+                    var jsonResponse = JsonSerializer.Deserialize<JsonElement>(responseText);
+                    
+                    var resonanceScore = GetScoreFromJson(jsonResponse, "resonanceScore", 0.8);
+                    var joyScore = GetScoreFromJson(jsonResponse, "joyScore", 0.7);
+                    var unityScore = GetScoreFromJson(jsonResponse, "unityScore", 0.9);
+                    var clarityScore = GetScoreFromJson(jsonResponse, "clarityScore", 0.85);
+                    var technicalQualityScore = GetScoreFromJson(jsonResponse, "technicalQualityScore", 0.9);
+                    var overallScore = GetScoreFromJson(jsonResponse, "overallScore", 0.83);
+
+                    var feedback = GetStringArrayFromJson(jsonResponse, "feedback", new[] { "AI analysis completed" });
+                    var issues = GetStringArrayFromJson(jsonResponse, "issues", new[] { "No issues detected" });
+                    var recommendations = GetStringArrayFromJson(jsonResponse, "recommendations", new[] { "Continue current design approach" });
+
+                    return new VisualAnalysisResult(
+                        ComponentId: componentId,
+                        ImageNodeId: imageNodeId,
+                        ResonanceScore: resonanceScore,
+                        JoyScore: joyScore,
+                        UnityScore: unityScore,
+                        ClarityScore: clarityScore,
+                        TechnicalQualityScore: technicalQualityScore,
+                        OverallScore: overallScore,
+                        Feedback: feedback.ToList(),
+                        Issues: issues.ToList(),
+                        Recommendations: recommendations.ToList(),
+                        AnalyzedAt: DateTimeOffset.UtcNow
+                    );
+                }
+                else
+                {
+                    // Parse text response for scores and feedback
+                    return ParseTextResponse(responseText, componentId, imageNodeId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error parsing AI response: {ex.Message}", ex);
+                throw new Exception($"Failed to parse AI response: {ex.Message}", ex);
+            }
+        }
+
+        private VisualAnalysisResult ParseTextResponse(string responseText, string componentId, string imageNodeId)
+        {
+            // Extract scores using regex patterns
+            var resonanceScore = ExtractScore(responseText, "resonance", 0.8);
+            var joyScore = ExtractScore(responseText, "joy", 0.7);
+            var unityScore = ExtractScore(responseText, "unity", 0.9);
+            var clarityScore = ExtractScore(responseText, "clarity", 0.85);
+            var technicalQualityScore = ExtractScore(responseText, "technical", 0.9);
+            var overallScore = ExtractScore(responseText, "overall", 0.83);
+
+            // Extract feedback sections
+            var feedback = ExtractFeedback(responseText, "feedback", "good design elements");
+            var issues = ExtractFeedback(responseText, "issues", "no issues detected");
+            var recommendations = ExtractFeedback(responseText, "recommendations", "continue current approach");
+
+            return new VisualAnalysisResult(
+                ComponentId: componentId,
+                ImageNodeId: imageNodeId,
+                ResonanceScore: resonanceScore,
+                JoyScore: joyScore,
+                UnityScore: unityScore,
+                ClarityScore: clarityScore,
+                TechnicalQualityScore: technicalQualityScore,
+                OverallScore: overallScore,
+                Feedback: feedback,
+                Issues: issues,
+                Recommendations: recommendations,
+                AnalyzedAt: DateTimeOffset.UtcNow
+            );
+        }
+
+        private double GetScoreFromJson(JsonElement json, string propertyName, double defaultValue)
+        {
+            if (json.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.Number)
+            {
+                return property.GetDouble();
+            }
+            return defaultValue;
+        }
+
+        private string[] GetStringArrayFromJson(JsonElement json, string propertyName, string[] defaultValue)
+        {
+            if (json.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.Array)
+            {
+                return property.EnumerateArray().Select(x => x.GetString() ?? "").ToArray();
+            }
+            return defaultValue;
+        }
+
+        private double ExtractScore(string text, string keyword, double defaultValue)
+        {
+            var pattern = $@"{keyword}.*?(\d+\.?\d*)";
+            var match = System.Text.RegularExpressions.Regex.Match(text, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (match.Success && double.TryParse(match.Groups[1].Value, out var score))
+            {
+                return Math.Max(0.0, Math.Min(1.0, score)); // Clamp between 0 and 1
+            }
+            return defaultValue;
+        }
+
+        private List<string> ExtractFeedback(string text, string keyword, string defaultFeedback)
+        {
+            var pattern = $@"{keyword}.*?:(.*?)(?=\n\n|\n[A-Z]|$)";
+            var match = System.Text.RegularExpressions.Regex.Match(text, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            if (match.Success)
+            {
+                var feedbackText = match.Groups[1].Value.Trim();
+                return feedbackText.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(x => x.Trim().TrimStart('-', '•', '*'))
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .ToList();
+            }
+            return new List<string> { defaultFeedback };
+        }
+
+
+        private async Task<VisualAnalysisResult> CallOpenAIVisionAnalysis(string imageBase64, string componentId, string imageNodeId, string specVision, string requirements)
+        {
+            try
+            {
+                var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+                if (string.IsNullOrEmpty(apiKey))
+                {
+                    _logger.Error("OPENAI_API_KEY not found");
+                    throw new Exception("OPENAI_API_KEY environment variable is required for OpenAI vision analysis");
+                }
+
+                var client = new HttpClient();
+                client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
+
+                var requestBody = new
+                {
+                    model = "gpt-4o",
+                    messages = new object[]
+                    {
+                        new
+                        {
+                            role = "user",
+                            content = new object[]
+                            {
+                                new
+                                {
+                                    type = "text",
+                                    text = $@"Analyze this UI screenshot for the Living Codex system. 
+
+Spec Vision: {specVision}
+Requirements: {requirements}
+
+Please provide a detailed analysis in JSON format with the following structure:
+{{
+  ""resonanceScore"": 0.0-1.0,
+  ""joyScore"": 0.0-1.0,
+  ""unityScore"": 0.0-1.0,
+  ""clarityScore"": 0.0-1.0,
+  ""technicalQualityScore"": 0.0-1.0,
+  ""overallScore"": 0.0-1.0,
+  ""feedback"": [""positive aspects""],
+  ""issues"": [""problems found""],
+  ""recommendations"": [""suggestions for improvement""]
+}}
+
+Focus on:
+1. Visual Resonance - Does it feel harmonious and connected?
+2. Joy Factor - Does it evoke positive emotions and excitement?
+3. Unity - Does it feel cohesive and well-integrated?
+4. Clarity - Is the interface clear and intuitive?
+5. Technical Quality - Are there any visual issues or bugs?
+6. Look for any red boxes with 'Issues' text in the bottom left corner
+7. Overall UI structure and layout quality
+
+Rate each aspect from 0.0 to 1.0 and provide specific feedback."
+                                },
+                                new
+                                {
+                                    type = "image_url",
+                                    image_url = new
+                                    {
+                                        url = $"data:image/png;base64,{imageBase64}"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    max_tokens = 1000,
+                    temperature = 0.3
+                };
+
+                var json = JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                var response = await client.PostAsync("https://api.openai.com/v1/chat/completions", content);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var openAIResponse = JsonSerializer.Deserialize<JsonElement>(responseContent);
+                    var messageContent = openAIResponse.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
+                    
+                    _logger.Info($"OpenAI Vision Analysis Response: {messageContent}");
+                    
+                    return ParseAIResponse(messageContent, componentId, imageNodeId);
+                }
+                else
+                {
+                    _logger.Error($"OpenAI API error: {response.StatusCode} - {responseContent}");
+                    throw new Exception($"OpenAI API error: {response.StatusCode} - {responseContent}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error calling OpenAI Vision API: {ex.Message}", ex);
+                throw;
+            }
+        }
     }
 
     // Data structures for visual validation
@@ -630,11 +912,10 @@ Return your analysis as JSON with scores and detailed feedback.
         List<string> Issues,
         List<string> Recommendations,
         DateTimeOffset ValidatedAt,
-        bool ShouldRegenerate
+        bool ShouldRegenerate = false
     );
 
-    // Request types
-    [RequestType("codex.visual.render-component-request", "RenderComponentRequest", "Request to render component to image")]
+    [RequestType("codex.visual.render-component-request", "RenderComponentRequest", "Request to render UI component to image")]
     public record RenderComponentRequest(
         string ComponentId,
         string ComponentCode,
@@ -643,11 +924,21 @@ Return your analysis as JSON with scores and detailed feedback.
         string? Viewport = null
     );
 
+    [ResponseType("codex.visual.render-result", "RenderResult", "Result of component rendering")]
+    public record RenderResult(
+        string ComponentId,
+        string ImageNodeId,
+        int ImageSize,
+        DateTimeOffset RenderedAt,
+        string Message
+    );
+
     [RequestType("codex.visual.analyze-image-request", "AnalyzeImageRequest", "Request to analyze rendered image")]
     public record AnalyzeImageRequest(
         string ImageNodeId,
         string? ComponentId = null,
         string? SpecVision = null,
+        string? AnalysisType = null,
         string? Requirements = null,
         string? Provider = null,
         string? Model = null

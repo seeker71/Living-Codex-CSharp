@@ -214,6 +214,17 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
         builder.Services.AddSingleton<RealtimeModule>();
         
         
+        // Add CORS services
+        builder.Services.AddCors(options =>
+        {
+            options.AddDefaultPolicy(policy =>
+            {
+                policy.AllowAnyOrigin()
+                      .AllowAnyMethod()
+                      .AllowAnyHeader();
+            });
+        });
+
         // Add Swagger/OpenAPI services
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen(c =>
@@ -375,6 +386,9 @@ builder.Services.AddSingleton<ICacheManager>(sp =>
 // Monitoring services
 builder.Services.AddSingleton<ErrorMetrics>();
 
+// Caching services
+builder.Services.AddSingleton<CodexBootstrap.Core.Caching.EndpointCacheService>();
+
 var app = builder.Build();
 
 // Initialize global configuration with the correct port from PortConfigurationService
@@ -443,6 +457,9 @@ app.UseExceptionHandler(errorApp =>
     });
 });
 
+// Add CORS middleware
+app.UseCors();
+
 // Add Authentication middleware
 app.UseAuthentication();
 app.UseAuthorization();
@@ -507,6 +524,9 @@ foreach (var module in loadedModules)
 
 // Register HTTP endpoints from all modules
 moduleLoader.RegisterHttpEndpoints(app, registry, coreApi);
+
+// Handle OPTIONS preflight requests
+app.MapMethods("/{*path}", new[] { "OPTIONS" }, () => Results.Ok());
 
 // ---- Core API Routes (Node/Edge only) ----
 app.MapGet("/nodes", () => coreApi.GetNodes());
@@ -622,6 +642,28 @@ app.MapGet("/metrics/errors", (ErrorMetrics metrics) =>
         timestamp = DateTime.UtcNow,
         totalErrors = snapshot.TotalErrors,
         byRoute = snapshot.ErrorsByRoute
+    });
+});
+
+// Cache management endpoints
+app.MapGet("/cache/stats", (CodexBootstrap.Core.Caching.EndpointCacheService cacheService) =>
+{
+    return Results.Ok(new
+    {
+        success = true,
+        timestamp = DateTime.UtcNow,
+        cache = cacheService.GetCacheStats()
+    });
+});
+
+app.MapPost("/cache/clear-expired", (CodexBootstrap.Core.Caching.EndpointCacheService cacheService) =>
+{
+    cacheService.ClearExpiredCache();
+    return Results.Ok(new
+    {
+        success = true,
+        message = "Expired cache entries cleared",
+        timestamp = DateTime.UtcNow
     });
 });
 
