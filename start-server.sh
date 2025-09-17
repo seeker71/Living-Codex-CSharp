@@ -16,6 +16,22 @@ LOG_FILE="$LOG_DIR/server-$(date +%Y%m%d-%H%M%S).log"
 # Configuration - will be determined by PortConfigurationService
 PORT=5002  # Default fallback port
 
+# Function to find available port
+find_available_port() {
+    local start_port=$1
+    local max_port=$((start_port + 100))
+    
+    for ((port=start_port; port<=max_port; port++)); do
+        if ! lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+            echo $port
+            return 0
+        fi
+    done
+    
+    echo "❌ No available ports found in range $start_port-$max_port"
+    return 1
+}
+
 # Ensure we're in the script directory
 cd "$SCRIPT_DIR"
 
@@ -242,10 +258,17 @@ main() {
     # Wait a moment for cleanup
     sleep 2
     
-    # Check if port is available
+    # Check if port is available, find alternative if needed
     if ! check_port; then
-        echo "❌ Cannot start server - port $PORT is still in use"
-        exit 1
+        echo "⚠️  Port $PORT is in use, finding alternative..."
+        AVAILABLE_PORT=$(find_available_port $PORT)
+        if [ $? -eq 0 ]; then
+            PORT=$AVAILABLE_PORT
+            echo "✅ Using alternative port: $PORT"
+        else
+            echo "❌ Cannot find available port - exiting"
+            exit 1
+        fi
     fi
     
     # Navigate to project directory
@@ -283,9 +306,16 @@ main() {
     echo "📝 Logs will be written to: $LOG_FILE"
     echo "📺 Logs will also be displayed on screen"
     
-    # Start server with hot-reload and dual logging (file + screen)
+    # Start server with dual logging (file + screen)
+    # Use regular dotnet run for stability (can be changed to dotnet watch for development)
     # Explicitly bind to IPv4 localhost to avoid IPv6 issues
-    dotnet watch run --hot-reload --urls "http://127.0.0.1:$PORT" --configuration Release 2>&1 | tee "$LOG_FILE" &
+    if [ "$1" = "--watch" ] || [ "$1" = "-w" ]; then
+        echo "🔄 Starting with hot-reload (development mode)..."
+        dotnet watch run --hot-reload --urls "http://127.0.0.1:$PORT" --configuration Release 2>&1 | tee "$LOG_FILE" &
+    else
+        echo "🚀 Starting in production mode..."
+        dotnet run --urls "http://127.0.0.1:$PORT" --configuration Release 2>&1 | tee "$LOG_FILE" &
+    fi
     SERVER_PID=$!
     
     echo "🆔 Server PID: $SERVER_PID"
@@ -316,9 +346,12 @@ main() {
             # Analyze startup logs for issues
             analyze_startup_logs "$LOG_FILE"
             
-            echo "🚀 Server is running in the background (PID: $SERVER_PID) ."
-
-            exit 1
+            echo "🚀 Server is running in the background (PID: $SERVER_PID)."
+            echo "Press Ctrl+C to stop the server."
+            
+            # Wait for user interrupt or server to exit
+            wait $SERVER_PID
+            exit 0
         else
             echo "❌ Server tests failed"
             echo "🛑 Stopping server..."
