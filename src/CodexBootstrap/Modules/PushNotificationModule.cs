@@ -11,7 +11,6 @@ namespace CodexBootstrap.Modules;
 /// </summary>
 public sealed class PushNotificationModule : ModuleBase
 {
-    private readonly RealtimeModule? _realtimeModule;
     private readonly ConcurrentDictionary<string, NotificationSubscription> _subscriptions = new();
     private readonly ConcurrentQueue<Notification> _notificationHistory = new();
     private readonly ConcurrentDictionary<string, NotificationTemplate> _templates = new();
@@ -25,9 +24,12 @@ public sealed class PushNotificationModule : ModuleBase
     public PushNotificationModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        _realtimeModule = null; // Will be configured during initialization
+        // RealtimeModule will be available via base class _realtimeModule
         InitializeDefaultTemplates();
     }
+
+    // Helper property to access RealtimeModule with proper typing
+    private dynamic? RealtimeModule => _realtimeModule;
 
     public override Node GetModuleNode()
     {
@@ -526,13 +528,13 @@ public sealed class PushNotificationModule : ModuleBase
             }
 
             // Send via real-time module if available
-            if (_realtimeModule != null)
+            if (RealtimeModule != null)
             {
                 foreach (var recipient in notification.Recipients)
                 {
                     try
                     {
-                        await _realtimeModule.PublishSystemEventAsync("notification", new
+                        await RealtimeModule.PublishSystemEventAsync("notification", new
                         {
                             Id = notification.Id,
                             Title = notification.Title,

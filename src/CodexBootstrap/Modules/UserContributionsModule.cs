@@ -34,11 +34,14 @@ public sealed class UserContributionsModule : ModuleBase
     public override string Description => "User contributions module with ETH ledger, change tracking, attribution, and reward sharing";
     public override string Version => "1.0.0";
 
-    public UserContributionsModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+    public UserContributionsModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, string? ethereumRpcUrl = null) 
         : base(registry, logger)
     {
-        // Default Ethereum RPC - could be configured via settings in the future
-        // _web3 = new Web3("https://mainnet.infura.io/v3/YOUR_PROJECT_ID");
+        
+        if (!string.IsNullOrEmpty(ethereumRpcUrl))
+        {
+            _web3 = new Web3(ethereumRpcUrl);
+        }
     }
 
     public override Node GetModuleNode()

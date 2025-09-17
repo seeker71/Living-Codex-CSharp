@@ -23,45 +23,11 @@ public sealed class EventStreamingModule : ModuleBase
     public EventStreamingModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        // No direct module dependencies - use api-router for inter-module communication
+        // RealtimeModule will be available via base class _realtimeModule
     }
 
-    // Helper method to publish system events via api-router
-    private async Task PublishSystemEventViaApiRouter(string eventType, StreamEvent streamEvent, string? userId = null)
-    {
-        try
-        {
-            if (_apiRouter == null)
-            {
-                _logger.Warn("ApiRouter not available - cannot publish system event");
-                return;
-            }
-
-            // Call RealtimeModule's PublishSystemEvent API via router
-            var request = JsonSerializer.Serialize(new
-            {
-                eventType = eventType,
-                eventData = streamEvent,
-                userId = userId
-            });
-
-            var requestElement = JsonDocument.Parse(request).RootElement;
-            
-            if (_apiRouter.TryGetHandler("codex.realtime", "PublishSystemEvent", out var handler))
-            {
-                await handler(requestElement);
-                _logger.Debug($"Published system event {eventType} via api-router");
-            }
-            else
-            {
-                _logger.Warn($"RealtimeModule PublishSystemEvent handler not found - event {eventType} not published");
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"Failed to publish system event via api-router: {ex.Message}");
-        }
-    }
+    // Helper property to access RealtimeModule with proper typing
+    private dynamic? RealtimeModule => _realtimeModule;
 
     public override Node GetModuleNode()
     {
@@ -497,9 +463,9 @@ public sealed class EventStreamingModule : ModuleBase
             }
 
             // Notify local real-time subscribers
-            if (_realtimeModule != null)
+            if (RealtimeModule != null)
             {
-                await _realtimeModule.PublishSystemEventAsync(request.EventType, streamEvent, request.UserId);
+                await RealtimeModule.PublishSystemEventAsync(request.EventType, streamEvent, request.UserId);
             }
 
             // Notify local subscribers
@@ -661,9 +627,9 @@ public sealed class EventStreamingModule : ModuleBase
         }
 
         // Notify real-time module
-        if (_realtimeModule != null)
+        if (RealtimeModule != null)
         {
-            await _realtimeModule.PublishSystemEventAsync(eventType, streamEvent, userId);
+            await RealtimeModule.PublishSystemEventAsync(eventType, streamEvent, userId);
         }
 
         // Notify subscribers

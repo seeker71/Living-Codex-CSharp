@@ -15,10 +15,10 @@ public sealed class StorageModule : ModuleBase
     public override string Description => "Storage management module that configures its own storage backend";
     public override string Version => "1.0.0";
 
-    public StorageModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+    public StorageModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IStorageBackend? storage = null) 
         : base(registry, logger)
     {
-        _storage = ConfigureDefaultStorageBackend();
+        _storage = storage ?? ConfigureDefaultStorageBackend();
     }
 
     /// <summary>

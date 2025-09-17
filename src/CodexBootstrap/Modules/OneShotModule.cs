@@ -10,8 +10,6 @@ public record OneShotExecuteResponse(string ModuleId, object Result, bool Succes
 
 public sealed class OneShotModule : ModuleBase
 {
-    private readonly IApiRouter _router;
-
     public override string Name => "One-Shot Operations Module";
     public override string Description => "Self-contained module for one-shot operations (apply, execute) using node-based storage";
     public override string Version => "0.1.0";
@@ -19,7 +17,6 @@ public sealed class OneShotModule : ModuleBase
     public OneShotModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        _router = new MockApiRouter(); // Will be updated via RegisterApiHandlers
     }
 
     public override Node GetModuleNode()
@@ -213,7 +210,7 @@ public sealed class OneShotModule : ModuleBase
 
     private async Task<object> ExecuteModuleApi(string moduleId, string apiName, JsonElement request)
     {
-        if (_router.TryGetHandler(moduleId, apiName, out var handler))
+        if (_apiRouter.TryGetHandler(moduleId, apiName, out var handler))
         {
             var result = await handler(request);
             return result;

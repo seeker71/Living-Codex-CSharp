@@ -20,13 +20,11 @@ namespace CodexBootstrap.Modules;
         public override string Version => "1.0.0";
         private readonly Dictionary<string, UserBeliefSystem> _userBeliefSystems = new();
         private readonly Dictionary<string, ConceptTranslationCache> _translationCache = new();
-        private readonly IServiceProvider? _serviceProvider;
 
     public UserConceptModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient)
         : base(registry, logger)
     {
         _httpClient = httpClient;
-        _serviceProvider = null;
     }
 
     public override Node GetModuleNode()

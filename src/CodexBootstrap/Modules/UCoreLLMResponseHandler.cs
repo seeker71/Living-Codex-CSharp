@@ -31,10 +31,11 @@ public class UCoreLLMResponseHandler : ModuleBase
     public override string Description => "Enhanced LLM response handler with U-CORE ontology mapping and resonance optimization";
     public override string Version => "1.0.0";
 
-    public UCoreLLMResponseHandler(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+    public UCoreLLMResponseHandler(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? apiRouter = null, object? resonanceEngine = null) 
         : base(registry, logger)
     {
-        _resonanceEngine = null; // Will be configured during initialization
+        _apiRouter = apiRouter ?? new MockApiRouter();
+        _resonanceEngine = resonanceEngine;
     }
 
     public override Node GetModuleNode()

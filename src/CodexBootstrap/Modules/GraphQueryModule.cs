@@ -12,7 +12,6 @@ namespace CodexBootstrap.Modules;
 /// </summary>
 public class GraphQueryModule : ModuleBase
 {
-    private readonly IServiceProvider? _serviceProvider;
 
     public override string Name => "Graph Query Module";
     public override string Description => "Provides graph-based querying and discovery using existing system infrastructure";
@@ -21,7 +20,6 @@ public class GraphQueryModule : ModuleBase
     public GraphQueryModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        _serviceProvider = null; // Will be configured during initialization
     }
 
 

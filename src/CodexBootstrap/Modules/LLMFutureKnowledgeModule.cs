@@ -80,7 +80,6 @@ public record FutureResponse(
 )]
 public class LLMFutureKnowledgeModule : ModuleBase
 {
-    private IApiRouter _apiRouter;
     private readonly Dictionary<string, LLMConfig> _llmConfigs;
     private readonly Dictionary<string, (SimpleTranslationResponse response, DateTime cachedAt)> _translationCache = new();
     private readonly TimeSpan _cacheExpiry = TimeSpan.FromHours(24); // Cache translations for 24 hours
@@ -89,10 +88,9 @@ public class LLMFutureKnowledgeModule : ModuleBase
     public override string Description => "Uses configurable local and remote LLMs for future knowledge retrieval and analysis";
     public override string Version => "1.0.0";
 
-    public LLMFutureKnowledgeModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? apiRouter = null) 
+    public LLMFutureKnowledgeModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        _apiRouter = apiRouter;
         _llmConfigs = new Dictionary<string, LLMConfig>();
         InitializeDefaultConfigs();
     }

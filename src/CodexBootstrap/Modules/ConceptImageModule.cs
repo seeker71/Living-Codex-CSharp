@@ -112,10 +112,7 @@ public record ImageGeneration(
 )]
 public class ConceptImageModule : ModuleBase
 {
-    // Node type constants for registry access
-    private const string ImageConfigTypeId = "codex.image.config";
-    private const string ConceptImageTypeId = "codex.image.concept";
-    private const string ImageGenerationTypeId = "codex.image.generation";
+    private readonly Dictionary<string, ImageConfig> _imageConfigs;
 
     public override string Name => "Concept Image Generation Module";
     public override string Description => "Renders concepts into images using configurable local and remote image generation models";
@@ -124,6 +121,7 @@ public class ConceptImageModule : ModuleBase
     public ConceptImageModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
+        _imageConfigs = new Dictionary<string, ImageConfig>();
         InitializeDefaultConfigs();
     }
 

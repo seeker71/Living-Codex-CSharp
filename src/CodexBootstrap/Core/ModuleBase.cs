@@ -20,6 +20,8 @@ public abstract class ModuleBase : IModule
     protected readonly Dictionary<string, Node> _moduleNodes = new();
     protected IApiRouter? _apiRouter;
     protected CoreApiService? _coreApiService;
+    protected object? _realtimeModule; // Will be set during inter-module communication setup
+    protected IServiceProvider? _serviceProvider; // Will be set during inter-module communication setup
     
     public abstract string Name { get; }
     public abstract string Description { get; }
@@ -130,6 +132,12 @@ public abstract class ModuleBase : IModule
     
     public virtual void SetupInterModuleCommunication(IServiceProvider services)
     {
+        // Store the service provider for modules to access services
+        _serviceProvider = services;
+        
+        // Try to get RealtimeModule from services for modules that need it
+        _realtimeModule = services.GetService(Type.GetType("CodexBootstrap.Modules.RealtimeModule"));
+        
         // Default implementation - modules can override to setup inter-module communication
         _logger.Info($"Inter-module communication setup for module: {Name}");
     }
