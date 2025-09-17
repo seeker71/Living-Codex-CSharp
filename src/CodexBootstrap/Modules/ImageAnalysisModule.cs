@@ -181,17 +181,15 @@ public record ExtractedEdge(
 )]
 public class ImageAnalysisModule : ModuleBase
 {
-    private IApiRouter _apiRouter;
     private readonly Dictionary<string, AnalysisConfig> _analysisConfigs;
 
     public override string Name => "Image Analysis Module";
     public override string Description => "Analyzes images to extract nodes and edges for integration with the node-based system";
     public override string Version => "1.0.0";
 
-    public ImageAnalysisModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? apiRouter = null) 
+    public ImageAnalysisModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        _apiRouter = apiRouter;
         _analysisConfigs = new Dictionary<string, AnalysisConfig>();
         InitializeDefaultConfigs();
     }

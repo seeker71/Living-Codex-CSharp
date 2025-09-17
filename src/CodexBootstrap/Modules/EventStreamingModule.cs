@@ -10,22 +10,57 @@ namespace CodexBootstrap.Modules;
 /// </summary>
 public sealed class EventStreamingModule : ModuleBase
 {
-    private readonly RealtimeModule? _realtimeModule;
     private readonly ConcurrentQueue<StreamEvent> _eventHistory = new();
     private readonly ConcurrentDictionary<string, EventSubscription> _subscriptions = new();
     private readonly ConcurrentDictionary<string, CrossServiceSubscription> _crossServiceSubscriptions = new();
     private readonly object _lock = new object();
     private int _maxHistorySize = 1000;
-    private CoreApiService? _coreApiService;
 
     public override string Name => "Event Streaming Module";
     public override string Description => "Event streaming module for live updates on node/edge changes";
     public override string Version => "1.0.0";
 
-    public EventStreamingModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, RealtimeModule? realtimeModule = null) 
+    public EventStreamingModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        _realtimeModule = realtimeModule;
+        // No direct module dependencies - use api-router for inter-module communication
+    }
+
+    // Helper method to publish system events via api-router
+    private async Task PublishSystemEventViaApiRouter(string eventType, StreamEvent streamEvent, string? userId = null)
+    {
+        try
+        {
+            if (_apiRouter == null)
+            {
+                _logger.Warn("ApiRouter not available - cannot publish system event");
+                return;
+            }
+
+            // Call RealtimeModule's PublishSystemEvent API via router
+            var request = JsonSerializer.Serialize(new
+            {
+                eventType = eventType,
+                eventData = streamEvent,
+                userId = userId
+            });
+
+            var requestElement = JsonDocument.Parse(request).RootElement;
+            
+            if (_apiRouter.TryGetHandler("codex.realtime", "PublishSystemEvent", out var handler))
+            {
+                await handler(requestElement);
+                _logger.Debug($"Published system event {eventType} via api-router");
+            }
+            else
+            {
+                _logger.Warn($"RealtimeModule PublishSystemEvent handler not found - event {eventType} not published");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Failed to publish system event via api-router: {ex.Message}");
+        }
     }
 
     public override Node GetModuleNode()

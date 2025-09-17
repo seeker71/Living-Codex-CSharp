@@ -14,7 +14,6 @@ public class LoadBalancingModule : ModuleBase
     private readonly Dictionary<string, LoadBalancingStrategy> _strategies = new();
     private readonly List<PerformanceMetric> _performanceMetrics = new();
     private readonly Dictionary<string, ScalingRecommendation> _scalingRecommendations = new();
-    private CoreApiService? _coreApiService;
     private readonly object _metricsLock = new();
 
     public override string Name => "Load Balancing Module";

@@ -24,16 +24,14 @@ namespace CodexBootstrap.Modules;
 )]
 public class LLMResponseHandlerModule : ModuleBase
 {
-    private readonly IApiRouter _apiRouter;
 
     public override string Name => "LLM Response Handler Module";
     public override string Description => "Converts LLM responses into structured nodes and edges for bootstrap integration";
     public override string Version => "1.0.0";
 
-    public LLMResponseHandlerModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? apiRouter = null) 
+    public LLMResponseHandlerModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        _apiRouter = apiRouter ?? new MockApiRouter();
     }
 
     public override Node GetModuleNode()

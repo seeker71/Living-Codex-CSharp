@@ -38,7 +38,6 @@ public record OneshotResponse(
 
 public sealed class BreathModule : ModuleBase
 {
-    private IApiRouter _apiRouter;
 
     public override string Name => "Breath Module";
     public override string Description => "Breath loop implementation for compose → expand → validate → (melt/patch/refreeze) → contract";

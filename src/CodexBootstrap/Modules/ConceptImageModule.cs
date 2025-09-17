@@ -112,18 +112,18 @@ public record ImageGeneration(
 )]
 public class ConceptImageModule : ModuleBase
 {
-    private IApiRouter _apiRouter;
-    private readonly Dictionary<string, ImageConfig> _imageConfigs;
+    // Node type constants for registry access
+    private const string ImageConfigTypeId = "codex.image.config";
+    private const string ConceptImageTypeId = "codex.image.concept";
+    private const string ImageGenerationTypeId = "codex.image.generation";
 
     public override string Name => "Concept Image Generation Module";
     public override string Description => "Renders concepts into images using configurable local and remote image generation models";
     public override string Version => "1.0.0";
 
-    public ConceptImageModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? apiRouter = null) 
+    public ConceptImageModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        _apiRouter = apiRouter;
-        _imageConfigs = new Dictionary<string, ImageConfig>();
         InitializeDefaultConfigs();
     }
 

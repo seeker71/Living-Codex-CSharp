@@ -19,10 +19,10 @@ namespace CodexBootstrap.Modules
         public override string Description => "Provides spec-driven architecture with ice/water/gas states";
         public override string Version => "1.0.0";
 
-        public SpecDrivenModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, SpecDrivenArchitecture? specDrivenArchitecture = null) 
+        public SpecDrivenModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
             : base(registry, logger)
         {
-            _specDrivenArchitecture = specDrivenArchitecture ?? new SpecDrivenArchitecture(logger, registry, null, null);
+            _specDrivenArchitecture = new SpecDrivenArchitecture(logger, registry, null, null);
         }
 
         public override Node GetModuleNode()

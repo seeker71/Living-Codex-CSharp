@@ -15,10 +15,10 @@ public sealed class PerformanceModule : ModuleBase
     public override string Description => "Performance monitoring and optimization insights";
     public override string Version => "0.1.0";
 
-    public PerformanceModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, PerformanceProfiler? profiler = null) 
+    public PerformanceModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        _profiler = profiler ?? new PerformanceProfiler(logger);
+        _profiler = new PerformanceProfiler(logger);
     }
 
 

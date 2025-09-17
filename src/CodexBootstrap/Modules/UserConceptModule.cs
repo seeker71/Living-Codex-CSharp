@@ -13,7 +13,6 @@ namespace CodexBootstrap.Modules;
 /// </summary>
     public class UserConceptModule : ModuleBase
     {
-        private readonly IApiRouter _apiRouter;
         private readonly HttpClient _httpClient;
 
         public override string Name => "User Concept Module";
@@ -21,22 +20,12 @@ namespace CodexBootstrap.Modules;
         public override string Version => "1.0.0";
         private readonly Dictionary<string, UserBeliefSystem> _userBeliefSystems = new();
         private readonly Dictionary<string, ConceptTranslationCache> _translationCache = new();
-        private CoreApiService? _coreApiService;
         private readonly IServiceProvider? _serviceProvider;
 
-    public UserConceptModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? apiRouter = null)
+    public UserConceptModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient)
         : base(registry, logger)
     {
         _httpClient = httpClient;
-        if (apiRouter == null)
-        {
-            _logger.Warn("UserConceptModule: Using MockApiRouter fallback - should be provided via DI in production");
-            _apiRouter = new MockApiRouter();
-        }
-        else
-        {
-            _apiRouter = apiRouter;
-        }
         _serviceProvider = null;
     }
 

@@ -21,10 +21,10 @@ public sealed class PortalModule : ModuleBase
     public override string Description => "Fractal exploration and navigation of external worlds";
     public override string Version => "1.0.0";
 
-    public PortalModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, ModuleCommunicationWrapper? communicationWrapper = null) 
+    public PortalModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        _communicationWrapper = communicationWrapper ?? new ModuleCommunicationWrapper(logger, "PortalModule");
+        _communicationWrapper = new ModuleCommunicationWrapper(logger, "PortalModule");
     }
 
     public override Node GetModuleNode()

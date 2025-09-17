@@ -23,7 +23,6 @@ namespace CodexBootstrap.Modules
         public override string Name => "Visual Validation Module";
         public override string Description => "Renders UI components to images and validates them against spec vision using AI analysis";
         public override string Version => "1.0.0";
-        private readonly IApiRouter _apiRouter;
         private readonly Func<string, string, int?, int?, string?, Task<byte[]>> _captureScreenshot;
 
         public VisualValidationModule(

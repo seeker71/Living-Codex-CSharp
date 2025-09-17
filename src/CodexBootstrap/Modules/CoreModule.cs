@@ -13,7 +13,6 @@ public record CoreSpecResponse(object Spec, bool Success, string Message = "Core
 
 public sealed class CoreModule : ModuleBase
 {
-    private IApiRouter _apiRouter;
 
     public override string Name => "Core System Module";
     public override string Description => "Core system functionality and atoms management";

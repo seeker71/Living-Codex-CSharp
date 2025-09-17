@@ -25,18 +25,16 @@ namespace CodexBootstrap.Modules;
 )]
 public class UCoreLLMResponseHandler : ModuleBase
 {
-    private readonly IApiRouter _apiRouter;
     private readonly object _resonanceEngine; // Temporarily using object until UCoreResonanceEngine is fixed
 
     public override string Name => "U-CORE LLM Response Handler";
     public override string Description => "Enhanced LLM response handler with U-CORE ontology mapping and resonance optimization";
     public override string Version => "1.0.0";
 
-    public UCoreLLMResponseHandler(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? apiRouter = null, object? resonanceEngine = null) 
+    public UCoreLLMResponseHandler(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        _apiRouter = apiRouter ?? new MockApiRouter();
-        _resonanceEngine = resonanceEngine;
+        _resonanceEngine = null; // Will be configured during initialization
     }
 
     public override Node GetModuleNode()

@@ -18,10 +18,10 @@ public sealed class TemporalConsciousnessModule : ModuleBase
     public override string Description => "Fractal exploration of time and temporality";
     public override string Version => "1.0.0";
 
-    public TemporalConsciousnessModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, ModuleCommunicationWrapper? communicationWrapper = null) 
+    public TemporalConsciousnessModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        _communicationWrapper = communicationWrapper ?? new ModuleCommunicationWrapper(logger, "TemporalConsciousnessModule");
+        _communicationWrapper = new ModuleCommunicationWrapper(logger, "TemporalConsciousnessModule");
     }
 
     public override Node GetModuleNode()

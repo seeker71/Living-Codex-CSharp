@@ -16,10 +16,10 @@ public sealed class MiddlewareModule : ModuleBase
     public override string Description => "Cross-cutting middleware concerns like performance monitoring";
     public override string Version => "0.1.0";
 
-    public MiddlewareModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, PerformanceProfiler? profiler = null) 
+    public MiddlewareModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        _profiler = profiler ?? new PerformanceProfiler(logger);
+        _profiler = new PerformanceProfiler(logger);
     }
 
     public override Node GetModuleNode()

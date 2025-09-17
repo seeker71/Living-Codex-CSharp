@@ -20,16 +20,14 @@ public record SpecImportResponse(string ModuleId, bool Success, string Message =
 [MetaNodeAttribute("codex.spec.module", "codex.meta/module", "SpecModule", "Specification management module")]
 public sealed class SpecModule : ModuleBase
 {
-    private readonly IApiRouter _apiRouter;
 
     public override string Name => "Spec Module";
     public override string Description => "Specification management module";
     public override string Version => "1.0.0";
 
-    public SpecModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? apiRouter = null) 
+    public SpecModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        _apiRouter = apiRouter ?? new MockApiRouter();
     }
 
     public override Node GetModuleNode()

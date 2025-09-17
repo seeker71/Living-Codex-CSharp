@@ -13,26 +13,16 @@ namespace CodexBootstrap.Modules;
 [ApiModule(Name = "ConceptModule", Version = "1.0.0", Description = "Concept Management Module - Self-contained fractal APIs", Tags = new[] { "concept", "management", "fractal" })]
 public class ConceptModule : ModuleBase
 {
-    private IApiRouter _apiRouter;
     private readonly HttpClient _httpClient;
 
     public override string Name => "Concept Management Module";
     public override string Version => "1.0.0";
     public override string Description => "Concept Management Module - Self-contained fractal APIs";
 
-    public ConceptModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? apiRouter = null)
+    public ConceptModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient)
         : base(registry, logger)
     {
         _httpClient = httpClient;
-        if (apiRouter == null)
-        {
-            _logger.Warn("ConceptModule: Using MockApiRouter fallback - should be provided via DI in production");
-            _apiRouter = new MockApiRouter();
-        }
-        else
-        {
-            _apiRouter = apiRouter;
-        }
     }
 
     public string ModuleId => "codex.concept";

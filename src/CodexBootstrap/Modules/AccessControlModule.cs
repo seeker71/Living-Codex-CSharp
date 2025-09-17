@@ -22,7 +22,7 @@ public sealed class AccessControlModule : ModuleBase
     public override string Description => "Comprehensive access control and permissions module using Microsoft.AspNetCore.Authorization";
     public override string Version => "1.0.0";
 
-    public AccessControlModule(INodeRegistry registry, ICodexLogger logger) : base(registry, logger)
+    public AccessControlModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) : base(registry, logger)
     {
         InitializeDefaultPermissions();
         InitializeDefaultRoles();

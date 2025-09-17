@@ -14,7 +14,6 @@ public class IntelligentCachingModule : ModuleBase
     private readonly Dictionary<string, UsagePattern> _usagePatterns = new();
     private readonly Dictionary<string, PreloadPrediction> _predictions = new();
     private readonly List<CacheMetrics> _cacheMetrics = new();
-    private CoreApiService? _coreApiService;
     private readonly object _cacheLock = new();
 
     public override string Name => "Intelligent Caching Module";

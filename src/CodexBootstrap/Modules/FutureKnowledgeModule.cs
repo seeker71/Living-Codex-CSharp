@@ -12,17 +12,14 @@ namespace CodexBootstrap.Modules;
 /// </remarks>
 public class FutureKnowledgeModule : ModuleBase
 {
-    private readonly IApiRouter _apiRouter;
-    private CoreApiService? _coreApiService;
 
     public override string Name => "Future Knowledge Module";
     public override string Description => "Retrieves and applies knowledge from future states";
     public override string Version => "1.0.0";
 
-    public FutureKnowledgeModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? apiRouter = null) 
+    public FutureKnowledgeModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        _apiRouter = apiRouter ?? new MockApiRouter();
     }
 
     public override Node GetModuleNode()

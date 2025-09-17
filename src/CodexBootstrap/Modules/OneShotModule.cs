@@ -16,10 +16,10 @@ public sealed class OneShotModule : ModuleBase
     public override string Description => "Self-contained module for one-shot operations (apply, execute) using node-based storage";
     public override string Version => "0.1.0";
 
-    public OneShotModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? router = null) 
+    public OneShotModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        _router = router ?? new MockApiRouter();
+        _router = new MockApiRouter(); // Will be updated via RegisterApiHandlers
     }
 
     public override Node GetModuleNode()

@@ -20,11 +20,11 @@ public sealed class StorageEndpointsModule : ModuleBase
     public override string Description => "Direct HTTP endpoints module for storage operations with comprehensive validation and error handling";
     public override string Version => "1.0.0";
 
-    public StorageEndpointsModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IStorageBackend? storageBackend = null, ICacheManager? cacheManager = null) 
+    public StorageEndpointsModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        _storageBackend = storageBackend;
-        _cacheManager = cacheManager;
+        _storageBackend = null; // Will be configured during initialization
+        _cacheManager = null;   // Will be configured during initialization
     }
 
     public override Node GetModuleNode()

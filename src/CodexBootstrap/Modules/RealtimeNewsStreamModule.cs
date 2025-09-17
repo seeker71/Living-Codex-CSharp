@@ -38,7 +38,6 @@ namespace CodexBootstrap.Modules
     {
         private readonly HttpClient _httpClient;
         private readonly Core.ConfigurationManager _configManager;
-        private readonly IApiRouter _apiRouter;
 
         public override string Name => "Realtime News Stream Module";
         public override string Description => "Real-time fractal news streaming module that ingests external news sources and transforms them through fractal analysis aligned with belief systems";
@@ -242,21 +241,12 @@ namespace CodexBootstrap.Modules
         private record OntologyAxis(string Name, List<string> Keywords);
         private List<OntologyAxis> _ontologyAxes = new();
 
-        public RealtimeNewsStreamModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? apiRouter = null)
+        public RealtimeNewsStreamModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient)
             : base(registry, logger)
         {
             _httpClient = httpClient;
             _configManager = new Core.ConfigurationManager(_registry, logger);
-            if (apiRouter == null)
-            {
-                _logger.Warn("RealtimeNewsStreamModule: Using MockApiRouter fallback - should be provided via DI in production");
-                _apiRouter = new MockApiRouter();
-            }
-            else
-            {
-                _apiRouter = apiRouter;
-            }
-            _aiTemplates = new AIModuleTemplates(_apiRouter, _logger);
+            _aiTemplates = new AIModuleTemplates(new MockApiRouter(), _logger); // Temporary until RegisterApiHandlers
             
             // Cross-module communicator will be initialized lazily
             

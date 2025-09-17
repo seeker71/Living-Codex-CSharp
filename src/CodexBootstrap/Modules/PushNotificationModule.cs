@@ -22,10 +22,10 @@ public sealed class PushNotificationModule : ModuleBase
     public override string Description => "Push notification module for client notification system";
     public override string Version => "1.0.0";
 
-    public PushNotificationModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, RealtimeModule? realtimeModule = null) 
+    public PushNotificationModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        _realtimeModule = realtimeModule;
+        _realtimeModule = null; // Will be configured during initialization
         InitializeDefaultTemplates();
     }
 

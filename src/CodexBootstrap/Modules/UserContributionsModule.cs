@@ -29,20 +29,16 @@ public sealed class UserContributionsModule : ModuleBase
     private readonly Dictionary<string, EnergyAmplification> _energyAmplifications = new();
     private readonly object _lock = new object();
     private int _maxHistorySize = 1000;
-    private CoreApiService? _coreApiService;
 
     public override string Name => "User Contributions Module";
     public override string Description => "User contributions module with ETH ledger, change tracking, attribution, and reward sharing";
     public override string Version => "1.0.0";
 
-    public UserContributionsModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, string? ethereumRpcUrl = null) 
+    public UserContributionsModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        
-        if (!string.IsNullOrEmpty(ethereumRpcUrl))
-        {
-            _web3 = new Web3(ethereumRpcUrl);
-        }
+        // Default Ethereum RPC - could be configured via settings in the future
+        // _web3 = new Web3("https://mainnet.infura.io/v3/YOUR_PROJECT_ID");
     }
 
     public override Node GetModuleNode()

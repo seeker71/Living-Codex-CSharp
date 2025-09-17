@@ -10,11 +10,11 @@ namespace CodexBootstrap.Modules;
 /// </summary>
 public class ConceptRegistryModule : ModuleBase
 {
-    private readonly Dictionary<string, ConceptRegistryEntry> _conceptRegistry = new();
-    private readonly Dictionary<string, List<string>> _serviceConcepts = new();
-    private readonly Dictionary<string, ConceptVersion> _conceptVersions = new();
-    private readonly Dictionary<string, List<ConceptRelationship>> _conceptRelationships = new();
-    private CoreApiService? _coreApiService;
+    // Node type constants for registry access
+    private const string ConceptRegistryEntryTypeId = "codex.concept-registry.entry";
+    private const string ConceptVersionTypeId = "codex.concept-registry.version";
+    private const string ConceptRelationshipTypeId = "codex.concept-registry.relationship";
+    private const string ServiceConceptMappingTypeId = "codex.concept-registry.service-mapping";
 
     public override string Name => "Concept Registry Module";
     public override string Description => "Central registry for all concepts across services";
@@ -23,6 +23,72 @@ public class ConceptRegistryModule : ModuleBase
     public ConceptRegistryModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
+        // Initialize with node-based storage - no in-memory collections
+    }
+
+    // Node-registry access helpers
+    private Node CreateConceptRegistryEntryNode(ConceptRegistryEntry entry)
+    {
+        return new Node(
+            Id: $"concept-registry.entry.{entry.ConceptId}",
+            TypeId: ConceptRegistryEntryTypeId,
+            State: ContentState.Ice,
+            Locale: "en-US",
+            Title: $"Registry Entry: {entry.ConceptId}",
+            Description: $"Registry entry for concept {entry.ConceptId} from service {entry.ServiceId}",
+            Content: new ContentRef(
+                MediaType: "application/json",
+                InlineJson: JsonSerializer.Serialize(entry),
+                InlineBytes: null,
+                ExternalUri: null,
+                AuthRef: null,
+                CacheKey: null
+            ),
+            Meta: new Dictionary<string, object>
+            {
+                ["conceptId"] = entry.ConceptId,
+                ["serviceId"] = entry.ServiceId,
+                ["version"] = entry.Version,
+                ["status"] = entry.Status,
+                ["createdAt"] = entry.CreatedAt,
+                ["updatedAt"] = entry.UpdatedAt
+            }
+        );
+    }
+
+    private ConceptRegistryEntry? GetConceptRegistryEntry(string conceptId)
+    {
+        var nodeId = $"concept-registry.entry.{conceptId}";
+        if (_registry.TryGet(nodeId, out var node) && node.TypeId == ConceptRegistryEntryTypeId)
+        {
+            return JsonSerializer.Deserialize<ConceptRegistryEntry>(node.Content.InlineJson ?? "{}");
+        }
+        return null;
+    }
+
+    private List<ConceptRegistryEntry> GetAllConceptRegistryEntries()
+    {
+        return _registry.GetNodesByType(ConceptRegistryEntryTypeId)
+            .Select(node => JsonSerializer.Deserialize<ConceptRegistryEntry>(node.Content.InlineJson ?? "{}"))
+            .Where(entry => entry != null)
+            .Cast<ConceptRegistryEntry>()
+            .ToList();
+    }
+
+    private void StoreConceptRegistryEntry(ConceptRegistryEntry entry)
+    {
+        var node = CreateConceptRegistryEntryNode(entry);
+        _registry.Upsert(node);
+    }
+
+    private List<string> GetServiceConcepts(string serviceId)
+    {
+        return _registry.GetNodesByType(ConceptRegistryEntryTypeId)
+            .Where(node => node.Meta?.GetValueOrDefault("serviceId")?.ToString() == serviceId)
+            .Select(node => node.Meta?.GetValueOrDefault("conceptId")?.ToString())
+            .Where(id => !string.IsNullOrEmpty(id))
+            .Cast<string>()
+            .ToList();
     }
 
     public override Node GetModuleNode()

@@ -19,6 +19,7 @@ public abstract class ModuleBase : IModule
     protected readonly AttributeProcessor _attributeProcessor;
     protected readonly Dictionary<string, Node> _moduleNodes = new();
     protected IApiRouter? _apiRouter;
+    protected CoreApiService? _coreApiService;
     
     public abstract string Name { get; }
     public abstract string Description { get; }
@@ -120,6 +121,9 @@ public abstract class ModuleBase : IModule
     
     public virtual void RegisterHttpEndpoints(WebApplication app, INodeRegistry nodeRegistry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
+        // Store the CoreApiService for use by modules
+        _coreApiService = coreApi;
+        
         // Default implementation - modules can override to register HTTP endpoints
         _logger.Info($"HTTP endpoints registered for module: {Name}");
     }

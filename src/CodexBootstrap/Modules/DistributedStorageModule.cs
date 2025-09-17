@@ -15,12 +15,11 @@ public sealed class DistributedStorageModule : ModuleBase
     public override string Description => "Distributed storage management module";
     public override string Version => "0.1.0";
 
-    public DistributedStorageModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IDistributedStorageBackend? distributedStorage = null) 
+    public DistributedStorageModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        _distributedStorage = distributedStorage;
-        _distributedCacheManager = distributedStorage != null ? 
-            new DistributedCacheManager(distributedStorage, new NodeCacheManager(distributedStorage, logger), logger) : null;
+        _distributedStorage = null; // Will be configured during initialization
+        _distributedCacheManager = null; // Will be configured when _distributedStorage is available
     }
 
     public override Node GetModuleNode()

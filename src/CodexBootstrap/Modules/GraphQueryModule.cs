@@ -12,18 +12,16 @@ namespace CodexBootstrap.Modules;
 /// </summary>
 public class GraphQueryModule : ModuleBase
 {
-    private IApiRouter _apiRouter;
     private readonly IServiceProvider? _serviceProvider;
-    private CoreApiService? _coreApiService;
 
     public override string Name => "Graph Query Module";
     public override string Description => "Provides graph-based querying and discovery using existing system infrastructure";
     public override string Version => "1.0.0";
 
-    public GraphQueryModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IServiceProvider? serviceProvider = null) 
+    public GraphQueryModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        _serviceProvider = serviceProvider;
+        _serviceProvider = null; // Will be configured during initialization
     }
 
 
