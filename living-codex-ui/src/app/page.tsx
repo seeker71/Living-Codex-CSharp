@@ -64,7 +64,7 @@ export default function HomePage() {
             Find ideas that resonate
           </h2>
           <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-            Meet people who amplify them. See the world's news through a living ontology.
+            Meet people who amplify them. See the world&apos;s news through a living ontology.
           </p>
           <p className="text-lg text-gray-500 mb-8">
             Everything is a Node. Explore concepts, people, and moments connected by resonance.
@@ -76,7 +76,7 @@ export default function HomePage() {
           {/* Resonance Controls */}
           <div className="lg:col-span-1">
             <ResonanceControls
-              onControlsChange={setControls}
+              onControlsChange={(newControls) => setControls(prev => ({...prev, ...newControls}))}
               className="sticky top-8"
             />
           </div>

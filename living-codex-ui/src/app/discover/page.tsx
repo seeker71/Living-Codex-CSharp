@@ -35,9 +35,9 @@ export default function DiscoverPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <a href="/" className="text-2xl font-bold text-gray-900">
+              <h1 className="text-2xl font-bold text-gray-900">
                 Living Codex
-              </a>
+              </h1>
             </div>
             <nav className="flex space-x-8">
               <a href="/discover" className="text-blue-600 font-medium">
@@ -69,7 +69,7 @@ export default function DiscoverPage() {
           {/* Controls Sidebar */}
           <div className="lg:col-span-1">
             <ResonanceControls
-              onControlsChange={setControls}
+              onControlsChange={(newControls) => setControls(prev => ({...prev, ...newControls}))}
               className="sticky top-8"
             />
           </div>

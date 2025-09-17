@@ -55,7 +55,7 @@ export default function GraphPage() {
               <h1 className="text-2xl font-bold text-gray-900">Graph</h1>
               <StatusBadge status="Simple" />
             </div>
-            <a href="/" className="text-gray-600 hover:text-gray-900">Home</a>
+            <button onClick={() => window.location.href = '/'} className="text-gray-600 hover:text-gray-900">Home</button>
           </div>
         </div>
       </header>
