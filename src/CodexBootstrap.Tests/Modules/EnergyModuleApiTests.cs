@@ -26,26 +26,41 @@ public class EnergyModuleApiTests : IClassFixture<TestServerFixture>
         };
     }
 
-    #region Missing Endpoint Tests (These should return 404 until implemented)
+    #region Implemented Endpoint Tests
 
     [Fact]
-    public async Task GetCollectiveEnergy_ShouldReturnNotFound_WhenNotImplemented()
+    public async Task GetCollectiveEnergy_ShouldReturnSuccess_WhenImplemented()
     {
         // Act
-        var response = await _client.GetAsync("/energy/collective");
+        var response = await _client.GetAsync("/contributions/abundance/collective-energy");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        
+        var content = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content, _jsonOptions);
+        
+        result.Should().NotBeNull();
+        result.Should().ContainKey("success");
+        result.Should().ContainKey("collectiveResonance");
     }
 
     [Fact]
-    public async Task GetContributorEnergy_ShouldReturnNotFound_WhenNotImplemented()
+    public async Task GetContributorEnergy_ShouldReturnSuccess_WhenImplemented()
     {
         // Act
-        var response = await _client.GetAsync("/energy/contributor/test-user");
+        var response = await _client.GetAsync("/contributions/abundance/contributor-energy/test-user");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        
+        var content = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content, _jsonOptions);
+        
+        result.Should().NotBeNull();
+        result.Should().ContainKey("success");
+        result.Should().ContainKey("userId");
+        result.Should().ContainKey("energyLevel");
     }
 
     [Fact]
@@ -75,16 +90,17 @@ public class EnergyModuleApiTests : IClassFixture<TestServerFixture>
     }
 
     [Fact]
-    public async Task RecordContribution_ShouldReturnNotFound_WhenNotImplemented()
+    public async Task RecordContribution_ShouldReturnSuccess_WhenImplemented()
     {
         // Arrange
         var request = new
         {
             userId = "test-user",
-            title = "Test Contribution",
+            entityId = "test-concept-123",
+            entityType = "concept",
+            contributionType = "Create",
             description = "A test contribution",
-            type = "concept",
-            energy = 100.0
+            value = 100.0
         };
 
         var content = new StringContent(
@@ -93,10 +109,16 @@ public class EnergyModuleApiTests : IClassFixture<TestServerFixture>
             "application/json");
 
         // Act
-        var response = await _client.PostAsync("/contributions", content);
+        var response = await _client.PostAsync("/contributions/record", content);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        
+        var responseContent = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(responseContent, _jsonOptions);
+        
+        result.Should().NotBeNull();
+        result.Should().ContainKey("success");
     }
 
     #endregion
@@ -107,7 +129,7 @@ public class EnergyModuleApiTests : IClassFixture<TestServerFixture>
     public async Task GetCollectiveEnergy_ShouldReturnEnergyValue_WhenImplemented()
     {
         // This test will be enabled when the endpoint is implemented
-        var response = await _client.GetAsync("/energy/collective");
+        var response = await _client.GetAsync("/contributions/abundance/collective-energy");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
         var content = await response.Content.ReadAsStringAsync();
@@ -122,7 +144,7 @@ public class EnergyModuleApiTests : IClassFixture<TestServerFixture>
     public async Task GetContributorEnergy_ShouldReturnUserEnergy_WhenImplemented()
     {
         // This test will be enabled when the endpoint is implemented
-        var response = await _client.GetAsync("/energy/contributor/test-user");
+        var response = await _client.GetAsync("/contributions/abundance/contributor-energy/test-user");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
         var content = await response.Content.ReadAsStringAsync();
@@ -168,10 +190,11 @@ public class EnergyModuleApiTests : IClassFixture<TestServerFixture>
         var request = new
         {
             userId = "test-user",
-            title = "Test Contribution",
+            entityId = "test-concept-123",
+            entityType = "concept",
+            contributionType = "Create",
             description = "A test contribution",
-            type = "concept",
-            energy = 100.0
+            value = 100.0
         };
 
         var content = new StringContent(
@@ -179,7 +202,7 @@ public class EnergyModuleApiTests : IClassFixture<TestServerFixture>
             Encoding.UTF8,
             "application/json");
 
-        var response = await _client.PostAsync("/contributions", content);
+        var response = await _client.PostAsync("/contributions/record", content);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
         var responseContent = await response.Content.ReadAsStringAsync();
@@ -199,7 +222,7 @@ public class EnergyModuleApiTests : IClassFixture<TestServerFixture>
         // This test will be enabled when the endpoint is implemented
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-        var response = await _client.GetAsync("/energy/collective");
+        var response = await _client.GetAsync("/contributions/abundance/collective-energy");
         stopwatch.Stop();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -212,7 +235,7 @@ public class EnergyModuleApiTests : IClassFixture<TestServerFixture>
         // This test will be enabled when the endpoint is implemented
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-        var response = await _client.GetAsync("/energy/contributor/test-user");
+        var response = await _client.GetAsync("/contributions/abundance/contributor-energy/test-user");
         stopwatch.Stop();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -227,7 +250,7 @@ public class EnergyModuleApiTests : IClassFixture<TestServerFixture>
     public async Task GetContributorEnergy_ShouldReturnBadRequest_WhenUserIdInvalid_WhenImplemented()
     {
         // This test will be enabled when the endpoint is implemented
-        var response = await _client.GetAsync("/energy/contributor/");
+        var response = await _client.GetAsync("/contributions/abundance/contributor-energy/");
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
@@ -237,8 +260,9 @@ public class EnergyModuleApiTests : IClassFixture<TestServerFixture>
         // This test will be enabled when the endpoint is implemented
         var request = new
         {
-            // Missing required fields
-            title = "Test Contribution"
+            // Missing required entityId field
+            userId = "test-user",
+            description = "Test Contribution"
         };
 
         var content = new StringContent(
@@ -246,7 +270,7 @@ public class EnergyModuleApiTests : IClassFixture<TestServerFixture>
             Encoding.UTF8,
             "application/json");
 
-        var response = await _client.PostAsync("/contributions", content);
+        var response = await _client.PostAsync("/contributions/record", content);
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
