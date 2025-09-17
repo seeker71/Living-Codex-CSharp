@@ -31,6 +31,9 @@ namespace CodexBootstrap.Modules
     /// Real-time fractal news streaming module that ingests external news sources
     /// and transforms them through fractal analysis aligned with belief systems
     /// </summary>
+    /// <remarks>
+    /// Requires NEWS_INGESTION_ENABLED and API keys; AI enrichment falls back to logs when the AI module handlers are unavailable.
+    /// </remarks>
     public class RealtimeNewsStreamModule : ModuleBase
     {
         private readonly HttpClient _httpClient;

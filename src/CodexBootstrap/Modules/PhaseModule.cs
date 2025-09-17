@@ -26,6 +26,12 @@ public sealed record ResonanceProposal(
     string Justification
 );
 
+/// <summary>
+/// Manages node state transitions between Ice, Water, and Gas states.
+/// </summary>
+/// <remarks>
+/// Does not move edges itself; relies on NodeRegistry edge re-evaluation when nodes settle into new buckets.
+/// </remarks>
 public sealed class PhaseModule : ModuleBase
 {
     public override string Name => "Phase Module";

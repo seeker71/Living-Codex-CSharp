@@ -7,6 +7,9 @@ namespace CodexBootstrap.Modules;
 /// <summary>
 /// Future Knowledge Module - Retrieves and applies knowledge from future states
 /// </summary>
+/// <remarks>
+/// Current implementation relies on Simulate* helpers and does not call external prediction services.
+/// </remarks>
 public class FutureKnowledgeModule : ModuleBase
 {
     private readonly IApiRouter _apiRouter;

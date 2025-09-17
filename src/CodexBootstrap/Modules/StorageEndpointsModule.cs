@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using FluentValidation;
@@ -218,9 +219,15 @@ public sealed class StorageEndpointsModule : ModuleBase
             var nodes = _registry.AllNodes().AsEnumerable();
 
             // Apply filters
-            if (!string.IsNullOrEmpty(query.TypeId))
+            var requestedTypeId = query.TypeId;
+            if (string.IsNullOrWhiteSpace(requestedTypeId) && !string.IsNullOrWhiteSpace(query.Type))
             {
-                nodes = nodes.Where(n => n.TypeId == query.TypeId);
+                requestedTypeId = query.Type;
+            }
+
+            if (!string.IsNullOrWhiteSpace(requestedTypeId))
+            {
+                nodes = nodes.Where(n => string.Equals(n.TypeId, requestedTypeId, StringComparison.OrdinalIgnoreCase));
             }
 
             if (query.State.HasValue)
@@ -729,6 +736,7 @@ public sealed class StorageEndpointsModule : ModuleBase
 
     public record NodeListQuery(
         string? TypeId = null,
+        string? Type = null,
         ContentState? State = null,
         string? Locale = null,
         string? SearchTerm = null,

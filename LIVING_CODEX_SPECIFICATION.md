@@ -58,6 +58,14 @@ The Living Codex is a consciousness-expanding, fractal-based system that impleme
 5. **Monitoring**: No alerting, dashboards, or observability
 6. **Scalability**: In-memory only, distributed support needs testing
 
+### ⚠️ Implementation Limitations (Current State)
+- **Node Lifecycle & Edges**: `NodeRegistry` only persists edges when both endpoints reach Water or Ice. Mixed-state links stay in-memory, so cross-phase relationships disappear after restart.
+- **Simulation-heavy Modules**: `FutureKnowledgeModule`, `IntelligentCachingModule`, and several AI helpers return synthetic data through `Simulate*` methods; they are placeholders for production inference pipelines.
+- **Abundance System**: `UserContributionsModule` operates entirely in-memory; Ethereum/Web3 calls are stubbed and no on-chain state exists today.
+- **News Ingestion**: `RealtimeNewsStreamModule` needs external API keys. Without them, `NewsFeedModule` responds from cached samples rather than live sources.
+- **Identity & Security**: Authentication relies on `InMemoryUserRepository`; OAuth providers require runtime configuration and there is no persistent user store or hardened middleware.
+- **Visual Validation**: `VisualValidationModule` depends on external LLM endpoints and Puppeteer screenshots; the module falls back to success responses if those services are unavailable.
+
 ### 📊 Module Completion Summary
 | Category | Modules | Complete | Partial | Failed | Production Ready |
 |----------|---------|----------|---------|--------|------------------|

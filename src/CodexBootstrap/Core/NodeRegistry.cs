@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
 using CodexBootstrap.Core.Storage;
 
 namespace CodexBootstrap.Core;
@@ -8,6 +10,9 @@ namespace CodexBootstrap.Core;
 /// - Ice nodes: Stored in high-performance, federated storage (PostgreSQL)
 /// - Water nodes: Stored in semi-persistent, local cache (SQLite)
 /// - Gas nodes: Generated on-demand, not persisted
+/// <remarks>
+/// Edge durability matches the colder endpoint: mixed-state links remain in-memory (Gas) until both nodes reach Water or Ice.
+/// </remarks>
 /// </summary>
 public class NodeRegistry : INodeRegistry
 {
@@ -18,8 +23,25 @@ public class NodeRegistry : INodeRegistry
     private readonly ConcurrentDictionary<string, Node> _iceNodes = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, Node> _waterNodes = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, Node> _gasNodes = new(StringComparer.OrdinalIgnoreCase);
-    private readonly List<Edge> _edges = new();
+
+    private readonly Dictionary<string, EdgeRecord> _edgeRecords = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, HashSet<string>> _nodeEdgeIndex = new(StringComparer.OrdinalIgnoreCase);
     private bool _isInitialized = false;
+
+    private sealed class EdgeRecord
+    {
+        public EdgeRecord(Edge edge, ContentState state)
+        {
+            Edge = edge;
+            State = state;
+        }
+
+        public Edge Edge { get; private set; }
+        public ContentState State { get; private set; }
+
+        public void UpdateEdge(Edge edge) => Edge = edge;
+        public void UpdateState(ContentState newState) => State = newState;
+    }
 
     public NodeRegistry(IIceStorageBackend iceStorage, IWaterStorageBackend waterStorage, ICodexLogger logger)
     {
@@ -39,16 +61,96 @@ public class NodeRegistry : INodeRegistry
         // Initialize storage backends outside of lock
         await _iceStorage.InitializeAsync();
         await _waterStorage.InitializeAsync();
-        
+
+        List<Node> iceNodes = new();
+        List<Node> waterNodes = new();
+
+        try
+        {
+            var loadedIceNodes = await _iceStorage.GetAllIceNodesAsync();
+            if (loadedIceNodes != null)
+            {
+                iceNodes = loadedIceNodes.ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error hydrating Ice nodes: {ex.Message}", ex);
+        }
+
+        try
+        {
+            var loadedWaterNodes = await _waterStorage.GetAllWaterNodesAsync();
+            if (loadedWaterNodes != null)
+            {
+                waterNodes = loadedWaterNodes.ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error hydrating Water nodes: {ex.Message}", ex);
+        }
+
+        var hydrationPerformed = false;
+        var skippedWaterCount = 0;
+        var hydratedIceCount = 0;
+        var hydratedWaterCount = 0;
+
         _lock.EnterWriteLock();
         try
         {
+            if (_isInitialized)
+            {
+                return;
+            }
+
+            hydrationPerformed = true;
+
+            foreach (var node in iceNodes)
+            {
+                var normalizedNode = node.State == ContentState.Ice
+                    ? node
+                    : node with { State = ContentState.Ice };
+
+                CacheNodeInMemory(normalizedNode);
+            }
+
+            foreach (var node in waterNodes)
+            {
+                if (_iceNodes.ContainsKey(node.Id))
+                {
+                    skippedWaterCount++;
+                    continue;
+                }
+
+                var normalizedNode = node.State == ContentState.Water
+                    ? node
+                    : node with { State = ContentState.Water };
+
+                CacheNodeInMemory(normalizedNode);
+            }
+
+            hydratedIceCount = _iceNodes.Count;
+            hydratedWaterCount = _waterNodes.Count;
+
             _isInitialized = true;
-            _logger.Info("UnifiedNodeRegistry initialized with Ice and Water storage backends");
         }
         finally
         {
             _lock.ExitWriteLock();
+        }
+
+        if (hydrationPerformed)
+        {
+            _logger.Info("UnifiedNodeRegistry initialized with Ice and Water storage backends");
+            if (skippedWaterCount > 0)
+            {
+                _logger.Info($"Hydrated {hydratedIceCount} Ice nodes and {hydratedWaterCount} Water nodes into memory (skipped {skippedWaterCount} Water nodes shadowed by Ice)");
+            }
+            else
+            {
+                _logger.Info($"Hydrated {hydratedIceCount} Ice nodes and {hydratedWaterCount} Water nodes into memory");
+            }
         }
     }
 
@@ -65,19 +167,18 @@ public class NodeRegistry : INodeRegistry
         _lock.EnterWriteLock();
         try
         {
+            CacheNodeInMemory(node);
+
             // Store in local collections immediately for synchronous access
             switch (node.State)
             {
                 case ContentState.Ice:
-                    _iceNodes[node.Id] = node;
                     _logger.Info($"Stored Ice node {node.Id} in local collection (total Ice nodes: {_iceNodes.Count})");
                     break;
                 case ContentState.Water:
-                    _waterNodes[node.Id] = node;
                     _logger.Info($"Stored Water node {node.Id} in local collection (total Water nodes: {_waterNodes.Count})");
                     break;
                 case ContentState.Gas:
-                    _gasNodes[node.Id] = node;
                     _logger.Info($"Stored Gas node {node.Id} in local collection (total Gas nodes: {_gasNodes.Count})");
                     break;
             }
@@ -107,6 +208,7 @@ public class NodeRegistry : INodeRegistry
                     _logger.Error($"Error storing {node.State} node {node.Id}: {ex.Message}", ex);
                 }
             });
+
         }
         finally
         {
@@ -115,6 +217,33 @@ public class NodeRegistry : INodeRegistry
 
         // Log after releasing the lock to avoid potential deadlocks
         _logger.Info($"Successfully cached {node.State} node {node.Id} in memory");
+    }
+
+    private void CacheNodeInMemory(Node node)
+    {
+        // Expecting caller to hold write lock
+        _iceNodes.TryRemove(node.Id, out _);
+        _waterNodes.TryRemove(node.Id, out _);
+        _gasNodes.TryRemove(node.Id, out _);
+
+        switch (node.State)
+        {
+            case ContentState.Ice:
+                _iceNodes[node.Id] = node;
+                break;
+            case ContentState.Water:
+                _waterNodes[node.Id] = node;
+                break;
+            case ContentState.Gas:
+                _gasNodes[node.Id] = node;
+                break;
+            default:
+                _logger.Warn($"Attempted to cache node {node.Id} with unrecognized state {node.State}");
+                break;
+        }
+
+        // Ensure connected edges are re-evaluated when this node changes state
+        ReevaluateEdgesForNode(node.Id);
     }
 
     public void Upsert(Edge edge)
@@ -127,23 +256,39 @@ public class NodeRegistry : INodeRegistry
                 throw new InvalidOperationException("Registry not initialized. Call InitializeAsync() first.");
             }
 
-            // Store edge in local collection immediately for synchronous access
-            _edges.Add(edge);
-            _logger.Debug($"Cached edge {edge.FromId}->{edge.ToId} in memory");
-
-            // Also store in persistent storage asynchronously
-            _ = Task.Run(async () =>
+            var edgeKey = BuildEdgeKey(edge.FromId, edge.ToId, edge.Role);
+            if (_edgeRecords.TryGetValue(edgeKey, out var record))
             {
-                try
+                var previousState = record.State;
+                var previousEdge = record.Edge;
+
+                if (!previousEdge.Equals(edge))
                 {
-                    await _iceStorage.StoreEdgeAsync(edge);
-                    _logger.Debug($"Stored edge {edge.FromId}->{edge.ToId} in federated storage");
+                    // If endpoints changed we need to rebuild index
+                    if (!string.Equals(previousEdge.FromId, edge.FromId, StringComparison.OrdinalIgnoreCase) ||
+                        !string.Equals(previousEdge.ToId, edge.ToId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        RemoveEdgeFromIndex(edgeKey, previousEdge);
+                        IndexEdge(edgeKey, edge);
+                    }
+
+                    record.UpdateEdge(edge);
                 }
-                catch (Exception ex)
+
+                var desiredState = DetermineDesiredEdgeState(edge.FromId, edge.ToId);
+                if (desiredState != previousState)
                 {
-                    _logger.Error($"Error storing edge {edge.FromId}->{edge.ToId}: {ex.Message}", ex);
+                    HandleEdgeStateTransition(edgeKey, record, previousState, desiredState);
                 }
-            });
+            }
+            else
+            {
+                var desiredState = DetermineDesiredEdgeState(edge.FromId, edge.ToId);
+                record = new EdgeRecord(edge, desiredState);
+                _edgeRecords[edgeKey] = record;
+                IndexEdge(edgeKey, edge);
+                HandleEdgeStateEntry(edgeKey, record, desiredState);
+            }
         }
         finally
         {
@@ -193,6 +338,167 @@ public class NodeRegistry : INodeRegistry
         // If not completed, return false and let caller use async method
         node = null!;
         return false;
+    }
+
+    private static string BuildEdgeKey(string fromId, string toId, string role)
+    {
+        return $"{fromId}::{role}::{toId}".ToLowerInvariant();
+    }
+
+    private ContentState DetermineDesiredEdgeState(string fromId, string toId)
+    {
+        var fromState = TryGetNodeStateUnsafe(fromId);
+        var toState = TryGetNodeStateUnsafe(toId);
+
+        if (fromState == ContentState.Ice && toState == ContentState.Ice)
+        {
+            return ContentState.Ice;
+        }
+
+        if (fromState == ContentState.Water && toState == ContentState.Water)
+        {
+            return ContentState.Water;
+        }
+
+        return ContentState.Gas;
+    }
+
+    private ContentState? TryGetNodeStateUnsafe(string nodeId)
+    {
+        if (_gasNodes.ContainsKey(nodeId))
+        {
+            return ContentState.Gas;
+        }
+
+        if (_waterNodes.ContainsKey(nodeId))
+        {
+            return ContentState.Water;
+        }
+
+        if (_iceNodes.ContainsKey(nodeId))
+        {
+            return ContentState.Ice;
+        }
+
+        return null;
+    }
+
+    private void HandleEdgeStateEntry(string edgeKey, EdgeRecord record, ContentState state)
+    {
+        record.UpdateState(state);
+
+        if (state == ContentState.Ice)
+        {
+            PersistEdgeToIce(record.Edge);
+        }
+    }
+
+    private void HandleEdgeStateTransition(string edgeKey, EdgeRecord record, ContentState previousState, ContentState newState)
+    {
+        if (previousState == newState)
+        {
+            return;
+        }
+
+        if (previousState == ContentState.Ice && newState != ContentState.Ice)
+        {
+            RemoveEdgeFromIce(record.Edge);
+        }
+
+        record.UpdateState(newState);
+
+        if (newState == ContentState.Ice)
+        {
+            PersistEdgeToIce(record.Edge);
+        }
+    }
+
+    private void PersistEdgeToIce(Edge edge)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _iceStorage.StoreEdgeAsync(edge);
+                _logger.Debug($"Stored edge {edge.FromId}->{edge.ToId} in federated storage");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error storing edge {edge.FromId}->{edge.ToId}: {ex.Message}", ex);
+            }
+        });
+    }
+
+    private void RemoveEdgeFromIce(Edge edge)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _iceStorage.DeleteEdgeAsync(edge.FromId, edge.ToId, edge.Role);
+                _logger.Debug($"Removed edge {edge.FromId}->{edge.ToId} from federated storage");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error removing edge {edge.FromId}->{edge.ToId}: {ex.Message}", ex);
+            }
+        });
+    }
+
+    private void IndexEdge(string edgeKey, Edge edge)
+    {
+        AddEdgeKeyForNode(edge.FromId, edgeKey);
+        AddEdgeKeyForNode(edge.ToId, edgeKey);
+    }
+
+    private void RemoveEdgeFromIndex(string edgeKey, Edge edge)
+    {
+        RemoveEdgeKeyForNode(edge.FromId, edgeKey);
+        RemoveEdgeKeyForNode(edge.ToId, edgeKey);
+    }
+
+    private void AddEdgeKeyForNode(string nodeId, string edgeKey)
+    {
+        if (!_nodeEdgeIndex.TryGetValue(nodeId, out var edges))
+        {
+            edges = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            _nodeEdgeIndex[nodeId] = edges;
+        }
+        edges.Add(edgeKey);
+    }
+
+    private void RemoveEdgeKeyForNode(string nodeId, string edgeKey)
+    {
+        if (_nodeEdgeIndex.TryGetValue(nodeId, out var edges))
+        {
+            edges.Remove(edgeKey);
+            if (edges.Count == 0)
+            {
+                _nodeEdgeIndex.Remove(nodeId);
+            }
+        }
+    }
+
+    private void ReevaluateEdgesForNode(string nodeId)
+    {
+        if (!_nodeEdgeIndex.TryGetValue(nodeId, out var edgeKeys) || edgeKeys.Count == 0)
+        {
+            return;
+        }
+
+        // Create a copy to avoid modification during iteration
+        var keysSnapshot = edgeKeys.ToList();
+        foreach (var edgeKey in keysSnapshot)
+        {
+            if (_edgeRecords.TryGetValue(edgeKey, out var record))
+            {
+                var newState = DetermineDesiredEdgeState(record.Edge.FromId, record.Edge.ToId);
+                if (newState != record.State)
+                {
+                    HandleEdgeStateTransition(edgeKey, record, record.State, newState);
+                }
+            }
+        }
     }
 
     public async Task<Node?> GetNodeAsync(string id)
@@ -402,8 +708,7 @@ public class NodeRegistry : INodeRegistry
                 throw new InvalidOperationException("Registry not initialized. Call InitializeAsync() first.");
             }
 
-            // Return edges from local collection
-            return _edges.ToList();
+            return _edgeRecords.Values.Select(r => r.Edge).ToList();
         }
         finally
         {
@@ -411,7 +716,7 @@ public class NodeRegistry : INodeRegistry
         }
     }
 
-    public async Task<IEnumerable<Edge>> AllEdgesAsync()
+    public Task<IEnumerable<Edge>> AllEdgesAsync()
     {
         _lock.EnterReadLock();
         try
@@ -420,13 +725,14 @@ public class NodeRegistry : INodeRegistry
             {
                 throw new InvalidOperationException("Registry not initialized. Call InitializeAsync() first.");
             }
+
+            var snapshot = _edgeRecords.Values.Select(r => r.Edge).ToList().AsEnumerable();
+            return Task.FromResult(snapshot);
         }
         finally
         {
             _lock.ExitReadLock();
         }
-
-        return await _iceStorage.GetAllEdgesAsync();
     }
 
     public Node? GetNode(string id)
@@ -454,6 +760,26 @@ public class NodeRegistry : INodeRegistry
             _gasNodes.TryRemove(nodeId, out _);
             
             _logger.Debug($"Removed node {nodeId} from local collections");
+
+            if (_nodeEdgeIndex.TryGetValue(nodeId, out var edgeKeys) && edgeKeys.Count > 0)
+            {
+                var keysSnapshot = edgeKeys.ToList();
+                foreach (var edgeKey in keysSnapshot)
+                {
+                    if (_edgeRecords.TryGetValue(edgeKey, out var record))
+                    {
+                        if (record.State == ContentState.Ice)
+                        {
+                            RemoveEdgeFromIce(record.Edge);
+                        }
+
+                        RemoveEdgeFromIndex(edgeKey, record.Edge);
+                        _edgeRecords.Remove(edgeKey);
+                    }
+                }
+
+                _nodeEdgeIndex.Remove(nodeId);
+            }
         }
         finally
         {
@@ -726,8 +1052,15 @@ public class NodeRegistry : INodeRegistry
             {
                 return Enumerable.Empty<Edge>();
             }
-            // Access edges directly from local collection to avoid lock recursion
-            return _edges.Where(e => e.FromId.Equals(fromId, StringComparison.OrdinalIgnoreCase));
+            if (_nodeEdgeIndex.TryGetValue(fromId, out var edgeKeys))
+            {
+                return edgeKeys
+                    .Select(key => _edgeRecords.TryGetValue(key, out var record) ? record.Edge : null)
+                    .Where(edge => edge != null)!
+                    .Cast<Edge>()
+                    .ToList();
+            }
+            return Enumerable.Empty<Edge>();
         }
         finally
         {
@@ -744,8 +1077,16 @@ public class NodeRegistry : INodeRegistry
             {
                 return Enumerable.Empty<Edge>();
             }
-            // Access edges directly from local collection to avoid lock recursion
-            return _edges.Where(e => e.ToId.Equals(toId, StringComparison.OrdinalIgnoreCase));
+            if (_nodeEdgeIndex.TryGetValue(toId, out var edgeKeys))
+            {
+                return edgeKeys
+                    .Select(key => _edgeRecords.TryGetValue(key, out var record) ? record.Edge : null)
+                    .Where(edge => edge != null)!
+                    .Cast<Edge>()
+                    .Where(edge => edge.ToId.Equals(toId, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
+            return Enumerable.Empty<Edge>();
         }
         finally
         {
@@ -800,8 +1141,22 @@ public class NodeRegistry : INodeRegistry
                 return null;
             }
             // Access edges directly from local collection to avoid lock recursion
-            return _edges.FirstOrDefault(e => e.FromId.Equals(fromId, StringComparison.OrdinalIgnoreCase) && 
-                                            e.ToId.Equals(toId, StringComparison.OrdinalIgnoreCase));
+            if (_nodeEdgeIndex.TryGetValue(fromId, out var edgeKeys))
+            {
+                foreach (var edgeKey in edgeKeys)
+                {
+                    if (_edgeRecords.TryGetValue(edgeKey, out var record))
+                    {
+                        var edge = record.Edge;
+                        if (edge.FromId.Equals(fromId, StringComparison.OrdinalIgnoreCase) &&
+                            edge.ToId.Equals(toId, StringComparison.OrdinalIgnoreCase))
+                        {
+                            return edge;
+                        }
+                    }
+                }
+            }
+            return null;
         }
         finally
         {
@@ -865,7 +1220,8 @@ public class NodeRegistry : INodeRegistry
             _iceNodes.Clear();
             _waterNodes.Clear();
             _gasNodes.Clear();
-            _edges.Clear();
+            _edgeRecords.Clear();
+            _nodeEdgeIndex.Clear();
             
             _logger.Debug("Registry cleared - all nodes and edges removed");
         }

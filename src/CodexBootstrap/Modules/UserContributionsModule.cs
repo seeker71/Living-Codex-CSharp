@@ -13,6 +13,9 @@ namespace CodexBootstrap.Modules;
 /// <summary>
 /// User contributions module with ETH ledger, change tracking, attribution, and reward sharing
 /// </summary>
+/// <remarks>
+/// Ethereum interactions are stubbed: ledger, rewards, and abundance metrics execute in-memory without on-chain persistence.
+/// </remarks>
 public sealed class UserContributionsModule : ModuleBase
 {
     private readonly Web3? _web3;

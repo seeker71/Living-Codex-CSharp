@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using CodexBootstrap.Core;
 using CodexBootstrap.Modules;
@@ -52,8 +53,33 @@ namespace CodexBootstrap.Tests.Modules
             _module.Register(_mockRegistry.Object);
 
             // Assert
-            // AIModule registers itself plus 4 prompt templates = 5 total
-            _mockRegistry.Verify(x => x.Upsert(It.IsAny<Node>()), Times.Exactly(5));
+            var upsertedNodes = _mockRegistry.Invocations
+                .Where(invocation => invocation.Method.Name == nameof(INodeRegistry.Upsert) && invocation.Arguments.FirstOrDefault() is Node)
+                .Select(invocation => (Node)invocation.Arguments[0]!)
+                .ToList();
+
+            upsertedNodes.Should().NotBeEmpty();
+
+            var upsertedIds = upsertedNodes
+                .Select(n => n.Id)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            upsertedIds.Should().Contain("ai-module");
+
+            var expectedPromptIds = new[]
+            {
+                "prompt.concept-extraction",
+                "prompt.fractal-transformation",
+                "prompt.scoring-analysis",
+                "prompt.future-query"
+            };
+
+            foreach (var promptId in expectedPromptIds)
+            {
+                upsertedIds.Should().Contain(promptId);
+            }
+
+            upsertedNodes.Count.Should().BeGreaterOrEqualTo(expectedPromptIds.Length + 1);
         }
 
         [Fact]

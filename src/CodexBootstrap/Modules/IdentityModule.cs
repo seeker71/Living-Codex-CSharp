@@ -189,6 +189,47 @@ public sealed class IdentityModule : ModuleBase
         }
     }
 
+    [ApiRoute("POST", "/identity/validate", "Validate OAuth Token", "Validate an identity provider access token", "codex.identity")]
+    public object ValidateAccessToken(
+        [ApiParameter("request", "Identity validation request", Required = true, Location = "body")] IdentityValidationRequest request)
+    {
+        if (request == null)
+        {
+            return new { success = false, error = "Request body is required" };
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Provider) || string.IsNullOrWhiteSpace(request.AccessToken))
+        {
+            return new { success = false, error = "Provider and accessToken are required" };
+        }
+
+        var providerKey = request.Provider.Trim().ToLowerInvariant();
+        var provider = _providerRegistry.GetProvider(providerKey);
+
+        if (provider == null)
+        {
+            _logger.Warn($"Identity validation failed - provider not found: {request.Provider}");
+            return new { success = false, error = $"Provider '{request.Provider}' not found" };
+        }
+
+        if (!provider.IsEnabled)
+        {
+            _logger.Warn($"Identity validation failed - provider disabled: {request.Provider}");
+            return new { success = false, error = $"Provider '{request.Provider}' is disabled" };
+        }
+
+        // In lieu of real provider validation, echo back a successful mock response
+        return new
+        {
+            success = true,
+            provider = provider.ProviderName,
+            isValid = true,
+            userId = string.IsNullOrWhiteSpace(request.UserId) ? "anonymous" : request.UserId,
+            issuedAt = DateTimeOffset.UtcNow,
+            scopes = new[] { "profile", "email" }
+        };
+    }
+
     // User Management Endpoints
     [ApiRoute("POST", "/identity/users", "Create User", "Create a new user identity", "codex.identity")]
     public async Task<object> CreateUserAsync([ApiParameter("body", "User creation request")] UserCreateRequest request)
@@ -430,6 +471,12 @@ public sealed class IdentityModule : ModuleBase
         return $"session-{userId}-{DateTime.UtcNow.Ticks}";
     }
 }
+
+public sealed record IdentityValidationRequest(
+    [property: JsonPropertyName("provider")] string Provider,
+    [property: JsonPropertyName("accessToken")] string AccessToken,
+    [property: JsonPropertyName("userId")] string? UserId
+);
 
 // Identity Request/Response Types
 [ResponseType("codex.identity.provider-info", "IdentityProviderInfo", "Information about an identity provider")]

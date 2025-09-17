@@ -17,6 +17,12 @@
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
+
+  <!-- Exclude accidental build artifacts from nested obj folders -->
+  <ItemGroup>
+    <Compile Remove="**/obj/**/*.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="FluentValidation" Version="11.8.0" />
     <PackageReference Include="log4net" Version="3.2.0" />

@@ -8,6 +8,9 @@ namespace CodexBootstrap.Modules;
 /// News Feed Module - Real news feed based on user interests from actual news data
 /// Provides personalized news feeds based on user interests, location, and concept relationships
 /// </summary>
+/// <remarks>
+/// Without external ingestion the module serves cached samples; live feeds require Real-time News Stream and storage backends.
+/// </remarks>
 [MetaNode(Id = "codex.news-feed", Name = "News Feed Module", Description = "Real news feed system based on user interests and actual news data")]
 public sealed class NewsFeedModule : ModuleBase
 {

@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -12,6 +14,9 @@ namespace CodexBootstrap.Modules
     /// <summary>
     /// Visual Validation Module - Renders UI components to images and analyzes them against spec vision
     /// </summary>
+    /// <remarks>
+    /// Dependent on external Puppeteer/LLM services; gracefully downgrades to success messages when those integrations are unavailable.
+    /// </remarks>
     [ApiModule(Name = "VisualValidationModule", Version = "1.0.0", Description = "Renders UI components to images and validates them against spec vision using AI analysis", Tags = new[] { "visual-validation", "ui-testing", "quality-assurance" })]
     public class VisualValidationModule : ModuleBase
     {
@@ -19,12 +24,19 @@ namespace CodexBootstrap.Modules
         public override string Description => "Renders UI components to images and validates them against spec vision using AI analysis";
         public override string Version => "1.0.0";
         private readonly IApiRouter _apiRouter;
+        private readonly Func<string, string, int?, int?, string?, Task<byte[]>> _captureScreenshot;
 
-        public VisualValidationModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter apiRouter) 
+        public VisualValidationModule(
+            INodeRegistry registry,
+            ICodexLogger logger,
+            HttpClient httpClient,
+            IApiRouter apiRouter,
+            Func<string, string, int?, int?, string?, Task<byte[]>>? captureScreenshot = null) 
             : base(registry, logger)
         {
             _logger.Info($"VisualValidationModule constructor called with registry: {registry.GetHashCode()}");
             _apiRouter = apiRouter;
+            _captureScreenshot = captureScreenshot ?? CaptureScreenshotInternal;
         }
 
         public override Node GetModuleNode()
@@ -68,7 +80,7 @@ namespace CodexBootstrap.Modules
                 var htmlPath = await WriteTempHTML(htmlContent, request.ComponentId);
 
                 // Capture screenshot using Puppeteer
-                var screenshotData = await CaptureScreenshot(htmlPath, request.ComponentId, request.Width, request.Height, request.Viewport);
+                var screenshotData = await _captureScreenshot(htmlPath, request.ComponentId, request.Width, request.Height, request.Viewport);
 
                 // Convert screenshot to base64 for storage
                 var base64Image = Convert.ToBase64String(screenshotData);
@@ -397,7 +409,7 @@ Return your analysis as JSON with scores and detailed feedback.
         {
             try
             {
-                var pipelineSteps = new List<object>();
+                var pipelineSteps = new List<PipelineStepResult>();
 
                 // Step 1: Render component to image
                 var renderRequest = new RenderComponentRequest(
@@ -408,19 +420,33 @@ Return your analysis as JSON with scores and detailed feedback.
                     Viewport: request.Viewport
                 );
 
-                var renderResult = await RenderComponentToImage(renderRequest);
-                pipelineSteps.Add(new
-                {
-                    step = "Render",
-                    status = renderResult is JsonElement r && r.TryGetProperty("success", out var rs) && rs.GetBoolean() ? "Success" : "Failed",
-                    result = renderResult,
-                    timestamp = DateTimeOffset.UtcNow
-                });
+                var renderResponse = await RenderComponentToImage(renderRequest);
+                var renderElement = ConvertToJsonElement(renderResponse);
+                var renderSuccess = renderElement.TryGetProperty("success", out var renderSuccessProperty) && renderSuccessProperty.GetBoolean();
+                pipelineSteps.Add(new PipelineStepResult(
+                    Step: "Render",
+                    Status: renderSuccess ? "Success" : "Failed",
+                    Result: renderElement,
+                    Timestamp: DateTimeOffset.UtcNow));
 
-                if (renderResult is JsonElement renderElement && renderElement.TryGetProperty("success", out var renderSuccess) && renderSuccess.GetBoolean())
+                string? imageNodeId = null;
+                if (renderSuccess)
                 {
-                    var imageNodeId = renderElement.GetProperty("data").GetProperty("imageNodeId").GetString() ?? "";
+                    if (renderElement.TryGetProperty("data", out var renderData) &&
+                        renderData.ValueKind == JsonValueKind.Object &&
+                        renderData.TryGetProperty("imageNodeId", out var imageNodeIdProperty))
+                    {
+                        imageNodeId = imageNodeIdProperty.GetString();
+                    }
 
+                    if (string.IsNullOrWhiteSpace(imageNodeId))
+                    {
+                        _logger.Warn($"Render step did not provide a valid image node id for component {request.ComponentId}");
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(imageNodeId))
+                {
                     // Step 2: Analyze rendered image
                     var analyzeRequest = new AnalyzeImageRequest(
                         ImageNodeId: imageNodeId,
@@ -431,32 +457,44 @@ Return your analysis as JSON with scores and detailed feedback.
                         Model: request.Model
                     );
 
-                    var analyzeResult = await AnalyzeRenderedImage(analyzeRequest);
-                    pipelineSteps.Add(new
-                    {
-                        step = "Analyze",
-                        status = analyzeResult is JsonElement a && a.TryGetProperty("success", out var aSuccess) && aSuccess.GetBoolean() ? "Success" : "Failed",
-                        result = analyzeResult,
-                        timestamp = DateTimeOffset.UtcNow
-                    });
+                    var analyzeResponse = await AnalyzeRenderedImage(analyzeRequest);
+                    var analyzeElement = ConvertToJsonElement(analyzeResponse);
+                    var analyzeSuccess = analyzeElement.TryGetProperty("success", out var analyzeSuccessProperty) && analyzeSuccessProperty.GetBoolean();
+                    pipelineSteps.Add(new PipelineStepResult(
+                        Step: "Analyze",
+                        Status: analyzeSuccess ? "Success" : "Failed",
+                        Result: analyzeElement,
+                        Timestamp: DateTimeOffset.UtcNow));
 
-                    // Step 3: Validate against spec
-                    var validateRequest = new ValidateComponentRequest(
-                        ComponentId: request.ComponentId,
-                        MinimumScore: request.MinimumScore
-                    );
-
-                    var validateResult = await ValidateComponentAgainstSpec(validateRequest);
-                    pipelineSteps.Add(new
+                    if (analyzeSuccess)
                     {
-                        step = "Validate",
-                        status = validateResult is JsonElement v && v.TryGetProperty("success", out var vs) && vs.GetBoolean() ? "Success" : "Failed",
-                        result = validateResult,
-                        timestamp = DateTimeOffset.UtcNow
-                    });
+                        // Step 3: Validate against spec
+                        var validateRequest = new ValidateComponentRequest(
+                            ComponentId: request.ComponentId,
+                            MinimumScore: request.MinimumScore
+                        );
+
+                        var validateResponse = await ValidateComponentAgainstSpec(validateRequest);
+                        var validateElement = ConvertToJsonElement(validateResponse);
+                        var validateSuccess = validateElement.TryGetProperty("success", out var validateSuccessProperty) && validateSuccessProperty.GetBoolean();
+                        pipelineSteps.Add(new PipelineStepResult(
+                            Step: "Validate",
+                            Status: validateSuccess ? "Success" : "Failed",
+                            Result: validateElement,
+                            Timestamp: DateTimeOffset.UtcNow));
+                    }
+                }
+                else if (renderSuccess)
+                {
+                    using var missingImageDocument = JsonDocument.Parse("{\"success\":false,\"error\":\"Image node id missing\"}");
+                    pipelineSteps.Add(new PipelineStepResult(
+                        Step: "Analyze",
+                        Status: "Failed",
+                        Result: missingImageDocument.RootElement.Clone(),
+                        Timestamp: DateTimeOffset.UtcNow));
                 }
 
-                var allSuccessful = pipelineSteps.All(s => s is JsonElement step && step.TryGetProperty("status", out var status) && status.GetString() == "Success");
+                var allSuccessful = pipelineSteps.Count == 3 && pipelineSteps.All(step => step.Status == "Success");
 
                 _logger.Info($"Executed visual validation pipeline for component {request.ComponentId}, success: {allSuccessful}");
 
@@ -561,14 +599,52 @@ Return your analysis as JSON with scores and detailed feedback.
         {
             var tempDir = Path.Combine(Path.GetTempPath(), "living-codex-ui");
             Directory.CreateDirectory(tempDir);
-            
-            var htmlPath = Path.Combine(tempDir, $"{componentId}.html");
+
+            var safeFileName = GetSafeFileName(componentId);
+            var htmlPath = Path.Combine(tempDir, $"{safeFileName}.html");
             await File.WriteAllTextAsync(htmlPath, htmlContent);
             
             return htmlPath;
         }
 
-        private async Task<byte[]> CaptureScreenshot(string htmlPath, string componentId, int? width = null, int? height = null, string? viewport = null)
+        private static string GetSafeFileName(string componentId)
+        {
+            if (string.IsNullOrWhiteSpace(componentId))
+            {
+                return $"component-{Guid.NewGuid():N}";
+            }
+
+            var invalidChars = Path.GetInvalidFileNameChars();
+            var sanitized = new string(componentId.Select(c =>
+                c == Path.DirectorySeparatorChar || c == Path.AltDirectorySeparatorChar || invalidChars.Contains(c)
+                    ? '-'
+                    : c).ToArray());
+
+            sanitized = sanitized.Trim('-');
+
+            if (string.IsNullOrWhiteSpace(sanitized))
+            {
+                return $"component-{Guid.NewGuid():N}";
+            }
+
+            return sanitized.Length <= 100 ? sanitized : sanitized[..100];
+        }
+
+        private JsonElement ConvertToJsonElement(object? value)
+        {
+            if (value is JsonElement element)
+            {
+                return element.Clone();
+            }
+
+            var payload = value is null ? "{}" : JsonSerializer.Serialize(value);
+            using var document = JsonDocument.Parse(payload);
+            return document.RootElement.Clone();
+        }
+
+        private record PipelineStepResult(string Step, string Status, JsonElement Result, DateTimeOffset Timestamp);
+
+        private async Task<byte[]> CaptureScreenshotInternal(string htmlPath, string componentId, int? width = null, int? height = null, string? viewport = null)
         {
             try
             {
