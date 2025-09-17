@@ -18,6 +18,7 @@ public abstract class ModuleBase : IModule
     protected readonly ICodexLogger _logger;
     protected readonly AttributeProcessor _attributeProcessor;
     protected readonly Dictionary<string, Node> _moduleNodes = new();
+    protected IApiRouter? _apiRouter;
     
     public abstract string Name { get; }
     public abstract string Description { get; }
@@ -110,6 +111,9 @@ public abstract class ModuleBase : IModule
     
     public virtual void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
+        // Store the router for use by modules
+        _apiRouter = router;
+        
         // Default implementation - modules can override to register API handlers
         _logger.Info($"API handlers registered for module: {Name}");
     }
