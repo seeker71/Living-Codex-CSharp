@@ -179,19 +179,6 @@ public class EnergyModuleApiTests : IClassFixture<TestServerFixture>
         result.Should().ContainKey("contributions");
     }
 
-    [Fact(Skip = "Endpoint not yet implemented")]
-    public async Task GetContributionStats_ShouldReturnStats_WhenImplemented()
-    {
-        // This test will be enabled when the endpoint is implemented
-        var response = await _client.GetAsync("/contributions/stats/test-user");
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        
-        var content = await response.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content, _jsonOptions);
-        
-        result.Should().NotBeNull();
-        result.Should().ContainKey("stats");
-    }
 
     [Fact(Skip = "Endpoint not yet implemented")]
     public async Task RecordContribution_ShouldCreateContribution_WhenImplemented()

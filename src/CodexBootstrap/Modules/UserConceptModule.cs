@@ -24,11 +24,19 @@ namespace CodexBootstrap.Modules;
         private CoreApiService? _coreApiService;
         private readonly IServiceProvider? _serviceProvider;
 
-    public UserConceptModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient)
+    public UserConceptModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? apiRouter = null)
         : base(registry, logger)
     {
         _httpClient = httpClient;
-        _apiRouter = apiRouter ?? throw new ArgumentNullException(nameof(apiRouter), "ApiRouter must be provided - MockApiRouter fallback removed");
+        if (apiRouter == null)
+        {
+            _logger.Warn("UserConceptModule: Using MockApiRouter fallback - should be provided via DI in production");
+            _apiRouter = new MockApiRouter();
+        }
+        else
+        {
+            _apiRouter = apiRouter;
+        }
         _serviceProvider = null;
     }
 

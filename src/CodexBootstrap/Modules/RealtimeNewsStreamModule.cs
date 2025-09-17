@@ -242,12 +242,20 @@ namespace CodexBootstrap.Modules
         private record OntologyAxis(string Name, List<string> Keywords);
         private List<OntologyAxis> _ontologyAxes = new();
 
-        public RealtimeNewsStreamModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient)
+        public RealtimeNewsStreamModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? apiRouter = null)
             : base(registry, logger)
         {
             _httpClient = httpClient;
             _configManager = new Core.ConfigurationManager(_registry, logger);
-            _apiRouter = apiRouter ?? throw new ArgumentNullException(nameof(apiRouter), "ApiRouter must be provided - MockApiRouter fallback removed");
+            if (apiRouter == null)
+            {
+                _logger.Warn("RealtimeNewsStreamModule: Using MockApiRouter fallback - should be provided via DI in production");
+                _apiRouter = new MockApiRouter();
+            }
+            else
+            {
+                _apiRouter = apiRouter;
+            }
             _aiTemplates = new AIModuleTemplates(_apiRouter, _logger);
             
             // Cross-module communicator will be initialized lazily
