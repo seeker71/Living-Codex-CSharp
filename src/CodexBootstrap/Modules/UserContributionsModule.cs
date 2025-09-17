@@ -276,6 +276,64 @@ public sealed class UserContributionsModule : ModuleBase
         }
     }
 
+    [ApiRoute("GET", "/contributions/stats/{userId}", "GetContributionStats", "Get aggregate contribution statistics for a user", "codex.user-contributions")]
+    public async Task<object> GetContributionStatsAsync(string userId)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(userId))
+            {
+                return new ErrorResponse("User ID is required");
+            }
+
+            var userContributions = _contributions.Values
+                .Where(c => c.UserId == userId)
+                .ToList();
+
+            var totalContributions = userContributions.Count;
+            var contributionsByType = userContributions
+                .GroupBy(c => c.ContributionType.ToString())
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            var totalValue = userContributions.Sum(c => c.Value);
+            var averageValue = totalContributions > 0 ? userContributions.Average(c => c.Value) : 0m;
+
+            var since30 = DateTimeOffset.UtcNow.AddDays(-30);
+            var recentCount = userContributions.Count(c => c.Timestamp >= since30);
+
+            var energyLevel = await CalculateContributorEnergyLevel(userId);
+
+            var userRewards = _userRewards.Values.Where(r => r.UserId == userId).ToList();
+            var totalRewards = userRewards.Sum(r => r.Amount);
+            var pendingRewards = userRewards.Where(r => r.Status == RewardStatus.Pending).Sum(r => r.Amount);
+            var paidRewards = userRewards.Where(r => r.Status == RewardStatus.Paid).Sum(r => r.Amount);
+
+            return new
+            {
+                success = true,
+                userId = userId,
+                totalContributions,
+                recentContributions = recentCount,
+                contributionsByType,
+                totalValue,
+                averageValue,
+                energyLevel,
+                rewards = new
+                {
+                    total = totalRewards,
+                    pending = pendingRewards,
+                    paid = paidRewards
+                },
+                generatedAt = DateTimeOffset.UtcNow
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error getting contribution stats: {ex.Message}", ex);
+            return new ErrorResponse($"Failed to get contribution stats: {ex.Message}");
+        }
+    }
+
     // Attribution Management API Methods
     [ApiRoute("POST", "/attributions/create", "CreateAttribution", "Create attribution for a contribution", "codex.user-contributions")]
     public async Task<object> CreateAttributionAsync([ApiParameter("body", "Attribution request")] CreateAttributionRequest request)

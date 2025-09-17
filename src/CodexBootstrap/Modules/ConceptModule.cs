@@ -24,7 +24,7 @@ public class ConceptModule : ModuleBase
         : base(registry, logger)
     {
         _httpClient = httpClient;
-        _apiRouter = new MockApiRouter(); // Will be set during registration
+        _apiRouter = apiRouter ?? throw new ArgumentNullException(nameof(apiRouter), "ApiRouter must be provided - MockApiRouter fallback removed");
     }
 
     public string ModuleId => "codex.concept";

@@ -80,13 +80,23 @@ public class EnergyModuleApiTests : IClassFixture<TestServerFixture>
     }
 
     [Fact]
-    public async Task GetContributionStats_ShouldReturnMethodNotAllowed_WhenNotImplemented()
+    public async Task GetContributionStats_ShouldReturnStats_WhenImplemented()
     {
         // Act
         var response = await _client.GetAsync("/contributions/stats/test-user");
 
-        // Assert - The endpoint doesn't exist but route matching returns 405 instead of 404
-        response.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
+        // Assert - The endpoint now exists and returns real stats
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        
+        var content = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content, _jsonOptions);
+        
+        result.Should().NotBeNull();
+        result.Should().ContainKey("success");
+        result.Should().ContainKey("userId");
+        result.Should().ContainKey("totalContributions");
+        result.Should().ContainKey("energyLevel");
+        result.Should().ContainKey("rewards");
     }
 
     [Fact]

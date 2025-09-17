@@ -247,7 +247,7 @@ namespace CodexBootstrap.Modules
         {
             _httpClient = httpClient;
             _configManager = new Core.ConfigurationManager(_registry, logger);
-            _apiRouter = new MockApiRouter();
+            _apiRouter = apiRouter ?? throw new ArgumentNullException(nameof(apiRouter), "ApiRouter must be provided - MockApiRouter fallback removed");
             _aiTemplates = new AIModuleTemplates(_apiRouter, _logger);
             
             // Cross-module communicator will be initialized lazily

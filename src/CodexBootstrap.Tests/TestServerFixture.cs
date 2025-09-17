@@ -26,8 +26,8 @@ namespace CodexBootstrap.Tests
         {
             Console.WriteLine($"[TestServerFixture] Starting InitializeAsync at {DateTime.UtcNow:HH:mm:ss.fff}");
             
-            // Use the hardcoded port that the server is configured to use
-            _port = 5002;
+            // Use a random port to avoid collisions during parallel test runs
+            _port = Random.Shared.Next(5010, 5999);
             Console.WriteLine($"[TestServerFixture] Using port {_port}");
             
             // Start the server as a separate process
