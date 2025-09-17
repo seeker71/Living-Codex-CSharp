@@ -249,7 +249,7 @@ public class NodeEdgeModuleApiTests : IClassFixture<TestServerFixture>
 
     #region Future Implementation Tests (Placeholder for when endpoints are implemented)
 
-    [Fact(Skip = "Endpoint not yet implemented")]
+    [Fact]
     public async Task GetEdge_ShouldReturnEdge_WhenImplemented()
     {
         // This test will be enabled when the endpoint is implemented

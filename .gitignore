@@ -6,3 +6,4 @@ logs/
 data/
 *.log
 generated/
+src/CodexBootstrap.Tests/TestResults

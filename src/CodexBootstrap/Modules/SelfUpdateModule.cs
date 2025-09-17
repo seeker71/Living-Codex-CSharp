@@ -24,17 +24,14 @@ namespace CodexBootstrap.Modules
         public override string Description => "Provides self-updating functionality for dynamic modules";
         public override string Version => "1.0.0";
 
-        public SelfUpdateModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, 
-            StableCore? stableCore = null, SelfUpdateSystem? selfUpdateSystem = null, 
-            ModuleCompiler? moduleCompiler = null, HotReloadManager? hotReloadManager = null) 
+        public SelfUpdateModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
             : base(registry, logger)
         {
-            // For now, set these to null to avoid circular dependencies
-            // They should be injected properly through dependency injection
-            _moduleCompiler = moduleCompiler;
-            _hotReloadManager = hotReloadManager;
-            _selfUpdateSystem = selfUpdateSystem;
-            _stableCore = stableCore;
+            // Initialize to null - these complex dependencies would need proper DI setup
+            _moduleCompiler = null;
+            _hotReloadManager = null;
+            _selfUpdateSystem = null;
+            _stableCore = null;
         }
 
         /// <summary>

@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Navigation } from '@/components/ui/Navigation';
+import { api } from '@/lib/api';
 
 // StatusBadge component for route status display
 function StatusBadge({ status }: { status: string }) {
@@ -40,10 +42,20 @@ export default function GraphPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('http://localhost:5002/storage-endpoints/stats')
-      .then(res => res.json())
-      .then(setStats)
-      .catch(err => setError(String(err)));
+    async function loadStorageStats() {
+      try {
+        const response = await api.get('/storage-endpoints/stats');
+        if (response.success) {
+          setStats(response.data as StorageStats);
+        } else {
+          setError(response.error || 'Failed to load storage stats');
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    }
+
+    loadStorageStats();
   }, []);
 
   return (
@@ -55,7 +67,7 @@ export default function GraphPage() {
               <h1 className="text-2xl font-bold text-gray-900">Graph</h1>
               <StatusBadge status="Simple" />
             </div>
-            <button onClick={() => window.location.href = '/'} className="text-gray-600 hover:text-gray-900">Home</button>
+            <Navigation />
           </div>
         </div>
       </header>

@@ -233,12 +233,15 @@ namespace CodexBootstrap.Tests.Modules
             Mock<IApiRouter> routerMock,
             Func<string, string, int?, int?, string?, Task<byte[]>> captureScreenshot)
         {
-            return new VisualValidationModule(
+            var module = new VisualValidationModule(
                 registry,
                 _loggerMock.Object,
-                new HttpClient(),
-                routerMock.Object,
-                captureScreenshot);
+                new HttpClient());
+            
+            // Set up the API router through the module's registration method
+            module.RegisterApiHandlers(routerMock.Object, registry);
+            
+            return module;
         }
 
         private static JsonElement ToJson(object result)

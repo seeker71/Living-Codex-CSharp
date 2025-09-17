@@ -255,7 +255,7 @@ public class NewsModuleApiTests : IClassFixture<TestServerFixture>
 
     #region Future Implementation Tests (Placeholder for when endpoints are implemented)
 
-    [Fact(Skip = "Endpoint not yet implemented")]
+    [Fact]
     public async Task GetNewsFeed_ShouldReturnNewsItems_WhenImplemented()
     {
         // This test will be enabled when the endpoint is implemented
@@ -263,7 +263,7 @@ public class NewsModuleApiTests : IClassFixture<TestServerFixture>
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    [Fact(Skip = "Endpoint not yet implemented")]
+    [Fact]
     public async Task SearchNews_ShouldReturnSearchResults_WhenImplemented()
     {
         // This test will be enabled when the endpoint is implemented

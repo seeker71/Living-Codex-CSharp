@@ -25,10 +25,10 @@ public sealed class SpecModule : ModuleBase
     public override string Description => "Specification management module";
     public override string Version => "1.0.0";
 
-    public SpecModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? apiRouter = null) 
+    public SpecModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        _apiRouter = apiRouter ?? new MockApiRouter();
+        // _apiRouter will be set via RegisterApiHandlers in ModuleBase
     }
 
     public override Node GetModuleNode()

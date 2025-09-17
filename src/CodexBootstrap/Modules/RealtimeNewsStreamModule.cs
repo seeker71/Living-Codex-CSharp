@@ -45,7 +45,7 @@ namespace CodexBootstrap.Modules
         private readonly Timer _ingestionTimer;
         private readonly Timer _cleanupTimer;
         private CrossModuleCommunicator? _moduleCommunicator;
-        private readonly AIModuleTemplates _aiTemplates;
+        private AIModuleTemplates? _aiTemplates;
         private readonly int _ingestionIntervalMinutes = 15;
         private readonly int _cleanupIntervalHours = 24;
         private readonly int _maxItemsPerSource = 50; // Increased from 10
@@ -65,6 +65,9 @@ namespace CodexBootstrap.Modules
 
         // Lazy-loaded cross-module communicator
         private CrossModuleCommunicator ModuleCommunicator => _moduleCommunicator ??= new CrossModuleCommunicator(_logger);
+
+        // Lazy-loaded AI templates (requires _apiRouter to be set)
+        private AIModuleTemplates AITemplates => _aiTemplates ??= new AIModuleTemplates(_apiRouter ?? new MockApiRouter(), _logger);
 
         // AI Module call templates
         private class AIModuleTemplates
@@ -241,21 +244,13 @@ namespace CodexBootstrap.Modules
         private record OntologyAxis(string Name, List<string> Keywords);
         private List<OntologyAxis> _ontologyAxes = new();
 
-        public RealtimeNewsStreamModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? apiRouter = null)
+        public RealtimeNewsStreamModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient)
             : base(registry, logger)
         {
             _httpClient = httpClient;
             _configManager = new Core.ConfigurationManager(_registry, logger);
-            if (apiRouter == null)
-            {
-                _logger.Warn("RealtimeNewsStreamModule: Using MockApiRouter fallback - should be provided via DI in production");
-                _apiRouter = new MockApiRouter();
-            }
-            else
-            {
-                _apiRouter = apiRouter;
-            }
-            _aiTemplates = new AIModuleTemplates(_apiRouter, _logger);
+            // _apiRouter will be set via RegisterApiHandlers in ModuleBase
+            // _aiTemplates will be lazy-loaded when needed
             
             // Cross-module communicator will be initialized lazily
             
@@ -801,7 +796,7 @@ namespace CodexBootstrap.Modules
                 _logger.Debug($"Attempting AI concept extraction for news item: {newsItem.Title}");
 
                 var content = newsItem.Title + " " + newsItem.Content;
-                var result = await _aiTemplates.ExtractConceptsAsync(content, 5);
+                var result = await AITemplates.ExtractConceptsAsync(content, 5);
                 
                 if (result != null)
                 {
@@ -844,7 +839,7 @@ namespace CodexBootstrap.Modules
                 _logger.Debug($"Attempting AI scoring analysis for news item: {newsItem.Title}");
 
                 var content = newsItem.Title + " " + newsItem.Content;
-                var result = await _aiTemplates.AnalyzeScoringAsync(content, "relevance");
+                var result = await AITemplates.AnalyzeScoringAsync(content, "relevance");
                 
                 if (result != null)
                 {
@@ -889,7 +884,7 @@ namespace CodexBootstrap.Modules
                 _logger.Debug($"Attempting AI fractal transformation for news item: {newsItem.Title}");
 
                 var content = newsItem.Title + " " + newsItem.Content;
-                var result = await _aiTemplates.TransformFractalAsync(content);
+                var result = await AITemplates.TransformFractalAsync(content);
                 
                 if (result != null)
                 {

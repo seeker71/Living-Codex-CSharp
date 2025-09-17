@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { ResonanceControls } from '@/components/ui/ResonanceControls';
 import { StreamLens } from '@/components/lenses/StreamLens';
+import { Navigation } from '@/components/ui/Navigation';
 import { usePages, useLenses } from '@/lib/hooks';
 import { defaultAtoms } from '@/lib/atoms';
 
@@ -25,7 +26,6 @@ export default function DiscoverPage() {
   const { data: pages, isLoading: pagesLoading } = usePages();
   const { data: lenses, isLoading: lensesLoading } = useLenses();
 
-  const currentPage = pages?.find(p => p.path === '/discover') || defaultAtoms.pages[1];
   const currentLens = lenses?.find(l => l.id === activeLens) || defaultAtoms.lenses[0];
 
   return (
@@ -39,17 +39,7 @@ export default function DiscoverPage() {
                 Living Codex
               </h1>
             </div>
-            <nav className="flex space-x-8">
-              <a href="/discover" className="text-blue-600 font-medium">
-                Discover
-              </a>
-              <a href="/resonance" className="text-gray-600 hover:text-gray-900">
-                Resonance
-              </a>
-              <a href="/about" className="text-gray-600 hover:text-gray-900">
-                About
-              </a>
-            </nav>
+            <Navigation />
           </div>
         </div>
       </header>

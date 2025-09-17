@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AtomFetcher, APIAdapter, UIPage, UILens, UIAction, UIControls } from './atoms';
+import { endpoints } from './api';
 
 const atomFetcher = new AtomFetcher();
 const apiAdapter = new APIAdapter();
@@ -41,7 +42,7 @@ export function useControls() {
 }
 
 // Hook for concept discovery
-export function useConceptDiscovery(params: Record<string, any> = {}) {
+export function useConceptDiscovery(params: Record<string, unknown> = {}) {
   return useQuery({
     queryKey: ['concepts', 'discover', params],
     queryFn: () => apiAdapter.call(
@@ -53,7 +54,7 @@ export function useConceptDiscovery(params: Record<string, any> = {}) {
 }
 
 // Hook for user discovery
-export function useUserDiscovery(params: Record<string, any> = {}) {
+export function useUserDiscovery(params: Record<string, unknown> = {}) {
   return useQuery({
     queryKey: ['users', 'discover', params],
     queryFn: () => apiAdapter.call(
@@ -124,5 +125,74 @@ export function useResonanceControls() {
     queryFn: () => atomFetcher.fetchAtoms<UIControls>('codex.ui.controls'),
     select: (data) => data.find(control => control.id === 'controls.resonance'),
     staleTime: 10 * 60 * 1000, // 10 minutes
+  });
+}
+
+// New hooks using improved API service with timeout handling
+
+export function useHealthStatus() {
+  return useQuery({
+    queryKey: ['health'],
+    queryFn: () => endpoints.health(),
+    refetchInterval: 30000, // Check health every 30 seconds
+    retry: 1, // Don't retry health checks aggressively
+  });
+}
+
+export function useStorageStats() {
+  return useQuery({
+    queryKey: ['storage', 'stats'],
+    queryFn: () => endpoints.storageStats(),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+export function useConcepts() {
+  return useQuery({
+    queryKey: ['concepts'],
+    queryFn: () => endpoints.getConcepts(),
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+}
+
+export function useCollectiveEnergy() {
+  return useQuery({
+    queryKey: ['energy', 'collective'],
+    queryFn: () => endpoints.getCollectiveEnergy(),
+    refetchInterval: 60000, // Update every minute
+  });
+}
+
+export function useContributorEnergy(userId: string) {
+  return useQuery({
+    queryKey: ['energy', 'contributor', userId],
+    queryFn: () => endpoints.getContributorEnergy(userId),
+    enabled: !!userId,
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useTrendingTopics(limit = 10, hoursBack = 24) {
+  return useQuery({
+    queryKey: ['news', 'trending', limit, hoursBack],
+    queryFn: () => endpoints.getTrendingTopics(limit, hoursBack),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+export function useNewsFeed(userId: string, limit = 20, hoursBack = 24) {
+  return useQuery({
+    queryKey: ['news', 'feed', userId, limit, hoursBack],
+    queryFn: () => endpoints.getNewsFeed(userId, limit, hoursBack),
+    enabled: !!userId,
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useNodes(typeId?: string, limit?: number) {
+  return useQuery({
+    queryKey: ['nodes', typeId, limit],
+    queryFn: () => endpoints.getNodes(typeId, limit),
+    staleTime: 5 * 60 * 1000,
   });
 }

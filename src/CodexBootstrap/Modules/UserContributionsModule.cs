@@ -34,14 +34,11 @@ public sealed class UserContributionsModule : ModuleBase
     public override string Description => "User contributions module with ETH ledger, change tracking, attribution, and reward sharing";
     public override string Version => "1.0.0";
 
-    public UserContributionsModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, string? ethereumRpcUrl = null) 
+    public UserContributionsModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        
-        if (!string.IsNullOrEmpty(ethereumRpcUrl))
-        {
-            _web3 = new Web3(ethereumRpcUrl);
-        }
+        // Initialize Web3 with environment configuration or default to null
+        _web3 = InitializeWeb3();
     }
 
     public override Node GetModuleNode()
@@ -1748,6 +1745,45 @@ Respond in JSON format with scores and brief explanations.
         {
             _logger.Error($"Failed to get abundance events: {ex.Message}", ex);
             return new ErrorResponse($"Failed to get abundance events: {ex.Message}");
+        }
+    }
+
+
+    /// <summary>
+    /// Initialize Web3 instance with environment configuration
+    /// </summary>
+    private Web3? InitializeWeb3()
+    {
+        try
+        {
+            // Check for Ethereum RPC URL from environment
+            var ethereumRpcUrl = Environment.GetEnvironmentVariable("ETHEREUM_RPC_URL");
+            
+            if (!string.IsNullOrEmpty(ethereumRpcUrl))
+            {
+                _logger.Info($"UserContributionsModule: Initializing Web3 with RPC URL: {ethereumRpcUrl}");
+                return new Web3(ethereumRpcUrl);
+            }
+            else
+            {
+                // Default to a test network or local node if no URL is specified
+                var defaultRpcUrl = Environment.GetEnvironmentVariable("ETH_NODE_URL") ?? "http://localhost:8545";
+                
+                // Only initialize if we can detect a local node or if explicitly configured
+                if (Environment.GetEnvironmentVariable("ENABLE_ETHEREUM") == "true")
+                {
+                    _logger.Info($"UserContributionsModule: Initializing Web3 with default URL: {defaultRpcUrl}");
+                    return new Web3(defaultRpcUrl);
+                }
+            }
+            
+            _logger.Info("UserContributionsModule: Web3 not initialized - no Ethereum configuration found");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"UserContributionsModule: Failed to initialize Web3: {ex.Message}", ex);
+            return null;
         }
     }
 }

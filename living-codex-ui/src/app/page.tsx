@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { ResonanceControls } from '@/components/ui/ResonanceControls';
 import { StreamLens } from '@/components/lenses/StreamLens';
+import { Navigation } from '@/components/ui/Navigation';
 import { usePages, useLenses } from '@/lib/hooks';
 import { defaultAtoms } from '@/lib/atoms';
 import { bootstrapUI } from '@/lib/bootstrap';
@@ -27,7 +28,6 @@ export default function HomePage() {
   const { data: lenses, isLoading: lensesLoading } = useLenses();
 
   // Use server data if available, otherwise use defaults
-  const currentPage = pages?.find(p => p.path === '/') || defaultAtoms.pages[0];
   const streamLens = lenses?.find(l => l.id === 'lens.stream') || defaultAtoms.lenses[0];
 
   return (
@@ -42,17 +42,7 @@ export default function HomePage() {
               </h1>
               <span className="ml-2 text-sm text-gray-500">v0.1</span>
             </div>
-            <nav className="flex space-x-8">
-              <a href="/discover" className="text-gray-600 hover:text-gray-900">
-                Discover
-              </a>
-              <a href="/resonance" className="text-gray-600 hover:text-gray-900">
-                Resonance
-              </a>
-              <a href="/about" className="text-gray-600 hover:text-gray-900">
-                About
-              </a>
-            </nav>
+            <Navigation />
           </div>
         </div>
       </header>

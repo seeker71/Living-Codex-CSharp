@@ -20,11 +20,11 @@ public sealed class StorageEndpointsModule : ModuleBase
     public override string Description => "Direct HTTP endpoints module for storage operations with comprehensive validation and error handling";
     public override string Version => "1.0.0";
 
-    public StorageEndpointsModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IStorageBackend? storageBackend = null, ICacheManager? cacheManager = null) 
+    public StorageEndpointsModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        _storageBackend = storageBackend;
-        _cacheManager = cacheManager;
+        _storageBackend = ConfigureDefaultStorageBackend();
+        _cacheManager = new NodeCacheManager(_storageBackend, logger);
     }
 
     public override Node GetModuleNode()
@@ -815,6 +815,37 @@ public sealed class StorageEndpointsModule : ModuleBase
             RuleFor(x => x.Skip).GreaterThanOrEqualTo(0).When(x => x.Skip.HasValue).WithMessage("Skip must be non-negative");
             RuleFor(x => x.Take).GreaterThan(0).When(x => x.Take.HasValue).WithMessage("Take must be positive");
             RuleFor(x => x.Take).LessThanOrEqualTo(1000).When(x => x.Take.HasValue).WithMessage("Take cannot exceed 1000");
+        }
+    }
+
+    /// <summary>
+    /// Configure the default storage backend based on environment or configuration
+    /// </summary>
+    private IStorageBackend ConfigureDefaultStorageBackend()
+    {
+        try
+        {
+            // Check for environment variables or configuration
+            var storageType = Environment.GetEnvironmentVariable("STORAGE_TYPE")?.ToLower() ?? "jsonfile";
+            var storagePath = Environment.GetEnvironmentVariable("STORAGE_PATH") ?? "data";
+            
+            _logger.Info($"StorageEndpointsModule: Configuring storage backend: {storageType} at {storagePath}");
+
+            IStorageBackend backend = storageType switch
+            {
+                "sqlite" => new SqliteStorageBackend(storagePath),
+                "jsonfile" => new JsonFileStorageBackend(storagePath),
+                _ => new JsonFileStorageBackend(storagePath)
+            };
+
+            _logger.Info($"StorageEndpointsModule: Storage backend configured successfully");
+            return backend;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"StorageEndpointsModule: Failed to configure storage backend: {ex.Message}");
+            // Fallback to JsonFileStorageBackend
+            return new JsonFileStorageBackend("data");
         }
     }
 }

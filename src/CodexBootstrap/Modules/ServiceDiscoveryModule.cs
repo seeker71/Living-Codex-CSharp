@@ -18,10 +18,10 @@ public class ServiceDiscoveryModule : ModuleBase
     public override string Description => "Modular Fractal API Design - Manages service registration, discovery, and health monitoring";
     public override string Version => "1.0.0";
 
-    public ServiceDiscoveryModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, IApiRouter? apiRouter = null) 
+    public ServiceDiscoveryModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
-        _apiRouter = apiRouter ?? new MockApiRouter();
+        // _apiRouter will be set via RegisterApiHandlers in ModuleBase
     }
 
 
