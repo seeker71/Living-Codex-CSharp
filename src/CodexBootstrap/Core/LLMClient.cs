@@ -116,29 +116,97 @@ public class LLMClient
                 {
                     var err = await response.Content.ReadAsStringAsync();
                     _logger.Error($"OpenAI request failed: {response.StatusCode} - {err}");
+
+                    // Model fallback on 404 or model-not-found
+                    var status = (int)response.StatusCode;
+                    if (status == 404 || err.IndexOf("model", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        var fallbackCandidates = new[]
+                        {
+                            Environment.GetEnvironmentVariable("OPENAI_CODEGEN_MODEL"),
+                            "gpt-5-codex",
+                            "gpt-5",
+                            "gpt-4.1",
+                            "gpt-4o",
+                            "gpt-4.1-mini",
+                            "gpt-4o-mini"
+                        };
+
+                        foreach (var candidate in fallbackCandidates)
+                        {
+                            if (string.IsNullOrWhiteSpace(candidate) || string.Equals(candidate, config.Model, StringComparison.OrdinalIgnoreCase))
+                            {
+                                continue;
+                            }
+
+                            _logger.Warn($"Retrying OpenAI call with fallback model '{candidate}'...");
+                            var retryBody = new
+                            {
+                                model = candidate,
+                                messages = new object[] { new { role = "user", content = prompt } },
+                                temperature = config.Temperature,
+                                top_p = config.TopP,
+                                max_tokens = config.MaxTokens
+                            };
+                            var retryJson = JsonSerializer.Serialize(retryBody);
+                            var retryReq = new HttpRequestMessage(HttpMethod.Post, $"{config.BaseUrl.TrimEnd('/')}/chat/completions")
+                            {
+                                Content = new StringContent(retryJson, Encoding.UTF8, "application/json")
+                            };
+                            if (!string.IsNullOrEmpty(config.ApiKey))
+                            {
+                                retryReq.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.ApiKey);
+                            }
+
+                            var retryResp = await _httpClient.SendAsync(retryReq);
+                            if (retryResp.IsSuccessStatusCode)
+                            {
+                                var retryContent = await retryResp.Content.ReadAsStringAsync();
+                                using var retryDoc = JsonDocument.Parse(retryContent);
+                                var retryText = retryDoc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "";
+                                int retryTokens = 0;
+                                if (retryDoc.RootElement.TryGetProperty("usage", out var usage2) && usage2.TryGetProperty("total_tokens", out var total2))
+                                {
+                                    retryTokens = total2.GetInt32();
+                                }
+
+                                return new LLMResponse
+                                {
+                                    Success = true,
+                                    Response = retryText,
+                                    Confidence = 0.85,
+                                    Model = candidate,
+                                    TokensUsed = retryTokens
+                                };
+                            }
+                        }
+                    }
+
                     return new LLMResponse { Success = false, Response = $"OpenAI error: {response.StatusCode}", Confidence = 0.0 };
                 }
 
                 var respContent = await response.Content.ReadAsStringAsync();
-                using var doc = JsonDocument.Parse(respContent);
-                var contentText = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "";
-                int tokensUsed = 0;
-                if (doc.RootElement.TryGetProperty("usage", out var usage))
+                using (var doc = JsonDocument.Parse(respContent))
                 {
-                    if (usage.TryGetProperty("total_tokens", out var totalTokens))
+                    var contentText = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "";
+                    int tokensUsed = 0;
+                    if (doc.RootElement.TryGetProperty("usage", out var usage))
                     {
-                        tokensUsed = totalTokens.GetInt32();
+                        if (usage.TryGetProperty("total_tokens", out var totalTokens))
+                        {
+                            tokensUsed = totalTokens.GetInt32();
+                        }
                     }
-                }
 
-                return new LLMResponse
-                {
-                    Success = true,
-                    Response = contentText,
-                    Confidence = 0.85,
-                    Model = config.Model,
-                    TokensUsed = tokensUsed
-                };
+                    return new LLMResponse
+                    {
+                        Success = true,
+                        Response = contentText,
+                        Confidence = 0.85,
+                        Model = config.Model,
+                        TokensUsed = tokensUsed
+                    };
+                }
             }
             else
             {
