@@ -18,6 +18,7 @@ export function Navigation() {
     { href: '/', label: 'Home', icon: '🏠' },
     { href: '/discover', label: 'Discover', icon: '🔍' },
     { href: '/news', label: 'News', icon: '📰' },
+    { href: '/ontology', label: 'Ontology', icon: '🧠' },
     { href: '/graph', label: 'Graph', icon: '🕸️' },
     { href: '/resonance', label: 'Resonance', icon: '🌊' },
     { href: '/about', label: 'About', icon: 'ℹ️' },
@@ -26,6 +27,7 @@ export function Navigation() {
   const authNavItems = [
     ...publicNavItems,
     { href: '/people', label: 'People', icon: '🌍' },
+    { href: '/create', label: 'Create', icon: '✨' },
     { href: '/profile', label: 'Profile', icon: '👤' },
   ];
 
