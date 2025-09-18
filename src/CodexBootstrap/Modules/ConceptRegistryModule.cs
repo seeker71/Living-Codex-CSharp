@@ -91,7 +91,7 @@ public class ConceptRegistryModule : ModuleBase
         {
             var routeNode = new Node(
                 Id: $"concept-registry.quality.route.{route.name}",
-                TypeId: "meta.route",
+                TypeId: "codex.meta/route",
                 State: ContentState.Ice,
                 Locale: "en",
                 Title: route.description,
@@ -144,7 +144,7 @@ public class ConceptRegistryModule : ModuleBase
         {
             var dtoNode = new Node(
                 Id: $"concept-registry.quality.dto.{dto.name}",
-                TypeId: "meta.type",
+                TypeId: "codex.meta/type",
                 State: ContentState.Ice,
                 Locale: "en",
                 Title: dto.name,

@@ -117,7 +117,7 @@ public class ServiceDiscoveryModule : ModuleBase
         {
             var routeNode = new Node(
                 Id: $"api-gateway.route.{route.name}",
-                TypeId: "meta.route",
+                TypeId: "codex.meta/route",
                 State: ContentState.Ice,
                 Locale: "en",
                 Title: route.description,
@@ -168,7 +168,7 @@ public class ServiceDiscoveryModule : ModuleBase
         {
             var dtoNode = new Node(
                 Id: $"api-gateway.dto.{dto.name}",
-                TypeId: "meta.type",
+                TypeId: "codex.meta/type",
                 State: ContentState.Ice,
                 Locale: "en",
                 Title: dto.name,
@@ -215,7 +215,7 @@ public class ServiceDiscoveryModule : ModuleBase
         {
             var classNode = new Node(
                 Id: $"api-gateway.class.{cls.name}",
-                TypeId: "meta.class",
+                TypeId: "codex.meta/type",
                 State: ContentState.Ice,
                 Locale: "en",
                 Title: cls.name,

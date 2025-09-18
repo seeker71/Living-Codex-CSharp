@@ -1212,7 +1212,7 @@ Please provide a thoughtful translation that adapts the concept to the {request.
         {
             var routeNode = new Node(
                 Id: $"cross-service-translation.route.{route.name}",
-                TypeId: "meta.route",
+                TypeId: "codex.meta/route",
                 State: ContentState.Ice,
                 Locale: "en",
                 Title: route.description,
@@ -1268,7 +1268,7 @@ Please provide a thoughtful translation that adapts the concept to the {request.
         {
             var dtoNode = new Node(
                 Id: $"cross-service-translation.dto.{dto.name}",
-                TypeId: "meta.type",
+                TypeId: "codex.meta/type",
                 State: ContentState.Ice,
                 Locale: "en",
                 Title: dto.name,
@@ -1316,7 +1316,7 @@ Please provide a thoughtful translation that adapts the concept to the {request.
         {
             var classNode = new Node(
                 Id: $"cross-service-translation.class.{cls.name}",
-                TypeId: "meta.class",
+                TypeId: "codex.meta/type",
                 State: ContentState.Ice,
                 Locale: "en",
                 Title: cls.name,

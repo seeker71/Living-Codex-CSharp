@@ -351,11 +351,11 @@ namespace CodexBootstrap.Core
 
         private Node GenerateMetaNode(PropertyInfo property, EnhancedApiTypeAttribute attr)
         {
-            var nodeId = !string.IsNullOrEmpty(attr.Id) ? attr.Id : $"meta.{property.DeclaringType?.Name.ToLower()}.{property.Name.ToLower()}";
+            var nodeId = !string.IsNullOrEmpty(attr.Id) ? attr.Id : $"codex.meta/{property.DeclaringType?.Name.ToLower()}.{property.Name.ToLower()}";
             
             return new Node(
                 nodeId,
-                "meta-node",
+                "codex.meta/node",
                 ContentState.Ice,
                 "en",
                 !string.IsNullOrEmpty(attr.Name) ? attr.Name : property.Name,

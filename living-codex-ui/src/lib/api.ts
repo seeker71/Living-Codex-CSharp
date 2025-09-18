@@ -229,17 +229,27 @@ export const endpoints = {
   health: () => api.get('/health'),
   storageStats: () => api.get('/storage-endpoints/stats'),
   
-  // Authentication
-  login: (username: string, password: string) => api.post('/identity/authenticate', { username, password }),
-  register: (username: string, email: string, password: string) => api.post('/identity/users', { username, email, password }),
-  validateToken: (token: string) => api.post('/identity/validate', { token }),
+  // Authentication (Unified)
+  login: (usernameOrEmail: string, password: string, rememberMe: boolean = false) => 
+    api.post('/auth/login', { usernameOrEmail, password, rememberMe }),
+  register: (username: string, email: string, password: string, displayName?: string) => 
+    api.post('/auth/register', { username, email, password, displayName }),
+  logout: (token: string) => 
+    api.post('/auth/logout', { token }),
+  validateToken: (token: string) => 
+    api.post('/auth/validate', { token }),
+  getUserProfile: (userId: string) =>
+    api.get(`/auth/profile/${userId}`),
+  updateUserProfile: (userId: string, updates: { displayName?: string; email?: string }) =>
+    api.put(`/auth/profile/${userId}`, updates),
+  changePassword: (userId: string, currentPassword: string, newPassword: string) =>
+    api.post('/auth/change-password', { userId, currentPassword, newPassword }),
   
   // Concepts
   getConcepts: () => api.get('/concepts'),
   createConcept: (concept: Record<string, unknown>) => api.post('/concepts', concept),
   
   // Users and contributions
-  getUserContributions: (userId: string) => api.get(`/contributions/user/${userId}`),
   getContributionStats: (userId: string) => api.get(`/contributions/stats/${userId}`),
   getCollectiveEnergy: () => api.get('/contributions/abundance/collective-energy'),
   getContributorEnergy: (userId: string) => api.get(`/contributions/abundance/contributor-energy/${userId}`),
@@ -249,8 +259,6 @@ export const endpoints = {
     api.post('/concept/user/link', { userId, conceptId, relation: 'attuned' }),
   unattuneConcept: (userId: string, conceptId: string) => 
     api.post('/concept/user/unlink', { userId, conceptId }),
-  recordContribution: (userId: string, entityId: string, contribution: string, type = 'amplification') =>
-    api.post('/contributions/record', { userId, entityId, contribution, type }),
   
   // News
   getTrendingTopics: (limit = 10, hoursBack = 24) => 
@@ -258,11 +266,29 @@ export const endpoints = {
   getNewsFeed: (userId: string, limit = 20, hoursBack = 24) =>
     api.get(`/news/feed/${userId}?limit=${limit}&hoursBack=${hoursBack}`),
   getPersonalNewsStream: (userId: string, limit = 20) =>
-    api.get(`/news/stream/feed/${userId}?limit=${limit}`),
+    api.get(`/news/feed/${userId}?limit=${limit}`),
+  getPersonalContributionsFeed: (userId: string, limit = 20) =>
+    api.get(`/contributions/user/${userId}?limit=${limit}&sortBy=timestamp&sortDescending=true`),
   searchNews: (query: Record<string, unknown>) => api.post('/news/search', query),
   
   // User-concept relationships
   getUserConcepts: (userId: string) => api.get(`/concept/user/${userId}`),
+  
+  // Contributions
+  recordContribution: (contribution: {
+    userId: string;
+    entityId: string;
+    entityType?: string;
+    contributionType?: string;
+    description?: string;
+    value?: number;
+    metadata?: Record<string, any>;
+  }) => api.post('/contributions/record', contribution),
+  
+  getUserContributions: (userId: string, query?: Record<string, any>) => {
+    const params = query ? new URLSearchParams(query).toString() : '';
+    return api.get(`/contributions/user/${userId}${params ? `?${params}` : ''}`);
+  },
   
   // Storage and nodes
   getNodes: (typeId?: string, limit?: number) => {
@@ -272,10 +298,26 @@ export const endpoints = {
     const queryString = params.toString();
     return api.get(`/storage-endpoints/nodes${queryString ? `?${queryString}` : ''}`);
   },
+  getNodeTypes: () => api.get('/storage-endpoints/types'),
+  searchNodesAdvanced: (searchRequest: {
+    typeIds?: string[];
+    searchTerm?: string;
+    states?: string[];
+    take?: number;
+    skip?: number;
+    sortBy?: string;
+    sortDescending?: boolean;
+  }) => api.post('/storage-endpoints/nodes/search', searchRequest),
   getNode: (id: string) => api.get(`/storage-endpoints/nodes/${id}`),
+  searchNodes: (query: Record<string, unknown>) => api.post('/storage-endpoints/nodes/search', query),
   
   // Edges
-  getEdges: () => api.get('/storage-endpoints/edges'),
+  getEdges: (limit?: number) => {
+    const params = new URLSearchParams();
+    if (limit) params.set('limit', limit.toString());
+    const queryString = params.toString();
+    return api.get(`/storage-endpoints/edges${queryString ? `?${queryString}` : ''}`);
+  },
   getEdge: (fromId: string, toId: string) => api.get(`/storage-endpoints/edges/${fromId}/${toId}`),
 };
 

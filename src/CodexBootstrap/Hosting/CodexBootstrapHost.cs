@@ -176,7 +176,7 @@ public static class CodexBootstrapHost
             sp.GetRequiredService<DynamicAttributionSystem>(),
             sp.GetService<object>() ?? new object()));
         builder.Services.AddSingleton<object>(_ => new object());
-        builder.Services.AddHttpClient<SecurityModule>();
+        builder.Services.AddHttpClient<IdentityModule>();
 
         builder.Services.AddSingleton(sp => new ModuleLoader(
             sp.GetRequiredService<INodeRegistry>(),

@@ -30,7 +30,7 @@
 
 #### **CoreModule.cs** - ❌ 20% Complete
 **Specification Requirements**:
-- Node-based system with meta-nodes
+- Node-based system with codex.meta/nodes
 - Thread-safe operations
 - Persistent storage
 - API route discovery

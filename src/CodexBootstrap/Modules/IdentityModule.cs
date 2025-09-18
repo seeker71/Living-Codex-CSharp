@@ -12,6 +12,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Security.Claims;
 using System.Text;
+using System.Security.Cryptography;
+using System.IdentityModel.Tokens.Jwt;
+using Microsoft.IdentityModel.Tokens;
 using CodexBootstrap.Core;
 using CodexBootstrap.Runtime;
 
@@ -25,15 +28,23 @@ namespace CodexBootstrap.Modules;
 public sealed class IdentityModule : ModuleBase
 {
     private readonly IdentityProviderRegistry _providerRegistry;
+    private readonly string _jwtSecret;
+    private readonly int _tokenExpirationHours;
+    private readonly Dictionary<string, UserSession> _activeSessions;
+    private readonly HashSet<string> _revokedTokens;
 
     public override string Name => "Identity Module";
     public override string Description => "Unified identity, authentication, and access management system";
-    public override string Version => "1.0.0";
+    public override string Version => "2.0.0";
 
     public IdentityModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
         _providerRegistry = new IdentityProviderRegistry(logger);
+        _jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? "default-jwt-secret-key-for-development-only";
+        _tokenExpirationHours = int.TryParse(Environment.GetEnvironmentVariable("JWT_EXPIRATION_HOURS"), out var hours) ? hours : 24;
+        _activeSessions = new Dictionary<string, UserSession>();
+        _revokedTokens = new HashSet<string>();
     }
 
     /// <summary>
@@ -46,12 +57,13 @@ public sealed class IdentityModule : ModuleBase
         return CreateModuleNode(
             moduleId: "codex.identity",
             name: "Identity Module",
-            version: "1.0.0",
-            description: "Unified identity, authentication, and access management system",
-            tags: new[] { "identity", "auth", "access", "users", "security", "permissions" },
+            version: "2.0.0",
+            description: "Unified identity, authentication, and access management system with JWT tokens",
+            tags: new[] { "identity", "auth", "access", "users", "security", "permissions", "jwt", "sessions" },
             capabilities: new[] { 
                 "identity", "authentication", "authorization", "user-management", 
-                "access-control", "session-management", "permissions", "providers" 
+                "access-control", "session-management", "permissions", "providers",
+                "user-registration", "user-login", "jwt-tokens", "password-management"
             },
             spec: "codex.spec.identity"
         );
@@ -446,6 +458,560 @@ public sealed class IdentityModule : ModuleBase
         }
     }
 
+    // ===============================
+    // UNIFIED AUTHENTICATION ENDPOINTS
+    // ===============================
+
+    [ApiRoute("POST", "/auth/register", "RegisterUser", "Register a new user account", "codex.identity")]
+    public async Task<object> RegisterUserAsync([ApiParameter("request", "User registration request")] AuthRegisterRequest request)
+    {
+        try
+        {
+            // Comprehensive validation
+            var validationResult = ValidateRegistrationRequest(request);
+            if (!validationResult.IsValid)
+            {
+                return new AuthResponse(false, null, null, validationResult.ErrorMessage);
+            }
+
+            // Check if user already exists
+            var existingUser = Registry.GetNode($"user.{request.Username}");
+            if (existingUser != null)
+            {
+                return new AuthResponse(false, null, null, "Username already exists");
+            }
+
+            // Check if email is already registered
+            var emailExists = await CheckEmailExistsAsync(request.Email);
+            if (emailExists)
+            {
+                return new AuthResponse(false, null, null, "Email already registered");
+            }
+
+            // Create user
+            var userId = $"user.{request.Username}";
+            var passwordHash = HashPasswordSecure(request.Password);
+            var userNode = CreateUserNode(userId, request.Username, request.Email, request.DisplayName, passwordHash);
+            
+            Registry.Upsert(userNode);
+            
+            // Create email index for fast lookup
+            CreateEmailIndex(request.Email, userId, request.Username);
+
+            // Generate welcome token
+            var token = GenerateJwtTokenSecure(userId, request.Username, request.Email);
+            var userProfile = CreateAuthUserProfile(userNode);
+
+            _logger.Info($"User registered successfully: {request.Username} ({request.Email})");
+            return new AuthResponse(true, token, userProfile, "Registration successful");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Registration error for {request.Username}: {ex.Message}", ex);
+            return new AuthResponse(false, null, null, "Registration failed due to system error");
+        }
+    }
+
+    [ApiRoute("POST", "/auth/login", "LoginUser", "Authenticate user credentials", "codex.identity")]
+    public async Task<object> LoginUserAsync([ApiParameter("request", "User login request")] AuthLoginRequest request)
+    {
+        try
+        {
+            // Validate request
+            if (string.IsNullOrEmpty(request.UsernameOrEmail) || string.IsNullOrEmpty(request.Password))
+            {
+                return new AuthResponse(false, null, null, "Username/email and password are required");
+            }
+
+            // Find user by username or email
+            var userNode = await FindUserByUsernameOrEmailAsync(request.UsernameOrEmail);
+            if (userNode == null)
+            {
+                return new AuthResponse(false, null, null, "Invalid credentials");
+            }
+
+            // Check if account is active
+            if (!IsUserActive(userNode))
+            {
+                return new AuthResponse(false, null, null, "Account is disabled or inactive");
+            }
+
+            // Verify password
+            var storedHash = userNode.Meta["passwordHash"]?.ToString();
+            if (storedHash == null || !VerifyPasswordSecure(request.Password, storedHash))
+            {
+                await RecordFailedLoginAttempt(userNode.Id);
+                return new AuthResponse(false, null, null, "Invalid credentials");
+            }
+
+            // Update last login
+            await UpdateLastLoginAsync(userNode);
+
+            // Generate token and create session
+            var token = GenerateJwtTokenSecure(userNode.Id, userNode.Meta["username"]?.ToString() ?? "", userNode.Meta["email"]?.ToString() ?? "");
+            var session = CreateUserSessionRecord(userNode.Id, token, request.RememberMe);
+            _activeSessions[token] = session;
+
+            var userProfile = CreateAuthUserProfile(userNode);
+
+            _logger.Info($"User logged in successfully: {userNode.Meta["username"]}");
+            return new AuthResponse(true, token, userProfile, "Login successful");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Login error: {ex.Message}", ex);
+            return new AuthResponse(false, null, null, "Authentication failed due to system error");
+        }
+    }
+
+    [ApiRoute("POST", "/auth/logout", "LogoutUser", "Logout user and invalidate session", "codex.identity")]
+    public async Task<object> LogoutUserAsync([ApiParameter("request", "Logout request")] AuthLogoutRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(request.Token))
+            {
+                return new { success = false, message = "Token is required" };
+            }
+
+            // Revoke token
+            _revokedTokens.Add(request.Token);
+            _activeSessions.Remove(request.Token);
+
+            // Update user's last activity
+            var claims = ValidateJwtTokenSecure(request.Token);
+            if (claims != null)
+            {
+                var userId = claims.FindFirst("userId")?.Value;
+                if (!string.IsNullOrEmpty(userId))
+                {
+                    await UpdateLastActivityAsync(userId);
+                }
+            }
+
+            return new { success = true, message = "Logout successful" };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Logout error: {ex.Message}", ex);
+            return new { success = false, message = "Logout failed" };
+        }
+    }
+
+    [ApiRoute("POST", "/auth/validate", "ValidateToken", "Validate JWT token", "codex.identity")]
+    public async Task<object> ValidateTokenAsync([ApiParameter("request", "Token validation request")] AuthTokenValidationRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(request.Token))
+            {
+                return new AuthTokenValidationResponse(false, null, "Token is required");
+            }
+
+            // Check if token is revoked
+            if (_revokedTokens.Contains(request.Token))
+            {
+                return new AuthTokenValidationResponse(false, null, "Token has been revoked");
+            }
+
+            // Validate JWT token
+            var claims = ValidateJwtTokenSecure(request.Token);
+            if (claims == null)
+            {
+                return new AuthTokenValidationResponse(false, null, "Invalid or expired token");
+            }
+
+            var userId = claims.FindFirst("userId")?.Value;
+            if (string.IsNullOrEmpty(userId))
+            {
+                return new AuthTokenValidationResponse(false, null, "Invalid token claims");
+            }
+
+            // Get user profile
+            var userNode = Registry.GetNode(userId);
+            if (userNode == null || !IsUserActive(userNode))
+            {
+                return new AuthTokenValidationResponse(false, null, "User not found or inactive");
+            }
+
+            var userProfile = CreateAuthUserProfile(userNode);
+            return new AuthTokenValidationResponse(true, userProfile, "Token is valid");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Token validation error: {ex.Message}", ex);
+            return new AuthTokenValidationResponse(false, null, "Token validation failed");
+        }
+    }
+
+    [ApiRoute("GET", "/auth/profile/{userId}", "GetAuthUserProfile", "Get user profile by ID", "codex.identity")]
+    public async Task<object> GetAuthUserProfileAsync([ApiParameter("userId", "User ID", Location = "path")] string userId)
+    {
+        try
+        {
+            var userNode = Registry.GetNode(userId);
+            if (userNode == null)
+            {
+                return new { success = false, message = "User not found" };
+            }
+
+            var profile = CreateAuthUserProfile(userNode);
+            return new { success = true, profile = profile };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Get profile error: {ex.Message}", ex);
+            return new { success = false, message = "Failed to get user profile" };
+        }
+    }
+
+    [ApiRoute("POST", "/auth/change-password", "ChangePassword", "Change user password", "codex.identity")]
+    public async Task<object> ChangePasswordAsync([ApiParameter("request", "Change password request")] AuthChangePasswordRequest request)
+    {
+        try
+        {
+            var userNode = Registry.GetNode(request.UserId);
+            if (userNode == null)
+            {
+                return new { success = false, message = "User not found" };
+            }
+
+            // Verify current password
+            var storedHash = userNode.Meta["passwordHash"]?.ToString();
+            if (storedHash == null || !VerifyPasswordSecure(request.CurrentPassword, storedHash))
+            {
+                return new { success = false, message = "Current password is incorrect" };
+            }
+
+            // Validate new password
+            var passwordValidation = ValidatePassword(request.NewPassword);
+            if (!passwordValidation.IsValid)
+            {
+                return new { success = false, message = passwordValidation.ErrorMessage };
+            }
+
+            // Update password
+            var newPasswordHash = HashPasswordSecure(request.NewPassword);
+            var updatedMeta = new Dictionary<string, object>(userNode.Meta)
+            {
+                ["passwordHash"] = newPasswordHash,
+                ["passwordChangedAt"] = DateTime.UtcNow,
+                ["updatedAt"] = DateTime.UtcNow
+            };
+
+            var updatedNode = userNode with { Meta = updatedMeta };
+            Registry.Upsert(updatedNode);
+
+            // Revoke all existing sessions for security
+            await RevokeAllUserSessionsAsync(request.UserId);
+
+            _logger.Info($"Password changed for user: {userNode.Meta["username"]}");
+            return new { success = true, message = "Password changed successfully. Please login again." };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Change password error: {ex.Message}", ex);
+            return new { success = false, message = "Failed to change password" };
+        }
+    }
+
+    // ===============================
+    // UNIFIED AUTH HELPER METHODS
+    // ===============================
+
+    private ValidationResult ValidateRegistrationRequest(AuthRegisterRequest request)
+    {
+        if (string.IsNullOrEmpty(request.Username))
+            return new ValidationResult(false, "Username is required");
+
+        if (request.Username.Length < 3 || request.Username.Length > 50)
+            return new ValidationResult(false, "Username must be between 3 and 50 characters");
+
+        if (!System.Text.RegularExpressions.Regex.IsMatch(request.Username, @"^[a-zA-Z0-9_-]+$"))
+            return new ValidationResult(false, "Username can only contain letters, numbers, underscores, and hyphens");
+
+        if (string.IsNullOrEmpty(request.Email))
+            return new ValidationResult(false, "Email is required");
+
+        if (!IsValidEmail(request.Email))
+            return new ValidationResult(false, "Invalid email format");
+
+        var passwordValidation = ValidatePassword(request.Password);
+        if (!passwordValidation.IsValid)
+            return passwordValidation;
+
+        return new ValidationResult(true, null);
+    }
+
+    private ValidationResult ValidatePassword(string password)
+    {
+        if (string.IsNullOrEmpty(password))
+            return new ValidationResult(false, "Password is required");
+
+        if (password.Length < 8)
+            return new ValidationResult(false, "Password must be at least 8 characters long");
+
+        if (!password.Any(char.IsUpper))
+            return new ValidationResult(false, "Password must contain at least one uppercase letter");
+
+        if (!password.Any(char.IsLower))
+            return new ValidationResult(false, "Password must contain at least one lowercase letter");
+
+        if (!password.Any(char.IsDigit))
+            return new ValidationResult(false, "Password must contain at least one number");
+
+        return new ValidationResult(true, null);
+    }
+
+    private bool IsValidEmail(string email)
+    {
+        try
+        {
+            var addr = new System.Net.Mail.MailAddress(email);
+            return addr.Address == email;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task<bool> CheckEmailExistsAsync(string email)
+    {
+        var emailIndexEdges = Registry.AllEdges()
+            .Where(e => e.Role == "email-index" && 
+                       e.Meta.ContainsKey("email") && 
+                       e.Meta["email"].ToString()?.Equals(email, StringComparison.OrdinalIgnoreCase) == true);
+        
+        return emailIndexEdges.Any();
+    }
+
+    private async Task<Node?> FindUserByUsernameOrEmailAsync(string usernameOrEmail)
+    {
+        // Try username first
+        var userByUsername = Registry.GetNode($"user.{usernameOrEmail}");
+        if (userByUsername != null)
+            return userByUsername;
+
+        // Try email lookup
+        var emailEdge = Registry.AllEdges()
+            .FirstOrDefault(e => e.Role == "email-index" && 
+                                e.Meta.ContainsKey("email") && 
+                                e.Meta["email"].ToString()?.Equals(usernameOrEmail, StringComparison.OrdinalIgnoreCase) == true);
+
+        if (emailEdge != null)
+        {
+            return Registry.GetNode(emailEdge.ToId);
+        }
+
+        return null;
+    }
+
+    private Node CreateUserNode(string userId, string username, string email, string? displayName, string passwordHash)
+    {
+        return new Node(
+            Id: userId,
+            TypeId: "codex.user",
+            State: ContentState.Ice,
+            Locale: "en",
+            Title: displayName ?? username,
+            Description: $"User account for {username}",
+            Content: new ContentRef(
+                MediaType: "application/json",
+                InlineJson: JsonSerializer.Serialize(new
+                {
+                    username = username,
+                    email = email,
+                    displayName = displayName ?? username,
+                    createdAt = DateTime.UtcNow,
+                    isActive = true
+                }),
+                InlineBytes: null,
+                ExternalUri: null
+            ),
+            Meta: new Dictionary<string, object>
+            {
+                ["username"] = username,
+                ["email"] = email,
+                ["displayName"] = displayName ?? username,
+                ["passwordHash"] = passwordHash,
+                ["createdAt"] = DateTime.UtcNow,
+                ["updatedAt"] = DateTime.UtcNow,
+                ["lastLoginAt"] = DateTime.UtcNow,
+                ["status"] = "active",
+                ["isActive"] = true,
+                ["loginAttempts"] = 0,
+                ["lastFailedLoginAt"] = (DateTime?)null
+            }
+        );
+    }
+
+    private void CreateEmailIndex(string email, string userId, string username)
+    {
+        var emailIndexEdge = new Edge(
+            FromId: "email-index",
+            ToId: userId,
+            Role: "email-index",
+            Weight: 1.0,
+            Meta: new Dictionary<string, object>
+            {
+                ["email"] = email.ToLowerInvariant(),
+                ["username"] = username,
+                ["createdAt"] = DateTime.UtcNow
+            }
+        );
+        Registry.Upsert(emailIndexEdge);
+    }
+
+    private AuthUserProfile CreateAuthUserProfile(Node userNode)
+    {
+        return new AuthUserProfile(
+            Id: userNode.Id,
+            Username: userNode.Meta["username"]?.ToString() ?? "",
+            Email: userNode.Meta["email"]?.ToString() ?? "",
+            DisplayName: userNode.Meta["displayName"]?.ToString() ?? "",
+            CreatedAt: userNode.Meta.ContainsKey("createdAt") ? (DateTime)userNode.Meta["createdAt"] : DateTime.MinValue,
+            LastLoginAt: userNode.Meta.ContainsKey("lastLoginAt") ? (DateTime?)userNode.Meta["lastLoginAt"] : null,
+            IsActive: userNode.Meta.ContainsKey("isActive") ? (bool)userNode.Meta["isActive"] : false,
+            Status: userNode.Meta["status"]?.ToString() ?? "unknown"
+        );
+    }
+
+    private bool IsUserActive(Node userNode)
+    {
+        return userNode.Meta.ContainsKey("isActive") && (bool)userNode.Meta["isActive"] &&
+               userNode.Meta.ContainsKey("status") && userNode.Meta["status"]?.ToString() == "active";
+    }
+
+    private string HashPasswordSecure(string password)
+    {
+        using var sha256 = SHA256.Create();
+        var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password + _jwtSecret));
+        return Convert.ToBase64String(hashedBytes);
+    }
+
+    private bool VerifyPasswordSecure(string password, string storedHash)
+    {
+        var hash = HashPasswordSecure(password);
+        return hash == storedHash;
+    }
+
+    private string GenerateJwtTokenSecure(string userId, string username, string email)
+    {
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var key = Encoding.ASCII.GetBytes(_jwtSecret);
+        var tokenDescriptor = new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(new[]
+            {
+                new Claim("userId", userId),
+                new Claim("username", username),
+                new Claim("email", email),
+                new Claim("iat", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
+            }),
+            Expires = DateTime.UtcNow.AddHours(_tokenExpirationHours),
+            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+        };
+        var token = tokenHandler.CreateToken(tokenDescriptor);
+        return tokenHandler.WriteToken(token);
+    }
+
+    private ClaimsPrincipal? ValidateJwtTokenSecure(string token)
+    {
+        try
+        {
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var key = Encoding.ASCII.GetBytes(_jwtSecret);
+            tokenHandler.ValidateToken(token, new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(key),
+                ValidateIssuer = false,
+                ValidateAudience = false,
+                ClockSkew = TimeSpan.Zero
+            }, out SecurityToken validatedToken);
+
+            var jwtToken = (JwtSecurityToken)validatedToken;
+            return new ClaimsPrincipal(new ClaimsIdentity(jwtToken.Claims));
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private UserSession CreateUserSessionRecord(string userId, string token, bool isPersistent)
+    {
+        return new UserSession(
+            Token: token,
+            UserId: userId,
+            CreatedAt: DateTime.UtcNow,
+            ExpiresAt: DateTime.UtcNow.AddHours(isPersistent ? _tokenExpirationHours * 7 : _tokenExpirationHours), // 7x longer for persistent
+            LastActivity: DateTime.UtcNow,
+            IsPersistent: isPersistent
+        );
+    }
+
+    private async Task UpdateLastLoginAsync(Node userNode)
+    {
+        var updatedMeta = new Dictionary<string, object>(userNode.Meta)
+        {
+            ["lastLoginAt"] = DateTime.UtcNow,
+            ["loginAttempts"] = 0
+        };
+        var updatedNode = userNode with { Meta = updatedMeta };
+        Registry.Upsert(updatedNode);
+    }
+
+    private async Task UpdateLastActivityAsync(string userId)
+    {
+        var userNode = Registry.GetNode(userId);
+        if (userNode != null)
+        {
+            var updatedMeta = new Dictionary<string, object>(userNode.Meta)
+            {
+                ["lastActivityAt"] = DateTime.UtcNow
+            };
+            var updatedNode = userNode with { Meta = updatedMeta };
+            Registry.Upsert(updatedNode);
+        }
+    }
+
+    private async Task RecordFailedLoginAttempt(string userId)
+    {
+        var userNode = Registry.GetNode(userId);
+        if (userNode != null)
+        {
+            var currentAttempts = userNode.Meta.ContainsKey("loginAttempts") ? (int)userNode.Meta["loginAttempts"] : 0;
+            var updatedMeta = new Dictionary<string, object>(userNode.Meta)
+            {
+                ["loginAttempts"] = currentAttempts + 1,
+                ["lastFailedLoginAt"] = DateTime.UtcNow
+            };
+
+            // Lock account after 5 failed attempts
+            if (currentAttempts + 1 >= 5)
+            {
+                updatedMeta["isActive"] = false;
+                updatedMeta["status"] = "locked";
+                updatedMeta["lockedAt"] = DateTime.UtcNow;
+            }
+
+            var updatedNode = userNode with { Meta = updatedMeta };
+            Registry.Upsert(updatedNode);
+        }
+    }
+
+    private async Task RevokeAllUserSessionsAsync(string userId)
+    {
+        var userSessions = _activeSessions.Where(kvp => kvp.Value.UserId == userId).ToList();
+        foreach (var session in userSessions)
+        {
+            _revokedTokens.Add(session.Key);
+            _activeSessions.Remove(session.Key);
+        }
+    }
+
     // Helper methods
     private string HashPassword(string password)
     {
@@ -511,3 +1077,92 @@ public record SessionCreateResponse(bool Success, string? SessionToken, string M
 
 [ResponseType("codex.identity.session-end-response", "SessionEndResponse", "Response for session ending")]
 public record SessionEndResponse(bool Success, string Message);
+
+// ===============================
+// UNIFIED AUTH REQUEST/RESPONSE MODELS
+// ===============================
+
+[MetaNode(Id = "codex.auth.register-request", Name = "Auth Register Request", Description = "User registration request")]
+public record AuthRegisterRequest(
+    [property: JsonPropertyName("username")] string Username,
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("password")] string Password,
+    [property: JsonPropertyName("displayName")] string? DisplayName = null
+);
+
+[MetaNode(Id = "codex.auth.login-request", Name = "Auth Login Request", Description = "User login request")]
+public record AuthLoginRequest(
+    [property: JsonPropertyName("usernameOrEmail")] string UsernameOrEmail,
+    [property: JsonPropertyName("password")] string Password,
+    [property: JsonPropertyName("rememberMe")] bool RememberMe = false
+);
+
+[MetaNode(Id = "codex.auth.logout-request", Name = "Auth Logout Request", Description = "User logout request")]
+public record AuthLogoutRequest(
+    [property: JsonPropertyName("token")] string Token
+);
+
+[MetaNode(Id = "codex.auth.token-validation-request", Name = "Auth Token Validation Request", Description = "JWT token validation request")]
+public record AuthTokenValidationRequest(
+    [property: JsonPropertyName("token")] string Token
+);
+
+[MetaNode(Id = "codex.auth.change-password-request", Name = "Auth Change Password Request", Description = "User password change request")]
+public record AuthChangePasswordRequest(
+    [property: JsonPropertyName("userId")] string UserId,
+    [property: JsonPropertyName("currentPassword")] string CurrentPassword,
+    [property: JsonPropertyName("newPassword")] string NewPassword
+);
+
+[MetaNode(Id = "codex.auth.response", Name = "Auth Response", Description = "Generic authentication response")]
+public record AuthResponse(
+    [property: JsonPropertyName("success")] bool Success,
+    [property: JsonPropertyName("token")] string? Token,
+    [property: JsonPropertyName("user")] AuthUserProfile? User,
+    [property: JsonPropertyName("message")] string Message,
+    [property: JsonPropertyName("timestamp")] DateTime Timestamp = default
+)
+{
+    public AuthResponse(bool success, string? token, AuthUserProfile? user, string message) 
+        : this(success, token, user, message, DateTime.UtcNow) { }
+}
+
+[MetaNode(Id = "codex.auth.token-validation-response", Name = "Auth Token Validation Response", Description = "JWT token validation response")]
+public record AuthTokenValidationResponse(
+    [property: JsonPropertyName("isValid")] bool IsValid,
+    [property: JsonPropertyName("user")] AuthUserProfile? User,
+    [property: JsonPropertyName("message")] string Message,
+    [property: JsonPropertyName("timestamp")] DateTime Timestamp = default
+)
+{
+    public AuthTokenValidationResponse(bool isValid, AuthUserProfile? user, string message) 
+        : this(isValid, user, message, DateTime.UtcNow) { }
+}
+
+[MetaNode(Id = "codex.auth.user-profile", Name = "Auth User Profile", Description = "Authentication user profile information")]
+public record AuthUserProfile(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("username")] string Username,
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("displayName")] string DisplayName,
+    [property: JsonPropertyName("createdAt")] DateTime CreatedAt,
+    [property: JsonPropertyName("lastLoginAt")] DateTime? LastLoginAt,
+    [property: JsonPropertyName("isActive")] bool IsActive,
+    [property: JsonPropertyName("status")] string Status
+);
+
+[MetaNode(Id = "codex.auth.user-session", Name = "User Session", Description = "User session information")]
+public record UserSession(
+    [property: JsonPropertyName("token")] string Token,
+    [property: JsonPropertyName("userId")] string UserId,
+    [property: JsonPropertyName("createdAt")] DateTime CreatedAt,
+    [property: JsonPropertyName("expiresAt")] DateTime ExpiresAt,
+    [property: JsonPropertyName("lastActivity")] DateTime LastActivity,
+    [property: JsonPropertyName("isPersistent")] bool IsPersistent
+);
+
+[MetaNode(Id = "codex.auth.validation-result", Name = "Validation Result", Description = "Validation result")]
+public record ValidationResult(
+    [property: JsonPropertyName("isValid")] bool IsValid,
+    [property: JsonPropertyName("errorMessage")] string? ErrorMessage
+);

@@ -603,6 +603,38 @@ public sealed class StorageEndpointsModule : ModuleBase
         }
     }
 
+    [ApiRoute("GET", "/storage-endpoints/types", "GetNodeTypes", "Get all available node types", "codex.storage-endpoints")]
+    public async Task<object> GetNodeTypesAsync()
+    {
+        try
+        {
+            var allNodes = _registry.AllNodes();
+            var nodeTypes = allNodes
+                .GroupBy(n => n.TypeId)
+                .Select(g => new {
+                    typeId = g.Key,
+                    count = g.Count(),
+                    sampleTitle = g.First().Title,
+                    description = $"{g.Count()} nodes of type {g.Key}"
+                })
+                .OrderByDescending(t => t.count)
+                .ToList();
+
+            _logger.Debug($"Retrieved {nodeTypes.Count} distinct node types");
+            return new { 
+                success = true, 
+                nodeTypes = nodeTypes,
+                totalTypes = nodeTypes.Count,
+                totalNodes = allNodes.Count()
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error getting node types: {ex.Message}", ex);
+            return new ErrorResponse($"Failed to get node types: {ex.Message}");
+        }
+    }
+
     [ApiRoute("POST", "/storage-endpoints/backup", "BackupStorage", "Create a backup of the storage", "codex.storage-endpoints")]
     public async Task<object> BackupStorageAsync([ApiParameter("body", "Backup request")] BackupRequest request)
     {

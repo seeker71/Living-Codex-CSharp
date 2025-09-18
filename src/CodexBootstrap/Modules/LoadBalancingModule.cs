@@ -116,7 +116,7 @@ public class LoadBalancingModule : ModuleBase
         {
             var routeNode = new Node(
                 Id: $"load-balancing.route.{route.name}",
-                TypeId: "meta.route",
+                TypeId: "codex.meta/route",
                 State: ContentState.Ice,
                 Locale: "en",
                 Title: route.description,
@@ -170,7 +170,7 @@ public class LoadBalancingModule : ModuleBase
         {
             var dtoNode = new Node(
                 Id: $"load-balancing.dto.{dto.name}",
-                TypeId: "meta.type",
+                TypeId: "codex.meta/type",
                 State: ContentState.Ice,
                 Locale: "en",
                 Title: dto.name,

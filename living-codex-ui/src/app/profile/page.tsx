@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Navigation } from '@/components/ui/Navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { useContributorEnergy, usePersonalNewsStream, useUserConcepts } from '@/lib/hooks';
+import { useContributorEnergy, usePersonalNewsStream, useUserConcepts, usePersonalContributionsFeed, useTrackInteraction } from '@/lib/hooks';
 
 interface UserStats {
   energyLevel: number;
@@ -28,13 +28,25 @@ export default function ProfilePage() {
   const { user, isAuthenticated, logout, isLoading: authLoading } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const trackInteraction = useTrackInteraction();
 
   // Use hooks for data fetching
-  const { data: userStats, isLoading: statsLoading } = useContributorEnergy(user?.username || '');
-  const { data: newsStream, isLoading: newsLoading } = usePersonalNewsStream(user?.username || '', 20);
-  const { data: userConcepts, isLoading: conceptsLoading } = useUserConcepts(user?.username || '');
+  const { data: userStats, isLoading: statsLoading } = useContributorEnergy(user?.id || '');
+  const { data: newsStream, isLoading: newsLoading } = usePersonalNewsStream(user?.id || '', 20);
+  const { data: contributionsData, isLoading: contributionsLoading } = usePersonalContributionsFeed(user?.id || '', 10);
+  const { data: userConcepts, isLoading: conceptsLoading } = useUserConcepts(user?.id || '');
 
-  const loading = statsLoading || newsLoading || conceptsLoading;
+  const loading = statsLoading || newsLoading || contributionsLoading || conceptsLoading;
+
+  // Track page visit
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      trackInteraction('profile-page', 'page-visit', {
+        section: 'profile',
+        userDisplayName: user.displayName
+      });
+    }
+  }, [isAuthenticated, user, trackInteraction]);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -194,8 +206,55 @@ export default function ProfilePage() {
             </div>
           </div>
 
+          {/* Recent Contributions */}
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  ⚡ Recent Contributions
+                </h2>
+                <span className="text-sm text-gray-500">
+                  Your activity
+                </span>
+              </div>
+
+              {contributionsLoading ? (
+                <div className="space-y-3">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="animate-pulse bg-gray-200 rounded-lg h-16"></div>
+                  ))}
+                </div>
+              ) : contributionsData?.success && (contributionsData.data as any)?.contributions?.length > 0 ? (
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {(contributionsData.data as any).contributions.map((contribution: any, index: number) => (
+                    <div key={index} className="border-l-4 border-green-500 pl-4 py-2">
+                      <div className="font-medium text-gray-900">{contribution.description || 'Contribution'}</div>
+                      <div className="text-sm text-gray-600">
+                        {contribution.contributionType} • {contribution.entityType}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        Value: {contribution.value} • Abundance: {contribution.abundanceMultiplier?.toFixed(2)}x
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        {new Date(contribution.timestamp).toLocaleString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center text-gray-500 py-8">
+                  <div className="text-4xl mb-4">⚡</div>
+                  <div className="text-lg font-medium mb-2">No Contributions Yet</div>
+                  <p className="text-sm">
+                    Start interacting with the system to see your contributions here.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Personal News Feed */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-1">
             <div className="bg-white rounded-lg border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-semibold text-gray-900">

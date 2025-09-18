@@ -6,9 +6,9 @@
 These are all generated from existing code and should NOT be persistent:
 
 #### Module Meta-Nodes (ModuleLoader.cs)
-- `meta.class.{fullName}` - Generated from class reflection
+- `codex.meta/class.{fullName}` - Generated from class reflection (TypeId: codex.meta/type)
 - `meta.method.{classType.FullName}.{methodName}` - Generated from method reflection  
-- `meta.route.{moduleType.Name}.{method.Name}` - Generated from API route discovery
+- `codex.meta/route.{moduleType.Name}.{method.Name}` - Generated from API route discovery
 - `meta.spec.{fileName}` - Generated from spec file parsing
 - `meta.spec.section.{fileName}.{section.Key}` - Generated from spec sections
 
@@ -78,10 +78,10 @@ Based on the principle that "only the absolute minimum should be Ice", here's wh
 
 ### 1. **Convert Generated Meta-Nodes to Water**
 All reflection-generated nodes should be Water state:
-- Module meta-nodes
-- API route meta-nodes  
-- Spec parsing meta-nodes
-- Class/method reflection meta-nodes
+- Module codex.meta/nodes
+- API route codex.meta/nodes  
+- Spec parsing codex.meta/nodes
+- Class/method reflection codex.meta/nodes
 
 ### 2. **Convert User-Generated Content to Water**
 User-created content should be Water unless it represents unique intellectual property:

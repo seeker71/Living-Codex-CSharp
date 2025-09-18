@@ -26,24 +26,24 @@ public sealed class ModuleLoader
 
     public void GenerateMetaNodes()
     {
-        _logger.Info("Starting meta-node generation for all loaded modules...");
+        _logger.Info("Starting codex.meta/node generation for all loaded modules...");
         
         try
         {
-            // Generate meta-nodes for all loaded modules
+            // Generate codex.meta/nodes for all loaded modules
             foreach (var module in _loadedModules)
             {
                 GenerateClassMetaNode(module.GetType());
             }
             
-            // Generate meta-nodes for spec files
+            // Generate codex.meta/nodes for spec files
             GenerateSpecFileMetaNodes();
             
             _logger.Info($"Meta-node generation completed for {_loadedModules.Count} modules");
         }
         catch (Exception ex)
         {
-            _logger.Error($"Error during meta-node generation: {ex.Message}", ex);
+            _logger.Error($"Error during codex.meta/node generation: {ex.Message}", ex);
         }
     }
 
@@ -350,8 +350,8 @@ public sealed class ModuleLoader
             
             // Create class meta-node
             var classNode = new Node(
-                Id: $"meta.class.{fullName}",
-                TypeId: "meta.class",
+                Id: $"codex.meta/class.{fullName}",
+                TypeId: "codex.meta/type",
                 State: ContentState.Water,
                 Locale: "en",
                 Title: className,
@@ -378,20 +378,20 @@ public sealed class ModuleLoader
             
             _registry.Upsert(classNode);
             
-            // Generate method meta-nodes
+            // Generate method codex.meta/nodes
             GenerateMethodMetaNodes(classType);
             
-            // Generate API route meta-nodes for modules
+            // Generate API route codex.meta/nodes for modules
             if (typeof(IModule).IsAssignableFrom(classType))
             {
                 GenerateApiRouteMetaNodes(classType);
             }
             
-            _logger.Info($"Generated meta-nodes for class: {className}");
+            _logger.Info($"Generated codex.meta/nodes for class: {className}");
         }
         catch (Exception ex)
         {
-            _logger.Error($"Error generating meta-nodes for class {classType.Name}: {ex.Message}", ex);
+            _logger.Error($"Error generating codex.meta/nodes for class {classType.Name}: {ex.Message}", ex);
         }
     }
 
@@ -414,7 +414,7 @@ public sealed class ModuleLoader
                 
                 var methodNode = new Node(
                     Id: $"meta.method.{classType.FullName}.{methodName}",
-                    TypeId: "meta.method",
+                    TypeId: "codex.meta/method",
                     State: ContentState.Water,
                     Locale: "en",
                     Title: methodName,
@@ -442,7 +442,7 @@ public sealed class ModuleLoader
             }
             catch (Exception ex)
             {
-                _logger.Error($"Error generating meta-node for method {method.Name}: {ex.Message}", ex);
+                _logger.Error($"Error generating codex.meta/node for method {method.Name}: {ex.Message}", ex);
             }
         }
     }
@@ -460,8 +460,8 @@ public sealed class ModuleLoader
                 foreach (var attr in routeAttributes)
                 {
                     var routeNode = new Node(
-                        Id: $"meta.route.{moduleType.Name}.{method.Name}",
-                        TypeId: "meta.route",
+                        Id: $"codex.meta/route.{moduleType.Name}.{method.Name}",
+                        TypeId: "codex.meta/route",
                         State: ContentState.Water,
                         Locale: "en",
                         Title: $"{attr.Verb} {attr.Route}",
@@ -494,7 +494,7 @@ public sealed class ModuleLoader
         }
         catch (Exception ex)
         {
-            _logger.Error($"Error generating API route meta-nodes for {moduleType.Name}: {ex.Message}", ex);
+            _logger.Error($"Error generating API route codex.meta/nodes for {moduleType.Name}: {ex.Message}", ex);
         }
     }
 
@@ -571,7 +571,7 @@ public sealed class ModuleLoader
                     
                     var specNode = new Node(
                         Id: $"meta.spec.{fileName}",
-                        TypeId: "meta.spec",
+                        TypeId: "codex.meta/spec",
                         State: ContentState.Water,
                         Locale: "en",
                         Title: fileName,
@@ -599,7 +599,7 @@ public sealed class ModuleLoader
                     {
                         var sectionNode = new Node(
                             Id: $"meta.spec.section.{fileName}.{section.Key}",
-                            TypeId: "meta.spec.section",
+                            TypeId: "codex.meta/spec.section",
                             State: ContentState.Water,
                             Locale: "en",
                             Title: section.Key,
@@ -629,7 +629,7 @@ public sealed class ModuleLoader
         }
         catch (Exception ex)
         {
-            _logger.Error($"Error generating spec file meta-nodes: {ex.Message}", ex);
+            _logger.Error($"Error generating spec file codex.meta/nodes: {ex.Message}", ex);
         }
     }
 

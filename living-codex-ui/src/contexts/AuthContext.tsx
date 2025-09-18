@@ -106,29 +106,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const login = async (username: string, password: string) => {
     try {
-      const response = await endpoints.login(username, password);
+      const response = await endpoints.login(username, password, false);
       
       if (response.success && response.data) {
-        const { token, userId } = response.data as any;
-        
-        // Create user object from login response data
-        let user: User;
         const responseData = response.data as any;
+        const { token, user: userData } = responseData;
         
-        if (responseData.user) {
-          // If user data is included in login response
-          user = responseData.user as User;
-        } else {
-          // Create user object from available data
-          user = {
-            id: responseData.userId || userId,
-            username,
-            email: responseData.email || '',
-            displayName: responseData.displayName || username,
-            createdAt: responseData.createdAt || new Date().toISOString(),
-            isActive: true,
-          };
+        if (!token) {
+          return { success: false, error: 'No authentication token received' };
         }
+        
+        // Use the user data from the unified auth response
+        const user: User = {
+          id: userData?.id || `user.${username}`,
+          username: userData?.username || username,
+          email: userData?.email || '',
+          displayName: userData?.displayName || userData?.username || username,
+          createdAt: userData?.createdAt || new Date().toISOString(),
+          isActive: userData?.isActive !== false,
+        };
 
         // Store in localStorage
         localStorage.setItem('auth_token', token);
@@ -143,7 +139,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         return { success: true };
       } else {
-        return { success: false, error: response.error || 'Login failed' };
+        return { success: false, error: responseData?.message || response.error || 'Login failed' };
       }
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Login failed' };
@@ -152,28 +148,66 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const register = async (username: string, email: string, password: string) => {
     try {
-      const response = await endpoints.register(username, email, password);
+      const response = await endpoints.register(username, email, password, username);
       
-      if (response.success) {
-        // Auto-login after successful registration
-        return await login(username, password);
+      if (response.success && response.data) {
+        const responseData = response.data as any;
+        const { token, user: userData } = responseData;
+        
+        if (token && userData) {
+          // Registration successful with immediate login
+          const user: User = {
+            id: userData.id || `user.${username}`,
+            username: userData.username || username,
+            email: userData.email || email,
+            displayName: userData.displayName || username,
+            createdAt: userData.createdAt || new Date().toISOString(),
+            isActive: userData.isActive !== false,
+          };
+
+          localStorage.setItem('auth_token', token);
+          localStorage.setItem('auth_user', JSON.stringify(user));
+
+          setAuthState({
+            user,
+            token,
+            isLoading: false,
+            isAuthenticated: true,
+          });
+
+          return { success: true };
+        } else {
+          // Registration successful but no immediate login - try to login
+          return await login(username, password);
+        }
       } else {
-        return { success: false, error: response.error || 'Registration failed' };
+        return { success: false, error: responseData?.message || response.error || 'Registration failed' };
       }
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Registration failed' };
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_user');
-    setAuthState({
-      user: null,
-      token: null,
-      isLoading: false,
-      isAuthenticated: false,
-    });
+  const logout = async () => {
+    try {
+      const token = authState.token;
+      if (token) {
+        // Call logout endpoint to invalidate token on server
+        await endpoints.logout(token);
+      }
+    } catch (error) {
+      console.error('Logout API call failed:', error);
+    } finally {
+      // Clear local storage and state regardless of API call result
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+      setAuthState({
+        user: null,
+        token: null,
+        isLoading: false,
+        isAuthenticated: false,
+      });
+    }
   };
 
   const refreshUser = async () => {

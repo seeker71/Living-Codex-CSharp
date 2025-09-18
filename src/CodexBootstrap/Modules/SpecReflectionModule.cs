@@ -13,7 +13,7 @@ public record IngestResponse(ModuleSpec Spec, bool Success, string Message);
 public sealed class SpecReflectionModule : ModuleBase
 {
     public override string Name => "Spec Reflection Module";
-    public override string Description => "Converts specs to meta-nodes and back, enabling self-describing system architecture";
+    public override string Description => "Converts specs to codex.meta/nodes and back, enabling self-describing system architecture";
     public override string Version => "0.1.0";
 
     public SpecReflectionModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
@@ -27,9 +27,9 @@ public sealed class SpecReflectionModule : ModuleBase
             moduleId: "codex.reflect",
             name: "Spec Reflection Module",
             version: "0.1.0",
-            description: "Converts specs to meta-nodes and back, enabling self-describing system architecture",
-            tags: new[] { "reflection", "spec", "meta-nodes", "self-describing" },
-            capabilities: new[] { "reflection", "spec-conversion", "meta-nodes", "self-describing" },
+            description: "Converts specs to codex.meta/nodes and back, enabling self-describing system architecture",
+            tags: new[] { "reflection", "spec", "codex.meta/nodes", "self-describing" },
+            capabilities: new[] { "reflection", "spec-conversion", "codex.meta/nodes", "self-describing" },
             spec: "codex.spec.reflection"
         );
     }
@@ -46,14 +46,14 @@ public sealed class SpecReflectionModule : ModuleBase
             State: ContentState.Ice,
             Locale: "en",
             Title: "Reflect Spec API",
-            Description: "Converts a module spec to meta-nodes",
+            Description: "Converts a module spec to codex.meta/nodes",
             Content: new ContentRef(
                 MediaType: "application/json",
                 InlineJson: JsonSerializer.Serialize(new
                 {
                     verb = "GET",
                     route = "/reflect/spec/{id}",
-                    description = "Reflects a module spec to meta-nodes",
+                    description = "Reflects a module spec to codex.meta/nodes",
                     parameters = new[] { new { name = "id", type = "string", required = true } }
                 }),
                 InlineBytes: null,
@@ -76,14 +76,14 @@ public sealed class SpecReflectionModule : ModuleBase
             State: ContentState.Ice,
             Locale: "en",
             Title: "Ingest Spec API",
-            Description: "Builds a module spec from meta-nodes",
+            Description: "Builds a module spec from codex.meta/nodes",
             Content: new ContentRef(
                 MediaType: "application/json",
                 InlineJson: JsonSerializer.Serialize(new
                 {
                     verb = "POST",
                     route = "/ingest/spec",
-                    description = "Ingests meta-nodes to build a module spec",
+                    description = "Ingests codex.meta/nodes to build a module spec",
                     parameters = new[] { new { name = "metaNodes", type = "array", required = true } }
                 }),
                 InlineBytes: null,
@@ -100,7 +100,7 @@ public sealed class SpecReflectionModule : ModuleBase
         registry.Upsert(ingestApiNode);
     }
 
-    [ApiRoute("GET", "/reflect/spec/{id}", "reflect-spec", "Reflect a module spec to meta-nodes", "codex.reflect")]
+    [ApiRoute("GET", "/reflect/spec/{id}", "reflect-spec", "Reflect a module spec to codex.meta/nodes", "codex.reflect")]
     public async Task<object> ReflectSpec([ApiParameter("id", "Spec ID to reflect", Required = true, Location = "path")] string id)
     {
         try
@@ -127,7 +127,7 @@ public sealed class SpecReflectionModule : ModuleBase
                 return new ErrorResponse($"Spec with ID '{id}' not found");
             }
 
-            // Convert spec to meta-nodes
+            // Convert spec to codex.meta/nodes
             var metaNodes = await Task.Run(() => ReflectSpecToMetaNodes(specNode, _registry));
             
             return new ReflectResponse(metaNodes, id);
@@ -138,7 +138,7 @@ public sealed class SpecReflectionModule : ModuleBase
         }
     }
 
-    [ApiRoute("POST", "/ingest/spec", "ingest-spec", "Ingest meta-nodes to build a module spec", "codex.reflect")]
+    [ApiRoute("POST", "/ingest/spec", "ingest-spec", "Ingest codex.meta/nodes to build a module spec", "codex.reflect")]
     public async Task<object> IngestSpec([ApiParameter("metaNodes", "Meta nodes to ingest", Required = true, Location = "body")] List<Node> metaNodes)
     {
         try
@@ -148,14 +148,14 @@ public sealed class SpecReflectionModule : ModuleBase
                 return new ErrorResponse("No meta nodes provided");
             }
 
-            // Convert meta-nodes back to spec
+            // Convert codex.meta/nodes back to spec
             var spec = await Task.Run(() => IngestMetaNodesToSpec(metaNodes));
             
-            return new IngestResponse(spec, true, "Successfully ingested meta-nodes to spec");
+            return new IngestResponse(spec, true, "Successfully ingested codex.meta/nodes to spec");
         }
         catch (Exception ex)
         {
-            return new ErrorResponse($"Failed to ingest meta-nodes: {ex.Message}");
+            return new ErrorResponse($"Failed to ingest codex.meta/nodes: {ex.Message}");
         }
     }
 
@@ -336,7 +336,7 @@ public sealed class SpecReflectionModule : ModuleBase
         {
             // Log error but return partial results
             var logger = new Log4NetLogger(typeof(SpecReflectionModule));
-            logger.Error($"Error reflecting spec to meta-nodes: {ex.Message}", ex);
+            logger.Error($"Error reflecting spec to codex.meta/nodes: {ex.Message}", ex);
         }
 
         return metaNodes;
@@ -427,14 +427,14 @@ public sealed class SpecReflectionModule : ModuleBase
                 Version: moduleVersion,
                 Description: moduleDescription,
                 Title: moduleTitle,
-                Dependencies: new List<ModuleRef>(), // Could be extracted from meta-nodes if needed
+                Dependencies: new List<ModuleRef>(), // Could be extracted from codex.meta/nodes if needed
                 Types: types,
                 Apis: apis
             );
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException($"Failed to ingest meta-nodes to spec: {ex.Message}", ex);
+            throw new InvalidOperationException($"Failed to ingest codex.meta/nodes to spec: {ex.Message}", ex);
         }
     }
 

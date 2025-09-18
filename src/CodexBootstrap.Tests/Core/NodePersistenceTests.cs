@@ -30,7 +30,7 @@ namespace CodexBootstrap.Tests.Core
         /// <summary>
         /// Test storage backend that simulates real persistence behavior
         /// </summary>
-        private class PersistentTestStorageBackend : IIceStorageBackend, IWaterStorageBackend
+        private class PersistentTestStorageBackend : IIceStorageBackend
         {
             private readonly Dictionary<string, Node> _persistentNodes = new();
             private readonly Dictionary<string, Edge> _persistentEdges = new();
@@ -204,47 +204,6 @@ namespace CodexBootstrap.Tests.Core
             {
                 _persistentNodes.Remove(id);
                 return Task.CompletedTask;
-            }
-
-            public Task CleanupExpiredNodesAsync() => Task.CompletedTask;
-
-            public Task<WaterStorageStats> GetStatsAsync()
-            {
-                return Task.FromResult(new WaterStorageStats(
-                    WaterNodeCount: _persistentNodes.Count,
-                    ExpiredNodeCount: 0,
-                    TotalSizeBytes: 0,
-                    LastUpdated: DateTime.UtcNow,
-                    AverageExpiry: TimeSpan.Zero,
-                    BackendStats: new Dictionary<string, object>()
-                ));
-            }
-
-            public Task BatchStoreWaterNodesAsync(IEnumerable<Node> nodes, TimeSpan? expiry = null)
-            {
-                foreach (var node in nodes)
-                {
-                    _persistentNodes[node.Id] = node;
-                }
-                return Task.CompletedTask;
-            }
-
-            public Task<IEnumerable<Node>> SearchWaterNodesAsync(string query, int limit = 100)
-            {
-                var results = _persistentNodes.Values
-                    .Where(n => n.Title?.Contains(query, StringComparison.OrdinalIgnoreCase) == true ||
-                               n.Description?.Contains(query, StringComparison.OrdinalIgnoreCase) == true)
-                    .Take(limit);
-                return Task.FromResult(results);
-            }
-
-            public Task<IEnumerable<Node>> GetWaterNodesByMetaAsync(string key, object value, int limit = 100)
-            {
-                var results = _persistentNodes.Values
-                    .Where(n => n.Meta?.ContainsKey(key) == true && 
-                               n.Meta[key]?.ToString() == value?.ToString())
-                    .Take(limit);
-                return Task.FromResult(results);
             }
 
             #endregion

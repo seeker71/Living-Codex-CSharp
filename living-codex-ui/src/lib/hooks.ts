@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AtomFetcher, APIAdapter, UIPage, UILens, UIAction, UIControls } from './atoms';
 import { endpoints } from './api';
+import { useCallback } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
 const atomFetcher = new AtomFetcher();
 const apiAdapter = new APIAdapter();
@@ -108,7 +110,15 @@ export function useAmplify() {
       conceptId: string; 
       contribution: string;
     }) => {
-      const response = await endpoints.recordContribution(userId, conceptId, contribution, 'amplification');
+      const response = await endpoints.recordContribution({
+        userId,
+        entityId: conceptId,
+        entityType: 'concept',
+        contributionType: 'Rating', // Use valid enum value
+        description: contribution,
+        value: 1,
+        metadata: { conceptId, action: 'amplify' }
+      });
       if (!response.success) {
         throw new Error(response.error || 'Failed to amplify concept');
       }
@@ -202,6 +212,31 @@ export function useNodes(typeId?: string, limit?: number) {
   });
 }
 
+export function useAdvancedNodeSearch(searchParams: {
+  typeIds?: string[];
+  searchTerm?: string;
+  states?: string[];
+  take?: number;
+  skip?: number;
+  sortBy?: string;
+  sortDescending?: boolean;
+}) {
+  return useQuery({
+    queryKey: ['nodes', 'search', searchParams],
+    queryFn: () => endpoints.searchNodesAdvanced(searchParams),
+    staleTime: 30 * 1000, // 30 seconds for search results
+    enabled: !!(searchParams.typeIds?.length || searchParams.searchTerm || searchParams.states?.length),
+  });
+}
+
+export function useNodeTypes() {
+  return useQuery({
+    queryKey: ['storage', 'types'],
+    queryFn: () => endpoints.getNodeTypes(),
+    staleTime: 10 * 60 * 1000, // 10 minutes - node types don't change often
+  });
+}
+
 export function useUserConcepts(userId: string) {
   return useQuery({
     queryKey: ['user', 'concepts', userId],
@@ -219,4 +254,81 @@ export function usePersonalNewsStream(userId: string, limit = 20) {
     refetchInterval: 30000, // Refresh every 30 seconds for real-time updates
     staleTime: 1 * 60 * 1000, // 1 minute
   });
+}
+
+export function usePersonalContributionsFeed(userId: string, limit = 20) {
+  return useQuery({
+    queryKey: ['contributions', 'feed', userId, limit],
+    queryFn: () => endpoints.getPersonalContributionsFeed(userId, limit),
+    enabled: !!userId,
+    refetchInterval: 15000, // Refresh every 15 seconds for contribution updates
+    staleTime: 30 * 1000, // 30 seconds
+  });
+}
+
+// Contribution tracking hooks
+export function useRecordContribution() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: endpoints.recordContribution,
+    onSuccess: () => {
+      // Invalidate related queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['contributions'] });
+      queryClient.invalidateQueries({ queryKey: ['news'] });
+      queryClient.invalidateQueries({ queryKey: ['energy'] });
+    },
+  });
+}
+
+export function useUserContributions(userId: string, query?: Record<string, any>) {
+  return useQuery({
+    queryKey: ['contributions', 'user', userId, query],
+    queryFn: () => endpoints.getUserContributions(userId, query),
+    enabled: !!userId,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// Convenience hooks for common interactions
+export function useTrackInteraction() {
+  const recordContribution = useRecordContribution();
+  const { user } = useAuth();
+  
+  return useCallback((entityId: string, interactionType: string, metadata?: Record<string, any>) => {
+    if (!user?.id) {
+      console.warn('Cannot track interaction: user not authenticated');
+      return;
+    }
+    
+    // Map interaction types to valid ContributionType enum values
+    const contributionTypeMap: Record<string, string> = {
+      'page-visit': 'View',
+      'button-click': 'Share',
+      'form-submit': 'Create',
+      'content-edit': 'Update',
+      'item-delete': 'Delete',
+      'add-comment': 'Comment',
+      'rate-item': 'Rating',
+      'amplify': 'Rating',
+      'attune': 'Share'
+    };
+    
+    const contributionType = contributionTypeMap[interactionType] || 'View';
+    
+    recordContribution.mutate({
+      userId: user.id,
+      entityId,
+      entityType: 'ui-interaction',
+      contributionType,
+      description: `User ${interactionType} interaction with ${entityId}`,
+      value: 1,
+      metadata: {
+        ...metadata,
+        originalInteractionType: interactionType,
+        timestamp: new Date().toISOString(),
+        page: window.location.pathname,
+      }
+    });
+  }, [recordContribution, user?.id]);
 }

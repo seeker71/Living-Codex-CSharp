@@ -38,11 +38,11 @@ public record OpenApiSpecInfo(
     string? SpecType
 );
 
-[MetaNode(Id = "codex.openapi", Name = "OpenAPI Module", Description = "Module for generating comprehensive OpenAPI 3.0 specifications from meta-node attributes")]
+[MetaNode(Id = "codex.openapi", Name = "OpenAPI Module", Description = "Module for generating comprehensive OpenAPI 3.0 specifications from codex.meta/node attributes")]
 public sealed class OpenApiModule : ModuleBase
 {
     public override string Name => "OpenAPI Module";
-    public override string Description => "Module for generating comprehensive OpenAPI 3.0 specifications from meta-node attributes";
+    public override string Description => "Module for generating comprehensive OpenAPI 3.0 specifications from codex.meta/node attributes";
     public override string Version => "1.0.0";
 
     public OpenApiModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 

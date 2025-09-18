@@ -94,7 +94,7 @@ export default function AboutPage() {
                 </div>
                 <div>
                   <div className="font-medium text-gray-900">Deterministic</div>
-                  <div className="text-gray-600">APIs derive from meta-nodes</div>
+                  <div className="text-gray-600">APIs derive from codex.meta/nodes</div>
                 </div>
               </div>
             </div>

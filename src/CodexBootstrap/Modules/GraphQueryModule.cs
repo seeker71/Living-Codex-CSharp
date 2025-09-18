@@ -8,7 +8,7 @@ namespace CodexBootstrap.Modules;
 
 /// <summary>
 /// Graph Query Module - Provides graph-based querying and discovery using existing system infrastructure
-/// Reuses HydrateModule for file loading, SpecReflectionModule for meta-nodes, and CoreApiService for queries
+/// Reuses HydrateModule for file loading, SpecReflectionModule for codex.meta/nodes, and CoreApiService for queries
 /// </summary>
 public class GraphQueryModule : ModuleBase
 {
@@ -296,7 +296,7 @@ public class GraphQueryModule : ModuleBase
 
                     _registry.Upsert(fileNode);
 
-                    // Generate meta-nodes for sections using existing patterns
+                    // Generate codex.meta/nodes for sections using existing patterns
                     await GenerateMetaNodesForFileAsync(fileNode);
                 }
                 catch (Exception ex)
@@ -312,7 +312,7 @@ public class GraphQueryModule : ModuleBase
     }
 
     /// <summary>
-    /// Generate meta-nodes for file using existing SpecReflectionModule patterns
+    /// Generate codex.meta/nodes for file using existing SpecReflectionModule patterns
     /// </summary>
     private async Task GenerateMetaNodesForFileAsync(Node fileNode)
     {
@@ -327,8 +327,8 @@ public class GraphQueryModule : ModuleBase
                 var level = section.GetValueOrDefault("level", 1) as int? ?? 1;
                 
                 var metaNode = new Node(
-                    Id: $"meta.section.{sectionTitle.Replace(' ', '_').ToLower()}",
-                    TypeId: "codex.meta.section",
+                    Id: $"codex.meta/section.{sectionTitle.Replace(' ', '_').ToLower()}",
+                    TypeId: "codex.meta/section",
                     State: ContentState.Ice,
                     Locale: "en",
                     Title: sectionTitle,
@@ -353,7 +353,7 @@ public class GraphQueryModule : ModuleBase
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error generating meta-nodes for file {fileNode.Id}: {ex.Message}");
+            Console.WriteLine($"Error generating codex.meta/nodes for file {fileNode.Id}: {ex.Message}");
         }
     }
 
