@@ -62,8 +62,24 @@ All meta-node TypeIds now follow the `codex.meta/` prefix convention:
 17. **Interface-Based Access**: All code now accesses registry through INodeRegistry interface
 
 ### 🚨 Remaining Production Blockers
-1. **Test Suite Modernization**: Test suite needs updates to match current API structure and interfaces
-2. **News Feed Algorithm**: Personal news feed concept matching needs refinement for better user experience
+1. **UI Feature Gap**: 60% of backend capabilities lack UI interfaces (news, ontology, people, portals, creation, node details)
+2. **Advanced Lenses Missing**: 8 lens types not implemented (Threads, Gallery, Chats, Circles, Swipe, Nearby, Live, Making)
+3. **UX Primitives Incomplete**: Core interaction primitives missing (Weave, Reflect, Invite, Global Controls)
+4. **Test Suite Modernization**: Test suite needs updates to match current API structure and interfaces
+
+### 🎯 **UI-BACKEND FEATURE PARITY ANALYSIS**
+**Backend Capability**: 52 modules with comprehensive API coverage
+**UI Coverage**: 8 routes implemented (40% of intended functionality)
+**Gap**: 60% of backend features lack UI interfaces
+
+#### **Available But Not Exposed**
+- **News Intelligence**: NewsFeedModule, RealtimeNewsStreamModule → No dedicated `/news` page
+- **Ontology Exploration**: ConceptRegistryModule, UCoreLLMResponseHandler → No `/ontology` browser
+- **People Discovery**: UserDiscoveryModule → No `/people` interface  
+- **Portal System**: PortalModule, TemporalConsciousnessModule → No `/portals` interface
+- **Concept Creation**: ConceptModule, AIModule → No `/create` guided flow
+- **Node Deep-Dive**: StorageEndpointsModule → No `/node/[id]` detail pages
+- **Real-time Features**: RealtimeModule, PushNotificationModule → Limited real-time UI integration
 3. **Error Handling**: Basic try-catch without comprehensive recovery mechanisms
 4. **Persistence**: Data lost on restart, needs database integration
 5. **Monitoring**: No alerting, dashboards, or observability

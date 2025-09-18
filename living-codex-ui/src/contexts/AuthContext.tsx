@@ -139,7 +139,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         return { success: true };
       } else {
-        return { success: false, error: responseData?.message || response.error || 'Login failed' };
+        return { success: false, error: response.error || 'Login failed' };
       }
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Login failed' };
@@ -181,7 +181,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return await login(username, password);
         }
       } else {
-        return { success: false, error: responseData?.message || response.error || 'Registration failed' };
+        return { success: false, error: response.error || 'Registration failed' };
       }
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Registration failed' };
