@@ -43,57 +43,145 @@ public class LLMClient
     }
 
     /// <summary>
+    /// Provider-aware availability check using supplied configuration
+    /// </summary>
+    public async Task<bool> IsServiceAvailableAsync(CodexBootstrap.Modules.LLMConfig config)
+    {
+        try
+        {
+            var provider = (config.Provider ?? "").ToLowerInvariant();
+            if (provider == "openai")
+            {
+                // Minimal check against OpenAI models endpoint
+                using var client = new HttpClient();
+                var request = new HttpRequestMessage(HttpMethod.Get, $"{config.BaseUrl.TrimEnd('/')}/models");
+                if (!string.IsNullOrEmpty(config.ApiKey))
+                {
+                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.ApiKey);
+                }
+                var response = await client.SendAsync(request);
+                return response.IsSuccessStatusCode;
+            }
+
+            // Default to Ollama check
+            using (var client = new HttpClient())
+            {
+                var response = await client.GetAsync("http://localhost:11434/api/tags");
+                return response.IsSuccessStatusCode;
+            }
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Send a query to the LLM
     /// </summary>
     public async Task<LLMResponse> QueryAsync(string prompt, CodexBootstrap.Modules.LLMConfig config)
     {
         try
         {
-            var request = new
+            var provider = (config.Provider ?? "").ToLowerInvariant();
+
+            if (provider == "openai")
             {
-                model = config.Model,
-                prompt = prompt,
-                stream = false,
-                options = new
+                // OpenAI Chat Completions
+                var body = new
                 {
+                    model = config.Model,
+                    messages = new object[]
+                    {
+                        new { role = "user", content = prompt }
+                    },
                     temperature = config.Temperature,
                     top_p = config.TopP,
                     max_tokens = config.MaxTokens
+                };
+
+                var json = JsonSerializer.Serialize(body);
+                var request = new HttpRequestMessage(HttpMethod.Post, $"{config.BaseUrl.TrimEnd('/')}/chat/completions")
+                {
+                    Content = new StringContent(json, Encoding.UTF8, "application/json")
+                };
+                if (!string.IsNullOrEmpty(config.ApiKey))
+                {
+                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.ApiKey);
                 }
-            };
 
-            var json = JsonSerializer.Serialize(request);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
+                _logger.Info($"Sending OpenAI chat completion with model {config.Model}");
+                var response = await _httpClient.SendAsync(request);
+                if (!response.IsSuccessStatusCode)
+                {
+                    var err = await response.Content.ReadAsStringAsync();
+                    _logger.Error($"OpenAI request failed: {response.StatusCode} - {err}");
+                    return new LLMResponse { Success = false, Response = $"OpenAI error: {response.StatusCode}", Confidence = 0.0 };
+                }
 
-            _logger.Info($"Sending LLM query to {_baseUrl}/api/generate with model {config.Model}");
+                var respContent = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(respContent);
+                var contentText = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "";
+                int tokensUsed = 0;
+                if (doc.RootElement.TryGetProperty("usage", out var usage))
+                {
+                    if (usage.TryGetProperty("total_tokens", out var totalTokens))
+                    {
+                        tokensUsed = totalTokens.GetInt32();
+                    }
+                }
 
-            var response = await _httpClient.PostAsync($"{_baseUrl}/api/generate", content);
-            
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.Error($"LLM request failed with status {response.StatusCode}");
                 return new LLMResponse
                 {
-                    Success = false,
-                    Response = $"LLM request failed: {response.StatusCode}",
-                    Confidence = 0.0
+                    Success = true,
+                    Response = contentText,
+                    Confidence = 0.85,
+                    Model = config.Model,
+                    TokensUsed = tokensUsed
                 };
             }
-
-            var responseContent = await response.Content.ReadAsStringAsync();
-            _logger.Debug($"Raw LLM response content: '{responseContent}'");
-            
-            var llmResponse = JsonSerializer.Deserialize<OllamaResponse>(responseContent);
-            _logger.Debug($"Deserialized LLM response: Response='{llmResponse?.Response}', Done={llmResponse?.Done}");
-
-            return new LLMResponse
+            else
             {
-                Success = true,
-                Response = llmResponse?.Response ?? "No response from LLM",
-                Confidence = 0.8, // Default confidence for now
-                Model = config.Model,
-                TokensUsed = llmResponse?.Done == true ? 1 : 0
-            };
+                // Default: Ollama-compatible endpoint
+                var request = new
+                {
+                    model = config.Model,
+                    prompt = prompt,
+                    stream = false,
+                    options = new
+                    {
+                        temperature = config.Temperature,
+                        top_p = config.TopP,
+                        max_tokens = config.MaxTokens
+                    }
+                };
+
+                var json = JsonSerializer.Serialize(request);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var targetBase = string.IsNullOrEmpty(config.BaseUrl) ? _baseUrl : config.BaseUrl;
+                _logger.Info($"Sending LLM query to {targetBase}/api/generate with model {config.Model}");
+                var response = await _httpClient.PostAsync($"{targetBase.TrimEnd('/')}/api/generate", content);
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.Error($"LLM request failed with status {response.StatusCode}");
+                    return new LLMResponse { Success = false, Response = $"LLM request failed: {response.StatusCode}", Confidence = 0.0 };
+                }
+
+                var responseContent = await response.Content.ReadAsStringAsync();
+                _logger.Debug($"Raw LLM response content: '{responseContent}'");
+                var llmResponse = JsonSerializer.Deserialize<OllamaResponse>(responseContent);
+                _logger.Debug($"Deserialized LLM response: Response='{llmResponse?.Response}', Done={llmResponse?.Done}");
+
+                return new LLMResponse
+                {
+                    Success = true,
+                    Response = llmResponse?.Response ?? "No response from LLM",
+                    Confidence = 0.8,
+                    Model = config.Model,
+                    TokensUsed = llmResponse?.Done == true ? 1 : 0
+                };
+            }
         }
         catch (Exception ex)
         {

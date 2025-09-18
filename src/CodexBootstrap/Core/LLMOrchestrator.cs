@@ -41,8 +41,8 @@ namespace CodexBootstrap.Core
                 var prompt = template.Render(parameters);
                 var config = overrideConfig ?? template.DefaultLLMConfig;
 
-                // Check if LLM is available
-                var isAvailable = await _llmClient.IsServiceAvailableAsync();
+                // Check if LLM is available (provider-aware)
+                var isAvailable = await _llmClient.IsServiceAvailableAsync(config);
                 if (!isAvailable)
                 {
                     _logger.Warn($"LLM service not available for template '{templateId}', using fallback");
