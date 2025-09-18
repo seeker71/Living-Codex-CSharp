@@ -111,7 +111,7 @@ Short intent: A modular Next.js UI whose pages and views are generated from spec
 - **Spec-driven**: Backend APIs describe their own UI requirements
 
 #### **Available AI Technologies (Sept 2025)**
-- **GPT-4o**: Advanced reasoning and code generation
+- **GPT-5 Codex**: Primary for one-shot UI/code generation (Sept 2025)
 - **Claude 3.5 Sonnet**: Excellent at architectural analysis and implementation
 - **GitHub Copilot**: Real-time code completion and generation
 - **Cursor AI**: Context-aware coding assistance
@@ -127,7 +127,7 @@ Short intent: A modular Next.js UI whose pages and views are generated from spec
    - Add spec-driven routing and navigation
 
 2. **AI Component Generator**
-   - Integrate with GPT-4o API for component generation
+   - Integrate with GPT-5 Codex API for component generation
    - Create template system for common UI patterns
    - Implement validation and testing for generated components
    - Add fallback mechanisms for AI failures
@@ -189,7 +189,7 @@ Short intent: A modular Next.js UI whose pages and views are generated from spec
 ### 🛠️ **TECHNICAL IMPLEMENTATION APPROACH**
 
 #### **AI Integration Points**
-1. **Component Generation**: Use GPT-4o to generate React components from API specs
+1. **Component Generation**: Use GPT-5 Codex to generate React components from API specs
 2. **UI Testing**: AI-generated test cases for all new components  
 3. **UX Optimization**: AI analysis of user interaction patterns
 4. **Code Quality**: AI-powered code review and optimization

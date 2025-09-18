@@ -84,6 +84,12 @@ namespace CodexBootstrap.Modules
             "openai-future-query", "OpenAI Future Query", "openai", "gpt-4o", 
             0.8f, 3072, 0.9f, "https://api.openai.com/v1");
 
+        // OpenAI code generation configuration (Sept 2025 best available)
+        public static readonly LLMConfig OpenAI_CodeGeneration = CreateConfig(
+            "openai-codegen", "OpenAI Code Generation", "openai", 
+            Environment.GetEnvironmentVariable("OPENAI_CODEGEN_MODEL") ?? "gpt-5-codex",
+            0.2f, 8192, 0.95f, Environment.GetEnvironmentVariable("OPENAI_BASE_URL") ?? "https://api.openai.com/v1");
+
         // Get configuration for a specific task
         public static LLMConfig GetConfigForTask(string task, string? preferredProvider = null, string? preferredModel = null)
         {
@@ -104,14 +110,24 @@ namespace CodexBootstrap.Modules
             }
 
             // Auto-detect best configuration based on available services
-            // For now, default to Mac M1 optimized configs
-            return task.ToLowerInvariant() switch
+            // Prefer OpenAI GPT-5 Codex for UI code generation when configured
+            var isOpenAIConfigured = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OPENAI_API_KEY"));
+            var normalizedTask = task.ToLowerInvariant();
+
+            if ((normalizedTask == "ui-page-generation" || normalizedTask == "ui-component-generation" || normalizedTask == "ui-pattern-evolution")
+                && isOpenAIConfigured)
+            {
+                return OpenAI_CodeGeneration;
+            }
+
+            // Defaults (local fast models) for analysis/transformation when OpenAI isn't configured
+            return normalizedTask switch
             {
                 "concept-extraction" => MacM1_ConceptExtraction,
                 "fractal-transformation" => MacM1_FractalTransform,
                 "fractal-transform" => MacM1_FractalTransform,
                 "future-query" => MacM1_FutureQuery,
-                _ => MacM1_ConceptExtraction
+                _ => isOpenAIConfigured ? OpenAI_CodeGeneration : MacM1_ConceptExtraction
             };
         }
 

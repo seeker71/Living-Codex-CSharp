@@ -159,7 +159,7 @@ All meta-node TypeIds now follow the `codex.meta/` prefix convention:
 - **Configurable Prompts**: External prompt template system with node storage
 - **LLM Orchestration**: Centralized LLM operation management
 - **Task-Specific Configurations**: Optimized LLM configs for different tasks and providers
-- **Provider Support**: Ollama (Mac M1, Turbo), OpenAI with automatic API key loading
+- **Provider Support**: Ollama (Mac M1, Turbo), OpenAI (GPT-5 Codex) with automatic API key loading
 - **CRITICAL ISSUES**: No error handling, no retry logic, no caching, no performance testing
 - **Meta-Node Registration**: All AI classes and records properly attributed
 - **JSON Serialization**: Fixed POST endpoint handling with proper request/response models

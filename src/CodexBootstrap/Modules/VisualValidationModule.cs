@@ -901,7 +901,7 @@ Return your analysis as JSON with scores and detailed feedback.
 
                 var requestBody = new
                 {
-                    model = "gpt-4o",
+                    model = Environment.GetEnvironmentVariable("OPENAI_VISION_MODEL") ?? "gpt-5-codex-vision",
                     messages = new object[]
                     {
                         new

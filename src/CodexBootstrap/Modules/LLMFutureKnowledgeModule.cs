@@ -22,7 +22,7 @@ namespace CodexBootstrap.Modules;
       ""context"": ""I am researching AI consciousness for my PhD thesis"",
       ""timeHorizon"": ""2 years"",
       ""perspective"": ""optimistic"",
-      ""llmConfig"": { ""id"": ""openai-gpt4"" },
+      ""llmConfig"": { ""id"": ""openai-gpt5-codex"" },
       ""metadata"": {}
     }"
 )]
@@ -49,7 +49,7 @@ public record FutureQuery(
       ""reasoning"": ""Generated using advanced predictive algorithms"",
       ""sources"": [""Historical patterns"", ""Trend analysis""],
       ""generatedAt"": ""2025-01-27T10:30:00Z"",
-      ""usedConfig"": { ""id"": ""openai-gpt4"" }
+      ""usedConfig"": { ""id"": ""openai-gpt5-codex"" }
     }"
 )]
 public record FutureResponse(
@@ -464,12 +464,12 @@ public class LLMFutureKnowledgeModule : ModuleBase
             }
         );
 
-        // OpenAI Configuration
-        _llmConfigs["openai-gpt4"] = new LLMConfig(
-            Id: "openai-gpt4",
-            Name: "OpenAI GPT-4",
+        // OpenAI Configuration (updated default model)
+        _llmConfigs["openai-gpt5-codex"] = new LLMConfig(
+            Id: "openai-gpt5-codex",
+            Name: "OpenAI GPT-5 Codex",
             Provider: "OpenAI",
-            Model: "gpt-4",
+            Model: Environment.GetEnvironmentVariable("OPENAI_CODEGEN_MODEL") ?? "gpt-5-codex",
             ApiKey: "",
             BaseUrl: "https://api.openai.com/v1",
             MaxTokens: 2000,
