@@ -72,6 +72,21 @@ All meta-node TypeIds now follow the `codex.meta/` prefix convention:
 **UI Coverage**: 8 routes implemented (40% of intended functionality)
 **Gap**: 60% of backend features lack UI interfaces
 
+### 🤖 AI Model Policy (Sept 2025)
+- Default provider: OpenAI
+- Code generation (UI/page/components): gpt-5-codex
+- Non-code tasks (extraction, analysis, scoring, future query): gpt-5-mini
+- Environment variables:
+  - `OPENAI_CODEGEN_MODEL=gpt-5-codex`
+  - `OPENAI_DEFAULT_MODEL=gpt-5-mini`
+  - `OPENAI_API_KEY=<your key>`
+- Behavior: AIModule routes codegen tasks to Codegen model; all others to Default model; falls back to local Ollama if OpenAI is not configured
+
+### 🔥 Hot Reload & Dev Loop
+- UI: Next.js `npm run dev` (hot reload enabled)
+- Backend: `dotnet watch run` via `./start-server-dev.sh` on port 5002
+- Spec watching: enabled by `hotreload.json` in `src/CodexBootstrap`
+
 #### **Available But Not Exposed**
 - **News Intelligence**: NewsFeedModule, RealtimeNewsStreamModule → No dedicated `/news` page
 - **Ontology Exploration**: ConceptRegistryModule, UCoreLLMResponseHandler → No `/ontology` browser

@@ -90,6 +90,12 @@ namespace CodexBootstrap.Modules
             Environment.GetEnvironmentVariable("OPENAI_CODEGEN_MODEL") ?? "gpt-5-codex",
             0.2f, 8192, 0.95f, Environment.GetEnvironmentVariable("OPENAI_BASE_URL") ?? "https://api.openai.com/v1");
 
+        // OpenAI default (non-codegen) configuration defaults to GPT-5 mini if available
+        public static readonly LLMConfig OpenAI_Default = CreateConfig(
+            "openai-default", "OpenAI Default (Non-Code)", "openai",
+            Environment.GetEnvironmentVariable("OPENAI_DEFAULT_MODEL") ?? "gpt-5-mini",
+            0.3f, 4096, 0.9f, Environment.GetEnvironmentVariable("OPENAI_BASE_URL") ?? "https://api.openai.com/v1");
+
         // Get configuration for a specific task
         public static LLMConfig GetConfigForTask(string task, string? preferredProvider = null, string? preferredModel = null)
         {
@@ -110,24 +116,27 @@ namespace CodexBootstrap.Modules
             }
 
             // Auto-detect best configuration based on available services
-            // Prefer OpenAI GPT-5 Codex for UI code generation when configured
+            // Policy: use GPT-5 Codex for code generation; GPT-5 mini for non-code when OpenAI is configured
             var isOpenAIConfigured = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OPENAI_API_KEY"));
             var normalizedTask = task.ToLowerInvariant();
 
-            if ((normalizedTask == "ui-page-generation" || normalizedTask == "ui-component-generation" || normalizedTask == "ui-pattern-evolution")
-                && isOpenAIConfigured)
+            var isCodeGenTask = normalizedTask == "ui-page-generation" ||
+                                normalizedTask == "ui-component-generation" ||
+                                normalizedTask == "ui-pattern-evolution";
+
+            if (isOpenAIConfigured)
             {
-                return OpenAI_CodeGeneration;
+                return isCodeGenTask ? OpenAI_CodeGeneration : OpenAI_Default;
             }
 
-            // Defaults (local fast models) for analysis/transformation when OpenAI isn't configured
+            // Fallback to local models when OpenAI is not configured
             return normalizedTask switch
             {
                 "concept-extraction" => MacM1_ConceptExtraction,
                 "fractal-transformation" => MacM1_FractalTransform,
                 "fractal-transform" => MacM1_FractalTransform,
                 "future-query" => MacM1_FutureQuery,
-                _ => isOpenAIConfigured ? OpenAI_CodeGeneration : MacM1_ConceptExtraction
+                _ => MacM1_ConceptExtraction
             };
         }
 

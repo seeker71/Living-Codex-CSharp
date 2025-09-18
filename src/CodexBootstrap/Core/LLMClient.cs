@@ -124,6 +124,8 @@ public class LLMClient
                         var fallbackCandidates = new[]
                         {
                             Environment.GetEnvironmentVariable("OPENAI_CODEGEN_MODEL"),
+                            "gpt-5-high-fast",
+                            "gpt-5",
                             "gpt-5-codex",
                             "gpt-5",
                             "gpt-4.1",
