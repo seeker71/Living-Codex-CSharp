@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { endpoints } from './api';
+import { buildApiUrl } from './config';
 
 interface HotReloadEvent {
   type: string;
@@ -24,7 +24,7 @@ export function useHotReload() {
   // Fetch hot-reload status
   const fetchStatus = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:5002/self-update/hot-reload-status');
+      const response = await fetch(buildApiUrl('/self-update/hot-reload-status'));
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
@@ -46,7 +46,7 @@ export function useHotReload() {
     autoRegenerate?: boolean;
   }) => {
     try {
-      const response = await fetch('http://localhost:5002/self-update/start-watching', {
+      const response = await fetch(buildApiUrl('/self-update/start-watching'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config || {})
@@ -69,7 +69,7 @@ export function useHotReload() {
   // Stop watching
   const stopWatching = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:5002/self-update/stop-watching', {
+      const response = await fetch(buildApiUrl('/self-update/stop-watching'), {
         method: 'POST'
       });
       
@@ -96,7 +96,7 @@ export function useHotReload() {
     model?: string;
   }) => {
     try {
-      const response = await fetch('http://localhost:5002/self-update/regenerate-component', {
+      const response = await fetch(buildApiUrl('/self-update/regenerate-component'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -131,7 +131,7 @@ export function useHotReload() {
   // Hot-swap component
   const hotSwapComponent = useCallback(async (componentPath: string, newCode: string) => {
     try {
-      const response = await fetch('http://localhost:5002/self-update/hot-swap', {
+      const response = await fetch(buildApiUrl('/self-update/hot-swap'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -161,7 +161,7 @@ export function useHotReload() {
   // Get history
   const getHistory = useCallback(async (limit: number = 50) => {
     try {
-      const response = await fetch(`http://localhost:5002/self-update/hot-reload-history?limit=${limit}`);
+      const response = await fetch(buildApiUrl(`/self-update/hot-reload-history?limit=${limit}`));
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
@@ -206,7 +206,7 @@ export function useHotReloadNotifications() {
     // For now, we'll poll for recent events
     const pollForEvents = async () => {
       try {
-        const response = await fetch('http://localhost:5002/self-update/hot-reload-history?limit=5');
+        const response = await fetch(buildApiUrl('/self-update/hot-reload-history?limit=5'));
         if (response.ok) {
           const data = await response.json();
           if (data.success && data.events) {

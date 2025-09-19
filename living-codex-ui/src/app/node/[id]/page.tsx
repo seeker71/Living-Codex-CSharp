@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Navigation } from '@/components/ui/Navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTrackInteraction } from '@/lib/hooks';
+import { buildApiUrl } from '@/lib/config';
 
 interface NodeData {
   id: string;
@@ -80,7 +81,7 @@ export default function NodeDetailPage() {
     
     try {
       // Load node details
-      const nodeResponse = await fetch(`http://localhost:5002/storage-endpoints/nodes/${nodeId}`);
+      const nodeResponse = await fetch(buildApiUrl(`/storage-endpoints/nodes/${nodeId}`));
       if (nodeResponse.ok) {
         const nodeData = await nodeResponse.json();
         if (nodeData.node) {
@@ -109,7 +110,7 @@ export default function NodeDetailPage() {
   const loadNodeRelationships = async (nodeId: string) => {
     try {
       // Load edges involving this node
-      const edgesResponse = await fetch(`http://localhost:5002/storage-endpoints/edges?nodeId=${nodeId}`);
+      const edgesResponse = await fetch(buildApiUrl(`/storage-endpoints/edges?nodeId=${nodeId}`));
       if (edgesResponse.ok) {
         const edgesData = await edgesResponse.json();
         if (edgesData.edges) {
@@ -125,7 +126,7 @@ export default function NodeDetailPage() {
           const related: RelatedNode[] = [];
           for (const relatedId of relatedNodeIds) {
             try {
-              const relatedResponse = await fetch(`http://localhost:5002/storage-endpoints/nodes/${relatedId}`);
+              const relatedResponse = await fetch(buildApiUrl(`/storage-endpoints/nodes/${relatedId}`));
               if (relatedResponse.ok) {
                 const relatedData = await relatedResponse.json();
                 if (relatedData.node) {
@@ -159,7 +160,7 @@ export default function NodeDetailPage() {
     if (!node || !editedNode) return;
 
     try {
-      const response = await fetch(`http://localhost:5002/storage-endpoints/nodes/${node.id}`, {
+      const response = await fetch(buildApiUrl(`/storage-endpoints/nodes/${node.id}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editedNode)

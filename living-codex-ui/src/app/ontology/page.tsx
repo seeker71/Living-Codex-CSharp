@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Navigation } from '@/components/ui/Navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTrackInteraction } from '@/lib/hooks';
+import { buildApiUrl } from '@/lib/config';
 
 interface OntologyAxis {
   id: string;
@@ -63,7 +64,7 @@ export default function OntologyPage() {
     setLoading(true);
     try {
       // Load U-CORE axes from storage
-      const axesResponse = await fetch('http://localhost:5002/storage-endpoints/nodes?typeId=codex.ontology.axis');
+      const axesResponse = await fetch(buildApiUrl('/storage-endpoints/nodes?typeId=codex.ontology.axis'));
       if (axesResponse.ok) {
         const axesData = await axesResponse.json();
         if (axesData.nodes) {
@@ -135,7 +136,7 @@ export default function OntologyPage() {
       }
 
       // Load related concepts
-      const conceptsResponse = await fetch('http://localhost:5002/storage-endpoints/nodes?limit=100');
+      const conceptsResponse = await fetch(buildApiUrl('/storage-endpoints/nodes?limit=100'));
       if (conceptsResponse.ok) {
         const conceptsData = await conceptsResponse.json();
         if (conceptsData.nodes) {

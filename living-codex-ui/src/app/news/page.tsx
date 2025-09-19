@@ -5,6 +5,7 @@ import { Navigation } from '@/components/ui/Navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { endpoints } from '@/lib/api';
 import { useTrackInteraction } from '@/lib/hooks';
+import { buildApiUrl } from '@/lib/config';
 
 interface NewsItem {
   title: string;
@@ -56,7 +57,7 @@ export default function NewsPage() {
         }
       } else if (selectedCategory === 'trending') {
         // Load trending news
-        const response = await fetch(`http://localhost:5002/news/trending?limit=20&hoursBack=${timeRange}`);
+        const response = await fetch(buildApiUrl(`/news/trending?limit=20&hoursBack=${timeRange}`));
         const data = await response.json();
         setTrendingTopics(data.topics || []);
       } else {
@@ -66,7 +67,7 @@ export default function NewsPage() {
           limit: 20,
           hoursBack: timeRange
         };
-        const response = await fetch('http://localhost:5002/news/search', {
+        const response = await fetch(buildApiUrl('/news/search'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(searchRequest)
@@ -91,7 +92,7 @@ export default function NewsPage() {
         limit: 20,
         hoursBack: timeRange
       };
-      const response = await fetch('http://localhost:5002/news/search', {
+      const response = await fetch(buildApiUrl('/news/search'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(searchRequest)
@@ -114,7 +115,7 @@ export default function NewsPage() {
     if (!user?.id) return;
     
     try {
-      await fetch('http://localhost:5002/news/read', {
+      await fetch(buildApiUrl('/news/read'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

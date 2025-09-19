@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Navigation } from '@/components/ui/Navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTrackInteraction } from '@/lib/hooks';
+import { buildApiUrl } from '@/lib/config';
 
 interface UserProfile {
   userId: string;
@@ -68,7 +69,7 @@ export default function PeoplePage() {
           break;
       }
 
-      const response = await fetch('http://localhost:5002/users/discover', {
+      const response = await fetch(buildApiUrl('/users/discover'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(discoveryRequest)
@@ -100,7 +101,7 @@ export default function PeoplePage() {
     
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:5002/concepts/${conceptId}/contributors`);
+      const response = await fetch(buildApiUrl(`/concepts/${conceptId}/contributors`));
       const data = await response.json();
       if (data.contributors) {
         setConceptContributors(data.contributors);

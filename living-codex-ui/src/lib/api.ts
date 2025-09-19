@@ -1,7 +1,9 @@
 'use client';
 
 // Backend API configuration and utilities
-const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5002';
+import { config } from './config';
+
+const BACKEND_BASE_URL = config.backend.baseUrl;
 const DEFAULT_TIMEOUT = 10000; // 10 seconds
 const RETRY_ATTEMPTS = 3;
 const RETRY_DELAY = 1000; // 1 second

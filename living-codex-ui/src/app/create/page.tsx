@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Navigation } from '@/components/ui/Navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTrackInteraction } from '@/lib/hooks';
+import { buildApiUrl } from '@/lib/config';
 
 interface ConceptCreationRequest {
   name: string;
@@ -91,7 +92,7 @@ export default function CreatePage() {
     setAiLoading(true);
     try {
       // Use AI module for concept assistance
-      const response = await fetch('http://localhost:5002/ai/extract-concepts', {
+      const response = await fetch(buildApiUrl('/ai/extract-concepts'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -154,7 +155,7 @@ export default function CreatePage() {
         tags: conceptTags
       };
 
-      const response = await fetch('http://localhost:5002/concept/create', {
+      const response = await fetch(buildApiUrl('/concept/create'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(conceptRequest)
@@ -214,7 +215,7 @@ export default function CreatePage() {
         }
       };
 
-      const response = await fetch('http://localhost:5002/image/concept/create', {
+      const response = await fetch(buildApiUrl('/image/concept/create'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(imageRequest)

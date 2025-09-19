@@ -241,7 +241,7 @@ public sealed class HotReloadModule : ModuleBase
             var json = JsonSerializer.Serialize(aiRequest);
             var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
             
-            var response = await httpClient.PostAsync("http://localhost:5002/ai/generate-ui-component", content);
+            var response = await httpClient.PostAsync(GlobalConfiguration.GetUrl("/ai/generate-ui-component"), content);
             if (response.IsSuccessStatusCode)
             {
                 var responseContent = await response.Content.ReadAsStringAsync();
@@ -559,7 +559,7 @@ public sealed class HotReloadModule : ModuleBase
             var json = JsonSerializer.Serialize(aiRequest);
             var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
             
-            var response = await httpClient.PostAsync("http://localhost:5002/ai/generate-ui-page", content);
+            var response = await httpClient.PostAsync(GlobalConfiguration.GetUrl("/ai/generate-ui-page"), content);
             if (response.IsSuccessStatusCode)
             {
                 _logger.Info($"AI-generated UI updates for spec: {specName}");
