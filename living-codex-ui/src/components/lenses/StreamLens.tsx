@@ -28,50 +28,6 @@ export function StreamLens({ lens, controls = {}, userId, className = '' }: Stre
     interests: controls.axes || ['resonance'],
   });
 
-  // Fallback test data when API returns empty
-  const testConcepts = [
-    {
-      id: 'concept-quantum-resonance',
-      name: 'Quantum Resonance',
-      description: 'The fundamental principle that all matter vibrates at specific frequencies, creating resonance fields that can be amplified and harmonized.',
-      axes: ['resonance', 'science', 'consciousness'],
-      resonance: 0.95,
-      type: 'concept',
-    },
-    {
-      id: 'concept-fractal-consciousness',
-      name: 'Fractal Consciousness',
-      description: 'The idea that consciousness exhibits fractal patterns at every scale, from individual thoughts to collective awareness.',
-      axes: ['consciousness', 'unity', 'innovation'],
-      resonance: 0.88,
-      type: 'concept',
-    },
-    {
-      id: 'concept-abundance-mindset',
-      name: 'Abundance Mindset',
-      description: 'A way of thinking that focuses on limitless possibilities and collaborative growth rather than scarcity and competition.',
-      axes: ['abundance', 'unity', 'impact'],
-      resonance: 0.92,
-      type: 'concept',
-    }
-  ];
-
-  const testUsers = [
-    {
-      id: 'user-alex-resonance',
-      name: 'Alex Resonance',
-      description: 'Exploring the intersection of quantum physics and consciousness',
-      axes: ['resonance', 'science', 'consciousness'],
-      type: 'user',
-    },
-    {
-      id: 'user-maya-fractal',
-      name: 'Maya Fractal',
-      description: 'Artist and researcher studying fractal patterns in nature and mind',
-      axes: ['consciousness', 'unity', 'innovation'],
-      type: 'user',
-    }
-  ];
 
   useEffect(() => {
     const fetchData = async () => {
@@ -83,17 +39,13 @@ export function StreamLens({ lens, controls = {}, userId, className = '' }: Stre
         const concepts = conceptQuery.data?.concepts || conceptQuery.data?.discoveredConcepts || [];
         const users = userQuery.data?.users || [];
         
-        // Use test data if API returns empty
-        const finalConcepts = concepts.length > 0 ? concepts : testConcepts;
-        const finalUsers = users.length > 0 ? users : testUsers;
-        
         // Transform and merge data
-        const conceptItems = finalConcepts.map((concept: any) => ({
+        const conceptItems = concepts.map((concept: any) => ({
           ...concept,
           type: 'concept',
         }));
 
-        const userItems = finalUsers.map((user: any) => ({
+        const userItems = users.map((user: any) => ({
           id: user.id,
           name: user.name || user.username,
           description: user.bio || user.description || `User interested in ${user.interests?.join(', ')}`,
