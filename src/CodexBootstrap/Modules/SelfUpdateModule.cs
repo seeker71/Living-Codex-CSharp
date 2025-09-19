@@ -272,10 +272,146 @@ namespace CodexBootstrap.Modules
             }
         }
 
+        // File watching and hot-reload endpoints moved from HotReloadModule
+        
+        /// <summary>
+        /// Start hot-reload file watching
+        /// </summary>
+        [ApiRoute("POST", "/self-update/start-watching", "start-watching", "Start hot-reload file watching", "self-update")]
+        public async Task<object> StartWatching([ApiParameter("body", "Watch configuration", Required = true, Location = "body")] WatchConfig config)
+        {
+            try
+            {
+                // Use _apiRouter for cross-module communication with HotReloadModule
+                if (_apiRouter != null)
+                {
+                    var result = await _apiRouter.CallAsync("hot-reload", "start-watching", System.Text.Json.JsonSerializer.SerializeToElement(config));
+                    return result ?? new { success = false, error = "No response from hot-reload module" };
+                }
+                return new { success = false, error = "API router not available" };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error starting file watching: {ex.Message}", ex);
+                return new { success = false, error = ex.Message };
+            }
+        }
+
+        /// <summary>
+        /// Stop hot-reload file watching
+        /// </summary>
+        [ApiRoute("POST", "/self-update/stop-watching", "stop-watching", "Stop hot-reload file watching", "self-update")]
+        public async Task<object> StopWatching()
+        {
+            try
+            {
+                if (_apiRouter != null)
+                {
+                    var result = await _apiRouter.CallAsync("hot-reload", "stop-watching", null);
+                    return result ?? new { success = false, error = "No response from hot-reload module" };
+                }
+                return new { success = false, error = "API router not available" };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error stopping file watching: {ex.Message}", ex);
+                return new { success = false, error = ex.Message };
+            }
+        }
+
+        /// <summary>
+        /// Get hot-reload status
+        /// </summary>
+        [ApiRoute("GET", "/self-update/hot-reload-status", "get-hot-reload-status", "Get hot-reload status", "self-update")]
+        public async Task<object> GetHotReloadStatus()
+        {
+            try
+            {
+                if (_apiRouter != null)
+                {
+                    var result = await _apiRouter.CallAsync("hot-reload", "get-status", null);
+                    return result ?? new { success = false, error = "No response from hot-reload module" };
+                }
+                return new { success = false, error = "API router not available" };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error getting hot-reload status: {ex.Message}", ex);
+                return new { success = false, error = ex.Message };
+            }
+        }
+
+        /// <summary>
+        /// AI-regenerate component
+        /// </summary>
+        [ApiRoute("POST", "/self-update/regenerate-component", "regenerate-component", "AI-regenerate component from spec", "self-update")]
+        public async Task<object> RegenerateComponent([ApiParameter("body", "Regeneration request", Required = true, Location = "body")] RegenerationRequest request)
+        {
+            try
+            {
+                if (_apiRouter != null)
+                {
+                    var result = await _apiRouter.CallAsync("hot-reload", "regenerate-component", System.Text.Json.JsonSerializer.SerializeToElement(request));
+                    return result ?? new { success = false, error = "No response from hot-reload module" };
+                }
+                return new { success = false, error = "API router not available" };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error regenerating component: {ex.Message}", ex);
+                return new { success = false, error = ex.Message };
+            }
+        }
+
+        /// <summary>
+        /// Hot-swap component code
+        /// </summary>
+        [ApiRoute("POST", "/self-update/hot-swap", "hot-swap-component", "Hot-swap component code", "self-update")]
+        public async Task<object> HotSwapComponent([ApiParameter("body", "Hot-swap request", Required = true, Location = "body")] HotSwapRequest request)
+        {
+            try
+            {
+                if (_apiRouter != null)
+                {
+                    var result = await _apiRouter.CallAsync("hot-reload", "hot-swap-component", System.Text.Json.JsonSerializer.SerializeToElement(request));
+                    return result ?? new { success = false, error = "No response from hot-reload module" };
+                }
+                return new { success = false, error = "API router not available" };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error hot-swapping component: {ex.Message}", ex);
+                return new { success = false, error = ex.Message };
+            }
+        }
+
+        /// <summary>
+        /// Get hot-reload history
+        /// </summary>
+        [ApiRoute("GET", "/self-update/hot-reload-history", "get-hot-reload-history", "Get hot-reload event history", "self-update")]
+        public async Task<object> GetHotReloadHistory([ApiParameter("limit", "Number of events to return", Required = false, Location = "query")] int limit = 50)
+        {
+            try
+            {
+                if (_apiRouter != null)
+                {
+                    var parameters = new { limit };
+                    var result = await _apiRouter.CallAsync("hot-reload", "get-history", System.Text.Json.JsonSerializer.SerializeToElement(parameters));
+                    return result ?? new { success = false, error = "No response from hot-reload module" };
+                }
+                return new { success = false, error = "API router not available" };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error getting hot-reload history: {ex.Message}", ex);
+                return new { success = false, error = ex.Message };
+            }
+        }
+
         /// <summary>
         /// Hot reloads a module
         /// </summary>
-        [Post("/self-update/hot-reload", "Hot Reload Module", "Hot reload a module with backup and rollback", "self-update")]
+        [ApiRoute("POST", "/self-update/hot-reload", "hot-reload-module", "Hot reload a module with backup and rollback", "self-update")]
         public async Task<object> HotReloadModuleAsync([ApiParameter("body", "Hot reload request")] HotReloadRequest request)
         {
             try
@@ -487,3 +623,30 @@ namespace CodexBootstrap.Modules
         public string DllPath { get; set; } = string.Empty;
     }
 }
+
+// Hot-reload data structures
+[MetaNode(Id = "codex.self-update.watch-config", Name = "Watch Config", Description = "Configuration for file watching")]
+public record WatchConfig(
+    List<string>? Paths = null,
+    List<string>? Extensions = null,
+    bool AutoRegenerate = true,
+    string? Provider = "openai",
+    string? Model = "gpt-5-codex"
+);
+
+[MetaNode(Id = "codex.self-update.regeneration-request", Name = "Regeneration Request", Description = "Request to regenerate component")]
+public record RegenerationRequest(
+    string ComponentId,
+    string? LensSpec = null,
+    string? ComponentType = null,
+    string? Requirements = null,
+    string? Provider = "openai",
+    string? Model = "gpt-5-codex"
+);
+
+[MetaNode(Id = "codex.self-update.hot-swap-request", Name = "Hot Swap Request", Description = "Request to hot-swap component")]
+public record HotSwapRequest(
+    string ComponentPath,
+    string NewCode,
+    bool CreateBackup = true
+);

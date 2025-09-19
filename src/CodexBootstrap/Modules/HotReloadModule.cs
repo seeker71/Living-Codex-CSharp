@@ -47,11 +47,50 @@ public sealed class HotReloadModule : ModuleBase
 
     public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
-        _logger.Info("Hot Reload Module API handlers registered");
+        _apiRouter = router;
+        
+        // Register internal API handlers for cross-module communication
+        router.Register("hot-reload", "start-watching", async (System.Text.Json.JsonElement? json) => 
+        {
+            var config = System.Text.Json.JsonSerializer.Deserialize<WatchConfig>(json?.GetRawText() ?? "{}");
+            return await StartWatching(config);
+        });
+        
+        router.Register("hot-reload", "stop-watching", async (System.Text.Json.JsonElement? json) => 
+        {
+            return await StopWatching();
+        });
+        
+        router.Register("hot-reload", "get-status", async (System.Text.Json.JsonElement? json) => 
+        {
+            return await GetStatus();
+        });
+        
+        router.Register("hot-reload", "regenerate-component", async (System.Text.Json.JsonElement? json) => 
+        {
+            var request = System.Text.Json.JsonSerializer.Deserialize<RegenerationRequest>(json?.GetRawText() ?? "{}");
+            return await RegenerateComponent(request);
+        });
+        
+        router.Register("hot-reload", "hot-swap-component", async (System.Text.Json.JsonElement? json) => 
+        {
+            var request = System.Text.Json.JsonSerializer.Deserialize<HotSwapRequest>(json?.GetRawText() ?? "{}");
+            return await HotSwapComponent(request);
+        });
+        
+        router.Register("hot-reload", "get-history", async (System.Text.Json.JsonElement? json) => 
+        {
+            var parameters = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(json?.GetRawText() ?? "{}");
+            var limit = parameters?.GetValueOrDefault("limit", 50) is System.Text.Json.JsonElement limitElement ? limitElement.GetInt32() : 50;
+            return await GetHistory(limit);
+        });
+        
+        _logger.Info("Hot Reload Module API handlers registered for cross-module communication");
     }
 
     public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
+        // HTTP endpoints are registered via attribute-based routing
         _logger.Info("Hot Reload Module HTTP endpoints registered");
     }
 
@@ -559,32 +598,7 @@ public sealed class HotReloadModule : ModuleBase
     }
 }
 
-// Data structures for hot-reload
-[MetaNode(Id = "codex.hot-reload.watch-config", Name = "Watch Config", Description = "Configuration for file watching")]
-public record WatchConfig(
-    List<string>? Paths = null,
-    List<string>? Extensions = null,
-    bool AutoRegenerate = true,
-    string? Provider = "openai",
-    string? Model = "gpt-5-codex"
-);
-
-[MetaNode(Id = "codex.hot-reload.regeneration-request", Name = "Regeneration Request", Description = "Request to regenerate component")]
-public record RegenerationRequest(
-    string ComponentId,
-    string? LensSpec = null,
-    string? ComponentType = null,
-    string? Requirements = null,
-    string? Provider = "openai",
-    string? Model = "gpt-5-codex"
-);
-
-[MetaNode(Id = "codex.hot-reload.hot-swap-request", Name = "Hot Swap Request", Description = "Request to hot-swap component")]
-public record HotSwapRequest(
-    string ComponentPath,
-    string NewCode,
-    bool CreateBackup = true
-);
+// Data structures for hot-reload (shared with SelfUpdateModule)
 
 [MetaNode(Id = "codex.hot-reload.component-definition", Name = "Component Definition", Description = "Definition of a hot-reloadable component")]
 public record ComponentDefinition(
