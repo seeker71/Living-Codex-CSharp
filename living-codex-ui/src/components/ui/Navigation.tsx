@@ -28,6 +28,7 @@ export function Navigation() {
     ...publicNavItems,
     { href: '/people', label: 'People', icon: '🌍' },
     { href: '/create', label: 'Create', icon: '✨' },
+    { href: '/dev', label: 'Dev', icon: '🛠️' },
     { href: '/profile', label: 'Profile', icon: '👤' },
   ];
 
