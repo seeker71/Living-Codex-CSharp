@@ -62,7 +62,18 @@ public class LLMClient
                 var response = await client.SendAsync(request);
                 return response.IsSuccessStatusCode;
             }
-
+            if (provider == "cursor")
+            {
+                using var client = new HttpClient();
+                var request = new HttpRequestMessage(HttpMethod.Get, $"{config.BaseUrl.TrimEnd('/')}/models");
+                if (!string.IsNullOrEmpty(config.ApiKey))
+                {
+                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.ApiKey);
+                }
+                var response = await client.SendAsync(request);
+                return response.IsSuccessStatusCode;
+            }
+            
             // Default to Ollama check
             using (var client = new HttpClient())
             {
@@ -185,6 +196,62 @@ public class LLMClient
                     }
 
                     return new LLMResponse { Success = false, Response = $"OpenAI error: {response.StatusCode}", Confidence = 0.0 };
+                }
+
+                var respContent = await response.Content.ReadAsStringAsync();
+                using (var doc = JsonDocument.Parse(respContent))
+                {
+                    var contentText = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "";
+                    int tokensUsed = 0;
+                    if (doc.RootElement.TryGetProperty("usage", out var usage))
+                    {
+                        if (usage.TryGetProperty("total_tokens", out var totalTokens))
+                        {
+                            tokensUsed = totalTokens.GetInt32();
+                        }
+                    }
+
+                    return new LLMResponse
+                    {
+                        Success = true,
+                        Response = contentText,
+                        Confidence = 0.85,
+                        Model = config.Model,
+                        TokensUsed = tokensUsed
+                    };
+                }
+            }
+            else if (provider == "cursor")
+            {
+                var body = new
+                {
+                    model = config.Model,
+                    messages = new object[]
+                    {
+                        new { role = "user", content = prompt }
+                    },
+                    temperature = config.Temperature,
+                    top_p = config.TopP,
+                    max_tokens = config.MaxTokens
+                };
+
+                var json = JsonSerializer.Serialize(body);
+                var request = new HttpRequestMessage(HttpMethod.Post, $"{config.BaseUrl.TrimEnd('/')}/chat/completions")
+                {
+                    Content = new StringContent(json, Encoding.UTF8, "application/json")
+                };
+                if (!string.IsNullOrEmpty(config.ApiKey))
+                {
+                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.ApiKey);
+                }
+
+                _logger.Info($"Sending Cursor chat completion with model {config.Model}");
+                var response = await _httpClient.SendAsync(request);
+                if (!response.IsSuccessStatusCode)
+                {
+                    var err = await response.Content.ReadAsStringAsync();
+                    _logger.Error($"Cursor request failed: {response.StatusCode} - {err}");
+                    return new LLMResponse { Success = false, Response = $"Cursor error: {response.StatusCode}", Confidence = 0.0 };
                 }
 
                 var respContent = await response.Content.ReadAsStringAsync();

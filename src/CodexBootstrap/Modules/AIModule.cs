@@ -27,9 +27,10 @@ namespace CodexBootstrap.Modules
         private static LLMConfig CreateConfig(string id, string name, string provider, string model, 
             double temperature, int maxTokens, double topP, string baseUrl = "http://localhost:11434")
         {
-            var apiKey = provider.ToLowerInvariant() == "openai" 
-                ? Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? ""
-                : "";
+            var lower = provider.ToLowerInvariant();
+            var apiKey = lower == "openai" ? Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? ""
+                       : lower == "cursor" ? Environment.GetEnvironmentVariable("CURSOR_API_KEY") ?? ""
+                       : "";
                 
             return new LLMConfig(
                 Id: id,
@@ -96,6 +97,16 @@ namespace CodexBootstrap.Modules
             Environment.GetEnvironmentVariable("OPENAI_DEFAULT_MODEL") ?? "gpt-5-mini",
             0.3f, 4096, 0.9f, Environment.GetEnvironmentVariable("OPENAI_BASE_URL") ?? "https://api.openai.com/v1");
 
+        // Cursor configuration templates (assume OpenAI-compatible)
+        public static readonly LLMConfig Cursor_Default = CreateConfig(
+            "cursor-default", "Cursor Default", "cursor",
+            Environment.GetEnvironmentVariable("CURSOR_DEFAULT_MODEL") ?? (Environment.GetEnvironmentVariable("OPENAI_DEFAULT_MODEL") ?? "gpt-5-mini"),
+            0.3f, 4096, 0.9f, Environment.GetEnvironmentVariable("CURSOR_BASE_URL") ?? "https://api.cursor.sh/v1");
+        public static readonly LLMConfig Cursor_Codegen = CreateConfig(
+            "cursor-codegen", "Cursor Codegen", "cursor",
+            Environment.GetEnvironmentVariable("CURSOR_CODEGEN_MODEL") ?? (Environment.GetEnvironmentVariable("OPENAI_CODEGEN_MODEL") ?? "gpt-5-codex"),
+            0.2f, 8192, 0.95f, Environment.GetEnvironmentVariable("CURSOR_BASE_URL") ?? "https://api.cursor.sh/v1");
+
         // Get configuration for a specific task
         public static LLMConfig GetConfigForTask(string task, string? preferredProvider = null, string? preferredModel = null)
         {
@@ -118,6 +129,7 @@ namespace CodexBootstrap.Modules
             // Auto-detect best configuration based on available services
             // Policy: use GPT-5 Codex for code generation; GPT-5 mini for non-code when OpenAI is configured
             var isOpenAIConfigured = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OPENAI_API_KEY"));
+            var isCursorConfigured = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CURSOR_API_KEY"));
             var normalizedTask = task.ToLowerInvariant();
 
             var isCodeGenTask = normalizedTask == "ui-page-generation" ||
@@ -127,6 +139,10 @@ namespace CodexBootstrap.Modules
             if (isOpenAIConfigured)
             {
                 return isCodeGenTask ? OpenAI_CodeGeneration : OpenAI_Default;
+            }
+            if (isCursorConfigured)
+            {
+                return isCodeGenTask ? Cursor_Codegen : Cursor_Default;
             }
 
             // Fallback to local models when OpenAI is not configured
