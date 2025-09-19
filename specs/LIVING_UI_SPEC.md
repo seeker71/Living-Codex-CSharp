@@ -111,11 +111,11 @@ Short intent: A modular Next.js UI whose pages and views are generated from spec
 - **Spec-driven**: Backend APIs describe their own UI requirements
 
 #### **Available AI Technologies (Sept 2025)**
- - **GPT-5 Codex**: Primary for one-shot UI/code generation (Sept 2025)
- - **GPT-5 Mini**: Default for non-code AI (extraction, scoring, analysis)
+- **GPT-5 Codex**: Primary for one-shot UI/code generation (Sept 2025)
+- **GPT-5 Mini**: Default for non-code AI (extraction, scoring, analysis)
+- **Cursor Background Agent API**: Context-aware code generation with Claude 3.5 Sonnet
 - **Claude 3.5 Sonnet**: Excellent at architectural analysis and implementation
 - **GitHub Copilot**: Real-time code completion and generation
-- **Cursor AI**: Context-aware coding assistance
 - **Anthropic Computer Use**: UI automation and testing
 
 ### 🎯 **IMPLEMENTATION ROADMAP (AI-First Approach)**

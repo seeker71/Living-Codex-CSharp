@@ -64,11 +64,12 @@ public class LLMClient
             }
             if (provider == "cursor")
             {
+                // Cursor Background Agent API availability check
                 using var client = new HttpClient();
-                var request = new HttpRequestMessage(HttpMethod.Get, $"{config.BaseUrl.TrimEnd('/')}/models");
+                var request = new HttpRequestMessage(HttpMethod.Get, $"{config.BaseUrl.TrimEnd('/')}/health");
                 if (!string.IsNullOrEmpty(config.ApiKey))
                 {
-                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.ApiKey);
+                    request.Headers.Add("X-API-Key", config.ApiKey);
                 }
                 var response = await client.SendAsync(request);
                 return response.IsSuccessStatusCode;
@@ -223,29 +224,27 @@ public class LLMClient
             }
             else if (provider == "cursor")
             {
+                // Cursor Background Agent API - use their specific endpoint structure
                 var body = new
                 {
+                    prompt = prompt,
                     model = config.Model,
-                    messages = new object[]
-                    {
-                        new { role = "user", content = prompt }
-                    },
                     temperature = config.Temperature,
-                    top_p = config.TopP,
-                    max_tokens = config.MaxTokens
+                    max_tokens = config.MaxTokens,
+                    stream = false
                 };
 
                 var json = JsonSerializer.Serialize(body);
-                var request = new HttpRequestMessage(HttpMethod.Post, $"{config.BaseUrl.TrimEnd('/')}/chat/completions")
+                var request = new HttpRequestMessage(HttpMethod.Post, $"{config.BaseUrl.TrimEnd('/')}/generate")
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json")
                 };
                 if (!string.IsNullOrEmpty(config.ApiKey))
                 {
-                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.ApiKey);
+                    request.Headers.Add("X-API-Key", config.ApiKey);
                 }
 
-                _logger.Info($"Sending Cursor chat completion with model {config.Model}");
+                _logger.Info($"Sending Cursor background agent request with model {config.Model}");
                 var response = await _httpClient.SendAsync(request);
                 if (!response.IsSuccessStatusCode)
                 {
@@ -257,7 +256,21 @@ public class LLMClient
                 var respContent = await response.Content.ReadAsStringAsync();
                 using (var doc = JsonDocument.Parse(respContent))
                 {
-                    var contentText = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "";
+                    // Cursor API response format (adjust based on actual response structure)
+                    var contentText = "";
+                    if (doc.RootElement.TryGetProperty("text", out var textProp))
+                    {
+                        contentText = textProp.GetString() ?? "";
+                    }
+                    else if (doc.RootElement.TryGetProperty("response", out var respProp))
+                    {
+                        contentText = respProp.GetString() ?? "";
+                    }
+                    else if (doc.RootElement.TryGetProperty("content", out var contentProp))
+                    {
+                        contentText = contentProp.GetString() ?? "";
+                    }
+
                     int tokensUsed = 0;
                     if (doc.RootElement.TryGetProperty("usage", out var usage))
                     {

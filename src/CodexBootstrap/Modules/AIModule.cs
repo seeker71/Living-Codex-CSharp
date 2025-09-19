@@ -97,15 +97,15 @@ namespace CodexBootstrap.Modules
             Environment.GetEnvironmentVariable("OPENAI_DEFAULT_MODEL") ?? "gpt-5-mini",
             0.3f, 4096, 0.9f, Environment.GetEnvironmentVariable("OPENAI_BASE_URL") ?? "https://api.openai.com/v1");
 
-        // Cursor configuration templates (assume OpenAI-compatible)
+        // Cursor Background Agent API configurations
         public static readonly LLMConfig Cursor_Default = CreateConfig(
-            "cursor-default", "Cursor Default", "cursor",
-            Environment.GetEnvironmentVariable("CURSOR_DEFAULT_MODEL") ?? (Environment.GetEnvironmentVariable("OPENAI_DEFAULT_MODEL") ?? "gpt-5-mini"),
-            0.3f, 4096, 0.9f, Environment.GetEnvironmentVariable("CURSOR_BASE_URL") ?? "https://api.cursor.sh/v1");
+            "cursor-default", "Cursor Background Agent Default", "cursor",
+            Environment.GetEnvironmentVariable("CURSOR_DEFAULT_MODEL") ?? "claude-3-5-sonnet-20241022",
+            0.3f, 4096, 0.9f, Environment.GetEnvironmentVariable("CURSOR_BASE_URL") ?? "https://api.cursor.com/v1");
         public static readonly LLMConfig Cursor_Codegen = CreateConfig(
-            "cursor-codegen", "Cursor Codegen", "cursor",
-            Environment.GetEnvironmentVariable("CURSOR_CODEGEN_MODEL") ?? (Environment.GetEnvironmentVariable("OPENAI_CODEGEN_MODEL") ?? "gpt-5-codex"),
-            0.2f, 8192, 0.95f, Environment.GetEnvironmentVariable("CURSOR_BASE_URL") ?? "https://api.cursor.sh/v1");
+            "cursor-codegen", "Cursor Background Agent Codegen", "cursor",
+            Environment.GetEnvironmentVariable("CURSOR_CODEGEN_MODEL") ?? "claude-3-5-sonnet-20241022",
+            0.2f, 8192, 0.95f, Environment.GetEnvironmentVariable("CURSOR_BASE_URL") ?? "https://api.cursor.com/v1");
 
         // Get configuration for a specific task
         public static LLMConfig GetConfigForTask(string task, string? preferredProvider = null, string? preferredModel = null)
