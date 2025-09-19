@@ -270,8 +270,8 @@ public sealed class UserDiscoveryModule : ModuleBase
             var apiKey = Environment.GetEnvironmentVariable("OPENCAGE_API_KEY");
             if (string.IsNullOrEmpty(apiKey))
             {
-                _logger.Warn("OPENCAGE_API_KEY not configured, using fallback geocoding");
-                return await FallbackGeocode(location);
+                _logger.Warn("OPENCAGE_API_KEY not configured, geocoding unavailable");
+                return null;
             }
 
             var encodedLocation = Uri.EscapeDataString(location);

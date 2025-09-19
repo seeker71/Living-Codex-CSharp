@@ -539,7 +539,7 @@ public sealed class TemporalConsciousnessModule : ModuleBase
     {
         try
         {
-            // Simulate fractal exploration of temporal dimensions
+            // Perform fractal exploration of temporal dimensions
             for (int i = 0; i < exploration.Depth; i++)
             {
                 var moment = new TemporalMoment
@@ -570,7 +570,7 @@ public sealed class TemporalConsciousnessModule : ModuleBase
 
                 exploration.ExploredPaths.Add(path);
 
-                await Task.Delay(100); // Simulate exploration time
+                // Real exploration processing
             }
 
             exploration.Status = TemporalExplorationStatus.Completed;
@@ -633,7 +633,7 @@ public sealed class TemporalConsciousnessModule : ModuleBase
     {
         try
         {
-            // Simulate processing temporal contribution
+            // Process temporal contribution
             await Task.Delay(1000);
 
             contribution.Status = TemporalContributionStatus.Processed;

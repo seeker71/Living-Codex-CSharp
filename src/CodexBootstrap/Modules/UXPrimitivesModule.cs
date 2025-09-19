@@ -89,8 +89,7 @@ public sealed class UXPrimitivesModule : ModuleBase
 
             _registry.Upsert(weaveNode);
 
-            // Also create as an edge for graph visualization
-            _registry.UpsertEdge(request.SourceId, request.TargetId, request.Relationship, request.Strength);
+            // Note: Edge creation would be handled by graph visualization module
 
             return new 
             { 
@@ -178,9 +177,7 @@ public sealed class UXPrimitivesModule : ModuleBase
                 }
             }
 
-            // Fallback reflection if AI is not available
-            var fallbackReflection = GenerateFallbackReflection(contentNode, request.ReflectionType, request.Depth);
-            return new { success = true, reflection = fallbackReflection };
+            return new ErrorResponse("AI reflection generation failed - no fallback data provided");
         }
         catch (Exception ex)
         {
@@ -308,35 +305,6 @@ public sealed class UXPrimitivesModule : ModuleBase
         };
     }
 
-    private ReflectionResult GenerateFallbackReflection(Node contentNode, string reflectionType, int depth)
-    {
-        var insights = new Dictionary<string, string>
-        {
-            ["insight"] = $"This content about '{contentNode.Title}' offers opportunities for deeper understanding.",
-            ["wisdom"] = $"The wisdom within '{contentNode.Title}' connects to universal patterns of growth and consciousness.",
-            ["connection"] = $"'{contentNode.Title}' weaves into the larger tapestry of knowledge and experience.",
-            ["transformation"] = $"Engaging with '{contentNode.Title}' has the potential to transform your perspective.",
-            ["resonance"] = $"'{contentNode.Title}' resonates with themes of unity, abundance, and conscious evolution."
-        };
-
-        var guidances = new Dictionary<string, string>
-        {
-            ["insight"] = "Take time to integrate this understanding into your worldview.",
-            ["wisdom"] = "Allow this wisdom to inform your choices and relationships.",
-            ["connection"] = "Explore how this connects to other areas of your life and learning.",
-            ["transformation"] = "Be open to how this might change your approach or understanding.",
-            ["resonance"] = "Notice how this content harmonizes with your values and aspirations."
-        };
-
-        return new ReflectionResult
-        {
-            Insight = insights.GetValueOrDefault(reflectionType, insights["insight"]),
-            Guidance = guidances.GetValueOrDefault(reflectionType, guidances["insight"]),
-            ReflectionType = reflectionType,
-            Depth = depth,
-            Confidence = 0.6
-        };
-    }
 }
 
 // Data structures for UX primitives

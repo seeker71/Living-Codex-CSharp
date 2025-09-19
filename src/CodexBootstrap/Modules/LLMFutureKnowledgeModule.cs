@@ -621,13 +621,7 @@ Format your response as a structured analysis that can be used for decision-maki
         catch (Exception ex)
         {
             Console.WriteLine($"[LLM] Error: {ex.Message}");
-            // Fallback to mock response if LLM is not available
-            return new AIConceptExtractionResponse(
-                Content: $"LLM unavailable: {ex.Message}. Future knowledge response for: {prompt.Substring(0, Math.Min(100, prompt.Length))}...",
-                Confidence: 0.5,
-                Reasoning: "Fallback response due to LLM unavailability",
-                Sources: new List<string> { "Fallback system", "Error handling" }
-            );
+            throw new Exception($"LLM service unavailable: {ex.Message}");
         }
     }
 

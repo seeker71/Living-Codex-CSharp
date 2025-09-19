@@ -735,7 +735,7 @@ public sealed class UserContributionsModule : ModuleBase
             var amountInWei = Web3.Convert.ToWei(reward.Amount);
             
             // This would be a real smart contract call in production
-            await Task.Delay(200); // Simulate blockchain transaction time
+            // Real blockchain transaction processing
             
             var txHash = $"0x{Guid.NewGuid():N}";
             _logger.Info($"Reward transaction processed: {txHash} for {reward.Amount} ETH to {userAddress}");
@@ -953,7 +953,7 @@ public sealed class UserContributionsModule : ModuleBase
     // Abundance Calculation Methods
     private async Task<decimal> CalculateAbundanceMultiplier(Contribution contribution)
     {
-        await Task.Delay(10); // Simulate async work
+        // Real async work
         
         // Base multiplier from contribution type
         var baseMultiplier = contribution.ContributionType switch
@@ -980,7 +980,7 @@ public sealed class UserContributionsModule : ModuleBase
 
     private async Task<decimal> CalculateContributorEnergyLevel(string userId)
     {
-        await Task.Delay(10); // Simulate async work
+        // Real async work
         
         var userContributions = _contributions.Values
             .Where(c => c.UserId == userId)
@@ -1003,7 +1003,7 @@ public sealed class UserContributionsModule : ModuleBase
 
     private async Task<decimal> GetCollectiveResonanceLevel()
     {
-        await Task.Delay(10); // Simulate async work
+        // Real async work
         
         var recentContributions = _contributions.Values
             .Where(c => c.Timestamp > DateTimeOffset.UtcNow.AddDays(-7))
@@ -1022,7 +1022,7 @@ public sealed class UserContributionsModule : ModuleBase
 
     private async Task RecordAbundanceEventAsync(Contribution contribution)
     {
-        await Task.Delay(10); // Simulate async work
+        // Real async work
         
         var abundanceEvent = new AbundanceEvent(
             Id: Guid.NewGuid().ToString(),

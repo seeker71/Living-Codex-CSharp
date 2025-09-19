@@ -253,43 +253,15 @@ Return your analysis as JSON with scores and detailed feedback.
                         }
                         else
                         {
-                            _logger.Warn("AI module handler not found - using fallback analysis");
-                            // Provide a fallback analysis for testing/development
-                            analysisResult = new VisualAnalysisResult(
-                                ComponentId: request.ComponentId ?? "",
-                                ImageNodeId: request.ImageNodeId,
-                                ResonanceScore: 0.9,
-                                JoyScore: 0.85,
-                                UnityScore: 0.95,
-                                ClarityScore: 0.88,
-                                TechnicalQualityScore: 0.92,
-                                OverallScore: 0.9,
-                                Feedback: new List<string> { "Fallback analysis - AI module not available" },
-                                Issues: new List<string>(),
-                                Recommendations: new List<string> { "Enable AI module for detailed analysis" },
-                                AnalyzedAt: DateTimeOffset.UtcNow
-                            );
+                            _logger.Warn("AI module handler not found - validation failed");
+                            throw new Exception("AI module not available - no fallback provided");
                         }
                     }
                 }
                 catch (Exception ex)
                 {
                     _logger.Error($"Error calling AI module: {ex.Message}", ex);
-                    // Provide a fallback analysis instead of throwing
-                    analysisResult = new VisualAnalysisResult(
-                        ComponentId: request.ComponentId ?? "",
-                        ImageNodeId: request.ImageNodeId,
-                        ResonanceScore: 0.7,
-                        JoyScore: 0.7,
-                        UnityScore: 0.7,
-                        ClarityScore: 0.7,
-                        TechnicalQualityScore: 0.7,
-                        OverallScore: 0.7,
-                        Feedback: new List<string> { $"Fallback analysis due to error: {ex.Message}" },
-                        Issues: new List<string> { "AI module integration error" },
-                        Recommendations: new List<string> { "Fix AI module integration", "Check API router setup" },
-                        AnalyzedAt: DateTimeOffset.UtcNow
-                    );
+                    throw new Exception($"AI module integration error: {ex.Message}");
                 }
 
                 // Store analysis as node

@@ -136,12 +136,12 @@ public sealed class GalleryModule : ModuleBase
                 State: ContentState.Water,
                 Locale: "en-US",
                 Title: request.Title,
-                Description = request.Description ?? "",
+                Description: request.Description ?? "",
                 Content: new ContentRef(
                     MediaType: "application/json",
                     InlineJson: JsonSerializer.Serialize(request),
                     InlineBytes: null,
-                    ExternalUri: request.ImageUrl
+                    ExternalUri: !string.IsNullOrEmpty(request.ImageUrl) ? new Uri(request.ImageUrl) : null
                 ),
                 Meta: new Dictionary<string, object>
                 {

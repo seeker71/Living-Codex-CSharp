@@ -285,7 +285,7 @@ namespace CodexBootstrap.Modules
                 // Use _apiRouter for cross-module communication with HotReloadModule
                 if (_apiRouter != null)
                 {
-                    var result = await _apiRouter.CallAsync("hot-reload", "start-watching", System.Text.Json.JsonSerializer.SerializeToElement(config));
+                    var result = await CallModuleMethod("hot-reload", "start-watching", System.Text.Json.JsonSerializer.SerializeToElement(config));
                     return result ?? new { success = false, error = "No response from hot-reload module" };
                 }
                 return new { success = false, error = "API router not available" };
@@ -307,7 +307,7 @@ namespace CodexBootstrap.Modules
             {
                 if (_apiRouter != null)
                 {
-                    var result = await _apiRouter.CallAsync("hot-reload", "stop-watching", null);
+                    var result = await CallModuleMethod("hot-reload", "stop-watching", null);
                     return result ?? new { success = false, error = "No response from hot-reload module" };
                 }
                 return new { success = false, error = "API router not available" };
@@ -329,7 +329,7 @@ namespace CodexBootstrap.Modules
             {
                 if (_apiRouter != null)
                 {
-                    var result = await _apiRouter.CallAsync("hot-reload", "get-status", null);
+                    var result = await CallModuleMethod("hot-reload", "get-status", null);
                     return result ?? new { success = false, error = "No response from hot-reload module" };
                 }
                 return new { success = false, error = "API router not available" };
@@ -351,7 +351,7 @@ namespace CodexBootstrap.Modules
             {
                 if (_apiRouter != null)
                 {
-                    var result = await _apiRouter.CallAsync("hot-reload", "regenerate-component", System.Text.Json.JsonSerializer.SerializeToElement(request));
+                    var result = await CallModuleMethod("hot-reload", "regenerate-component", System.Text.Json.JsonSerializer.SerializeToElement(request));
                     return result ?? new { success = false, error = "No response from hot-reload module" };
                 }
                 return new { success = false, error = "API router not available" };
@@ -373,7 +373,7 @@ namespace CodexBootstrap.Modules
             {
                 if (_apiRouter != null)
                 {
-                    var result = await _apiRouter.CallAsync("hot-reload", "hot-swap-component", System.Text.Json.JsonSerializer.SerializeToElement(request));
+                    var result = await CallModuleMethod("hot-reload", "hot-swap-component", System.Text.Json.JsonSerializer.SerializeToElement(request));
                     return result ?? new { success = false, error = "No response from hot-reload module" };
                 }
                 return new { success = false, error = "API router not available" };
@@ -396,7 +396,7 @@ namespace CodexBootstrap.Modules
                 if (_apiRouter != null)
                 {
                     var parameters = new { limit };
-                    var result = await _apiRouter.CallAsync("hot-reload", "get-history", System.Text.Json.JsonSerializer.SerializeToElement(parameters));
+                    var result = await CallModuleMethod("hot-reload", "get-history", System.Text.Json.JsonSerializer.SerializeToElement(parameters));
                     return result ?? new { success = false, error = "No response from hot-reload module" };
                 }
                 return new { success = false, error = "API router not available" };
@@ -586,6 +586,16 @@ namespace CodexBootstrap.Modules
                 return new { success = false, error = ex.Message };
             }
         }
+
+        // Helper method for cross-module communication
+        private async Task<object?> CallModuleMethod(string moduleId, string method, System.Text.Json.JsonElement? parameters = null)
+        {
+            if (_apiRouter != null && _apiRouter.TryGetHandler(moduleId, method, out var handler))
+            {
+                return await handler(parameters);
+            }
+            return null;
+        }
     }
 
     /// <summary>
@@ -614,14 +624,13 @@ namespace CodexBootstrap.Modules
         public string DllPath { get; set; } = string.Empty;
     }
 
-    /// <summary>
-    /// Request to hot reload a module
-    /// </summary>
-    public class HotReloadRequest
-    {
-        public string ModuleName { get; set; } = string.Empty;
-        public string DllPath { get; set; } = string.Empty;
-    }
+/// <summary>
+/// Request to hot reload a module
+/// </summary>
+public class HotReloadRequest
+{
+    public string ModuleName { get; set; } = string.Empty;
+    public string DllPath { get; set; } = string.Empty;
 }
 
 // Hot-reload data structures
@@ -650,3 +659,4 @@ public record HotSwapRequest(
     string NewCode,
     bool CreateBackup = true
 );
+}
