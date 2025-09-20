@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using CodexBootstrap.Modules;
 using CodexBootstrap.Core;
 using CodexBootstrap.Runtime;
-using CodexBootstrap.Tests;
+using CodexBootstrap.Tests.Modules;
 
 namespace CodexBootstrap.Tests.Modules;
 
@@ -23,8 +23,8 @@ public class ThreadsModuleTests : IClassFixture<TestServerFixture>
     public async Task ListThreads_WithoutMockData_ReturnsEmptyList()
     {
         // Arrange
-        var registry = new NodeRegistry();
-        var logger = new ConsoleLogger();
+        var registry = TestInfrastructure.CreateTestNodeRegistry();
+        var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new ThreadsModule(registry, logger, httpClient);
 
@@ -44,8 +44,8 @@ public class ThreadsModuleTests : IClassFixture<TestServerFixture>
     public async Task CreateThread_WithValidData_CreatesSuccessfully()
     {
         // Arrange
-        var registry = new NodeRegistry();
-        var logger = new ConsoleLogger();
+        var registry = TestInfrastructure.CreateTestNodeRegistry();
+        var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new ThreadsModule(registry, logger, httpClient);
 
@@ -73,8 +73,8 @@ public class ThreadsModuleTests : IClassFixture<TestServerFixture>
     public async Task CreateThread_WithoutTitle_ReturnsError()
     {
         // Arrange
-        var registry = new NodeRegistry();
-        var logger = new ConsoleLogger();
+        var registry = TestInfrastructure.CreateTestNodeRegistry();
+        var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new ThreadsModule(registry, logger, httpClient);
 
@@ -90,17 +90,17 @@ public class ThreadsModuleTests : IClassFixture<TestServerFixture>
 
         // Assert
         Assert.NotNull(result);
-        var errorResponse = result as ErrorResponse;
+        var errorResponse = result as CodexBootstrap.Core.ErrorResponse;
         Assert.NotNull(errorResponse);
-        Assert.Equal("Title and content are required", errorResponse.Message);
+        Assert.Equal("Title and content are required", errorResponse.Error);
     }
 
     [Fact]
     public async Task GetThread_WithNonExistentId_ReturnsError()
     {
         // Arrange
-        var registry = new NodeRegistry();
-        var logger = new ConsoleLogger();
+        var registry = TestInfrastructure.CreateTestNodeRegistry();
+        var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new ThreadsModule(registry, logger, httpClient);
 
@@ -109,17 +109,17 @@ public class ThreadsModuleTests : IClassFixture<TestServerFixture>
 
         // Assert
         Assert.NotNull(result);
-        var errorResponse = result as ErrorResponse;
+        var errorResponse = result as CodexBootstrap.Core.ErrorResponse;
         Assert.NotNull(errorResponse);
-        Assert.Equal("Thread not found", errorResponse.Message);
+        Assert.Equal("Thread not found", errorResponse.Error);
     }
 
     [Fact]
     public async Task AddReply_WithoutThread_ReturnsError()
     {
         // Arrange
-        var registry = new NodeRegistry();
-        var logger = new ConsoleLogger();
+        var registry = TestInfrastructure.CreateTestNodeRegistry();
+        var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new ThreadsModule(registry, logger, httpClient);
 
@@ -135,17 +135,17 @@ public class ThreadsModuleTests : IClassFixture<TestServerFixture>
 
         // Assert
         Assert.NotNull(result);
-        var errorResponse = result as ErrorResponse;
+        var errorResponse = result as CodexBootstrap.Core.ErrorResponse;
         Assert.NotNull(errorResponse);
-        Assert.Equal("Thread not found", errorResponse.Message);
+        Assert.Equal("Thread not found", errorResponse.Error);
     }
 
     [Fact]
     public void ModuleNode_HasCorrectProperties()
     {
         // Arrange
-        var registry = new NodeRegistry();
-        var logger = new ConsoleLogger();
+        var registry = TestInfrastructure.CreateTestNodeRegistry();
+        var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new ThreadsModule(registry, logger, httpClient);
 
@@ -161,19 +161,3 @@ public class ThreadsModuleTests : IClassFixture<TestServerFixture>
     }
 }
 
-/// <summary>
-/// Console logger for testing - no mock data, real logging
-/// </summary>
-public class ConsoleLogger : ICodexLogger
-{
-    public void Debug(string message) => Console.WriteLine($"[DEBUG] {message}");
-    public void Debug(string message, Exception ex) => Console.WriteLine($"[DEBUG] {message} {ex?.Message}");
-    public void Info(string message) => Console.WriteLine($"[INFO] {message}");
-    public void Info(string message, Exception ex) => Console.WriteLine($"[INFO] {message} {ex?.Message}");
-    public void Warn(string message) => Console.WriteLine($"[WARN] {message}");
-    public void Warn(string message, Exception ex) => Console.WriteLine($"[WARN] {message} {ex?.Message}");
-    public void Error(string message) => Console.WriteLine($"[ERROR] {message}");
-    public void Error(string message, Exception? ex = null) => Console.WriteLine($"[ERROR] {message} {ex?.Message}");
-    public void Fatal(string message) => Console.WriteLine($"[FATAL] {message}");
-    public void Fatal(string message, Exception ex) => Console.WriteLine($"[FATAL] {message} {ex?.Message}");
-}

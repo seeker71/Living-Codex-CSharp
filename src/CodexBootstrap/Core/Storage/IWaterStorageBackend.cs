@@ -62,6 +62,31 @@ public interface IWaterStorageBackend
     /// Search operations
     /// </summary>
     Task<IEnumerable<Node>> SearchWaterNodesAsync(string query, int limit = 100);
+
+    /// <summary>
+    /// Store an edge in Water storage (for fluid state edges)
+    /// </summary>
+    Task StoreWaterEdgeAsync(Edge edge, TimeSpan? expiry = null);
+
+    /// <summary>
+    /// Get all Water edges
+    /// </summary>
+    Task<IEnumerable<Edge>> GetAllWaterEdgesAsync();
+
+    /// <summary>
+    /// Get Water edges from a specific node
+    /// </summary>
+    Task<IEnumerable<Edge>> GetWaterEdgesFromAsync(string fromId);
+
+    /// <summary>
+    /// Get Water edges to a specific node
+    /// </summary>
+    Task<IEnumerable<Edge>> GetWaterEdgesToAsync(string toId);
+
+    /// <summary>
+    /// Delete a Water edge
+    /// </summary>
+    Task DeleteWaterEdgeAsync(string fromId, string toId, string role);
 }
 
 /// <summary>

@@ -49,9 +49,30 @@ public sealed class GalleryModule : ModuleBase
         _logger.Info("Gallery Module HTTP endpoints registered");
     }
 
+    // Public methods for direct testing
+    public async Task<object> ListGalleryItems(int? limit = 20, string? filter = null, string? sort = "resonance")
+    {
+        return await ListGalleryItemsImpl(limit, filter, sort);
+    }
+
+    public async Task<object> CreateGalleryItem(GalleryItemCreateRequest request)
+    {
+        return await CreateGalleryItemImpl(request);
+    }
+
+    public async Task<object> GetGalleryItem(string itemId)
+    {
+        return await GetGalleryItemImpl(itemId);
+    }
+
+    public async Task<object> GenerateAIImage(AIImageGenerateRequest request)
+    {
+        return await GenerateAIImageImpl(request);
+    }
+
     // List gallery items
     [ApiRoute("GET", "/gallery/list", "list-gallery-items", "Get list of gallery items", "codex.gallery")]
-    public async Task<object> ListGalleryItems(
+    public async Task<object> ListGalleryItemsImpl(
         [ApiParameter("limit", "Number of items to return", Required = false)] int? limit = 20,
         [ApiParameter("filter", "Filter by axis", Required = false)] string? filter = null,
         [ApiParameter("sort", "Sort order", Required = false)] string? sort = "resonance")
@@ -120,7 +141,7 @@ public sealed class GalleryModule : ModuleBase
 
     // Create gallery item
     [ApiRoute("POST", "/gallery/create", "create-gallery-item", "Create a new gallery item", "codex.gallery")]
-    public async Task<object> CreateGalleryItem([ApiParameter("body", "Gallery item creation request", Required = true, Location = "body")] GalleryItemCreateRequest request)
+    public async Task<object> CreateGalleryItemImpl([ApiParameter("body", "Gallery item creation request", Required = true, Location = "body")] GalleryItemCreateRequest request)
     {
         try
         {
@@ -178,7 +199,7 @@ public sealed class GalleryModule : ModuleBase
 
     // Get gallery item details
     [ApiRoute("GET", "/gallery/{itemId}", "get-gallery-item", "Get detailed information about a gallery item", "codex.gallery")]
-    public async Task<object> GetGalleryItem([ApiParameter("itemId", "Gallery item ID", Required = true, Location = "path")] string itemId)
+    public async Task<object> GetGalleryItemImpl([ApiParameter("itemId", "Gallery item ID", Required = true, Location = "path")] string itemId)
     {
         try
         {
@@ -223,7 +244,7 @@ public sealed class GalleryModule : ModuleBase
 
     // Generate AI image
     [ApiRoute("POST", "/gallery/generate", "generate-ai-image", "Generate an AI image for the gallery", "codex.gallery")]
-    public async Task<object> GenerateAIImage([ApiParameter("body", "AI image generation request", Required = true, Location = "body")] AIImageGenerateRequest request)
+    public async Task<object> GenerateAIImageImpl([ApiParameter("body", "AI image generation request", Required = true, Location = "body")] AIImageGenerateRequest request)
     {
         try
         {
@@ -254,7 +275,7 @@ public sealed class GalleryModule : ModuleBase
                     AiPrompt = request.Prompt
                 };
 
-                var createResult = await CreateGalleryItem(createRequest);
+                var createResult = await CreateGalleryItemImpl(createRequest);
                 return createResult;
             }
             else

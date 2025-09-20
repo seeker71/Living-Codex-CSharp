@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using CodexBootstrap.Modules;
 using CodexBootstrap.Core;
 using CodexBootstrap.Runtime;
-using CodexBootstrap.Tests;
+using CodexBootstrap.Tests.Modules;
 
 namespace CodexBootstrap.Tests.Modules;
 
@@ -23,15 +23,16 @@ public class FutureKnowledgeModuleTests : IClassFixture<TestServerFixture>
     public async Task RetrieveFutureKnowledge_WithoutImplementation_ReturnsError()
     {
         // Arrange
-        var registry = new NodeRegistry();
-        var logger = new ConsoleLogger();
+        var registry = TestInfrastructure.CreateTestNodeRegistry();
+        var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new FutureKnowledgeModule(registry, logger, httpClient);
 
         var request = new FutureKnowledgeRequest(
             Query: "What will happen to consciousness research?",
             Domain: "consciousness",
-            TimeHorizon: 5
+            TimeHorizon: 5,
+            Filters: null
         );
 
         // Act
@@ -39,23 +40,24 @@ public class FutureKnowledgeModuleTests : IClassFixture<TestServerFixture>
 
         // Assert
         Assert.NotNull(result);
-        var errorResponse = result as ErrorResponse;
+        var errorResponse = result as CodexBootstrap.Core.ErrorResponse;
         Assert.NotNull(errorResponse);
-        Assert.Equal("Future knowledge retrieval not yet implemented", errorResponse.Message);
+        Assert.Equal("Future knowledge retrieval not yet implemented", errorResponse.Error);
     }
 
     [Fact]
     public async Task ApplyFutureKnowledge_WithoutImplementation_ReturnsError()
     {
         // Arrange
-        var registry = new NodeRegistry();
-        var logger = new ConsoleLogger();
+        var registry = TestInfrastructure.CreateTestNodeRegistry();
+        var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new FutureKnowledgeModule(registry, logger, httpClient);
 
         var request = new FutureKnowledgeApplicationRequest(
             KnowledgeId: "test-knowledge",
-            TargetContext: "current-research"
+            TargetContext: "current-research",
+            Parameters: null
         );
 
         // Act
@@ -63,23 +65,24 @@ public class FutureKnowledgeModuleTests : IClassFixture<TestServerFixture>
 
         // Assert
         Assert.NotNull(result);
-        var errorResponse = result as ErrorResponse;
+        var errorResponse = result as CodexBootstrap.Core.ErrorResponse;
         Assert.NotNull(errorResponse);
-        Assert.Equal("Knowledge application not yet implemented", errorResponse.Message);
+        Assert.Equal("Knowledge application not yet implemented", errorResponse.Error);
     }
 
     [Fact]
     public async Task DiscoverPatterns_WithoutImplementation_ReturnsError()
     {
         // Arrange
-        var registry = new NodeRegistry();
-        var logger = new ConsoleLogger();
+        var registry = TestInfrastructure.CreateTestNodeRegistry();
+        var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new FutureKnowledgeModule(registry, logger, httpClient);
 
         var request = new PatternDiscoveryRequest(
             Domain: "consciousness",
-            Keywords: new[] { "emergence", "complexity" }
+            Keywords: new[] { "emergence", "complexity" },
+            TimeRange: null
         );
 
         // Act
@@ -87,17 +90,17 @@ public class FutureKnowledgeModuleTests : IClassFixture<TestServerFixture>
 
         // Assert
         Assert.NotNull(result);
-        var errorResponse = result as ErrorResponse;
+        var errorResponse = result as CodexBootstrap.Core.ErrorResponse;
         Assert.NotNull(errorResponse);
-        Assert.Equal("Pattern discovery not yet implemented", errorResponse.Message);
+        Assert.Equal("Pattern discovery not yet implemented", errorResponse.Error);
     }
 
     [Fact]
     public async Task AnalyzePatterns_WithoutImplementation_ReturnsError()
     {
         // Arrange
-        var registry = new NodeRegistry();
-        var logger = new ConsoleLogger();
+        var registry = TestInfrastructure.CreateTestNodeRegistry();
+        var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new FutureKnowledgeModule(registry, logger, httpClient);
 
@@ -111,17 +114,17 @@ public class FutureKnowledgeModuleTests : IClassFixture<TestServerFixture>
 
         // Assert
         Assert.NotNull(result);
-        var errorResponse = result as ErrorResponse;
+        var errorResponse = result as CodexBootstrap.Core.ErrorResponse;
         Assert.NotNull(errorResponse);
-        Assert.Equal("Pattern analysis not yet implemented", errorResponse.Message);
+        Assert.Equal("Pattern analysis not yet implemented", errorResponse.Error);
     }
 
     [Fact]
     public async Task GetTrendingPatterns_WithoutImplementation_ReturnsError()
     {
         // Arrange
-        var registry = new NodeRegistry();
-        var logger = new ConsoleLogger();
+        var registry = TestInfrastructure.CreateTestNodeRegistry();
+        var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new FutureKnowledgeModule(registry, logger, httpClient);
 
@@ -130,23 +133,24 @@ public class FutureKnowledgeModuleTests : IClassFixture<TestServerFixture>
 
         // Assert
         Assert.NotNull(result);
-        var errorResponse = result as ErrorResponse;
+        var errorResponse = result as CodexBootstrap.Core.ErrorResponse;
         Assert.NotNull(errorResponse);
-        Assert.Equal("Trending patterns not yet implemented", errorResponse.Message);
+        Assert.Equal("Trending patterns not yet implemented", errorResponse.Error);
     }
 
     [Fact]
     public async Task GeneratePrediction_WithoutImplementation_ReturnsError()
     {
         // Arrange
-        var registry = new NodeRegistry();
-        var logger = new ConsoleLogger();
+        var registry = TestInfrastructure.CreateTestNodeRegistry();
+        var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new FutureKnowledgeModule(registry, logger, httpClient);
 
         var request = new PatternPredictionRequest(
             PatternId: "test-pattern",
-            TimeHorizon: 10
+            TimeHorizon: 10,
+            Parameters: null
         );
 
         // Act
@@ -154,17 +158,17 @@ public class FutureKnowledgeModuleTests : IClassFixture<TestServerFixture>
 
         // Assert
         Assert.NotNull(result);
-        var errorResponse = result as ErrorResponse;
+        var errorResponse = result as CodexBootstrap.Core.ErrorResponse;
         Assert.NotNull(errorResponse);
-        Assert.Equal("Prediction generation not yet implemented", errorResponse.Message);
+        Assert.Equal("Prediction generation not yet implemented", errorResponse.Error);
     }
 
     [Fact]
     public void ModuleNode_HasCorrectProperties()
     {
         // Arrange
-        var registry = new NodeRegistry();
-        var logger = new ConsoleLogger();
+        var registry = TestInfrastructure.CreateTestNodeRegistry();
+        var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new FutureKnowledgeModule(registry, logger, httpClient);
 
@@ -183,8 +187,8 @@ public class FutureKnowledgeModuleTests : IClassFixture<TestServerFixture>
     public void Module_Description_NoLongerMentionsSimulation()
     {
         // Arrange
-        var registry = new NodeRegistry();
-        var logger = new ConsoleLogger();
+        var registry = TestInfrastructure.CreateTestNodeRegistry();
+        var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new FutureKnowledgeModule(registry, logger, httpClient);
 

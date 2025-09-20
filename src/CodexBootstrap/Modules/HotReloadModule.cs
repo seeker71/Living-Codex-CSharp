@@ -95,7 +95,7 @@ public sealed class HotReloadModule : ModuleBase
     }
 
     // Start watching for file changes
-    [ApiRoute("POST", "/hot-reload/start", "start-watching", "Start hot-reload file watching", "codex.hot-reload")]
+    [ApiRoute("POST", "/hot-reload/start", "hot-reload-start-watching", "Start hot-reload file watching", "codex.hot-reload")]
     public async Task<object> StartWatching([ApiParameter("body", "Watch configuration", Required = true, Location = "body")] WatchConfig config)
     {
         try
@@ -165,7 +165,7 @@ public sealed class HotReloadModule : ModuleBase
     }
 
     // Stop watching for file changes
-    [ApiRoute("POST", "/hot-reload/stop", "stop-watching", "Stop hot-reload file watching", "codex.hot-reload")]
+    [ApiRoute("POST", "/hot-reload/stop", "hot-reload-stop-watching", "Stop hot-reload file watching", "codex.hot-reload")]
     public async Task<object> StopWatching()
     {
         try
@@ -193,7 +193,7 @@ public sealed class HotReloadModule : ModuleBase
     }
 
     // Get hot-reload status
-    [ApiRoute("GET", "/hot-reload/status", "get-status", "Get hot-reload status", "codex.hot-reload")]
+    [ApiRoute("GET", "/hot-reload/status", "hot-reload-get-status", "Get hot-reload status", "codex.hot-reload")]
     public async Task<object> GetStatus()
     {
         try
@@ -216,7 +216,7 @@ public sealed class HotReloadModule : ModuleBase
     }
 
     // Manually trigger component regeneration
-    [ApiRoute("POST", "/hot-reload/regenerate", "regenerate-component", "AI-regenerate component from spec", "codex.hot-reload")]
+    [ApiRoute("POST", "/hot-reload/regenerate", "hot-reload-regenerate-component", "AI-regenerate component from spec", "codex.hot-reload")]
     public async Task<object> RegenerateComponent([ApiParameter("body", "Regeneration request", Required = true, Location = "body")] RegenerationRequest request)
     {
         try
@@ -289,7 +289,7 @@ public sealed class HotReloadModule : ModuleBase
     }
 
     // Hot-swap an existing component
-    [ApiRoute("POST", "/hot-reload/swap", "hot-swap-component", "Hot-swap component code", "codex.hot-reload")]
+    [ApiRoute("POST", "/hot-reload/swap", "hot-reload-hot-swap-component", "Hot-swap component code", "codex.hot-reload")]
     public async Task<object> HotSwapComponent([ApiParameter("body", "Hot-swap request", Required = true, Location = "body")] HotSwapRequest request)
     {
         try
@@ -344,7 +344,7 @@ public sealed class HotReloadModule : ModuleBase
     }
 
     // Get hot-reload history
-    [ApiRoute("GET", "/hot-reload/history", "get-history", "Get hot-reload event history", "codex.hot-reload")]
+    [ApiRoute("GET", "/hot-reload/history", "hot-reload-get-history", "Get hot-reload event history", "codex.hot-reload")]
     public async Task<object> GetHistory([ApiParameter("limit", "Number of events to return", Required = false, Location = "query")] int limit = 50)
     {
         try

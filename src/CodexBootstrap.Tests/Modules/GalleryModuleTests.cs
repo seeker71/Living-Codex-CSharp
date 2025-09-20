@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using CodexBootstrap.Modules;
 using CodexBootstrap.Core;
 using CodexBootstrap.Runtime;
-using CodexBootstrap.Tests;
+using CodexBootstrap.Tests.Modules;
 
 namespace CodexBootstrap.Tests.Modules;
 
@@ -23,8 +23,8 @@ public class GalleryModuleTests : IClassFixture<TestServerFixture>
     public async Task ListGalleryItems_WithoutMockData_ReturnsEmptyList()
     {
         // Arrange
-        var registry = new NodeRegistry();
-        var logger = new ConsoleLogger();
+        var registry = TestInfrastructure.CreateTestNodeRegistry();
+        var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new GalleryModule(registry, logger, httpClient);
 
@@ -44,8 +44,8 @@ public class GalleryModuleTests : IClassFixture<TestServerFixture>
     public async Task CreateGalleryItem_WithValidData_CreatesSuccessfully()
     {
         // Arrange
-        var registry = new NodeRegistry();
-        var logger = new ConsoleLogger();
+        var registry = TestInfrastructure.CreateTestNodeRegistry();
+        var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new GalleryModule(registry, logger, httpClient);
 
@@ -75,8 +75,8 @@ public class GalleryModuleTests : IClassFixture<TestServerFixture>
     public async Task CreateGalleryItem_WithoutTitle_ReturnsError()
     {
         // Arrange
-        var registry = new NodeRegistry();
-        var logger = new ConsoleLogger();
+        var registry = TestInfrastructure.CreateTestNodeRegistry();
+        var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new GalleryModule(registry, logger, httpClient);
 
@@ -92,17 +92,17 @@ public class GalleryModuleTests : IClassFixture<TestServerFixture>
 
         // Assert
         Assert.NotNull(result);
-        var errorResponse = result as ErrorResponse;
+        var errorResponse = result as CodexBootstrap.Core.ErrorResponse;
         Assert.NotNull(errorResponse);
-        Assert.Equal("Title and image URL are required", errorResponse.Message);
+        Assert.Equal("Title and image URL are required", errorResponse.Error);
     }
 
     [Fact]
     public async Task CreateGalleryItem_WithoutImageUrl_ReturnsError()
     {
         // Arrange
-        var registry = new NodeRegistry();
-        var logger = new ConsoleLogger();
+        var registry = TestInfrastructure.CreateTestNodeRegistry();
+        var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new GalleryModule(registry, logger, httpClient);
 
@@ -118,17 +118,17 @@ public class GalleryModuleTests : IClassFixture<TestServerFixture>
 
         // Assert
         Assert.NotNull(result);
-        var errorResponse = result as ErrorResponse;
+        var errorResponse = result as CodexBootstrap.Core.ErrorResponse;
         Assert.NotNull(errorResponse);
-        Assert.Equal("Title and image URL are required", errorResponse.Message);
+        Assert.Equal("Title and image URL are required", errorResponse.Error);
     }
 
     [Fact]
     public async Task GetGalleryItem_WithNonExistentId_ReturnsError()
     {
         // Arrange
-        var registry = new NodeRegistry();
-        var logger = new ConsoleLogger();
+        var registry = TestInfrastructure.CreateTestNodeRegistry();
+        var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new GalleryModule(registry, logger, httpClient);
 
@@ -137,17 +137,17 @@ public class GalleryModuleTests : IClassFixture<TestServerFixture>
 
         // Assert
         Assert.NotNull(result);
-        var errorResponse = result as ErrorResponse;
+        var errorResponse = result as CodexBootstrap.Core.ErrorResponse;
         Assert.NotNull(errorResponse);
-        Assert.Equal("Gallery item not found", errorResponse.Message);
+        Assert.Equal("Gallery item not found", errorResponse.Error);
     }
 
     [Fact]
     public async Task GenerateAIImage_WithoutPrompt_ReturnsError()
     {
         // Arrange
-        var registry = new NodeRegistry();
-        var logger = new ConsoleLogger();
+        var registry = TestInfrastructure.CreateTestNodeRegistry();
+        var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new GalleryModule(registry, logger, httpClient);
 
@@ -162,17 +162,17 @@ public class GalleryModuleTests : IClassFixture<TestServerFixture>
 
         // Assert
         Assert.NotNull(result);
-        var errorResponse = result as ErrorResponse;
+        var errorResponse = result as CodexBootstrap.Core.ErrorResponse;
         Assert.NotNull(errorResponse);
-        Assert.Equal("Prompt is required for AI image generation", errorResponse.Message);
+        Assert.Equal("Prompt is required for AI image generation", errorResponse.Error);
     }
 
     [Fact]
     public void ModuleNode_HasCorrectProperties()
     {
         // Arrange
-        var registry = new NodeRegistry();
-        var logger = new ConsoleLogger();
+        var registry = TestInfrastructure.CreateTestNodeRegistry();
+        var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new GalleryModule(registry, logger, httpClient);
 

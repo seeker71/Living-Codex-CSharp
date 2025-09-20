@@ -277,7 +277,7 @@ namespace CodexBootstrap.Modules
         /// <summary>
         /// Start hot-reload file watching
         /// </summary>
-        [ApiRoute("POST", "/self-update/start-watching", "start-watching", "Start hot-reload file watching", "self-update")]
+        [ApiRoute("POST", "/self-update/start-watching", "self-update-start-watching", "Start hot-reload file watching", "self-update")]
         public async Task<object> StartWatching([ApiParameter("body", "Watch configuration", Required = true, Location = "body")] WatchConfig config)
         {
             try
@@ -300,7 +300,7 @@ namespace CodexBootstrap.Modules
         /// <summary>
         /// Stop hot-reload file watching
         /// </summary>
-        [ApiRoute("POST", "/self-update/stop-watching", "stop-watching", "Stop hot-reload file watching", "self-update")]
+        [ApiRoute("POST", "/self-update/stop-watching", "self-update-stop-watching", "Stop hot-reload file watching", "self-update")]
         public async Task<object> StopWatching()
         {
             try
@@ -322,7 +322,7 @@ namespace CodexBootstrap.Modules
         /// <summary>
         /// Get hot-reload status
         /// </summary>
-        [ApiRoute("GET", "/self-update/hot-reload-status", "get-hot-reload-status", "Get hot-reload status", "self-update")]
+        [ApiRoute("GET", "/self-update/hot-reload-status", "self-update-get-hot-reload-status", "Get hot-reload status", "self-update")]
         public async Task<object> GetHotReloadStatus()
         {
             try
@@ -344,7 +344,7 @@ namespace CodexBootstrap.Modules
         /// <summary>
         /// AI-regenerate component
         /// </summary>
-        [ApiRoute("POST", "/self-update/regenerate-component", "regenerate-component", "AI-regenerate component from spec", "self-update")]
+        [ApiRoute("POST", "/self-update/regenerate-component", "self-update-regenerate-component", "AI-regenerate component from spec", "self-update")]
         public async Task<object> RegenerateComponent([ApiParameter("body", "Regeneration request", Required = true, Location = "body")] RegenerationRequest request)
         {
             try
@@ -366,7 +366,7 @@ namespace CodexBootstrap.Modules
         /// <summary>
         /// Hot-swap component code
         /// </summary>
-        [ApiRoute("POST", "/self-update/hot-swap", "hot-swap-component", "Hot-swap component code", "self-update")]
+        [ApiRoute("POST", "/self-update/hot-swap", "self-update-hot-swap-component", "Hot-swap component code", "self-update")]
         public async Task<object> HotSwapComponent([ApiParameter("body", "Hot-swap request", Required = true, Location = "body")] HotSwapRequest request)
         {
             try
@@ -388,7 +388,7 @@ namespace CodexBootstrap.Modules
         /// <summary>
         /// Get hot-reload history
         /// </summary>
-        [ApiRoute("GET", "/self-update/hot-reload-history", "get-hot-reload-history", "Get hot-reload event history", "self-update")]
+        [ApiRoute("GET", "/self-update/hot-reload-history", "self-update-get-hot-reload-history", "Get hot-reload event history", "self-update")]
         public async Task<object> GetHotReloadHistory([ApiParameter("limit", "Number of events to return", Required = false, Location = "query")] int limit = 50)
         {
             try

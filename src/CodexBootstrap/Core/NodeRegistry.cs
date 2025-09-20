@@ -11,7 +11,8 @@ namespace CodexBootstrap.Core;
 /// - Water nodes: Stored in semi-persistent, local cache (SQLite)
 /// - Gas nodes: Generated on-demand, not persisted
 /// <remarks>
-/// Edge durability matches the colder endpoint: mixed-state links remain in-memory (Gas) until both nodes reach Water or Ice.
+/// Edge durability matches the more fluid endpoint: edges persist in the most fluid state of their endpoints (Gas > Water > Ice).
+/// This ensures edges can only link from inside out, not outside in.
 /// </remarks>
 /// </summary>
 public class NodeRegistry : INodeRegistry
@@ -108,6 +109,8 @@ public class NodeRegistry : INodeRegistry
 
             foreach (var node in iceNodes)
             {
+                if (node == null) continue; // Skip null nodes
+                
                 var normalizedNode = node.State == ContentState.Ice
                     ? node
                     : node with { State = ContentState.Ice };
@@ -117,6 +120,8 @@ public class NodeRegistry : INodeRegistry
 
             foreach (var node in waterNodes)
             {
+                if (node == null) continue; // Skip null nodes
+                
                 if (_iceNodes.ContainsKey(node.Id))
                 {
                     skippedWaterCount++;
@@ -350,17 +355,26 @@ public class NodeRegistry : INodeRegistry
         var fromState = TryGetNodeStateUnsafe(fromId);
         var toState = TryGetNodeStateUnsafe(toId);
 
-        if (fromState == ContentState.Ice && toState == ContentState.Ice)
+        // If either endpoint is null (node not found), default to Gas
+        if (fromState == null || toState == null)
         {
-            return ContentState.Ice;
+            return ContentState.Gas;
         }
 
-        if (fromState == ContentState.Water && toState == ContentState.Water)
+        // Edge persists in the more fluid state (Gas > Water > Ice)
+        // This ensures edges can only link from inside out, not outside in
+        if (fromState == ContentState.Gas || toState == ContentState.Gas)
+        {
+            return ContentState.Gas;
+        }
+
+        if (fromState == ContentState.Water || toState == ContentState.Water)
         {
             return ContentState.Water;
         }
 
-        return ContentState.Gas;
+        // Both endpoints are Ice
+        return ContentState.Ice;
     }
 
     private ContentState? TryGetNodeStateUnsafe(string nodeId)
@@ -391,6 +405,11 @@ public class NodeRegistry : INodeRegistry
         {
             PersistEdgeToIce(record.Edge);
         }
+        else if (state == ContentState.Water)
+        {
+            PersistEdgeToWater(record.Edge);
+        }
+        // Gas edges remain in memory only
     }
 
     private void HandleEdgeStateTransition(string edgeKey, EdgeRecord record, ContentState previousState, ContentState newState)
@@ -400,17 +419,28 @@ public class NodeRegistry : INodeRegistry
             return;
         }
 
+        // Remove from previous storage
         if (previousState == ContentState.Ice && newState != ContentState.Ice)
         {
             RemoveEdgeFromIce(record.Edge);
         }
+        else if (previousState == ContentState.Water && newState != ContentState.Water)
+        {
+            RemoveEdgeFromWater(record.Edge);
+        }
 
         record.UpdateState(newState);
 
+        // Store in new storage
         if (newState == ContentState.Ice)
         {
             PersistEdgeToIce(record.Edge);
         }
+        else if (newState == ContentState.Water)
+        {
+            PersistEdgeToWater(record.Edge);
+        }
+        // Gas edges remain in memory only
     }
 
     private void PersistEdgeToIce(Edge edge)
@@ -441,6 +471,38 @@ public class NodeRegistry : INodeRegistry
             catch (Exception ex)
             {
                 _logger.Error($"Error removing edge {edge.FromId}->{edge.ToId}: {ex.Message}", ex);
+            }
+        });
+    }
+
+    private void PersistEdgeToWater(Edge edge)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _waterStorage.StoreWaterEdgeAsync(edge);
+                _logger.Debug($"Stored edge {edge.FromId}->{edge.ToId} in Water storage");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error storing edge {edge.FromId}->{edge.ToId} in Water storage: {ex.Message}", ex);
+            }
+        });
+    }
+
+    private void RemoveEdgeFromWater(Edge edge)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _waterStorage.DeleteWaterEdgeAsync(edge.FromId, edge.ToId, edge.Role);
+                _logger.Debug($"Removed edge {edge.FromId}->{edge.ToId} from Water storage");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error removing edge {edge.FromId}->{edge.ToId} from Water storage: {ex.Message}", ex);
             }
         });
     }

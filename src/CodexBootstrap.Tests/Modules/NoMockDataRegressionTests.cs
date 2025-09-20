@@ -22,7 +22,7 @@ public class NoMockDataRegressionTests : IClassFixture<TestServerFixture>
     public NoMockDataRegressionTests(TestServerFixture fixture)
     {
         _fixture = fixture;
-        _client = _fixture.Client;
+        _client = _fixture.HttpClient;
     }
 
     [Fact]

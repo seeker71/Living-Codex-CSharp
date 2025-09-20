@@ -5,6 +5,7 @@ namespace CodexBootstrap.Core.Storage
     public class InMemoryWaterStorageBackend : IWaterStorageBackend
     {
         private readonly ConcurrentDictionary<string, (Node node, DateTime? expiry)> _nodes = new();
+        private readonly ConcurrentDictionary<string, (Edge edge, DateTime? expiry)> _edges = new();
 
         public Task InitializeAsync()
         {
@@ -115,6 +116,48 @@ namespace CodexBootstrap.Core.Storage
                 .Select(n => n.node)
                 .Take(limit);
             return Task.FromResult(results);
+        }
+
+        public Task StoreWaterEdgeAsync(Edge edge, TimeSpan? expiry = null)
+        {
+            var expiryTime = expiry.HasValue ? DateTime.UtcNow.Add(expiry.Value) : (DateTime?)null;
+            var edgeKey = $"{edge.FromId}->{edge.ToId}:{edge.Role}";
+            _edges[edgeKey] = (edge, expiryTime);
+            return Task.CompletedTask;
+        }
+
+        public Task<IEnumerable<Edge>> GetAllWaterEdgesAsync()
+        {
+            var now = DateTime.UtcNow;
+            var validEdges = _edges.Values
+                .Where(e => !e.expiry.HasValue || now <= e.expiry.Value)
+                .Select(e => e.edge);
+            return Task.FromResult(validEdges);
+        }
+
+        public Task<IEnumerable<Edge>> GetWaterEdgesFromAsync(string fromId)
+        {
+            var now = DateTime.UtcNow;
+            var validEdges = _edges.Values
+                .Where(e => (!e.expiry.HasValue || now <= e.expiry.Value) && e.edge.FromId == fromId)
+                .Select(e => e.edge);
+            return Task.FromResult(validEdges);
+        }
+
+        public Task<IEnumerable<Edge>> GetWaterEdgesToAsync(string toId)
+        {
+            var now = DateTime.UtcNow;
+            var validEdges = _edges.Values
+                .Where(e => (!e.expiry.HasValue || now <= e.expiry.Value) && e.edge.ToId == toId)
+                .Select(e => e.edge);
+            return Task.FromResult(validEdges);
+        }
+
+        public Task DeleteWaterEdgeAsync(string fromId, string toId, string role)
+        {
+            var edgeKey = $"{fromId}->{toId}:{role}";
+            _edges.TryRemove(edgeKey, out _);
+            return Task.CompletedTask;
         }
 
         public void Dispose()

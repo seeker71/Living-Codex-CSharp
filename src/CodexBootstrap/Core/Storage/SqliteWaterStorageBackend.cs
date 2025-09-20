@@ -55,19 +55,39 @@ public class SqliteWaterStorageBackend : IWaterStorageBackend
                 generated_from TEXT
             )";
 
-        // Create indexes for Water nodes
+        // Create table for Water edges with expiry
+        var createWaterEdgesTable = @"
+            CREATE TABLE IF NOT EXISTS water_edges (
+                from_id TEXT NOT NULL,
+                to_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                weight REAL,
+                meta TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                expires_at DATETIME NOT NULL,
+                PRIMARY KEY (from_id, to_id, role)
+            )";
+
+        // Create indexes for Water nodes and edges
         var createIndexes = @"
             CREATE INDEX IF NOT EXISTS idx_water_nodes_type_id ON water_nodes(type_id);
             CREATE INDEX IF NOT EXISTS idx_water_nodes_expires_at ON water_nodes(expires_at);
             CREATE INDEX IF NOT EXISTS idx_water_nodes_generated_from ON water_nodes(generated_from);
             CREATE INDEX IF NOT EXISTS idx_water_nodes_created_at ON water_nodes(created_at);
+            CREATE INDEX IF NOT EXISTS idx_water_edges_from_id ON water_edges(from_id);
+            CREATE INDEX IF NOT EXISTS idx_water_edges_to_id ON water_edges(to_id);
+            CREATE INDEX IF NOT EXISTS idx_water_edges_expires_at ON water_edges(expires_at);
         ";
 
         using var command1 = new SqliteCommand(createWaterNodesTable, connection);
         await command1.ExecuteNonQueryAsync();
 
-        using var command2 = new SqliteCommand(createIndexes, connection);
+        using var command2 = new SqliteCommand(createWaterEdgesTable, connection);
         await command2.ExecuteNonQueryAsync();
+
+        using var command3 = new SqliteCommand(createIndexes, connection);
+        await command3.ExecuteNonQueryAsync();
 
         _logger.Info("SQLite Water storage backend initialized");
     }
@@ -359,6 +379,127 @@ public class SqliteWaterStorageBackend : IWaterStorageBackend
         return nodes;
     }
 
+    public async Task StoreWaterEdgeAsync(Edge edge, TimeSpan? expiry = null)
+    {
+        var actualExpiry = expiry ?? _defaultExpiry;
+        var expiresAt = DateTime.UtcNow.Add(actualExpiry);
+
+        using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+
+        var sql = @"
+            INSERT OR REPLACE INTO water_edges (from_id, to_id, role, weight, meta, updated_at, expires_at)
+            VALUES (@fromId, @toId, @role, @weight, @meta, @updatedAt, @expiresAt)";
+
+        using var command = new SqliteCommand(sql, connection);
+        command.Parameters.AddWithValue("@fromId", edge.FromId);
+        command.Parameters.AddWithValue("@toId", edge.ToId);
+        command.Parameters.AddWithValue("@role", edge.Role);
+        command.Parameters.AddWithValue("@weight", edge.Weight ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("@meta", edge.Meta != null ? JsonSerializer.Serialize(edge.Meta, _jsonOptions) : (object)DBNull.Value);
+        command.Parameters.AddWithValue("@updatedAt", DateTime.UtcNow);
+        command.Parameters.AddWithValue("@expiresAt", expiresAt);
+
+        await command.ExecuteNonQueryAsync();
+    }
+
+    public async Task<IEnumerable<Edge>> GetAllWaterEdgesAsync()
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+
+        var sql = @"
+            SELECT * FROM water_edges 
+            WHERE expires_at > @now 
+            ORDER BY created_at";
+
+        using var command = new SqliteCommand(sql, connection);
+        command.Parameters.AddWithValue("@now", DateTime.UtcNow);
+        using var reader = await command.ExecuteReaderAsync();
+
+        var edges = new List<Edge>();
+        while (await reader.ReadAsync())
+        {
+            var edge = MapEdgeFromReader(reader);
+            if (edge != null)
+            {
+                edges.Add(edge);
+            }
+        }
+
+        return edges;
+    }
+
+    public async Task<IEnumerable<Edge>> GetWaterEdgesFromAsync(string fromId)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+
+        var sql = @"
+            SELECT * FROM water_edges 
+            WHERE from_id = @fromId AND expires_at > @now 
+            ORDER BY created_at";
+
+        using var command = new SqliteCommand(sql, connection);
+        command.Parameters.AddWithValue("@fromId", fromId);
+        command.Parameters.AddWithValue("@now", DateTime.UtcNow);
+        using var reader = await command.ExecuteReaderAsync();
+
+        var edges = new List<Edge>();
+        while (await reader.ReadAsync())
+        {
+            var edge = MapEdgeFromReader(reader);
+            if (edge != null)
+            {
+                edges.Add(edge);
+            }
+        }
+
+        return edges;
+    }
+
+    public async Task<IEnumerable<Edge>> GetWaterEdgesToAsync(string toId)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+
+        var sql = @"
+            SELECT * FROM water_edges 
+            WHERE to_id = @toId AND expires_at > @now 
+            ORDER BY created_at";
+
+        using var command = new SqliteCommand(sql, connection);
+        command.Parameters.AddWithValue("@toId", toId);
+        command.Parameters.AddWithValue("@now", DateTime.UtcNow);
+        using var reader = await command.ExecuteReaderAsync();
+
+        var edges = new List<Edge>();
+        while (await reader.ReadAsync())
+        {
+            var edge = MapEdgeFromReader(reader);
+            if (edge != null)
+            {
+                edges.Add(edge);
+            }
+        }
+
+        return edges;
+    }
+
+    public async Task DeleteWaterEdgeAsync(string fromId, string toId, string role)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+
+        var sql = "DELETE FROM water_edges WHERE from_id = @fromId AND to_id = @toId AND role = @role";
+        using var command = new SqliteCommand(sql, connection);
+        command.Parameters.AddWithValue("@fromId", fromId);
+        command.Parameters.AddWithValue("@toId", toId);
+        command.Parameters.AddWithValue("@role", role);
+
+        await command.ExecuteNonQueryAsync();
+    }
+
     private async Task<Node?> MapNodeFromReader(SqliteDataReader reader)
     {
         try
@@ -388,6 +529,31 @@ public class SqliteWaterStorageBackend : IWaterStorageBackend
         catch (Exception ex)
         {
             _logger.Error($"Error mapping Water node from reader: {ex.Message}", ex);
+            return null;
+        }
+    }
+
+    private Edge? MapEdgeFromReader(SqliteDataReader reader)
+    {
+        try
+        {
+            var fromId = reader.GetString(reader.GetOrdinal("from_id"));
+            var toId = reader.GetString(reader.GetOrdinal("to_id"));
+            var role = reader.GetString(reader.GetOrdinal("role"));
+            var weight = reader.IsDBNull(reader.GetOrdinal("weight")) ? null : (double?)reader.GetDouble(reader.GetOrdinal("weight"));
+
+            Dictionary<string, object>? meta = null;
+            if (!reader.IsDBNull(reader.GetOrdinal("meta")))
+            {
+                var metaJson = reader.GetString(reader.GetOrdinal("meta"));
+                meta = JsonSerializer.Deserialize<Dictionary<string, object>>(metaJson, _jsonOptions);
+            }
+
+            return new Edge(fromId, toId, role, weight, meta);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error mapping Water edge from reader: {ex.Message}", ex);
             return null;
         }
     }

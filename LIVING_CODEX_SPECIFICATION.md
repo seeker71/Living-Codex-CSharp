@@ -33,6 +33,10 @@ All meta-node TypeIds now follow the `codex.meta/` prefix convention:
 ### Node Registry Architecture
 - **Single Global Registry**: Only one NodeRegistry instance in the entire system
 - **Node State Lifecycle**: Ice (persistent), Water (semi-persistent), Gas (transient)
+- **Enhanced Edge Persistence**: Edges persist in the more fluid backend when endpoints are in different states
+  - **Fluid State Hierarchy**: Gas > Water > Ice (Gas is most fluid)
+  - **Inside-Out Linking**: Edges can only link from inside out, not outside in
+  - **Dynamic Migration**: Edges automatically migrate between storage backends based on endpoint state changes
 - **No Local Registries**: All modules must use the global registry via constructor injection
 - **Portal Pattern**: External data access through unified portal modules (news, search, APIs, sensors)
 
@@ -40,26 +44,31 @@ All meta-node TypeIds now follow the `codex.meta/` prefix convention:
 
 **CURRENT STATE: PRODUCTION READY**  
 **OVERALL COMPLETION: 85%**  
-**RECENT IMPROVEMENTS: AUTHENTICATION UNIFIED, META-NODE STANDARDIZATION, DYNAMIC NODE TYPE DISCOVERY, GRAPH PAGE ENHANCED**
+**RECENT IMPROVEMENTS: ENHANCED EDGE PERSISTENCE, AUTHENTICATION UNIFIED, META-NODE STANDARDIZATION, DYNAMIC NODE TYPE DISCOVERY, GRAPH PAGE ENHANCED**
 
 ### ✅ Recently Resolved Issues
-1. **Authentication Unified**: All auth endpoints consolidated into IdentityModule with JWT tokens, session management, and enhanced security
-2. **Meta-Node Standardization**: Systematically updated all meta-node TypeIds to use `codex.meta/` prefix (meta.type → codex.meta/type, meta.route → codex.meta/route, meta.method → codex.meta/method)
-3. **Dynamic Node Type Discovery**: Replaced hardcoded nodeTypes with backend API that returns all available types with counts
-4. **Graph Page Enhanced**: Comprehensive graph visualization with real-time data, node explorer, edge browser, and insights
-5. **React Infinite Re-render Fixed**: Resolved infinite re-render issues on discover and home pages using useCallback
-6. **User Profile Integration**: Complete user authentication system with energy balance, contributions, and personalized news feed
-7. **Real User Tracking**: Fixed demo-user issue, now properly tracks authenticated users in contributions and news feed
-8. **News Feed Concept Matching**: Implemented user concept interaction tracking for personalized news feed
-9. **Build System Fixed**: ILogger naming conflicts resolved, compilation successful
-10. **Port Testing Implemented**: Comprehensive testing across 8 different ports (5002-5009)
-11. **OAuth System Restored**: Complete OAuth authentication with 5 providers (Google, Microsoft, GitHub, Facebook, Twitter)
-12. **User Discovery Implemented**: Advanced user discovery by interests, location, and concept contributions
-13. **News Streaming Working**: Real-time news ingestion with AI processing and fractal transformation
-14. **U-CORE Integration Complete**: Dynamic ontology axis loading with 7 axes (abundance, unity, resonance, innovation, science, consciousness, impact)
-15. **NodeRegistry Architecture Unified**: Single INodeRegistry interface, eliminated multiple implementations
-16. **Persistent Storage Integrated**: Ice (PostgreSQL) and Water (SQLite) storage backends implemented
-17. **Interface-Based Access**: All code now accesses registry through INodeRegistry interface
+1. **Enhanced Edge Persistence**: Implemented fluid state edge persistence where edges persist in the more fluid backend (Gas > Water > Ice)
+   - Edges automatically migrate between Ice and Water storage based on endpoint state changes
+   - Inside-out linking principle enforced: edges can only link from inside out, not outside in
+   - Comprehensive test coverage with 9 StateTransitionTests validating all scenarios
+   - Extended IWaterStorageBackend interface to support edge operations
+2. **Authentication Unified**: All auth endpoints consolidated into IdentityModule with JWT tokens, session management, and enhanced security
+3. **Meta-Node Standardization**: Systematically updated all meta-node TypeIds to use `codex.meta/` prefix (meta.type → codex.meta/type, meta.route → codex.meta/route, meta.method → codex.meta/method)
+4. **Dynamic Node Type Discovery**: Replaced hardcoded nodeTypes with backend API that returns all available types with counts
+5. **Graph Page Enhanced**: Comprehensive graph visualization with real-time data, node explorer, edge browser, and insights
+6. **React Infinite Re-render Fixed**: Resolved infinite re-render issues on discover and home pages using useCallback
+7. **User Profile Integration**: Complete user authentication system with energy balance, contributions, and personalized news feed
+8. **Real User Tracking**: Fixed demo-user issue, now properly tracks authenticated users in contributions and news feed
+9. **News Feed Concept Matching**: Implemented user concept interaction tracking for personalized news feed
+10. **Build System Fixed**: ILogger naming conflicts resolved, compilation successful
+11. **Port Testing Implemented**: Comprehensive testing across 8 different ports (5002-5009)
+12. **OAuth System Restored**: Complete OAuth authentication with 5 providers (Google, Microsoft, GitHub, Facebook, Twitter)
+13. **User Discovery Implemented**: Advanced user discovery by interests, location, and concept contributions
+14. **News Streaming Working**: Real-time news ingestion with AI processing and fractal transformation
+15. **U-CORE Integration Complete**: Dynamic ontology axis loading with 7 axes (abundance, unity, resonance, innovation, science, consciousness, impact)
+16. **NodeRegistry Architecture Unified**: Single INodeRegistry interface, eliminated multiple implementations
+17. **Persistent Storage Integrated**: Ice (PostgreSQL) and Water (SQLite) storage backends implemented
+18. **Interface-Based Access**: All code now accesses registry through INodeRegistry interface
 
 ### 🚨 Remaining Production Blockers
 1. **UI Feature Gap**: 60% of backend capabilities lack UI interfaces (news, ontology, people, portals, creation, node details)
@@ -110,7 +119,7 @@ All meta-node TypeIds now follow the `codex.meta/` prefix convention:
 6. **Scalability**: In-memory only, distributed support needs testing
 
 ### ⚠️ Implementation Limitations (Current State)
-- **Node Lifecycle & Edges**: `NodeRegistry` only persists edges when both endpoints reach Water or Ice. Mixed-state links stay in-memory, so cross-phase relationships disappear after restart.
+- **~~Node Lifecycle & Edges~~**: ✅ **RESOLVED** - Enhanced edge persistence system now stores edges in the more fluid backend when endpoints are in different states (Gas > Water > Ice). Edges can only link from inside out, not outside in.
 - **Simulation-heavy Modules**: `FutureKnowledgeModule`, `IntelligentCachingModule`, and several AI helpers return synthetic data through `Simulate*` methods; they are placeholders for production inference pipelines.
 - **Abundance System**: `UserContributionsModule` operates entirely in-memory; Ethereum/Web3 calls are stubbed and no on-chain state exists today.
 - **News Ingestion**: `RealtimeNewsStreamModule` needs external API keys. Without them, `NewsFeedModule` responds from cached samples rather than live sources.
@@ -144,10 +153,14 @@ All meta-node TypeIds now follow the `codex.meta/` prefix convention:
 
 ### 1. Core Framework (60% Complete - ARCHITECTURE SOLIDIFIED)
 - **Future Framework Node**: 52 modules implemented, architecture unified
-- **Node Registry System**: ✅ **UNIFIED ARCHITECTURE COMPLETE**
+- **Node Registry System**: ✅ **UNIFIED ARCHITECTURE COMPLETE WITH ENHANCED EDGE PERSISTENCE**
   - Single INodeRegistry interface with unified implementation
   - Ice (PostgreSQL) and Water (SQLite) storage backends integrated
   - Proper node state lifecycle management (Ice/Water/Gas)
+  - ✅ **Enhanced Edge Persistence System**: Edges persist in more fluid backend (Gas > Water > Ice)
+  - ✅ **Dynamic Edge Migration**: Edges automatically migrate between storage backends on state changes
+  - ✅ **Inside-Out Linking**: Edges can only link from inside out, maintaining architectural integrity
+  - ✅ **Comprehensive Test Coverage**: 9 StateTransitionTests validating all edge persistence scenarios
   - No local registries - all modules use global registry via constructor injection
 - **API Route Discovery**: 363 endpoints registered, single constructor pattern enforced
 - **Module Loading**: ✅ **REFACTORED WITH MULTI-PHASE LOADING**

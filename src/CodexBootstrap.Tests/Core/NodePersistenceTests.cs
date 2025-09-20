@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using CodexBootstrap.Core;
 using CodexBootstrap.Core.Storage;
+using CodexBootstrap.Tests.Modules;
 using FluentAssertions;
 using Moq;
 using Xunit;
@@ -17,14 +18,14 @@ namespace CodexBootstrap.Tests.Core
     public class NodePersistenceTests
     {
         private readonly Mock<ICodexLogger> _mockLogger;
-        private readonly PersistentTestStorageBackend _iceStorage;
-        private readonly PersistentTestStorageBackend _waterStorage;
+        private readonly TestIceStorageBackend _iceStorage;
+        private readonly TestWaterStorageBackend _waterStorage;
 
         public NodePersistenceTests()
         {
             _mockLogger = new Mock<ICodexLogger>();
-            _iceStorage = new PersistentTestStorageBackend("Ice");
-            _waterStorage = new PersistentTestStorageBackend("Water");
+            _iceStorage = new TestIceStorageBackend();
+            _waterStorage = new TestWaterStorageBackend();
         }
 
         /// <summary>
@@ -166,12 +167,6 @@ namespace CodexBootstrap.Tests.Core
                 return Task.FromResult(results);
             }
 
-            public Task<Edge?> GetEdgeAsync(string fromId, string toId, string role)
-            {
-                var edgeKey = $"{fromId}->{toId}:{role}";
-                _persistentEdges.TryGetValue(edgeKey, out var edge);
-                return Task.FromResult(edge);
-            }
 
             #endregion
 
@@ -225,7 +220,7 @@ namespace CodexBootstrap.Tests.Core
                 Locale: "en",
                 Title: "Test Ice Node",
                 Description: "A test node in Ice state",
-                Content: new NodeContent(InlineJson: "{\"data\": \"ice-data\"}"),
+                Content: new ContentRef(MediaType: "application/json", InlineJson: "{\"data\": \"ice-data\"}", InlineBytes: null, ExternalUri: null),
                 Meta: new Dictionary<string, object> { { "test", "ice-value" } }
             );
 
@@ -234,10 +229,10 @@ namespace CodexBootstrap.Tests.Core
             await Task.Delay(100); // Allow async storage to complete
 
             // Assert
-            _iceStorage.GetPersistentNodes().Should().ContainKey("test-ice-node");
-            _waterStorage.GetPersistentNodes().Should().NotContainKey("test-ice-node");
+            _iceStorage.GetPersistentNodes().Should().Contain(n => n.Id == "test-ice-node");
+            _waterStorage.GetPersistentNodes().Should().NotContain(n => n.Id == "test-ice-node");
 
-            var storedNode = _iceStorage.GetPersistentNodes()["test-ice-node"];
+            var storedNode = _iceStorage.GetPersistentNodes().First(n => n.Id == "test-ice-node");
             storedNode.State.Should().Be(ContentState.Ice);
             storedNode.Title.Should().Be("Test Ice Node");
             storedNode.Content?.InlineJson.Should().Be("{\"data\": \"ice-data\"}");
@@ -257,7 +252,7 @@ namespace CodexBootstrap.Tests.Core
                 Locale: "en",
                 Title: "Test Water Node",
                 Description: "A test node in Water state",
-                Content: new NodeContent(InlineJson: "{\"data\": \"water-data\"}"),
+                Content: new ContentRef(MediaType: "application/json", InlineJson: "{\"data\": \"water-data\"}", InlineBytes: null, ExternalUri: null),
                 Meta: new Dictionary<string, object> { { "test", "water-value" } }
             );
 
@@ -266,10 +261,10 @@ namespace CodexBootstrap.Tests.Core
             await Task.Delay(100); // Allow async storage to complete
 
             // Assert
-            _waterStorage.GetPersistentNodes().Should().ContainKey("test-water-node");
-            _iceStorage.GetPersistentNodes().Should().NotContainKey("test-water-node");
+            _waterStorage.GetPersistentNodes().Should().Contain(n => n.Id == "test-water-node");
+            _iceStorage.GetPersistentNodes().Should().NotContain(n => n.Id == "test-water-node");
 
-            var storedNode = _waterStorage.GetPersistentNodes()["test-water-node"];
+            var storedNode = _waterStorage.GetPersistentNodes().First(n => n.Id == "test-water-node");
             storedNode.State.Should().Be(ContentState.Water);
             storedNode.Title.Should().Be("Test Water Node");
             storedNode.Content?.InlineJson.Should().Be("{\"data\": \"water-data\"}");
@@ -289,7 +284,7 @@ namespace CodexBootstrap.Tests.Core
                 Locale: "en",
                 Title: "Test Gas Node",
                 Description: "A test node in Gas state",
-                Content: new NodeContent(InlineJson: "{\"data\": \"gas-data\"}"),
+                Content: new ContentRef(MediaType: "application/json", InlineJson: "{\"data\": \"gas-data\"}", InlineBytes: null, ExternalUri: null),
                 Meta: new Dictionary<string, object> { { "test", "gas-value" } }
             );
 
@@ -298,8 +293,8 @@ namespace CodexBootstrap.Tests.Core
             await Task.Delay(100); // Allow any potential storage to complete
 
             // Assert - Gas nodes should not be persisted
-            _iceStorage.GetPersistentNodes().Should().NotContainKey("test-gas-node");
-            _waterStorage.GetPersistentNodes().Should().NotContainKey("test-gas-node");
+            _iceStorage.GetPersistentNodes().Should().NotContain(n => n.Id == "test-gas-node");
+            _waterStorage.GetPersistentNodes().Should().NotContain(n => n.Id == "test-gas-node");
 
             // But should be available in memory
             registry.TryGet("test-gas-node", out var retrievedNode).Should().BeTrue();
@@ -320,7 +315,7 @@ namespace CodexBootstrap.Tests.Core
                 Locale: "en",
                 Title: "Transition Node",
                 Description: "A node that will transition states",
-                Content: new NodeContent(InlineJson: "{\"data\": \"original\"}"),
+                Content: new ContentRef(MediaType: "application/json", InlineJson: "{\"data\": \"original\"}", InlineBytes: null, ExternalUri: null),
                 Meta: new Dictionary<string, object> { { "version", 1 } }
             );
 
@@ -329,23 +324,23 @@ namespace CodexBootstrap.Tests.Core
             await Task.Delay(100);
 
             // Assert 1: Should be in Ice storage
-            _iceStorage.GetPersistentNodes().Should().ContainKey("transition-node");
-            _waterStorage.GetPersistentNodes().Should().NotContainKey("transition-node");
+            _iceStorage.GetPersistentNodes().Should().Contain(n => n.Id == "transition-node");
+            _waterStorage.GetPersistentNodes().Should().NotContain(n => n.Id == "transition-node");
 
             // Act 2: Transition to Water
             var waterNode = iceNode with { 
                 State = ContentState.Water,
-                Content = new NodeContent(InlineJson: "{\"data\": \"updated\"}"),
+                Content = new ContentRef(MediaType: "application/json", InlineJson: "{\"data\": \"updated\"}", InlineBytes: null, ExternalUri: null),
                 Meta = new Dictionary<string, object> { { "version", 2 } }
             };
             registry.Upsert(waterNode);
             await Task.Delay(100);
 
             // Assert 2: Should be in Water storage, removed from Ice
-            _waterStorage.GetPersistentNodes().Should().ContainKey("transition-node");
+            _waterStorage.GetPersistentNodes().Should().Contain(n => n.Id == "transition-node");
             // Note: Ice storage might still contain the old version until cleanup
             
-            var storedWaterNode = _waterStorage.GetPersistentNodes()["transition-node"];
+            var storedWaterNode = _waterStorage.GetPersistentNodes().First(n => n.Id == "transition-node");
             storedWaterNode.State.Should().Be(ContentState.Water);
             storedWaterNode.Content?.InlineJson.Should().Be("{\"data\": \"updated\"}");
             storedWaterNode.Meta?["version"].Should().Be(2);
@@ -365,7 +360,7 @@ namespace CodexBootstrap.Tests.Core
                 Locale: "en",
                 Title: "Water to Gas Node",
                 Description: "A node that will become Gas",
-                Content: new NodeContent(InlineJson: "{\"data\": \"water-data\"}"),
+                Content: new ContentRef(MediaType: "application/json", InlineJson: "{\"data\": \"water-data\"}", InlineBytes: null, ExternalUri: null),
                 Meta: new Dictionary<string, object> { { "test", "water" } }
             );
 
@@ -374,7 +369,7 @@ namespace CodexBootstrap.Tests.Core
             await Task.Delay(100);
 
             // Assert 1: Should be in Water storage
-            _waterStorage.GetPersistentNodes().Should().ContainKey("water-to-gas-node");
+            _waterStorage.GetPersistentNodes().Should().Contain(n => n.Id == "water-to-gas-node");
 
             // Act 2: Transition to Gas
             var gasNode = waterNode with { State = ContentState.Gas };
@@ -407,8 +402,8 @@ namespace CodexBootstrap.Tests.Core
 
             // Assert - Nodes are persisted
             _iceStorage.GetPersistentNodes().Should().HaveCount(2);
-            _iceStorage.GetPersistentNodes().Should().ContainKey("ice-1");
-            _iceStorage.GetPersistentNodes().Should().ContainKey("ice-2");
+            _iceStorage.GetPersistentNodes().Should().Contain(n => n.Id == "ice-1");
+            _iceStorage.GetPersistentNodes().Should().Contain(n => n.Id == "ice-2");
 
             // Act - Simulate server restart by creating new registry (cache cleared)
             _iceStorage.SimulateServerRestart();
@@ -443,8 +438,8 @@ namespace CodexBootstrap.Tests.Core
 
             // Assert - Nodes are persisted
             _waterStorage.GetPersistentNodes().Should().HaveCount(2);
-            _waterStorage.GetPersistentNodes().Should().ContainKey("water-1");
-            _waterStorage.GetPersistentNodes().Should().ContainKey("water-2");
+            _waterStorage.GetPersistentNodes().Should().Contain(n => n.Id == "water-1");
+            _waterStorage.GetPersistentNodes().Should().Contain(n => n.Id == "water-2");
 
             // Act - Simulate server restart
             _iceStorage.SimulateServerRestart();
@@ -480,8 +475,8 @@ namespace CodexBootstrap.Tests.Core
             // Assert - Gas nodes are in memory but not persisted
             registry1.TryGet("gas-1", out var _).Should().BeTrue();
             registry1.TryGet("gas-2", out var _).Should().BeTrue();
-            _iceStorage.GetPersistentNodes().Should().NotContainKey("gas-1");
-            _waterStorage.GetPersistentNodes().Should().NotContainKey("gas-1");
+            _iceStorage.GetPersistentNodes().Should().NotContain(n => n.Id == "gas-1");
+            _waterStorage.GetPersistentNodes().Should().NotContain(n => n.Id == "gas-1");
 
             // Act - Simulate server restart
             _iceStorage.SimulateServerRestart();
@@ -552,14 +547,15 @@ namespace CodexBootstrap.Tests.Core
             );
 
             // Act
-            registry.UpsertEdge(edge);
+            registry.Upsert(edge);
             await Task.Delay(100);
 
             // Assert - Edge should be persisted in Ice storage
-            _iceStorage.GetPersistentEdges().Should().ContainValue(edge);
+            _iceStorage.GetPersistentEdges().Should().Contain(e => 
+                e.FromId == edge.FromId && e.ToId == edge.ToId && e.Role == edge.Role);
             
             // Test edge retrieval
-            var retrievedEdge = await registry.GetEdgeAsync("ice-edge-1", "ice-edge-2", "relates-to");
+            var retrievedEdge = registry.GetEdge("ice-edge-1", "ice-edge-2");
             retrievedEdge.Should().NotBeNull();
             retrievedEdge!.Weight.Should().Be(1.0);
             retrievedEdge.Meta?["test"].Should().Be("edge-data");
@@ -589,11 +585,11 @@ namespace CodexBootstrap.Tests.Core
             );
 
             // Act
-            registry.UpsertEdge(edge);
+            registry.Upsert(edge);
             await Task.Delay(100);
 
             // Assert - Edge should be persisted (in this case, both backends implement the same interface)
-            var retrievedEdge = await registry.GetEdgeAsync("water-edge-1", "water-edge-2", "connects-to");
+            var retrievedEdge = registry.GetEdge("water-edge-1", "water-edge-2");
             retrievedEdge.Should().NotBeNull();
             retrievedEdge!.Weight.Should().Be(0.8);
             retrievedEdge.Meta?["type"].Should().Be("water-edge");
@@ -623,16 +619,16 @@ namespace CodexBootstrap.Tests.Core
             );
 
             // Act
-            registry.UpsertEdge(edge);
+            registry.Upsert(edge);
             await Task.Delay(100);
 
             // Assert - Mixed state edge should be Gas (in-memory only)
-            var retrievedEdge = await registry.GetEdgeAsync("mixed-ice", "mixed-water", "mixed-edge");
+            var retrievedEdge = registry.GetEdge("mixed-ice", "mixed-water");
             retrievedEdge.Should().NotBeNull();
             retrievedEdge!.Meta?["state"].Should().Be("mixed");
 
             // Mixed edges should not be in persistent storage (they're Gas)
-            _iceStorage.GetPersistentEdges().Values.Should().NotContain(e => 
+            _iceStorage.GetPersistentEdges().Should().NotContain(e => 
                 e.FromId == "mixed-ice" && e.ToId == "mixed-water" && e.Role == "mixed-edge");
         }
 
@@ -650,13 +646,13 @@ namespace CodexBootstrap.Tests.Core
             var nodes = new[]
             {
                 new Node("persistent-ice-1", "test.ice", ContentState.Ice, "en", "Persistent Ice 1", "Ice node 1", 
-                    new NodeContent(InlineJson: "{\"data\": \"ice1\"}"), new Dictionary<string, object> { { "key", "ice1" } }),
+                    new ContentRef(MediaType: "application/json", InlineJson: "{\"data\": \"ice1\"}", InlineBytes: null, ExternalUri: null), new Dictionary<string, object> { { "key", "ice1" } }),
                 new Node("persistent-ice-2", "test.ice", ContentState.Ice, "en", "Persistent Ice 2", "Ice node 2",
-                    new NodeContent(InlineJson: "{\"data\": \"ice2\"}"), new Dictionary<string, object> { { "key", "ice2" } }),
+                    new ContentRef(MediaType: "application/json", InlineJson: "{\"data\": \"ice2\"}", InlineBytes: null, ExternalUri: null), new Dictionary<string, object> { { "key", "ice2" } }),
                 new Node("persistent-water-1", "test.water", ContentState.Water, "en", "Persistent Water 1", "Water node 1",
-                    new NodeContent(InlineJson: "{\"data\": \"water1\"}"), new Dictionary<string, object> { { "key", "water1" } }),
+                    new ContentRef(MediaType: "application/json", InlineJson: "{\"data\": \"water1\"}", InlineBytes: null, ExternalUri: null), new Dictionary<string, object> { { "key", "water1" } }),
                 new Node("persistent-water-2", "test.water", ContentState.Water, "en", "Persistent Water 2", "Water node 2",
-                    new NodeContent(InlineJson: "{\"data\": \"water2\"}"), new Dictionary<string, object> { { "key", "water2" } }),
+                    new ContentRef(MediaType: "application/json", InlineJson: "{\"data\": \"water2\"}", InlineBytes: null, ExternalUri: null), new Dictionary<string, object> { { "key", "water2" } }),
                 new Node("transient-gas-1", "test.gas", ContentState.Gas, "en", "Transient Gas 1", "Gas node 1", null, null),
                 new Node("transient-gas-2", "test.gas", ContentState.Gas, "en", "Transient Gas 2", "Gas node 2", null, null)
             };
@@ -722,9 +718,9 @@ namespace CodexBootstrap.Tests.Core
             var waterToWaterEdge = new Edge("edge-water-1", "edge-water-1", "self-ref", 0.9, new Dictionary<string, object> { { "type", "self" } });
             var iceToGasEdge = new Edge("edge-ice-1", "edge-gas-1", "ice-to-gas", 0.5, new Dictionary<string, object> { { "type", "transient" } });
 
-            registry1.UpsertEdge(iceToIceEdge);
-            registry1.UpsertEdge(waterToWaterEdge);
-            registry1.UpsertEdge(iceToGasEdge);
+            registry1.Upsert(iceToIceEdge);
+            registry1.Upsert(waterToWaterEdge);
+            registry1.Upsert(iceToGasEdge);
             await Task.Delay(200);
 
             // Act - Simulate server restart
@@ -732,7 +728,7 @@ namespace CodexBootstrap.Tests.Core
             await registry2.InitializeAsync();
 
             // Assert - Only edges between persistent nodes should survive
-            var restoredIceToIce = await registry2.GetEdgeAsync("edge-ice-1", "edge-ice-2", "ice-to-ice");
+            var restoredIceToIce = registry2.GetEdge("edge-ice-1", "edge-ice-2");
             restoredIceToIce.Should().NotBeNull();
             restoredIceToIce!.Meta?["type"].Should().Be("persistent");
 
@@ -758,7 +754,7 @@ namespace CodexBootstrap.Tests.Core
                 Locale: "en",
                 Title: "Complex Node",
                 Description: "A node with complex transitions",
-                Content: new NodeContent(InlineJson: "{\"version\": 1, \"data\": \"original\"}"),
+                Content: new ContentRef(MediaType: "application/json", InlineJson: "{\"version\": 1, \"data\": \"original\"}", InlineBytes: null, ExternalUri: null),
                 Meta: new Dictionary<string, object> { { "stage", "initial" } }
             );
 
@@ -766,20 +762,20 @@ namespace CodexBootstrap.Tests.Core
             registry.Upsert(originalNode);
             await Task.Delay(100);
 
-            _iceStorage.GetPersistentNodes().Should().ContainKey("complex-transition");
+            _iceStorage.GetPersistentNodes().Should().Contain(n => n.Id == "complex-transition");
             registry.TryGet("complex-transition", out var stage1Node).Should().BeTrue();
             stage1Node.State.Should().Be(ContentState.Ice);
 
             // Act & Assert - Stage 2: Ice → Water
             var waterNode = originalNode with {
                 State = ContentState.Water,
-                Content = new NodeContent(InlineJson: "{\"version\": 2, \"data\": \"updated\"}"),
+                Content = new ContentRef(MediaType: "application/json", InlineJson: "{\"version\": 2, \"data\": \"updated\"}", InlineBytes: null, ExternalUri: null),
                 Meta = new Dictionary<string, object> { { "stage", "water" } }
             };
             registry.Upsert(waterNode);
             await Task.Delay(100);
 
-            _waterStorage.GetPersistentNodes().Should().ContainKey("complex-transition");
+            _waterStorage.GetPersistentNodes().Should().Contain(n => n.Id == "complex-transition");
             registry.TryGet("complex-transition", out var stage2Node).Should().BeTrue();
             stage2Node.State.Should().Be(ContentState.Water);
             stage2Node.Meta?["stage"].Should().Be("water");
@@ -787,7 +783,7 @@ namespace CodexBootstrap.Tests.Core
             // Act & Assert - Stage 3: Water → Gas
             var gasNode = waterNode with {
                 State = ContentState.Gas,
-                Content = new NodeContent(InlineJson: "{\"version\": 3, \"data\": \"transient\"}"),
+                Content = new ContentRef(MediaType: "application/json", InlineJson: "{\"version\": 3, \"data\": \"transient\"}", InlineBytes: null, ExternalUri: null),
                 Meta = new Dictionary<string, object> { { "stage", "gas" } }
             };
             registry.Upsert(gasNode);
@@ -870,13 +866,11 @@ namespace CodexBootstrap.Tests.Core
             var registry = new NodeRegistry(_iceStorage, _waterStorage, _mockLogger.Object);
             await registry.InitializeAsync();
 
-            var complexContent = new NodeContent(
+            var complexContent = new ContentRef(
+                MediaType: "application/json",
                 InlineJson: "{\"complex\": {\"nested\": {\"data\": [1, 2, 3]}, \"unicode\": \"🎉\", \"special\": \"chars & symbols\"}}",
-                ExternalRefs: new List<ExternalRef>
-                {
-                    new ExternalRef("file", "/path/to/file.json", "application/json"),
-                    new ExternalRef("url", "https://example.com/data", "text/plain")
-                }
+                InlineBytes: null,
+                ExternalUri: new Uri("https://example.com/data")
             );
 
             var complexMeta = new Dictionary<string, object>
@@ -911,8 +905,8 @@ namespace CodexBootstrap.Tests.Core
             registry2.TryGet("complex-data-node", out var restoredNode).Should().BeTrue();
             
             restoredNode.Content?.InlineJson.Should().Be(complexContent.InlineJson);
-            restoredNode.Content?.ExternalRefs.Should().HaveCount(2);
-            restoredNode.Content?.ExternalRefs?.First().Uri.Should().Be("/path/to/file.json");
+            restoredNode.Content?.ExternalUri.Should().NotBeNull();
+            restoredNode.Content?.ExternalUri?.ToString().Should().Be("https://example.com/data");
             
             restoredNode.Meta?["string"].Should().Be("test value");
             restoredNode.Meta?["number"].Should().Be(42);
@@ -929,7 +923,7 @@ namespace CodexBootstrap.Tests.Core
 
             var nodeId = "versioned-node";
             var v1Node = new Node(nodeId, "test.versioned", ContentState.Ice, "en", "Version 1", "First version", 
-                new NodeContent(InlineJson: "{\"version\": 1}"), new Dictionary<string, object> { { "rev", 1 } });
+                new ContentRef(MediaType: "application/json", InlineJson: "{\"version\": 1}", InlineBytes: null, ExternalUri: null), new Dictionary<string, object> { { "rev", 1 } });
 
             // Act - Store version 1
             registry.Upsert(v1Node);
@@ -939,7 +933,7 @@ namespace CodexBootstrap.Tests.Core
             var v2Node = v1Node with {
                 Title = "Version 2",
                 Description = "Second version",
-                Content = new NodeContent(InlineJson: "{\"version\": 2}"),
+                Content = new ContentRef(MediaType: "application/json", InlineJson: "{\"version\": 2}", InlineBytes: null, ExternalUri: null),
                 Meta = new Dictionary<string, object> { { "rev", 2 } }
             };
             registry.Upsert(v2Node);
@@ -983,7 +977,7 @@ namespace CodexBootstrap.Tests.Core
                         Locale: "en",
                         Title: $"Concurrent Node {nodeIndex}",
                         Description: $"Node created concurrently #{nodeIndex}",
-                        Content: new NodeContent(InlineJson: $"{{\"index\": {nodeIndex}}}"),
+                        Content: new ContentRef(MediaType: "application/json", InlineJson: $"{{\"index\": {nodeIndex}}}", InlineBytes: null, ExternalUri: null),
                         Meta: new Dictionary<string, object> { { "index", nodeIndex } }
                     );
 
@@ -1047,9 +1041,9 @@ namespace CodexBootstrap.Tests.Core
             var waterToGasEdge = new Edge("edge-test-water", "edge-test-gas", "water-gas", 1.0, null);
             var iceToGasEdge = new Edge("edge-test-ice", "edge-test-gas", "ice-gas", 1.0, null);
 
-            registry.UpsertEdge(iceToWaterEdge);
-            registry.UpsertEdge(waterToGasEdge);
-            registry.UpsertEdge(iceToGasEdge);
+            registry.Upsert(iceToWaterEdge);
+            registry.Upsert(waterToGasEdge);
+            registry.Upsert(iceToGasEdge);
             await Task.Delay(100);
 
             // Act - Simulate server restart (Gas nodes and mixed edges should be lost)
@@ -1062,13 +1056,13 @@ namespace CodexBootstrap.Tests.Core
             registry2.TryGet("edge-test-gas", out var _).Should().BeFalse(); // Gas node lost
 
             // Edges involving Gas nodes should be invalid after restart
-            var restoredIceToWater = await registry2.GetEdgeAsync("edge-test-ice", "edge-test-water", "ice-water");
+            var restoredIceToWater = registry2.GetEdge("edge-test-ice", "edge-test-water");
             restoredIceToWater.Should().NotBeNull(); // Both endpoints exist
 
-            var restoredWaterToGas = await registry2.GetEdgeAsync("edge-test-water", "edge-test-gas", "water-gas");
+            var restoredWaterToGas = registry2.GetEdge("edge-test-water", "edge-test-gas");
             restoredWaterToGas.Should().BeNull(); // Gas endpoint missing
 
-            var restoredIceToGas = await registry2.GetEdgeAsync("edge-test-ice", "edge-test-gas", "ice-gas");
+            var restoredIceToGas = registry2.GetEdge("edge-test-ice", "edge-test-gas");
             restoredIceToGas.Should().BeNull(); // Gas endpoint missing
         }
 
@@ -1195,7 +1189,7 @@ namespace CodexBootstrap.Tests.Core
                     Locale: "en",
                     Title: $"Stress Node {i}",
                     Description: $"Stress test node #{i}",
-                    Content: new NodeContent(InlineJson: $"{{\"index\": {i}, \"data\": \"stress-test-{i}\"}}"),
+                    Content: new ContentRef(MediaType: "application/json", InlineJson: $"{{\"index\": {i}, \"data\": \"stress-test-{i}\"}}", InlineBytes: null, ExternalUri: null),
                     Meta: new Dictionary<string, object> { { "index", i }, { "state", state.ToString() } }
                 );
 
@@ -1220,7 +1214,7 @@ namespace CodexBootstrap.Tests.Core
             
             foreach (var edge in edges)
             {
-                registry.UpsertEdge(edge);
+                registry.Upsert(edge);
             }
             
             await Task.Delay(500); // Allow storage operations to complete

@@ -51,9 +51,40 @@ public class FutureKnowledgeModule : ModuleBase
         _logger.Info("Future Knowledge Module HTTP endpoints registered");
     }
 
+    // Public methods for direct testing (these delegate to the API route methods)
+    public async Task<object> RetrieveFutureKnowledge(FutureKnowledgeRequest request)
+    {
+        return await RetrieveFutureKnowledgeImpl(request);
+    }
+
+    public async Task<object> ApplyFutureKnowledge(FutureKnowledgeApplicationRequest request)
+    {
+        return await ApplyFutureKnowledgeImpl(request);
+    }
+
+    public async Task<object> DiscoverPatterns(PatternDiscoveryRequest request)
+    {
+        return await DiscoverPatternsImpl(request);
+    }
+
+    public async Task<object> AnalyzePatterns(PatternAnalysisRequest request)
+    {
+        return await AnalyzePatternsImpl(request);
+    }
+
+    public async Task<object> GetTrendingPatterns(string? query = null)
+    {
+        return await GetTrendingPatternsImpl(query);
+    }
+
+    public async Task<object> GeneratePrediction(PatternPredictionRequest request)
+    {
+        return await GeneratePredictionImpl(request);
+    }
+
     // Future Knowledge Retrieval
     [ApiRoute("POST", "/future-knowledge/retrieve", "retrieve-future-knowledge", "Retrieve knowledge from future states", "codex.future-knowledge")]
-    public async Task<object> RetrieveFutureKnowledge([ApiParameter("body", "Future knowledge request", Required = true, Location = "body")] FutureKnowledgeRequest request)
+    public async Task<object> RetrieveFutureKnowledgeImpl([ApiParameter("body", "Future knowledge request", Required = true, Location = "body")] FutureKnowledgeRequest request)
     {
         try
         {
@@ -70,7 +101,7 @@ public class FutureKnowledgeModule : ModuleBase
 
     // Knowledge Application
     [ApiRoute("POST", "/future-knowledge/apply", "apply-future-knowledge", "Apply future knowledge to current state", "codex.future-knowledge")]
-    public async Task<object> ApplyFutureKnowledge([ApiParameter("body", "Knowledge application request", Required = true, Location = "body")] FutureKnowledgeApplicationRequest request)
+    public async Task<object> ApplyFutureKnowledgeImpl([ApiParameter("body", "Knowledge application request", Required = true, Location = "body")] FutureKnowledgeApplicationRequest request)
     {
         try
         {
@@ -87,7 +118,7 @@ public class FutureKnowledgeModule : ModuleBase
 
     // Pattern Discovery
     [ApiRoute("POST", "/future-knowledge/discover-patterns", "discover-patterns", "Discover patterns in future knowledge", "codex.future-knowledge")]
-    public async Task<object> DiscoverPatterns([ApiParameter("body", "Pattern discovery request", Required = true, Location = "body")] PatternDiscoveryRequest request)
+    public async Task<object> DiscoverPatternsImpl([ApiParameter("body", "Pattern discovery request", Required = true, Location = "body")] PatternDiscoveryRequest request)
     {
         try
         {
@@ -104,7 +135,7 @@ public class FutureKnowledgeModule : ModuleBase
 
     // Pattern Analysis
     [ApiRoute("POST", "/future-knowledge/analyze-patterns", "analyze-patterns", "Analyze discovered patterns", "codex.future-knowledge")]
-    public async Task<object> AnalyzePatterns([ApiParameter("body", "Pattern analysis request", Required = true, Location = "body")] PatternAnalysisRequest request)
+    public async Task<object> AnalyzePatternsImpl([ApiParameter("body", "Pattern analysis request", Required = true, Location = "body")] PatternAnalysisRequest request)
     {
         try
         {
@@ -121,7 +152,7 @@ public class FutureKnowledgeModule : ModuleBase
 
     // Trending Patterns
     [ApiRoute("GET", "/future-knowledge/trending", "get-trending-patterns", "Get trending patterns", "codex.future-knowledge")]
-    public async Task<object> GetTrendingPatterns([ApiParameter("query", "Trending patterns query", Required = false)] string? query = null)
+    public async Task<object> GetTrendingPatternsImpl([ApiParameter("query", "Trending patterns query", Required = false)] string? query = null)
     {
         try
         {
@@ -138,7 +169,7 @@ public class FutureKnowledgeModule : ModuleBase
 
     // Prediction Generation
     [ApiRoute("POST", "/future-knowledge/predict", "generate-prediction", "Generate predictions based on patterns", "codex.future-knowledge")]
-    public async Task<object> GeneratePrediction([ApiParameter("body", "Prediction request", Required = true, Location = "body")] PatternPredictionRequest request)
+    public async Task<object> GeneratePredictionImpl([ApiParameter("body", "Prediction request", Required = true, Location = "body")] PatternPredictionRequest request)
     {
         try
         {
@@ -248,3 +279,4 @@ public record PatternPrediction(
     double Confidence,
     DateTimeOffset PredictedFor
 );
+

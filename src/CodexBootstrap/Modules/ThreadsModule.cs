@@ -49,9 +49,30 @@ public sealed class ThreadsModule : ModuleBase
         _logger.Info("Threads Module HTTP endpoints registered");
     }
 
+    // Public methods for direct testing
+    public async Task<object> ListThreads(int? limit = 20)
+    {
+        return await ListThreadsImpl(limit);
+    }
+
+    public async Task<object> CreateThread(ThreadCreateRequest request)
+    {
+        return await CreateThreadImpl(request);
+    }
+
+    public async Task<object> GetThread(string threadId)
+    {
+        return await GetThreadImpl(threadId);
+    }
+
+    public async Task<object> AddReply(string threadId, ThreadReplyRequest request)
+    {
+        return await AddReplyImpl(threadId, request);
+    }
+
     // List threads
     [ApiRoute("GET", "/threads/list", "list-threads", "Get list of discussion threads", "codex.threads")]
-    public async Task<object> ListThreads([ApiParameter("limit", "Number of threads to return", Required = false)] int? limit = 20)
+    public async Task<object> ListThreadsImpl([ApiParameter("limit", "Number of threads to return", Required = false)] int? limit = 20)
     {
         try
         {
@@ -91,7 +112,7 @@ public sealed class ThreadsModule : ModuleBase
 
     // Create new thread
     [ApiRoute("POST", "/threads/create", "create-thread", "Create a new discussion thread", "codex.threads")]
-    public async Task<object> CreateThread([ApiParameter("body", "Thread creation request", Required = true, Location = "body")] ThreadCreateRequest request)
+    public async Task<object> CreateThreadImpl([ApiParameter("body", "Thread creation request", Required = true, Location = "body")] ThreadCreateRequest request)
     {
         try
         {
@@ -144,7 +165,7 @@ public sealed class ThreadsModule : ModuleBase
 
     // Get thread details
     [ApiRoute("GET", "/threads/{threadId}", "get-thread", "Get detailed information about a thread", "codex.threads")]
-    public async Task<object> GetThread([ApiParameter("threadId", "Thread ID", Required = true, Location = "path")] string threadId)
+    public async Task<object> GetThreadImpl([ApiParameter("threadId", "Thread ID", Required = true, Location = "path")] string threadId)
     {
         try
         {
@@ -188,7 +209,7 @@ public sealed class ThreadsModule : ModuleBase
 
     // Add reply to thread
     [ApiRoute("POST", "/threads/{threadId}/reply", "add-reply", "Add a reply to a thread", "codex.threads")]
-    public async Task<object> AddReply(
+    public async Task<object> AddReplyImpl(
         [ApiParameter("threadId", "Thread ID", Required = true, Location = "path")] string threadId,
         [ApiParameter("body", "Reply request", Required = true, Location = "body")] ThreadReplyRequest request)
     {
