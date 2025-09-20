@@ -314,14 +314,44 @@ public sealed class GalleryModule : ModuleBase
 
     private double GetPopularityScore(Node itemNode)
     {
-        // Simple popularity calculation - in a real system this would be based on views, likes, etc.
+        // Real popularity calculation based on engagement metrics
         var resonance = GetItemResonance(itemNode);
-        var ageInDays = (DateTime.UtcNow - Convert.ToDateTime(itemNode.Meta?.GetValueOrDefault("createdAt") ?? DateTime.UtcNow)).TotalDays;
+        var meta = itemNode.Meta ?? new Dictionary<string, object>();
         
-        // Boost recent content slightly
-        var recencyBoost = Math.Max(0, 1 - (ageInDays / 30)) * 0.1;
+        // Extract engagement metrics from node metadata
+        var views = Convert.ToInt32(meta.GetValueOrDefault("views", 0));
+        var likes = Convert.ToInt32(meta.GetValueOrDefault("likes", 0));
+        var comments = Convert.ToInt32(meta.GetValueOrDefault("comments", 0));
+        var shares = Convert.ToInt32(meta.GetValueOrDefault("shares", 0));
+        var downloads = Convert.ToInt32(meta.GetValueOrDefault("downloads", 0));
         
-        return resonance + recencyBoost;
+        // Calculate engagement score with weighted metrics
+        var engagementScore = 
+            (views * 0.1) +           // Views have lower weight
+            (likes * 1.0) +           // Likes are primary engagement
+            (comments * 2.0) +        // Comments show deeper engagement
+            (shares * 3.0) +          // Shares indicate high value
+            (downloads * 2.5);        // Downloads show utility
+        
+        // Normalize engagement score (log scale to prevent extreme values)
+        var normalizedEngagement = Math.Log10(engagementScore + 1) / 10.0;
+        
+        // Calculate age factor for recency boost
+        var createdAt = meta.GetValueOrDefault("createdAt");
+        var ageInDays = createdAt != null 
+            ? (DateTime.UtcNow - Convert.ToDateTime(createdAt)).TotalDays
+            : 0;
+        var recencyBoost = Math.Max(0, 1 - (ageInDays / 30)) * 0.15;
+        
+        // Calculate quality factor based on AI analysis if available
+        var qualityScore = Convert.ToDouble(meta.GetValueOrDefault("qualityScore", 0.5));
+        var qualityFactor = qualityScore * 0.2;
+        
+        // Combine all factors: base resonance + engagement + recency + quality
+        var totalScore = resonance + normalizedEngagement + recencyBoost + qualityFactor;
+        
+        // Cap at maximum score
+        return Math.Min(1.0, totalScore);
     }
 
     private string[] GetItemAxes(Node itemNode)

@@ -1028,8 +1028,34 @@ public sealed class IdentityModule : ModuleBase
 
     private string GenerateJwtToken(string username, string email)
     {
-        // In a real system, generate a proper JWT token
-        return $"jwt-{username}-{email}-{DateTime.UtcNow.Ticks}";
+        // Generate a proper JWT token with claims
+        var tokenHandler = new JwtSecurityTokenHandler();
+        
+        // Use a secure key - in production this should be from configuration
+        var key = Encoding.UTF8.GetBytes("your-256-bit-secret-key-here-must-be-at-least-32-chars-long!");
+        
+        var tokenDescriptor = new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(new[]
+            {
+                new Claim(ClaimTypes.Name, username),
+                new Claim(ClaimTypes.Email, email),
+                new Claim(ClaimTypes.NameIdentifier, username),
+                new Claim("username", username),
+                new Claim("email", email),
+                new Claim("iat", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+                new Claim("jti", Guid.NewGuid().ToString()) // JWT ID for uniqueness
+            }),
+            Expires = DateTime.UtcNow.AddHours(24), // Token expires in 24 hours
+            Issuer = "CodexBootstrap",
+            Audience = "CodexBootstrap-Users",
+            SigningCredentials = new SigningCredentials(
+                new SymmetricSecurityKey(key),
+                SecurityAlgorithms.HmacSha256Signature)
+        };
+        
+        var token = tokenHandler.CreateToken(tokenDescriptor);
+        return tokenHandler.WriteToken(token);
     }
 
     private string GenerateSessionToken(string userId)
