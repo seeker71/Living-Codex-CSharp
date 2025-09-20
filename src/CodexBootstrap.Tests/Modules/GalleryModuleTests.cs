@@ -53,7 +53,7 @@ public class GalleryModuleTests : IClassFixture<TestServerFixture>
         {
             Title = "Test Gallery Item",
             Description = "This is a test gallery item",
-            ImageUrl = "https://example.com/image.jpg",
+            ImageUrl = "https://example.com/image.jpg", 
             AuthorId = "test-user-1",
             AuthorName = "Test User",
             Axes = new[] { "consciousness", "unity" },
