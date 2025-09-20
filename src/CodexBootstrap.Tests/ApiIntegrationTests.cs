@@ -1,3 +1,4 @@
+using System;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -10,7 +11,7 @@ namespace CodexBootstrap.Tests
     /// Integration tests that work with a running server
     /// These tests assume a server is running on localhost:5002
     /// </summary>
-    public class ApiIntegrationTests
+    public class ApiIntegrationTests : IDisposable
     {
         private readonly HttpClient _httpClient;
 

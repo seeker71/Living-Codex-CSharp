@@ -38,7 +38,7 @@ namespace CodexBootstrap.Tests
             resultObj.Should().ContainKey("Result");
             var actualResult = resultObj["Result"] as JsonElement?;
             actualResult.Should().NotBeNull();
-            actualResult.Value.GetProperty("success").GetBoolean().Should().BeTrue();
+            actualResult!.Value.GetProperty("success").GetBoolean().Should().BeTrue();
             actualResult.Value.GetProperty("loginUrl").GetString().Should().NotBeNullOrEmpty();
             actualResult.Value.GetProperty("state").GetString().Should().NotBeNullOrEmpty();
         }
@@ -255,7 +255,7 @@ namespace CodexBootstrap.Tests
                     result.Should().ContainKey("message");
                     var messageProp = result["message"] as JsonElement?;
                     messageProp.Should().NotBeNull();
-                    messageProp.Value.GetString().Should().Contain("exists");
+                    messageProp!.Value.GetString().Should().Contain("exists");
                 }
             }
             catch (HttpRequestException)

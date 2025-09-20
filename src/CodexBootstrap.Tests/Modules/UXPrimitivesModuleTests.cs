@@ -84,7 +84,7 @@ public class UXPrimitivesModuleTests : IClassFixture<TestServerFixture>
         var relationshipProperty = resultType.GetProperty("relationship");
         var strengthProperty = resultType.GetProperty("strength");
         
-        Assert.True((bool)successProperty.GetValue(result));
+        Assert.True((bool)successProperty.GetValue(result)!);
         Assert.NotNull(weaveIdProperty.GetValue(result));
         Assert.Equal("Weave connection created successfully", messageProperty.GetValue(result));
         Assert.Equal("related", relationshipProperty.GetValue(result));

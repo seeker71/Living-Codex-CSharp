@@ -48,7 +48,7 @@ public class ConceptModuleApiTests : IClassFixture<TestServerFixture>
         result.Should().ContainKey("concepts");
         var concepts = result["concepts"] as JsonElement?;
         concepts.Should().NotBeNull();
-        concepts.Value.ValueKind.Should().Be(JsonValueKind.Array);
+        concepts!.Value.ValueKind.Should().Be(JsonValueKind.Array);
         concepts.Value.GetArrayLength().Should().BeGreaterOrEqualTo(0);
     }
 

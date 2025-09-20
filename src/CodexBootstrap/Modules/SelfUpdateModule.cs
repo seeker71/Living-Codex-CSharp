@@ -15,10 +15,12 @@ namespace CodexBootstrap.Modules
     [ApiModule(Name = "SelfUpdateModule", Version = "1.0.0", Description = "Provides self-updating functionality for dynamic modules", Tags = new[] { "self-update", "hot-reload", "modules" })]
     public class SelfUpdateModule : ModuleBase
     {
-        private readonly StableCore _stableCore;
-        private readonly SelfUpdateSystem _selfUpdateSystem;
-        private readonly ModuleCompiler _moduleCompiler;
-        private readonly HotReloadManager _hotReloadManager;
+        private readonly StableCore? _stableCore;
+#pragma warning disable CS0414 // Field assigned but never used - temporary until SelfUpdateSystem is implemented
+        private readonly SelfUpdateSystem? _selfUpdateSystem;
+#pragma warning restore CS0414
+        private readonly ModuleCompiler? _moduleCompiler;
+        private readonly HotReloadManager? _hotReloadManager;
 
         public override string Name => "Self Update Module";
         public override string Description => "Provides self-updating functionality for dynamic modules";

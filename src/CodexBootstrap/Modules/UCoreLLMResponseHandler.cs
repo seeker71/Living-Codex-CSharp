@@ -25,7 +25,9 @@ namespace CodexBootstrap.Modules;
 )]
 public class UCoreLLMResponseHandler : ModuleBase
 {
+#pragma warning disable CS0414 // Field assigned but never used - temporary until UCoreResonanceEngine is implemented
     private readonly object? _resonanceEngine; // Temporarily using object until UCoreResonanceEngine is fixed
+#pragma warning restore CS0414
 
     public override string Name => "U-CORE LLM Response Handler";
     public override string Description => "Enhanced LLM response handler with U-CORE ontology mapping and resonance optimization";
