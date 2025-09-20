@@ -381,19 +381,19 @@ public sealed class GalleryModule : ModuleBase
 [MetaNode(Id = "codex.gallery.create-request", Name = "Gallery Item Create Request", Description = "Request to create a new gallery item")]
 public record GalleryItemCreateRequest
 {
-    public string Title { get; set; } = "";
-    public string? Description { get; set; }
-    public string ImageUrl { get; set; } = "";
-    public string? ThumbnailUrl { get; set; }
-    public string? AuthorId { get; set; }
-    public string? AuthorName { get; set; }
-    public string? AuthorAvatar { get; set; }
-    public string[]? Axes { get; set; }
-    public string[]? Tags { get; set; }
-    public string? MediaType { get; set; }
-    public object? Dimensions { get; set; }
-    public bool? AiGenerated { get; set; }
-    public string? AiPrompt { get; set; }
+    public string Title { get; init; } = "";
+    public string? Description { get; init; }
+    public string ImageUrl { get; init; } = "";
+    public string? ThumbnailUrl { get; init; }
+    public string? AuthorId { get; init; }
+    public string? AuthorName { get; init; }
+    public string? AuthorAvatar { get; init; }
+    public string[]? Axes { get; init; }
+    public string[]? Tags { get; init; }
+    public string? MediaType { get; init; }
+    public object? Dimensions { get; init; }
+    public bool? AiGenerated { get; init; }
+    public string? AiPrompt { get; init; }
 }
 
 [MetaNode(Id = "codex.gallery.ai-generate-request", Name = "AI Image Generate Request", Description = "Request to generate an AI image")]

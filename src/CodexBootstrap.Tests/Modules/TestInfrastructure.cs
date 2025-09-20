@@ -51,7 +51,7 @@ public class TestIceStorageBackend : IIceStorageBackend
     }
     public Task<IEnumerable<Node>> GetAllIceNodesAsync() => Task.FromResult(_nodes.Values.AsEnumerable());
     public Task<IEnumerable<Node>> GetIceNodesByTypeAsync(string typeId) => 
-        Task.FromResult(_nodes.Values.Where(n => n.TypeId == typeId));
+        Task.FromResult(_nodes.Values.Where(n => n != null && n.TypeId == typeId));
     public Task StoreEdgeAsync(Edge edge)
     {
         var key = $"{edge.FromId}-{edge.ToId}-{edge.Role}";
@@ -133,7 +133,7 @@ public class TestWaterStorageBackend : IWaterStorageBackend
     }
     public Task<IEnumerable<Node>> GetAllWaterNodesAsync() => Task.FromResult(_nodes.Values.AsEnumerable());
     public Task<IEnumerable<Node>> GetWaterNodesByTypeAsync(string typeId) => 
-        Task.FromResult(_nodes.Values.Where(n => n.TypeId == typeId));
+        Task.FromResult(_nodes.Values.Where(n => n != null && n.TypeId == typeId));
     public Task<bool> IsAvailableAsync() => Task.FromResult(true);
     public Task<WaterStorageStats> GetStatsAsync() => Task.FromResult(new WaterStorageStats(
         WaterNodeCount: _nodes.Count,

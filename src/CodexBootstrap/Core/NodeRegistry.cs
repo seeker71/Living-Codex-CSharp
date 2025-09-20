@@ -138,6 +138,9 @@ public class NodeRegistry : INodeRegistry
             hydratedIceCount = _iceNodes.Count;
             hydratedWaterCount = _waterNodes.Count;
 
+            // Load edges from storage
+            await LoadEdgesFromStorageAsync();
+
             _isInitialized = true;
         }
         finally
@@ -156,6 +159,48 @@ public class NodeRegistry : INodeRegistry
             {
                 _logger.Info($"Hydrated {hydratedIceCount} Ice nodes and {hydratedWaterCount} Water nodes into memory");
             }
+        }
+    }
+
+    private async Task LoadEdgesFromStorageAsync()
+    {
+        try
+        {
+            // Load edges from Ice storage
+            var iceEdges = await _iceStorage.GetAllEdgesAsync();
+            foreach (var edge in iceEdges)
+            {
+                if (edge != null)
+                {
+                    var edgeKey = BuildEdgeKey(edge.FromId, edge.ToId, edge.Role);
+                    var record = new EdgeRecord(edge, ContentState.Ice);
+                    _edgeRecords[edgeKey] = record;
+                    IndexEdge(edgeKey, edge);
+                }
+            }
+
+            // Load edges from Water storage
+            var waterEdges = await _waterStorage.GetAllWaterEdgesAsync();
+            foreach (var edge in waterEdges)
+            {
+                if (edge != null)
+                {
+                    var edgeKey = BuildEdgeKey(edge.FromId, edge.ToId, edge.Role);
+                    // Only add if not already present from Ice storage (Ice takes precedence)
+                    if (!_edgeRecords.ContainsKey(edgeKey))
+                    {
+                        var record = new EdgeRecord(edge, ContentState.Water);
+                        _edgeRecords[edgeKey] = record;
+                        IndexEdge(edgeKey, edge);
+                    }
+                }
+            }
+
+            _logger.Info($"Loaded {_edgeRecords.Count} edges from storage");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error loading edges from storage: {ex.Message}", ex);
         }
     }
 
@@ -871,10 +916,10 @@ public class NodeRegistry : INodeRegistry
         // Look for a related Ice node that could generate this Water node
         var iceNodes = await _iceStorage.GetAllIceNodesAsync();
         var relatedIceNodes = iceNodes
-            .Where(n => n.Id == id || 
+            .Where(n => n != null && (n.Id == id || 
                        (n.Meta?.ContainsKey("generates") == true && 
                         n.Meta["generates"] is string generates && 
-                        generates == id))
+                        generates == id)))
             .ToList();
 
         if (!relatedIceNodes.Any())
@@ -908,10 +953,10 @@ public class NodeRegistry : INodeRegistry
         
         var relatedNodes = iceNodes
             .Concat(waterNodes)
-            .Where(n => n.Id == id || 
+            .Where(n => n != null && (n.Id == id || 
                        (n.Meta?.ContainsKey("generates") == true && 
                         n.Meta["generates"] is string generates && 
-                        generates == id))
+                        generates == id)))
             .ToList();
 
         if (!relatedNodes.Any())
