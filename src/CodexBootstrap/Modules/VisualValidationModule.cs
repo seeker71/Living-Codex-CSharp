@@ -51,7 +51,8 @@ namespace CodexBootstrap.Modules
 
         public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
         {
-            // This method is now handled by attribute-based discovery
+            _apiRouter = router;
+            _logger.Info("VisualValidationModule API router registered for internal calls");
         }
 
         public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)

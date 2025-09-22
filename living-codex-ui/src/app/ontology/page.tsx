@@ -47,6 +47,12 @@ export default function OntologyPage() {
   const [viewMode, setViewMode] = useState<'axes' | 'concepts' | 'relationships'>('axes');
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(50);
+  const [totalConcepts, setTotalConcepts] = useState(0);
+  const [loadingConcepts, setLoadingConcepts] = useState(false);
 
   // Track page visit
   useEffect(() => {
@@ -59,6 +65,13 @@ export default function OntologyPage() {
   useEffect(() => {
     loadOntologyData();
   }, []);
+
+  // Load concepts when filters or pagination change
+  useEffect(() => {
+    if (viewMode === 'concepts') {
+      loadConceptsWithFilters();
+    }
+  }, [viewMode, selectedAxis, searchQuery, currentPage]);
 
   const loadOntologyData = async () => {
     setLoading(true);
@@ -135,13 +148,13 @@ export default function OntologyPage() {
         setOntologyAxes(defaultAxes);
       }
 
-      // Load related concepts
-      const conceptsResponse = await fetch(buildApiUrl('/storage-endpoints/nodes?limit=100'));
+      // Load a sample of concepts for axis counting (no filtering needed here)
+      const conceptsResponse = await fetch(buildApiUrl('/storage-endpoints/nodes?take=1000'));
       if (conceptsResponse.ok) {
         const conceptsData = await conceptsResponse.json();
         if (conceptsData.nodes) {
           const conceptNodes = conceptsData.nodes
-            .filter((node: any) => node.typeId !== 'codex.ontology.axis')
+            .filter((node: any) => node.typeId !== 'codex.ontology.axis' && node.typeId !== 'codex.ontology/root')
             .map((node: any) => ({
               id: node.id,
               title: node.title,
@@ -151,10 +164,13 @@ export default function OntologyPage() {
               relationships: [],
               score: 0
             }));
-          setConcepts(conceptNodes);
           
           // Update concept counts for axes
           updateAxisConceptCounts(ontologyAxes, conceptNodes);
+          
+          // Set initial concepts (will be replaced by filtered results when needed)
+          setConcepts(conceptNodes);
+          setTotalConcepts(conceptNodes.length);
         }
       }
 
@@ -162,6 +178,55 @@ export default function OntologyPage() {
       console.error('Error loading ontology data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadConceptsWithFilters = async () => {
+    setLoadingConcepts(true);
+    try {
+      // Build query parameters for server-side filtering
+      const params = new URLSearchParams();
+      params.append('skip', ((currentPage - 1) * pageSize).toString());
+      params.append('take', pageSize.toString());
+      
+      // Add search term if provided
+      if (searchQuery.trim()) {
+        params.append('searchTerm', searchQuery.trim());
+      }
+
+      // For axis filtering, we need to do a more complex search since axis is computed client-side
+      // For now, we'll filter by typeId to exclude axes and load more, then filter client-side
+      // TODO: Implement server-side axis filtering by adding axis metadata to nodes
+      
+      const response = await fetch(buildApiUrl(`/storage-endpoints/nodes?${params.toString()}`));
+      if (response.ok) {
+        const data = await response.json();
+        if (data.nodes) {
+          let conceptNodes = data.nodes
+            .filter((node: any) => node.typeId !== 'codex.ontology.axis' && node.typeId !== 'codex.ontology/root')
+            .map((node: any) => ({
+              id: node.id,
+              title: node.title,
+              description: node.description || '',
+              typeId: node.typeId,
+              axis: determineAxis(node, ontologyAxes),
+              relationships: [],
+              score: 0
+            }));
+
+          // Apply axis filter client-side (until we implement server-side axis metadata)
+          if (selectedAxis) {
+            conceptNodes = conceptNodes.filter((concept: ConceptNode) => concept.axis === selectedAxis);
+          }
+
+          setConcepts(conceptNodes);
+          setTotalConcepts(data.totalCount || conceptNodes.length);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading filtered concepts:', error);
+    } finally {
+      setLoadingConcepts(false);
     }
   };
 
@@ -195,6 +260,7 @@ export default function OntologyPage() {
   const selectAxis = (axisId: string) => {
     setSelectedAxis(axisId);
     setSelectedConcept('');
+    setCurrentPage(1); // Reset pagination when axis changes
     
     // Track axis exploration
     if (user?.id) {
@@ -203,6 +269,16 @@ export default function OntologyPage() {
         axisName: ontologyAxes.find(a => a.id === axisId)?.name
       });
     }
+  };
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    setCurrentPage(1); // Reset pagination when search changes
+  };
+
+  const handleAxisFilterChange = (axisId: string) => {
+    setSelectedAxis(axisId);
+    setCurrentPage(1); // Reset pagination when filter changes
   };
 
   const selectConcept = (conceptId: string) => {
@@ -230,13 +306,8 @@ export default function OntologyPage() {
     return colors[axisId] || 'gray';
   };
 
-  const filteredConcepts = concepts.filter(concept => {
-    const matchesSearch = searchQuery === '' || 
-      concept.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      concept.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesAxis = selectedAxis === '' || concept.axis === selectedAxis;
-    return matchesSearch && matchesAxis;
-  });
+  // Concepts are now filtered server-side, no need for client-side filtering
+  const filteredConcepts = concepts;
 
   const getAxisStats = (axis: OntologyAxis) => {
     const axisConcepts = concepts.filter(c => c.axis === axis.id);
@@ -252,20 +323,20 @@ export default function OntologyPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navigation />
       
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">🧠 U-CORE Ontology Browser</h1>
-          <p className="text-gray-600">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">🧠 U-CORE Ontology Browser</h1>
+          <p className="text-gray-600 dark:text-gray-300">
             Explore the Universal Consciousness Ontology for Reality Enhancement (U-CORE) axes and concept relationships
           </p>
         </div>
 
         {/* Controls */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
           <div className="flex flex-col md:flex-row gap-4">
             {/* View Mode */}
             <div className="flex space-x-2">
@@ -293,9 +364,9 @@ export default function OntologyPage() {
               <input
                 type="text"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 placeholder="Search concepts..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="input-standard"
               />
             </div>
 
@@ -303,8 +374,8 @@ export default function OntologyPage() {
             <div>
               <select
                 value={selectedAxis}
-                onChange={(e) => setSelectedAxis(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onChange={(e) => handleAxisFilterChange(e.target.value)}
+                className="input-standard"
               >
                 <option value="">All Axes</option>
                 {ontologyAxes.map(axis => (
@@ -328,9 +399,9 @@ export default function OntologyPage() {
             <div className="lg:col-span-2">
               {/* Axes View */}
               {viewMode === 'axes' && (
-                <div className="bg-white rounded-lg border border-gray-200">
+                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                   <div className="p-6 border-b border-gray-200">
-                    <h2 className="text-xl font-semibold text-gray-900">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                       🌟 U-CORE Ontology Axes ({ontologyAxes.length})
                     </h2>
                   </div>
@@ -379,9 +450,9 @@ export default function OntologyPage() {
                               {/* Top Concepts */}
                               {stats.topConcepts.length > 0 && (
                                 <div className="text-sm">
-                                  <span className="text-gray-500">Top concepts: </span>
+                                  <span className="text-gray-500 dark:text-gray-400">Top concepts: </span>
                                   {stats.topConcepts.map((concept, idx) => (
-                                    <span key={idx} className="text-gray-700">
+                                    <span key={idx} className="text-gray-700 dark:text-gray-200">
                                       {concept.title}
                                       {idx < stats.topConcepts.length - 1 && ', '}
                                     </span>
@@ -408,16 +479,29 @@ export default function OntologyPage() {
 
               {/* Concepts View */}
               {viewMode === 'concepts' && (
-                <div className="bg-white rounded-lg border border-gray-200">
+                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                   <div className="p-6 border-b border-gray-200">
-                    <h2 className="text-xl font-semibold text-gray-900">
-                      🧩 Concepts ({filteredConcepts.length})
-                      {selectedAxis && (
-                        <span className="text-blue-600 ml-2">
-                          in {ontologyAxes.find(a => a.id === selectedAxis)?.name}
-                        </span>
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                        🧩 Concepts ({totalConcepts})
+                        {selectedAxis && (
+                          <span className="text-blue-600 ml-2">
+                            in {ontologyAxes.find(a => a.id === selectedAxis)?.name}
+                          </span>
+                        )}
+                      </h2>
+                      {loadingConcepts && (
+                        <div className="flex items-center gap-2 text-gray-500">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                          Loading...
+                        </div>
                       )}
-                    </h2>
+                    </div>
+                    {totalConcepts > pageSize && (
+                      <div className="mt-4 text-sm text-gray-600">
+                        Showing {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, totalConcepts)} of {totalConcepts} concepts
+                      </div>
+                    )}
                   </div>
                   <div className="divide-y divide-gray-200">
                     {filteredConcepts.length > 0 ? (
@@ -466,14 +550,71 @@ export default function OntologyPage() {
                       </div>
                     )}
                   </div>
+                  
+                  {/* Pagination Controls */}
+                  {totalConcepts > pageSize && (
+                    <div className="p-6 border-t border-gray-200 flex items-center justify-between">
+                      <div className="text-sm text-gray-600">
+                        Page {currentPage} of {Math.ceil(totalConcepts / pageSize)}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                          disabled={currentPage === 1 || loadingConcepts}
+                          className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-800"
+                        >
+                          Previous
+                        </button>
+                        
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: Math.min(5, Math.ceil(totalConcepts / pageSize)) }, (_, i) => {
+                            const totalPages = Math.ceil(totalConcepts / pageSize);
+                            let page;
+                            if (totalPages <= 5) {
+                              page = i + 1;
+                            } else if (currentPage <= 3) {
+                              page = i + 1;
+                            } else if (currentPage >= totalPages - 2) {
+                              page = totalPages - 4 + i;
+                            } else {
+                              page = currentPage - 2 + i;
+                            }
+                            
+                            return (
+                              <button
+                                key={page}
+                                onClick={() => setCurrentPage(page)}
+                                disabled={loadingConcepts}
+                                className={`px-3 py-2 text-sm rounded-lg ${
+                                  currentPage === page
+                                    ? 'bg-blue-600 text-white'
+                                    : 'border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50'
+                                }`}
+                              >
+                                {page}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        
+                        <button
+                          onClick={() => setCurrentPage(Math.min(Math.ceil(totalConcepts / pageSize), currentPage + 1))}
+                          disabled={currentPage === Math.ceil(totalConcepts / pageSize) || loadingConcepts}
+                          className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-800"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* Relationships View */}
               {viewMode === 'relationships' && (
-                <div className="bg-white rounded-lg border border-gray-200">
+                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                   <div className="p-6 border-b border-gray-200">
-                    <h2 className="text-xl font-semibold text-gray-900">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                       🔗 Axis Relationships
                     </h2>
                   </div>
@@ -517,11 +658,11 @@ export default function OntologyPage() {
                         <p className="text-gray-600 text-sm">{axis.description}</p>
                         <div className="space-y-2">
                           <div className="flex justify-between">
-                            <span className="text-gray-600">Concepts</span>
+                            <span className="text-gray-600 dark:text-gray-300">Concepts</span>
                             <span className="font-medium">{stats.conceptCount}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-600">Avg Score</span>
+                            <span className="text-gray-600 dark:text-gray-300">Avg Score</span>
                             <span className="font-medium">{stats.avgScore}</span>
                           </div>
                         </div>
@@ -549,15 +690,15 @@ export default function OntologyPage() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">📊 Ontology Stats</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Total Axes</span>
+                    <span className="text-gray-600 dark:text-gray-300">Total Axes</span>
                     <span className="font-medium">{ontologyAxes.length}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Total Concepts</span>
+                    <span className="text-gray-600 dark:text-gray-300">Total Concepts</span>
                     <span className="font-medium">{concepts.length}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Filtered</span>
+                    <span className="text-gray-600 dark:text-gray-300">Filtered</span>
                     <span className="font-medium">{filteredConcepts.length}</span>
                   </div>
                 </div>

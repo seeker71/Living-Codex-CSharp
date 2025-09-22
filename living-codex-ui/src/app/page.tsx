@@ -36,16 +36,16 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200">
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                 Living Codex
               </h1>
-              <span className="ml-2 text-sm text-gray-500">v0.1</span>
+              <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">v0.1</span>
             </div>
             <Navigation />
           </div>
@@ -55,13 +55,13 @@ export default function HomePage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Hero Section */}
         <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold text-gray-900 mb-4">
+          <h2 className="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4">
             Find ideas that resonate
           </h2>
-          <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+          <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
             Meet people who amplify them. See the world&apos;s news through a living ontology.
           </p>
-          <p className="text-lg text-gray-500 mb-8">
+          <p className="text-lg text-gray-500 dark:text-gray-400 mb-8">
             Everything is a Node. Explore concepts, people, and moments connected by resonance.
           </p>
         </div>
@@ -79,10 +79,10 @@ export default function HomePage() {
           {/* Main Stream */}
           <div className="lg:col-span-3">
             <div className="mb-6">
-              <h3 className="text-2xl font-semibold text-gray-900 mb-2">
+              <h3 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
                 Now Resonating
               </h3>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-300">
                 Concepts and people that align with your resonance field
               </p>
             </div>
@@ -107,27 +107,33 @@ export default function HomePage() {
 
         {/* Quick Actions */}
         <div className="mt-12 text-center">
-          <h3 className="text-xl font-semibold text-gray-900 mb-4">
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
             Quick Actions
           </h3>
-          <div className="flex justify-center space-x-4">
+          <div className="flex justify-center space-x-4 flex-wrap gap-4">
             <a
               href="/discover"
               className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
             >
-              Discover Concepts
+              🔍 Discover Concepts
+            </a>
+            <a
+              href="/code"
+              className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
+            >
+              💻 Browse & Edit Code
             </a>
             <a
               href="/resonance"
               className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors"
             >
-              Compare Resonance
+              🌊 Compare Resonance
             </a>
             <a
               href="/about"
               className="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 transition-colors"
             >
-              Learn More
+              ℹ️ Learn More
             </a>
           </div>
         </div>

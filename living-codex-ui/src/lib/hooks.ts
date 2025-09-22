@@ -47,10 +47,47 @@ export function useControls() {
 export function useConceptDiscovery(params: Record<string, unknown> = {}) {
   return useQuery({
     queryKey: ['concepts', 'discover', params],
-    queryFn: () => apiAdapter.call(
-      { method: 'POST', path: '/concept/discover' },
-      params
-    ),
+    queryFn: async () => {
+      try {
+        // Try the discovery endpoint first
+        const discoveryResult = await apiAdapter.call(
+          { method: 'POST', path: '/concept/discover' },
+          params
+        );
+        
+        // If discovery returns no concepts, fall back to basic concepts
+        if (discoveryResult && Array.isArray(discoveryResult.discoveredConcepts) && discoveryResult.discoveredConcepts.length === 0) {
+          console.log('Discovery endpoint returned no concepts, falling back to basic concepts');
+          const conceptsResult = await apiAdapter.call(
+            { method: 'GET', path: '/concepts' },
+            {}
+          );
+          // Return in discovery format for compatibility
+          return {
+            success: true,
+            discoveredConcepts: conceptsResult.concepts || [],
+            totalDiscovered: conceptsResult.concepts?.length || 0,
+            message: 'Using basic concepts as fallback'
+          };
+        }
+        
+        return discoveryResult;
+      } catch (error) {
+        // Fall back to basic concepts endpoint on error
+        console.log('Discovery endpoint failed, falling back to basic concepts');
+        const conceptsResult = await apiAdapter.call(
+          { method: 'GET', path: '/concepts' },
+          {}
+        );
+        // Return in discovery format for compatibility
+        return {
+          success: true,
+          discoveredConcepts: conceptsResult.concepts || [],
+          totalDiscovered: conceptsResult.concepts?.length || 0,
+          message: 'Using basic concepts due to discovery error'
+        };
+      }
+    },
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }

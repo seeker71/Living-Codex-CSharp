@@ -241,14 +241,14 @@ export default function PortalsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navigation />
       
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">🚪 Portal Interface</h1>
-          <p className="text-gray-600">
+          <p className="text-gray-600 dark:text-gray-300">
             Explore external worlds, temporal dimensions, and consciousness connections through unified portals
           </p>
         </div>
@@ -289,7 +289,7 @@ export default function PortalsPage() {
                 {activeTab === 'portals' && (
                   <div>
                     <div className="flex items-center justify-between mb-6">
-                      <h2 className="text-xl font-semibold text-gray-900">
+                      <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                         🌐 External Portals ({portals.length})
                       </h2>
                       <button
@@ -312,7 +312,7 @@ export default function PortalsPage() {
                                 type="text"
                                 value={newPortal.name}
                                 onChange={(e) => setNewPortal({...newPortal, name: e.target.value})}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="input-standard"
                                 placeholder="Portal name..."
                               />
                             </div>
@@ -321,7 +321,7 @@ export default function PortalsPage() {
                               <textarea
                                 value={newPortal.description}
                                 onChange={(e) => setNewPortal({...newPortal, description: e.target.value})}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="input-standard"
                                 rows={2}
                                 placeholder="Portal description..."
                               />
@@ -332,7 +332,7 @@ export default function PortalsPage() {
                                 type="url"
                                 value={newPortal.url}
                                 onChange={(e) => setNewPortal({...newPortal, url: e.target.value})}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="input-standard"
                                 placeholder="https://example.com"
                               />
                             </div>
@@ -341,7 +341,7 @@ export default function PortalsPage() {
                               <select
                                 value={newPortal.portalType}
                                 onChange={(e) => setNewPortal({...newPortal, portalType: e.target.value})}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="input-standard"
                               >
                                 <option value="website">🌐 Website</option>
                                 <option value="api">🔌 API</option>
@@ -425,7 +425,7 @@ export default function PortalsPage() {
                 {activeTab === 'temporal' && (
                   <div>
                     <div className="flex items-center justify-between mb-6">
-                      <h2 className="text-xl font-semibold text-gray-900">
+                      <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                         ⏰ Temporal Portals ({temporalPortals.length})
                       </h2>
                     </div>
@@ -439,7 +439,7 @@ export default function PortalsPage() {
                           <select
                             value={temporalExploration.explorationType}
                             onChange={(e) => setTemporalExploration({...temporalExploration, explorationType: e.target.value})}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="input-standard"
                           >
                             <option value="consciousness_mapping">🧠 Consciousness Mapping</option>
                             <option value="causality_analysis">🔗 Causality Analysis</option>
@@ -496,11 +496,11 @@ export default function PortalsPage() {
                             
                             <div className="space-y-2 mb-4">
                               <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Consciousness Level</span>
+                                <span className="text-gray-600 dark:text-gray-300">Consciousness Level</span>
                                 <span className="font-medium">{(portal.consciousnessLevel * 100).toFixed(1)}%</span>
                               </div>
                               <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Resonance</span>
+                                <span className="text-gray-600 dark:text-gray-300">Resonance</span>
                                 <span className="font-medium">{(portal.resonance * 100).toFixed(1)}%</span>
                               </div>
                             </div>

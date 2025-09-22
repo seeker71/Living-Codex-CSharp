@@ -48,10 +48,10 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
   };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6 max-w-md mx-auto">
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 max-w-md mx-auto">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Join Living Codex</h2>
-        <p className="text-gray-600">Create your account to start exploring</p>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Join Living Codex</h2>
+        <p className="text-gray-600 dark:text-gray-300">Create your account to start exploring</p>
       </div>
 
       {error && (
@@ -62,7 +62,7 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
             Username
           </label>
           <input
@@ -71,7 +71,7 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="input-standard"
             placeholder="Choose a username"
             disabled={isLoading}
           />
@@ -87,7 +87,7 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="input-standard"
             placeholder="Enter your email"
             disabled={isLoading}
           />
@@ -104,7 +104,7 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={6}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="input-standard"
             placeholder="Create a password (min 6 characters)"
             disabled={isLoading}
           />
@@ -120,7 +120,7 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="input-standard"
             placeholder="Confirm your password"
             disabled={isLoading}
           />

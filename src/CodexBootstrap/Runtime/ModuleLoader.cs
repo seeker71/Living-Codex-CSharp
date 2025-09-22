@@ -174,7 +174,7 @@ public sealed class ModuleLoader
     
     /// <summary>
     /// Create a module instance with required dependencies
-    /// All modules must have constructor(NodeRegistry, ICodexLogger, HttpClient)
+    /// All modules must have constructor(INodeRegistry, ICodexLogger, HttpClient)
     /// </summary>
     private IModule? CreateModule(Type moduleType)
     {

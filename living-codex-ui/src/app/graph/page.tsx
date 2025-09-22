@@ -142,12 +142,12 @@ export default function GraphPage() {
   }, [selectedView, selectedEdgeRole, selectedRelationshipType, edgeSearchQuery]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
-              <h1 className="text-2xl font-bold text-gray-900">Knowledge Graph</h1>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Knowledge Graph</h1>
               <StatusBadge status="Enhanced" />
             </div>
             <Navigation />
@@ -200,12 +200,12 @@ export default function GraphPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                   <div className="bg-white rounded-lg border border-gray-200 p-4">
                     <div className="text-gray-500 text-sm">Total Nodes</div>
-                    <div className="text-3xl font-bold text-gray-900">{(stats.data as any)?.stats?.nodeCount?.toLocaleString() ?? '—'}</div>
+                    <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">{(stats.data as any)?.stats?.nodeCount?.toLocaleString() ?? '—'}</div>
                     <div className="text-xs text-gray-400 mt-1">All states</div>
                   </div>
                   <div className="bg-white rounded-lg border border-gray-200 p-4">
                     <div className="text-gray-500 text-sm">Total Edges</div>
-                    <div className="text-3xl font-bold text-gray-900">{(stats.data as any)?.stats?.edgeCount?.toLocaleString() ?? '—'}</div>
+                    <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">{(stats.data as any)?.stats?.edgeCount?.toLocaleString() ?? '—'}</div>
                     <div className="text-xs text-gray-400 mt-1">Relationships</div>
                   </div>
                   <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -303,7 +303,7 @@ export default function GraphPage() {
                   <select
                     value={selectedNodeType}
                     onChange={(e) => setSelectedNodeType(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="input-standard"
                   >
                     <option value="">All Types</option>
                     {nodeTypes.map((type: string) => (
@@ -323,7 +323,7 @@ export default function GraphPage() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search nodes..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="input-standard"
                   />
                 </div>
                 
@@ -342,7 +342,7 @@ export default function GraphPage() {
             {/* Node Results */}
             <div className="bg-white rounded-lg border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   Node Results
                 </h3>
                 <span className="text-sm text-gray-500">
@@ -459,7 +459,7 @@ export default function GraphPage() {
             {/* Edge Results */}
             <div className="bg-white rounded-lg border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                   📊 Edge Relationships
                   {edgesData && (
                     <span className="ml-2 text-sm font-normal text-gray-500">
@@ -542,21 +542,21 @@ export default function GraphPage() {
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">📈 Growth Patterns</h3>
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Node Density</span>
+                      <span className="text-gray-600 dark:text-gray-300">Node Density</span>
                       <span className="font-medium">
                         {stats?.success && (stats.data as any)?.stats?.nodeCount && (stats.data as any)?.stats?.edgeCount ? 
                           ((stats.data as any).stats.edgeCount / (stats.data as any).stats.nodeCount).toFixed(2) : '—'} edges/node
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Average Node Size</span>
+                      <span className="text-gray-600 dark:text-gray-300">Average Node Size</span>
                       <span className="font-medium">
                         {stats?.success && (stats.data as any)?.stats?.nodeCount ? 
                           `${((stats.data as any).stats.totalItems / (stats.data as any).stats.nodeCount).toFixed(1)}` : '—'} items/node
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600">System Health</span>
+                      <span className="text-gray-600 dark:text-gray-300">System Health</span>
                       <span className="font-medium text-green-600">Excellent</span>
                     </div>
                   </div>
@@ -593,15 +593,15 @@ export default function GraphPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                   <div>
                     <div className="font-medium text-gray-900 mb-2">Meta-Nodes</div>
-                    <p className="text-gray-600">Schemas, APIs, and structural definitions that describe the system itself</p>
+                    <p className="text-gray-600 dark:text-gray-300">Schemas, APIs, and structural definitions that describe the system itself</p>
                   </div>
                   <div>
                     <div className="font-medium text-gray-900 mb-2">Content Nodes</div>
-                    <p className="text-gray-600">User data, concepts, contributions, and knowledge artifacts</p>
+                    <p className="text-gray-600 dark:text-gray-300">User data, concepts, contributions, and knowledge artifacts</p>
                   </div>
                   <div>
                     <div className="font-medium text-gray-900 mb-2">Flow Nodes</div>
-                    <p className="text-gray-600">Process definitions, workflows, and system state transitions</p>
+                    <p className="text-gray-600 dark:text-gray-300">Process definitions, workflows, and system state transitions</p>
                   </div>
                 </div>
               </div>
@@ -614,7 +614,7 @@ export default function GraphPage() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg border border-gray-200 p-6 max-w-2xl w-full mx-4 max-h-96 overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Node Details</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Node Details</h3>
                 <button
                   onClick={() => setNodeDetails(null)}
                   className="text-gray-400 hover:text-gray-600"

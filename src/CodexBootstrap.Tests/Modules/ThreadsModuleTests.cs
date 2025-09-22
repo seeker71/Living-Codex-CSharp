@@ -24,6 +24,7 @@ public class ThreadsModuleTests : IClassFixture<TestServerFixture>
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        await registry.InitializeAsync();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new ThreadsModule(registry, logger, httpClient);
@@ -33,11 +34,16 @@ public class ThreadsModuleTests : IClassFixture<TestServerFixture>
 
         // Assert
         Assert.NotNull(result);
-        var resultObj = result as dynamic;
-        Assert.True(resultObj?.success);
-        var threads = resultObj?.threads;
+        var resultType = result.GetType();
+        var successProp = resultType.GetProperty("success");
+        var threadsProp = resultType.GetProperty("threads");
+        Assert.NotNull(successProp);
+        Assert.NotNull(threadsProp);
+        var success = (bool)successProp.GetValue(result)!;
+        var threads = threadsProp.GetValue(result);
+        Assert.True(success);
         Assert.NotNull(threads);
-        Assert.Empty(threads);
+        Assert.Empty((IEnumerable<object>)threads!);
     }
 
     [Fact]
@@ -45,6 +51,7 @@ public class ThreadsModuleTests : IClassFixture<TestServerFixture>
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        await registry.InitializeAsync();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new ThreadsModule(registry, logger, httpClient);
@@ -63,10 +70,19 @@ public class ThreadsModuleTests : IClassFixture<TestServerFixture>
 
         // Assert
         Assert.NotNull(result);
-        var resultObj = result as dynamic;
-        Assert.True(resultObj?.success);
-        Assert.NotNull(resultObj?.threadId);
-        Assert.Equal("Thread created successfully", resultObj?.message);
+        var resultType = result.GetType();
+        var successProp = resultType.GetProperty("success");
+        var threadIdProp = resultType.GetProperty("threadId");
+        var messageProp = resultType.GetProperty("message");
+        Assert.NotNull(successProp);
+        Assert.NotNull(threadIdProp);
+        Assert.NotNull(messageProp);
+        var success = (bool)successProp.GetValue(result)!;
+        var threadId = threadIdProp.GetValue(result)?.ToString();
+        var message = messageProp.GetValue(result)?.ToString();
+        Assert.True(success);
+        Assert.False(string.IsNullOrEmpty(threadId));
+        Assert.Equal("Thread created successfully", message);
     }
 
     [Fact]
@@ -74,6 +90,7 @@ public class ThreadsModuleTests : IClassFixture<TestServerFixture>
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        await registry.InitializeAsync();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new ThreadsModule(registry, logger, httpClient);
@@ -100,6 +117,7 @@ public class ThreadsModuleTests : IClassFixture<TestServerFixture>
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        await registry.InitializeAsync();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new ThreadsModule(registry, logger, httpClient);
@@ -119,6 +137,7 @@ public class ThreadsModuleTests : IClassFixture<TestServerFixture>
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        await registry.InitializeAsync();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new ThreadsModule(registry, logger, httpClient);

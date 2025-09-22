@@ -85,13 +85,15 @@ check_port() {
 wait_for_server() {
     local server_pid=$1
     echo "⏳ Waiting for server to start (PID: $server_pid)..."
-    local max_attempts=30
+    local max_attempts=5
     local attempt=0
     
     while [ $attempt -lt $max_attempts ]; do
         # Check if the process is still running
         if ! kill -0 $server_pid 2>/dev/null; then
             echo "❌ Server process (PID: $server_pid) has died unexpectedly"
+            echo "📋 Checking logs for startup errors..."
+            tail -n 30 "$LOG_FILE" 2>/dev/null || echo "No logs available"
             return 1
         fi
         
@@ -103,10 +105,12 @@ wait_for_server() {
         
         attempt=$((attempt + 1))
         echo "Attempt $attempt/$max_attempts - waiting... (PID: $server_pid still running)"
-        sleep 2
+        sleep 1
     done
     
-    echo "❌ Server failed to start within expected time"
+    echo "❌ Server failed to start within 5 seconds"
+    echo "📋 Checking logs for startup issues..."
+    tail -n 30 "$LOG_FILE" 2>/dev/null || echo "No logs available"
     return 1
 }
 
@@ -133,8 +137,8 @@ test_server() {
     fi
     
     # Test spec endpoints
-    echo "Testing /spec/modules..."
-    if curl -s "http://127.0.0.1:$PORT/spec/modules" >/dev/null 2>&1; then
+    echo "Testing /spec/modules/all..."
+    if curl -s "http://127.0.0.1:$PORT/spec/modules/all" >/dev/null 2>&1; then
         echo "✅ Spec modules endpoint working"
     else
         echo "❌ Spec modules endpoint failed"
@@ -147,14 +151,20 @@ test_server() {
 
 # Global variable to track server PID
 SERVER_PID=""
+SERVER_STARTED_SUCCESSFULLY=false
 
 # Cleanup function
 cleanup() {
-    if [ ! -z "$SERVER_PID" ] && kill -0 $SERVER_PID 2>/dev/null; then
+    if [ "$SERVER_STARTED_SUCCESSFULLY" = false ] && [ ! -z "$SERVER_PID" ] && kill -0 $SERVER_PID 2>/dev/null; then
         echo ""
-        echo "🛑 Script interrupted. Server (PID: $SERVER_PID) is still running."
-        echo "   To stop the server: kill $SERVER_PID"
-        echo "   To view logs: tail -f $LOG_FILE"
+        echo "🛑 Script interrupted during startup. Stopping server (PID: $SERVER_PID)..."
+        kill $SERVER_PID 2>/dev/null || true
+        sleep 2
+        if kill -0 $SERVER_PID 2>/dev/null; then
+            echo "🔨 Force killing server..."
+            kill -9 $SERVER_PID 2>/dev/null || true
+        fi
+        echo "✅ Server stopped"
     fi
 }
 
@@ -304,17 +314,17 @@ main() {
     # Start the server with logging
     echo "🚀 Starting server on port $PORT..."
     echo "📝 Logs will be written to: $LOG_FILE"
-    echo "📺 Logs will also be displayed on screen"
+    echo "📺 Use 'tail -f $LOG_FILE' to monitor logs"
     
-    # Start server with dual logging (file + screen)
+    # Start server with logging to file
     # Use regular dotnet run for stability (can be changed to dotnet watch for development)
     # Explicitly bind to IPv4 localhost to avoid IPv6 issues
     if [ "$1" = "--watch" ] || [ "$1" = "-w" ]; then
         echo "🔄 Starting with hot-reload (development mode)..."
-        dotnet watch run --hot-reload --urls "http://127.0.0.1:$PORT" --configuration Release 2>&1 | tee "$LOG_FILE" &
+        dotnet watch run --hot-reload --urls "http://127.0.0.1:$PORT" --configuration Release > "$LOG_FILE" 2>&1 &
     else
         echo "🚀 Starting in production mode..."
-        dotnet run --urls "http://127.0.0.1:$PORT" --configuration Release 2>&1 | tee "$LOG_FILE" &
+        dotnet run --urls "http://127.0.0.1:$PORT" --configuration Release > "$LOG_FILE" 2>&1 &
     fi
     SERVER_PID=$!
     
@@ -322,7 +332,7 @@ main() {
     echo "📝 Log file: $LOG_FILE"
     
     # Give the server a moment to start
-    sleep 3
+    sleep 1
     
     # Wait for server to be ready
     if wait_for_server $SERVER_PID; then
@@ -335,7 +345,7 @@ main() {
             echo "🌐 URL: http://127.0.0.1:$PORT"
             echo "📊 Health: http://127.0.0.1:$PORT/health"
             echo "🤖 AI Health: http://127.0.0.1:$PORT/ai/health"
-            echo "📋 Spec: http://127.0.0.1:$PORT/spec/modules"
+            echo "📋 Spec: http://127.0.0.1:$PORT/spec/modules/all"
             echo "📖 Swagger: http://127.0.0.1:$PORT/swagger"
             echo "📝 Logs: $LOG_FILE"
             echo ""
@@ -346,11 +356,15 @@ main() {
             # Analyze startup logs for issues
             analyze_startup_logs "$LOG_FILE"
             
-            echo "🚀 Server is running in the background (PID: $SERVER_PID)."
-            echo "Press Ctrl+C to stop the server."
+            # Mark server as successfully started
+            SERVER_STARTED_SUCCESSFULLY=true
             
-            # Wait for user interrupt or server to exit
-            wait $SERVER_PID
+            echo "🚀 Server is running in the background (PID: $SERVER_PID)."
+            echo "   The script will now exit, leaving the server running."
+            echo "   You can interact with the server immediately."
+            echo ""
+            
+            # Server is running successfully in background - exit script
             exit 0
         else
             echo "❌ Server tests failed"

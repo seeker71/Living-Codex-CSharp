@@ -24,6 +24,7 @@ interface AuthContextType extends AuthState {
   register: (username: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  testConnection: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -106,14 +107,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const login = async (username: string, password: string) => {
     try {
+      console.log('🔐 Attempting login for:', username);
       const response = await endpoints.login(username, password, false);
+      console.log('📡 Login response:', response);
       
       if (response.success && response.data) {
         const responseData = response.data as any;
         const { token, user: userData } = responseData;
         
         if (!token) {
-          return { success: false, error: 'No authentication token received' };
+          console.error('❌ No token in response:', responseData);
+          return { success: false, error: 'No authentication token received from server' };
         }
         
         // Use the user data from the unified auth response
@@ -137,18 +141,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
           isAuthenticated: true,
         });
 
+        console.log('✅ Login successful for:', user.username);
         return { success: true };
       } else {
-        return { success: false, error: response.error || 'Login failed' };
+        console.error('❌ Login failed:', response.error);
+        return { success: false, error: response.error || 'Login failed - please check credentials' };
       }
     } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : 'Login failed' };
+      console.error('❌ Network error during login:', error);
+      return { 
+        success: false, 
+        error: `Network error: ${error instanceof Error ? error.message : 'Unable to connect to server'}. Please check if backend is running on port 5002.` 
+      };
     }
   };
 
   const register = async (username: string, email: string, password: string) => {
     try {
+      console.log('📝 Attempting registration for:', username, email);
       const response = await endpoints.register(username, email, password, username);
+      console.log('📡 Registration response:', response);
       
       if (response.success && response.data) {
         const responseData = response.data as any;
@@ -175,16 +187,35 @@ export function AuthProvider({ children }: AuthProviderProps) {
             isAuthenticated: true,
           });
 
+          console.log('✅ Registration successful for:', user.username);
           return { success: true };
         } else {
+          console.log('⚠️ Registration successful but no immediate login - trying to login');
           // Registration successful but no immediate login - try to login
           return await login(username, password);
         }
       } else {
-        return { success: false, error: response.error || 'Registration failed' };
+        console.error('❌ Registration failed:', response.error);
+        return { success: false, error: response.error || 'Registration failed - please check your information' };
       }
     } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : 'Registration failed' };
+      console.error('❌ Network error during registration:', error);
+      return { 
+        success: false, 
+        error: `Network error: ${error instanceof Error ? error.message : 'Unable to connect to server'}. Please check if backend is running on port 5002.` 
+      };
+    }
+  };
+
+  const testConnection = async () => {
+    try {
+      console.log('🔍 Testing backend connection...');
+      const response = await endpoints.health();
+      console.log('📡 Health check response:', response);
+      return response.success;
+    } catch (error) {
+      console.error('❌ Backend connection failed:', error);
+      return false;
     }
   };
 
@@ -231,6 +262,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     register,
     logout,
     refreshUser,
+    testConnection,
   };
 
   return (
@@ -239,3 +271,4 @@ export function AuthProvider({ children }: AuthProviderProps) {
     </AuthContext.Provider>
   );
 }
+

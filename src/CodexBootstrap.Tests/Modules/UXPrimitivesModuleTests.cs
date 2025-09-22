@@ -24,6 +24,7 @@ public class UXPrimitivesModuleTests : IClassFixture<TestServerFixture>
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        await registry.InitializeAsync();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new UXPrimitivesModule(registry, logger, httpClient);
@@ -96,6 +97,7 @@ public class UXPrimitivesModuleTests : IClassFixture<TestServerFixture>
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        await registry.InitializeAsync();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new UXPrimitivesModule(registry, logger, httpClient);
@@ -134,6 +136,7 @@ public class UXPrimitivesModuleTests : IClassFixture<TestServerFixture>
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        await registry.InitializeAsync();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new UXPrimitivesModule(registry, logger, httpClient);
@@ -153,7 +156,7 @@ public class UXPrimitivesModuleTests : IClassFixture<TestServerFixture>
         Assert.NotNull(result);
         var errorResponse = result as CodexBootstrap.Core.ErrorResponse;
         Assert.NotNull(errorResponse);
-        Assert.Contains("Error generating reflection", errorResponse.Error);
+        Assert.Contains("Content not found", errorResponse.Error);
     }
 
     [Fact]
@@ -161,6 +164,7 @@ public class UXPrimitivesModuleTests : IClassFixture<TestServerFixture>
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        await registry.InitializeAsync();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new UXPrimitivesModule(registry, logger, httpClient);
@@ -187,6 +191,7 @@ public class UXPrimitivesModuleTests : IClassFixture<TestServerFixture>
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        await registry.InitializeAsync();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new UXPrimitivesModule(registry, logger, httpClient);
@@ -234,6 +239,7 @@ public class UXPrimitivesModuleTests : IClassFixture<TestServerFixture>
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        await registry.InitializeAsync();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new UXPrimitivesModule(registry, logger, httpClient);
@@ -261,6 +267,7 @@ public class UXPrimitivesModuleTests : IClassFixture<TestServerFixture>
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        await registry.InitializeAsync();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new UXPrimitivesModule(registry, logger, httpClient);
@@ -295,6 +302,7 @@ public class UXPrimitivesModuleTests : IClassFixture<TestServerFixture>
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        registry.InitializeAsync().Wait();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new UXPrimitivesModule(registry, logger, httpClient);

@@ -1,14 +1,31 @@
 [
   {
-    "Id": "nature-science",
-    "Name": "Nature - Scientific Discoveries",
-    "Type": "rss",
-    "Url": "https://www.nature.com/nature.rss",
+    "Id": "hackernews",
+    "Name": "Hacker News Top",
+    "Type": "hackernews",
+    "Url": "https://hacker-news.firebaseio.com/v0/topstories.json",
     "Categories": [
+      "technology",
+      "startups"
+    ],
+    "OntologyLevels": [
+      "L0-L2"
+    ],
+    "IsActive": true,
+    "UpdateIntervalMinutes": 30,
+    "Priority": 1,
+    "LastIngested": null,
+    "Metadata": {}
+  },
+  {
+    "Id": "nasa-breaking",
+    "Name": "NASA Breaking News",
+    "Type": "rss",
+    "Url": "https://www.nasa.gov/rss/dyn/breaking_news.rss",
+    "Categories": [
+      "space",
       "science",
-      "research",
-      "discovery",
-      "consciousness"
+      "nasa"
     ],
     "OntologyLevels": [
       "L0-L2"
@@ -20,162 +37,38 @@
     "Metadata": {}
   },
   {
-    "Id": "sciam-science",
-    "Name": "Scientific American",
+    "Id": "arstechnica",
+    "Name": "Ars Technica",
     "Type": "rss",
-    "Url": "https://rss.sciam.com/ScientificAmerican-Global",
-    "Categories": [
-      "science",
-      "research",
-      "consciousness",
-      "discovery"
-    ],
-    "OntologyLevels": [
-      "L0-L2"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 120,
-    "Priority": 2,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "quanta-magazine",
-    "Name": "Quanta Magazine",
-    "Type": "rss",
-    "Url": "https://api.quantamagazine.org/feed/",
-    "Categories": [
-      "science",
-      "mathematics",
-      "physics",
-      "consciousness"
-    ],
-    "OntologyLevels": [
-      "L0-L2"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 180,
-    "Priority": 3,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "science-daily",
-    "Name": "Science Daily",
-    "Type": "rss",
-    "Url": "https://www.sciencedaily.com/rss/all.xml",
-    "Categories": [
-      "science",
-      "research",
-      "technology",
-      "discovery"
-    ],
-    "OntologyLevels": [
-      "L0-L2"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 90,
-    "Priority": 4,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "new-scientist",
-    "Name": "New Scientist",
-    "Type": "rss",
-    "Url": "https://www.newscientist.com/feed/home/",
-    "Categories": [
-      "science",
-      "technology",
-      "research",
-      "innovation"
-    ],
-    "OntologyLevels": [
-      "L0-L2"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 120,
-    "Priority": 5,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "mit-technology-review",
-    "Name": "MIT Technology Review",
-    "Type": "rss",
-    "Url": "https://www.technologyreview.com/feed/",
+    "Url": "https://feeds.arstechnica.com/arstechnica/index",
     "Categories": [
       "technology",
-      "innovation",
-      "research",
-      "consciousness"
+      "science",
+      "computing"
     ],
     "OntologyLevels": [
       "L0-L2"
     ],
     "IsActive": true,
-    "UpdateIntervalMinutes": 180,
-    "Priority": 6,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "ieee-spectrum",
-    "Name": "IEEE Spectrum",
-    "Type": "rss",
-    "Url": "https://spectrum.ieee.org/rss/fulltext",
-    "Categories": [
-      "engineering",
-      "technology",
-      "innovation",
-      "consciousness"
-    ],
-    "OntologyLevels": [
-      "L1-L3"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 120,
+    "UpdateIntervalMinutes": 60,
     "Priority": 1,
     "LastIngested": null,
     "Metadata": {}
   },
   {
-    "Id": "arstechnica-tech",
+    "Id": "arstechnica",
     "Name": "Ars Technica",
     "Type": "rss",
     "Url": "https://feeds.arstechnica.com/arstechnica/index/",
     "Categories": [
-      "technology",
-      "engineering",
-      "innovation",
-      "consciousness"
+      "technology"
     ],
     "OntologyLevels": [
-      "L1-L3"
+      "L0-L2"
     ],
     "IsActive": true,
-    "UpdateIntervalMinutes": 90,
-    "Priority": 2,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "hacker-news",
-    "Name": "Hacker News",
-    "Type": "api",
-    "Url": "https://hacker-news.firebaseio.com/v0/",
-    "Categories": [
-      "technology",
-      "programming",
-      "innovation",
-      "consciousness"
-    ],
-    "OntologyLevels": [
-      "L1-L3"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 60,
-    "Priority": 3,
+    "UpdateIntervalMinutes": 25,
+    "Priority": 1,
     "LastIngested": null,
     "Metadata": {}
   },
@@ -187,311 +80,402 @@
     "Categories": [
       "technology",
       "startups",
-      "innovation",
-      "consciousness"
+      "ai"
     ],
     "OntologyLevels": [
-      "L1-L3"
+      "L0-L2"
     ],
     "IsActive": true,
-    "UpdateIntervalMinutes": 60,
-    "Priority": 4,
+    "UpdateIntervalMinutes": 15,
+    "Priority": 1,
     "LastIngested": null,
     "Metadata": {}
   },
   {
-    "Id": "wired-tech",
-    "Name": "Wired Technology",
+    "Id": "wired",
+    "Name": "Wired",
     "Type": "rss",
     "Url": "https://www.wired.com/feed/rss",
     "Categories": [
       "technology",
-      "innovation",
-      "culture",
-      "consciousness"
-    ],
-    "OntologyLevels": [
-      "L1-L3"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 120,
-    "Priority": 5,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "lions-roar-spirituality",
-    "Name": "Lions Roar - Buddhist Wisdom",
-    "Type": "rss",
-    "Url": "https://www.lionsroar.com/feed/",
-    "Categories": [
-      "spirituality",
-      "mindfulness",
-      "consciousness",
-      "wisdom"
-    ],
-    "OntologyLevels": [
-      "L3-L4"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 240,
-    "Priority": 1,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "tricycle-buddhism",
-    "Name": "Tricycle - Buddhist Teachings",
-    "Type": "rss",
-    "Url": "https://tricycle.org/feed/",
-    "Categories": [
-      "spirituality",
-      "buddhism",
-      "mindfulness",
-      "consciousness"
-    ],
-    "OntologyLevels": [
-      "L3-L4"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 300,
-    "Priority": 2,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "mindful-org",
-    "Name": "Mindful.org",
-    "Type": "rss",
-    "Url": "https://www.mindful.org/feed/",
-    "Categories": [
-      "mindfulness",
-      "meditation",
-      "consciousness",
-      "wellness"
-    ],
-    "OntologyLevels": [
-      "L3-L4"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 240,
-    "Priority": 3,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "consciousness-research",
-    "Name": "Consciousness Research Network",
-    "Type": "rss",
-    "Url": "https://consciousness-research.org/feed/",
-    "Categories": [
-      "consciousness",
-      "research",
-      "spirituality",
       "science"
     ],
     "OntologyLevels": [
-      "L3-L4"
+      "L0-L2"
     ],
     "IsActive": true,
-    "UpdateIntervalMinutes": 360,
-    "Priority": 4,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "integral-life",
-    "Name": "Integral Life",
-    "Type": "rss",
-    "Url": "https://integrallife.com/feed/",
-    "Categories": [
-      "consciousness",
-      "spirituality",
-      "evolution",
-      "wisdom"
-    ],
-    "OntologyLevels": [
-      "L3-L4"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 300,
-    "Priority": 5,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "global-citizen-unity",
-    "Name": "Global Citizen - Unity Consciousness",
-    "Type": "rss",
-    "Url": "https://www.globalcitizen.org/en/feed/",
-    "Categories": [
-      "unity",
-      "global",
-      "consciousness",
-      "collaboration"
-    ],
-    "OntologyLevels": [
-      "L5-L6"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 180,
+    "UpdateIntervalMinutes": 30,
     "Priority": 1,
     "LastIngested": null,
     "Metadata": {}
   },
   {
-    "Id": "un-news-unity",
-    "Name": "UN News - International Cooperation",
-    "Type": "rss",
-    "Url": "https://news.un.org/en/rss",
-    "Categories": [
-      "unity",
-      "international",
-      "cooperation",
-      "consciousness"
-    ],
-    "OntologyLevels": [
-      "L5-L6"
-    ],
+    "Id": "hackernews",
+    "Name": "Hacker News",
+    "Type": "api",
+    "Url": "https://hacker-news.firebaseio.com/v0/topstories.json",
+    "Categories": [],
+    "OntologyLevels": [],
     "IsActive": true,
-    "UpdateIntervalMinutes": 240,
-    "Priority": 2,
+    "UpdateIntervalMinutes": 30,
+    "Priority": 1,
     "LastIngested": null,
     "Metadata": {}
   },
   {
-    "Id": "world-economic-forum",
-    "Name": "World Economic Forum",
+    "Id": "nature",
+    "Name": "Nature",
     "Type": "rss",
-    "Url": "https://www.weforum.org/feeds/",
+    "Url": "https://www.nature.com/nature.rss",
     "Categories": [
-      "global",
-      "collaboration",
-      "consciousness",
-      "unity"
+      "science",
+      "research",
+      "peer-reviewed"
     ],
     "OntologyLevels": [
-      "L5-L6"
+      "L0-L2"
     ],
     "IsActive": true,
-    "UpdateIntervalMinutes": 300,
-    "Priority": 3,
+    "UpdateIntervalMinutes": 60,
+    "Priority": 1,
     "LastIngested": null,
     "Metadata": {}
   },
   {
-    "Id": "global-issues",
-    "Name": "Global Issues",
+    "Id": "sciencedaily",
+    "Name": "Science Daily",
     "Type": "rss",
-    "Url": "https://www.globalissues.org/news/rss",
+    "Url": "https://www.sciencedaily.com/rss/all.xml",
     "Categories": [
-      "global",
-      "unity",
-      "consciousness",
-      "collaboration"
+      "science",
+      "research",
+      "discovery"
     ],
     "OntologyLevels": [
-      "L5-L6"
+      "L0-L2"
     ],
     "IsActive": true,
-    "UpdateIntervalMinutes": 360,
-    "Priority": 4,
+    "UpdateIntervalMinutes": 45,
+    "Priority": 1,
     "LastIngested": null,
     "Metadata": {}
   },
   {
-    "Id": "bbc-world",
+    "Id": "sciencemag",
+    "Name": "Science Magazine",
+    "Type": "rss",
+    "Url": "https://www.science.org/rss/news_current.xml",
+    "Categories": [
+      "science",
+      "research",
+      "peer-reviewed"
+    ],
+    "OntologyLevels": [
+      "L0-L2"
+    ],
+    "IsActive": true,
+    "UpdateIntervalMinutes": 60,
+    "Priority": 1,
+    "LastIngested": null,
+    "Metadata": {}
+  },
+  {
+    "Id": "newscientist",
+    "Name": "New Scientist",
+    "Type": "rss",
+    "Url": "https://www.newscientist.com/feed/home/",
+    "Categories": [
+      "science",
+      "technology",
+      "discovery"
+    ],
+    "OntologyLevels": [
+      "L0-L2"
+    ],
+    "IsActive": true,
+    "UpdateIntervalMinutes": 40,
+    "Priority": 1,
+    "LastIngested": null,
+    "Metadata": {}
+  },
+  {
+    "Id": "scientificamerican",
+    "Name": "Scientific American",
+    "Type": "rss",
+    "Url": "http://rss.sciam.com/ScientificAmerican-Global",
+    "Categories": [
+      "science",
+      "research",
+      "innovation"
+    ],
+    "OntologyLevels": [
+      "L0-L2"
+    ],
+    "IsActive": true,
+    "UpdateIntervalMinutes": 50,
+    "Priority": 1,
+    "LastIngested": null,
+    "Metadata": {}
+  },
+  {
+    "Id": "livescience",
+    "Name": "Live Science",
+    "Type": "rss",
+    "Url": "https://www.livescience.com/feeds/all",
+    "Categories": [
+      "science",
+      "health",
+      "environment"
+    ],
+    "OntologyLevels": [
+      "L0-L2"
+    ],
+    "IsActive": true,
+    "UpdateIntervalMinutes": 35,
+    "Priority": 1,
+    "LastIngested": null,
+    "Metadata": {}
+  },
+  {
+    "Id": "physicsworld",
+    "Name": "Physics World",
+    "Type": "rss",
+    "Url": "https://physicsworld.com/feed/",
+    "Categories": [
+      "physics",
+      "quantum",
+      "research"
+    ],
+    "OntologyLevels": [
+      "L0-L2"
+    ],
+    "IsActive": true,
+    "UpdateIntervalMinutes": 60,
+    "Priority": 1,
+    "LastIngested": null,
+    "Metadata": {}
+  },
+  {
+    "Id": "phys",
+    "Name": "Phys.org",
+    "Type": "rss",
+    "Url": "https://phys.org/rss-feed/",
+    "Categories": [
+      "physics",
+      "science",
+      "technology"
+    ],
+    "OntologyLevels": [
+      "L0-L2"
+    ],
+    "IsActive": true,
+    "UpdateIntervalMinutes": 40,
+    "Priority": 1,
+    "LastIngested": null,
+    "Metadata": {}
+  },
+  {
+    "Id": "quantamagazine",
+    "Name": "Quanta Magazine",
+    "Type": "rss",
+    "Url": "https://www.quantamagazine.org/feed/",
+    "Categories": [
+      "physics",
+      "mathematics",
+      "biology"
+    ],
+    "OntologyLevels": [
+      "L0-L2"
+    ],
+    "IsActive": true,
+    "UpdateIntervalMinutes": 120,
+    "Priority": 1,
+    "LastIngested": null,
+    "Metadata": {}
+  },
+  {
+    "Id": "nasa",
+    "Name": "NASA News",
+    "Type": "rss",
+    "Url": "https://www.nasa.gov/rss/dyn/breaking_news.rss",
+    "Categories": [
+      "space",
+      "astronomy",
+      "exploration"
+    ],
+    "OntologyLevels": [
+      "L0-L2"
+    ],
+    "IsActive": true,
+    "UpdateIntervalMinutes": 45,
+    "Priority": 1,
+    "LastIngested": null,
+    "Metadata": {}
+  },
+  {
+    "Id": "spacenews",
+    "Name": "SpaceNews",
+    "Type": "rss",
+    "Url": "https://spacenews.com/feed/",
+    "Categories": [
+      "space",
+      "commercial-space",
+      "satellites"
+    ],
+    "OntologyLevels": [
+      "L0-L2"
+    ],
+    "IsActive": true,
+    "UpdateIntervalMinutes": 40,
+    "Priority": 1,
+    "LastIngested": null,
+    "Metadata": {}
+  },
+  {
+    "Id": "spacecom",
+    "Name": "Space.com",
+    "Type": "rss",
+    "Url": "https://www.space.com/feeds/all",
+    "Categories": [
+      "space",
+      "astronomy",
+      "exploration"
+    ],
+    "OntologyLevels": [
+      "L0-L2"
+    ],
+    "IsActive": true,
+    "UpdateIntervalMinutes": 35,
+    "Priority": 1,
+    "LastIngested": null,
+    "Metadata": {}
+  },
+  {
+    "Id": "universetoday",
+    "Name": "Universe Today",
+    "Type": "rss",
+    "Url": "https://www.universetoday.com/feed/",
+    "Categories": [
+      "space",
+      "astronomy",
+      "astrophysics"
+    ],
+    "OntologyLevels": [
+      "L0-L2"
+    ],
+    "IsActive": true,
+    "UpdateIntervalMinutes": 45,
+    "Priority": 1,
+    "LastIngested": null,
+    "Metadata": {}
+  },
+  {
+    "Id": "esa",
+    "Name": "European Space Agency",
+    "Type": "rss",
+    "Url": "https://www.esa.int/rssfeed/Our_Activities/Space_Science",
+    "Categories": [
+      "space",
+      "science",
+      "exploration"
+    ],
+    "OntologyLevels": [
+      "L0-L2"
+    ],
+    "IsActive": true,
+    "UpdateIntervalMinutes": 60,
+    "Priority": 1,
+    "LastIngested": null,
+    "Metadata": {}
+  },
+  {
+    "Id": "reuters",
+    "Name": "Reuters",
+    "Type": "rss",
+    "Url": "https://www.reuters.com/rss/worldNews",
+    "Categories": [
+      "world",
+      "politics",
+      "business"
+    ],
+    "OntologyLevels": [
+      "L0-L2"
+    ],
+    "IsActive": true,
+    "UpdateIntervalMinutes": 15,
+    "Priority": 1,
+    "LastIngested": null,
+    "Metadata": {}
+  },
+  {
+    "Id": "bbc",
     "Name": "BBC World News",
     "Type": "rss",
     "Url": "http://feeds.bbci.co.uk/news/world/rss.xml",
     "Categories": [
       "world",
-      "international",
-      "consciousness",
-      "unity"
+      "politics",
+      "international"
     ],
     "OntologyLevels": [
-      "L7-L8"
+      "L0-L2"
     ],
     "IsActive": true,
-    "UpdateIntervalMinutes": 30,
+    "UpdateIntervalMinutes": 20,
     "Priority": 1,
     "LastIngested": null,
     "Metadata": {}
   },
   {
-    "Id": "reuters-world",
-    "Name": "Reuters World News",
+    "Id": "ap",
+    "Name": "Associated Press",
     "Type": "rss",
-    "Url": "https://feeds.reuters.com/Reuters/worldNews",
+    "Url": "https://www.apnews.com/apf-topnews?output=rss",
     "Categories": [
       "world",
-      "international",
-      "consciousness",
-      "unity"
+      "politics",
+      "breaking-news"
     ],
     "OntologyLevels": [
-      "L7-L8"
+      "L0-L2"
     ],
     "IsActive": true,
-    "UpdateIntervalMinutes": 30,
-    "Priority": 2,
+    "UpdateIntervalMinutes": 15,
+    "Priority": 1,
     "LastIngested": null,
     "Metadata": {}
   },
   {
-    "Id": "guardian-world",
-    "Name": "The Guardian World",
+    "Id": "guardian",
+    "Name": "The Guardian",
     "Type": "rss",
     "Url": "https://www.theguardian.com/world/rss",
     "Categories": [
       "world",
-      "international",
-      "consciousness",
-      "unity"
+      "politics",
+      "environment"
     ],
     "OntologyLevels": [
-      "L7-L8"
+      "L0-L2"
     ],
     "IsActive": true,
-    "UpdateIntervalMinutes": 45,
-    "Priority": 3,
+    "UpdateIntervalMinutes": 25,
+    "Priority": 1,
     "LastIngested": null,
     "Metadata": {}
   },
   {
-    "Id": "al-jazeera-world",
-    "Name": "Al Jazeera World",
+    "Id": "aljazeera",
+    "Name": "Al Jazeera",
     "Type": "rss",
     "Url": "https://www.aljazeera.com/xml/rss/all.xml",
     "Categories": [
       "world",
-      "international",
-      "consciousness",
-      "unity"
+      "middle-east",
+      "politics"
     ],
     "OntologyLevels": [
-      "L7-L8"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 60,
-    "Priority": 4,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "bloomberg-finance",
-    "Name": "Bloomberg Finance",
-    "Type": "rss",
-    "Url": "https://feeds.bloomberg.com/markets/news.rss",
-    "Categories": [
-      "finance",
-      "economics",
-      "consciousness",
-      "abundance"
-    ],
-    "OntologyLevels": [
-      "L9-L10"
+      "L0-L2"
     ],
     "IsActive": true,
     "UpdateIntervalMinutes": 30,
@@ -500,382 +484,115 @@
     "Metadata": {}
   },
   {
-    "Id": "reuters-business",
-    "Name": "Reuters Business",
-    "Type": "rss",
-    "Url": "https://feeds.reuters.com/reuters/businessNews",
-    "Categories": [
-      "finance",
-      "business",
-      "consciousness",
-      "abundance"
-    ],
-    "OntologyLevels": [
-      "L9-L10"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 30,
-    "Priority": 2,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "financial-times",
-    "Name": "Financial Times",
-    "Type": "rss",
-    "Url": "https://www.ft.com/rss/home",
-    "Categories": [
-      "finance",
-      "economics",
-      "consciousness",
-      "abundance"
-    ],
-    "OntologyLevels": [
-      "L9-L10"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 60,
-    "Priority": 3,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "wall-street-journal",
-    "Name": "Wall Street Journal",
-    "Type": "rss",
-    "Url": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
-    "Categories": [
-      "finance",
-      "markets",
-      "consciousness",
-      "abundance"
-    ],
-    "OntologyLevels": [
-      "L9-L10"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 60,
-    "Priority": 4,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "webmd-health",
-    "Name": "WebMD Health News",
-    "Type": "rss",
-    "Url": "https://rssfeeds.webmd.com/rss/rss.aspx?RSSSource=RSS_PUBLIC",
-    "Categories": [
-      "health",
-      "wellness",
-      "consciousness",
-      "healing"
-    ],
-    "OntologyLevels": [
-      "L11-L12"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 120,
-    "Priority": 1,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "medical-news-today",
+    "Id": "medicalnews",
     "Name": "Medical News Today",
     "Type": "rss",
     "Url": "https://www.medicalnewstoday.com/rss",
     "Categories": [
       "health",
       "medicine",
-      "consciousness",
-      "healing"
+      "research"
     ],
     "OntologyLevels": [
-      "L11-L12"
+      "L0-L2"
     ],
     "IsActive": true,
-    "UpdateIntervalMinutes": 180,
-    "Priority": 2,
+    "UpdateIntervalMinutes": 45,
+    "Priority": 1,
     "LastIngested": null,
     "Metadata": {}
   },
   {
-    "Id": "mayo-clinic-health",
-    "Name": "Mayo Clinic Health",
+    "Id": "healthline",
+    "Name": "Healthline",
     "Type": "rss",
-    "Url": "https://www.mayoclinic.org/rss/all-mayo-clinic-news",
+    "Url": "https://www.healthline.com/rss",
     "Categories": [
       "health",
       "wellness",
-      "consciousness",
-      "healing"
+      "nutrition"
     ],
     "OntologyLevels": [
-      "L11-L12"
+      "L0-L2"
     ],
     "IsActive": true,
-    "UpdateIntervalMinutes": 240,
-    "Priority": 3,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "environmental-news-network",
-    "Name": "Environmental News Network",
-    "Type": "rss",
-    "Url": "https://www.enn.com/rss.xml",
-    "Categories": [
-      "environment",
-      "sustainability",
-      "consciousness",
-      "unity"
-    ],
-    "OntologyLevels": [
-      "L13-L14"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 180,
+    "UpdateIntervalMinutes": 60,
     "Priority": 1,
     "LastIngested": null,
     "Metadata": {}
   },
   {
-    "Id": "treehugger-environment",
-    "Name": "TreeHugger Environment",
+    "Id": "webmd",
+    "Name": "WebMD Health News",
     "Type": "rss",
-    "Url": "https://www.treehugger.com/feeds/all.rss",
+    "Url": "https://rssfeeds.webmd.com/rss/rss.aspx?RSSSource=RSS_PUBLIC",
     "Categories": [
-      "environment",
-      "sustainability",
-      "consciousness",
-      "unity"
+      "health",
+      "medicine",
+      "wellness"
     ],
     "OntologyLevels": [
-      "L13-L14"
+      "L0-L2"
     ],
     "IsActive": true,
-    "UpdateIntervalMinutes": 240,
-    "Priority": 2,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "national-geographic-environment",
-    "Name": "National Geographic Environment",
-    "Type": "rss",
-    "Url": "https://feeds.nationalgeographic.com/ng/News/News_Environment",
-    "Categories": [
-      "environment",
-      "nature",
-      "consciousness",
-      "unity"
-    ],
-    "OntologyLevels": [
-      "L13-L14"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 300,
-    "Priority": 3,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "space-cosmic-consciousness",
-    "Name": "Space.com - Cosmic Consciousness",
-    "Type": "rss",
-    "Url": "https://www.space.com/feeds/all",
-    "Categories": [
-      "cosmology",
-      "consciousness",
-      "universe",
-      "exploration"
-    ],
-    "OntologyLevels": [
-      "L15-L16"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 240,
+    "UpdateIntervalMinutes": 50,
     "Priority": 1,
     "LastIngested": null,
     "Metadata": {}
   },
   {
-    "Id": "phys-org-cosmology",
-    "Name": "Phys.org - Physics \u0026 Cosmology",
+    "Id": "theverge",
+    "Name": "The Verge",
     "Type": "rss",
-    "Url": "https://phys.org/rss-feed/",
+    "Url": "https://www.theverge.com/rss/index.xml",
     "Categories": [
-      "cosmology",
-      "physics",
-      "science",
-      "consciousness"
+      "technology",
+      "gadgets"
     ],
     "OntologyLevels": [
-      "L15-L16"
+      "L0-L2"
     ],
     "IsActive": true,
-    "UpdateIntervalMinutes": 120,
-    "Priority": 2,
+    "UpdateIntervalMinutes": 60,
+    "Priority": 1,
     "LastIngested": null,
     "Metadata": {}
   },
   {
-    "Id": "nasa-space-news",
-    "Name": "NASA Space News",
+    "Id": "nasa-jpl",
+    "Name": "NASA JPL News",
     "Type": "rss",
-    "Url": "https://www.nasa.gov/rss/dyn/breaking_news.rss",
+    "Url": "https://www.jpl.nasa.gov/feeds/news.xml",
     "Categories": [
       "space",
-      "cosmology",
-      "consciousness",
-      "exploration"
+      "nasa"
     ],
     "OntologyLevels": [
-      "L15-L16"
+      "L0-L2"
     ],
     "IsActive": true,
-    "UpdateIntervalMinutes": 180,
-    "Priority": 3,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "quantum-magazine",
-    "Name": "Quantum Magazine",
-    "Type": "rss",
-    "Url": "https://www.quantamagazine.org/feed/",
-    "Categories": [
-      "quantum",
-      "physics",
-      "consciousness",
-      "cosmology"
-    ],
-    "OntologyLevels": [
-      "L15-L16"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 240,
-    "Priority": 4,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "artsy-art-news",
-    "Name": "Artsy Art News",
-    "Type": "rss",
-    "Url": "https://www.artsy.net/rss/news",
-    "Categories": [
-      "art",
-      "culture",
-      "consciousness",
-      "creativity"
-    ],
-    "OntologyLevels": [
-      "L17-L18"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 360,
+    "UpdateIntervalMinutes": 60,
     "Priority": 1,
     "LastIngested": null,
     "Metadata": {}
   },
   {
-    "Id": "hyperallergic-art",
-    "Name": "Hyperallergic Art",
+    "Id": "mit-news",
+    "Name": "MIT News",
     "Type": "rss",
-    "Url": "https://hyperallergic.com/feed/",
+    "Url": "https://news.mit.edu/rss",
     "Categories": [
-      "art",
-      "culture",
-      "consciousness",
-      "creativity"
+      "science",
+      "research",
+      "education",
+      "technology"
     ],
     "OntologyLevels": [
-      "L17-L18"
+      "L0-L2"
     ],
     "IsActive": true,
-    "UpdateIntervalMinutes": 300,
-    "Priority": 2,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "artnews-culture",
-    "Name": "ARTnews Culture",
-    "Type": "rss",
-    "Url": "https://www.artnews.com/feed/",
-    "Categories": [
-      "art",
-      "culture",
-      "consciousness",
-      "creativity"
-    ],
-    "OntologyLevels": [
-      "L17-L18"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 360,
-    "Priority": 3,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "philosophy-now",
-    "Name": "Philosophy Now",
-    "Type": "rss",
-    "Url": "https://philosophynow.org/rss",
-    "Categories": [
-      "philosophy",
-      "wisdom",
-      "consciousness",
-      "truth"
-    ],
-    "OntologyLevels": [
-      "L19-L20"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 480,
+    "UpdateIntervalMinutes": 60,
     "Priority": 1,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "ieet-future-consciousness",
-    "Name": "IEET Future Consciousness",
-    "Type": "rss",
-    "Url": "https://ieet.org/index.php/IEET2/rss",
-    "Categories": [
-      "philosophy",
-      "future",
-      "consciousness",
-      "wisdom"
-    ],
-    "OntologyLevels": [
-      "L19-L20"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 360,
-    "Priority": 2,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "big-think-wisdom",
-    "Name": "Big Think Wisdom",
-    "Type": "rss",
-    "Url": "https://bigthink.com/feed/",
-    "Categories": [
-      "philosophy",
-      "wisdom",
-      "consciousness",
-      "truth"
-    ],
-    "OntologyLevels": [
-      "L19-L20"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 300,
-    "Priority": 3,
     "LastIngested": null,
     "Metadata": {}
   }

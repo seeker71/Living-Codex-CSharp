@@ -29,13 +29,13 @@ export default function AboutPage() {
   const slowCalls = ApiLogger.getSlowCalls(3000); // Calls over 3 seconds
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200">
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-gray-900">Living Codex</h1>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Living Codex</h1>
             </div>
             <Navigation />
           </div>
@@ -45,10 +45,10 @@ export default function AboutPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Page Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
             About Living Codex
           </h1>
-          <p className="text-gray-600">
+          <p className="text-gray-600 dark:text-gray-300">
             A fractal knowledge system where everything is a node
           </p>
         </div>
@@ -56,51 +56,51 @@ export default function AboutPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* About Content */}
           <div className="space-y-6">
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
                 🌐 Everything is a Node
               </h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
                 Living Codex implements a fractal knowledge architecture where all data, 
                 structure, flow, state, deltas, policies, and specs exist as nodes with edges.
               </p>
               <ul className="space-y-2 text-sm text-gray-600">
-                <li>• <strong>Ice Nodes:</strong> Immutable, persistent knowledge stored in federated storage</li>
-                <li>• <strong>Water Nodes:</strong> Mutable, semi-persistent data in local cache</li>
-                <li>• <strong>Gas Nodes:</strong> Transient, derivable information generated on-demand</li>
+                <li>• <strong className="text-gray-900 dark:text-gray-100">Ice Nodes:</strong> Immutable, persistent knowledge stored in federated storage</li>
+                <li>• <strong className="text-gray-900 dark:text-gray-100">Water Nodes:</strong> Mutable, semi-persistent data in local cache</li>
+                <li>• <strong className="text-gray-900 dark:text-gray-100">Gas Nodes:</strong> Transient, derivable information generated on-demand</li>
               </ul>
             </div>
 
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
                 🔮 Resonance Architecture
               </h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
                 The system uses resonance patterns to connect related concepts, people, and ideas.
                 Contributions amplify energy and strengthen connections across the knowledge graph.
               </p>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <div className="font-medium text-gray-900">Meta-Nodes</div>
-                  <div className="text-gray-600">Describe structure and relationships</div>
+                  <div className="text-gray-600 dark:text-gray-300">Describe structure and relationships</div>
                 </div>
                 <div>
                   <div className="font-medium text-gray-900">Tiny Deltas</div>
-                  <div className="text-gray-600">Minimal patches preserve history</div>
+                  <div className="text-gray-600 dark:text-gray-300">Minimal patches preserve history</div>
                 </div>
                 <div>
                   <div className="font-medium text-gray-900">Single Lifecycle</div>
-                  <div className="text-gray-600">Compose → Expand → Validate → Contract</div>
+                  <div className="text-gray-600 dark:text-gray-300">Compose → Expand → Validate → Contract</div>
                 </div>
                 <div>
                   <div className="font-medium text-gray-900">Deterministic</div>
-                  <div className="text-gray-600">APIs derive from codex.meta/nodes</div>
+                  <div className="text-gray-600 dark:text-gray-300">APIs derive from codex.meta/nodes</div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
                 🚀 Technology Stack
               </h2>
               <div className="grid grid-cols-2 gap-4 text-sm">
@@ -128,8 +128,8 @@ export default function AboutPage() {
 
           {/* System Status */}
           <div className="space-y-6">
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
                 📊 System Status
               </h2>
               
@@ -144,28 +144,28 @@ export default function AboutPage() {
                   
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <div className="text-gray-600">Total Nodes</div>
-                      <div className="font-medium">{Number(healthStatus.nodeCount)?.toLocaleString() || 'N/A'}</div>
+                      <div className="text-gray-600 dark:text-gray-300">Total Nodes</div>
+                      <div className="font-medium text-gray-900 dark:text-gray-100">{Number(healthStatus.nodeCount)?.toLocaleString() || 'N/A'}</div>
                     </div>
                     <div>
-                      <div className="text-gray-600">Total Edges</div>
-                      <div className="font-medium">{Number(healthStatus.edgeCount)?.toLocaleString() || 'N/A'}</div>
+                      <div className="text-gray-600 dark:text-gray-300">Total Edges</div>
+                      <div className="font-medium text-gray-900 dark:text-gray-100">{Number(healthStatus.edgeCount)?.toLocaleString() || 'N/A'}</div>
                     </div>
                     <div>
-                      <div className="text-gray-600">Modules Loaded</div>
-                      <div className="font-medium">{Number(healthStatus.moduleCount) || 'N/A'}</div>
+                      <div className="text-gray-600 dark:text-gray-300">Modules Loaded</div>
+                      <div className="font-medium text-gray-900 dark:text-gray-100">{Number(healthStatus.moduleCount) || 'N/A'}</div>
                     </div>
                     <div>
-                      <div className="text-gray-600">API Routes</div>
-                      <div className="font-medium">{Number((healthStatus as any)?.registrationMetrics?.totalRoutesRegistered)?.toLocaleString() || 'N/A'}</div>
+                      <div className="text-gray-600 dark:text-gray-300">API Routes</div>
+                      <div className="font-medium text-gray-900 dark:text-gray-100">{Number((healthStatus as any)?.registrationMetrics?.totalRoutesRegistered)?.toLocaleString() || 'N/A'}</div>
                     </div>
                     <div>
-                      <div className="text-gray-600">Request Count</div>
-                      <div className="font-medium">{Number(healthStatus.requestCount)?.toLocaleString() || 'N/A'}</div>
+                      <div className="text-gray-600 dark:text-gray-300">Request Count</div>
+                      <div className="font-medium text-gray-900 dark:text-gray-100">{Number(healthStatus.requestCount)?.toLocaleString() || 'N/A'}</div>
                     </div>
                     <div>
-                      <div className="text-gray-600">Uptime</div>
-                      <div className="font-medium">{String(healthStatus.uptime) || 'N/A'}</div>
+                      <div className="text-gray-600 dark:text-gray-300">Uptime</div>
+                      <div className="font-medium text-gray-900 dark:text-gray-100">{String(healthStatus.uptime) || 'N/A'}</div>
                     </div>
                   </div>
                 </div>
@@ -180,9 +180,9 @@ export default function AboutPage() {
             </div>
 
             {/* API Call Monitoring */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                   🔍 API Monitoring
                 </h2>
                 <button
@@ -195,7 +195,7 @@ export default function AboutPage() {
 
               <div className="grid grid-cols-3 gap-4 mb-4">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-gray-900">{apiLogs.length}</div>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{apiLogs.length}</div>
                   <div className="text-sm text-gray-600">Total Calls</div>
                 </div>
                 <div className="text-center">

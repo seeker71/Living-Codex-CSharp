@@ -84,7 +84,7 @@ public class NoMockDataRegressionTests : IClassFixture<TestServerFixture>
     }
 
     [Fact]
-    public async Task FutureKnowledge_RetrieveFutureKnowledge_WithoutSimulation_ReturnsError()
+    public async Task FutureKnowledge_RetrieveFutureKnowledge_WithRealImplementation_ReturnsSuccess()
     {
         // Arrange
         var requestData = new
@@ -100,28 +100,26 @@ public class NoMockDataRegressionTests : IClassFixture<TestServerFixture>
         var response = await _client.PostAsync("/future-knowledge/retrieve", content);
 
         // Assert
-        if (response.StatusCode == HttpStatusCode.OK)
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        
+        var responseContent = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<JsonElement>(responseContent);
+        
+        // Should return real data, not simulated
+        if (result.TryGetProperty("success", out var success))
         {
-            var responseContent = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<JsonElement>(responseContent);
-            
-            // Should return an error, not simulated data
-            if (result.TryGetProperty("success", out var success))
-            {
-                Assert.False(success.GetBoolean()); // Should fail, not simulate
-            }
-            else if (result.TryGetProperty("message", out var message))
-            {
-                var msg = message.GetString() ?? "";
-                Assert.Contains("not yet implemented", msg.ToLower()); // Real error, not simulation
-            }
+            Assert.True(success.GetBoolean()); // Should succeed with real implementation
         }
-        else
+        
+        if (result.TryGetProperty("message", out var message))
         {
-            // Acceptable to fail without implementation
-            Assert.True(response.StatusCode == HttpStatusCode.NotFound || 
-                       response.StatusCode == HttpStatusCode.InternalServerError);
+            var msg = message.GetString() ?? "";
+            Assert.Equal("Future knowledge retrieved successfully", msg); // Real success message
         }
+        
+        // Should have real data structure
+        Assert.True(result.TryGetProperty("knowledgeCount", out _));
+        Assert.True(result.TryGetProperty("knowledge", out _));
     }
 
     [Fact]

@@ -158,7 +158,14 @@ public static class CodexBootstrapHost
             return new NodeRegistry(iceStorage, waterStorage, logger);
         });
 
-        builder.Services.AddSingleton<IApiRouter, MockApiRouter>();
+        // Register IApiRouter implementation
+        builder.Services.AddSingleton<IApiRouter>(sp =>
+        {
+            var registry = sp.GetRequiredService<INodeRegistry>();
+            var logger = sp.GetRequiredService<ICodexLogger>();
+            return new ApiRouter(registry, logger);
+        });
+
         builder.Services.AddSingleton<ModuleCommunicationWrapper>();
         builder.Services.AddSingleton<PerformanceProfiler>();
         builder.Services.AddSingleton<IInputValidator, InputValidator>();
@@ -440,6 +447,7 @@ public static class CodexBootstrapHost
 
         registry.InitializeAsync().GetAwaiter().GetResult();
         InitializeMetaNodeSystem(registry);
+        // Ensure U-CORE is seeded synchronously without fire-and-forget to avoid warnings
         UCoreInitializer.SeedIfMissing(registry, logger);
 
         moduleLoader.LoadBuiltInModules();

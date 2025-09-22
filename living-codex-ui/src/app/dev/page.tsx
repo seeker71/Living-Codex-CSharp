@@ -22,14 +22,14 @@ export default function DevPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navigation />
       
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">🛠️ Developer Dashboard</h1>
-          <p className="text-gray-600">
+          <p className="text-gray-600 dark:text-gray-300">
             Real-time hot-reload monitoring, AI-driven component generation, and development tools
           </p>
         </div>
@@ -74,19 +74,19 @@ export default function DevPage() {
             <h3 className="text-lg font-semibold text-gray-900 mb-4">⚙️ System Information</h3>
             <div className="space-y-3">
               <div className="flex justify-between">
-                <span className="text-gray-600">Backend Mode</span>
+                <span className="text-gray-600 dark:text-gray-300">Backend Mode</span>
                 <span className="font-medium text-green-600">Hot Reload (dotnet watch)</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Frontend Mode</span>
+                <span className="text-gray-600 dark:text-gray-300">Frontend Mode</span>
                 <span className="font-medium text-green-600">Next.js Dev Server</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Spec Watching</span>
+                <span className="text-gray-600 dark:text-gray-300">Spec Watching</span>
                 <span className="font-medium text-blue-600">Enabled</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">AI Integration</span>
+                <span className="text-gray-600 dark:text-gray-300">AI Integration</span>
                 <span className="font-medium text-purple-600">Multi-Provider</span>
               </div>
             </div>

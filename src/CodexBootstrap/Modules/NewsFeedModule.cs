@@ -320,6 +320,31 @@ public sealed class NewsFeedModule : ModuleBase
         }
     }
 
+    // Get latest news items (utility endpoint for UI/testing)
+    [ApiRoute("GET", "/news/latest", "Get Latest News", "Get latest news items across all sources", "codex.news-feed")]
+    public async Task<object> GetLatestNews(
+        [ApiParameter("query", "Number of items to return", Required = false, Location = "query")] int limit = 20)
+    {
+        try
+        {
+            var items = Registry
+                .GetNodesByType("codex.news.item")
+                .OrderByDescending(n => n.Meta?.GetValueOrDefault("publishedAt"))
+                .Take(Math.Max(1, Math.Min(limit, 100)))
+                .Select(MapNodeToNewsFeedItem)
+                .Where(i => i != null)
+                .Cast<NewsFeedItem>()
+                .ToList();
+
+            return new NewsFeedResponse(items, items.Count, "Latest news items");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error getting latest news: {ex.Message}", ex);
+            return new ErrorResponse($"Error getting latest news: {ex.Message}");
+        }
+    }
+
     // Get news items for specific interests
     private async Task<List<NewsFeedItem>> GetNewsFeedItemsForInterests(
         List<string> interests, 
@@ -691,11 +716,30 @@ public sealed class NewsFeedModule : ModuleBase
     {
         try
         {
+            DateTime published;
+            var raw = node.Meta?.GetValueOrDefault("publishedAt");
+            if (raw is DateTime dt)
+            {
+                published = dt.ToUniversalTime();
+            }
+            else if (raw is DateTimeOffset dto)
+            {
+                published = dto.UtcDateTime;
+            }
+            else if (raw is string s && DateTime.TryParse(s, out var parsed))
+            {
+                published = DateTime.SpecifyKind(parsed, DateTimeKind.Utc);
+            }
+            else
+            {
+                published = DateTime.UtcNow;
+            }
+
             return new NewsFeedItem(
                 Title: node.Title ?? "",
                 Description: node.Description ?? "",
                 Url: node.Meta?.GetValueOrDefault("url")?.ToString() ?? "",
-                PublishedAt: node.Meta?.GetValueOrDefault("publishedAt") is DateTime publishedAt ? publishedAt : DateTime.UtcNow,
+                PublishedAt: published,
                 Source: node.Meta?.GetValueOrDefault("source")?.ToString() ?? "Unknown",
                 Author: node.Meta?.GetValueOrDefault("author")?.ToString(),
                 ImageUrl: node.Meta?.GetValueOrDefault("imageUrl")?.ToString(),

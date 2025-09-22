@@ -13,20 +13,10 @@ using System.Security.Cryptography;
 using CodexBootstrap.Core;
 using CodexBootstrap.Runtime;
 using Microsoft.AspNetCore.Builder;
+using System.Xml.Linq;
 
 namespace CodexBootstrap.Modules
 {
-    // Mock API Router for parameterless constructor
-    public class MockApiRouter : IApiRouter
-    {
-        public void Register(string moduleId, string api, Func<JsonElement?, Task<object>> handler) { }
-        public bool TryGetHandler(string moduleId, string api, out Func<JsonElement?, Task<object>> handler) 
-        { 
-            handler = null!; 
-            return false; 
-        }
-        public INodeRegistry GetRegistry() => throw new NotImplementedException("MockApiRouter should not be used in production");
-    }
     /// <summary>
     /// Real-time fractal news streaming module that ingests external news sources
     /// and transforms them through fractal analysis aligned with belief systems
@@ -34,6 +24,7 @@ namespace CodexBootstrap.Modules
     /// <remarks>
     /// Requires NEWS_INGESTION_ENABLED and API keys; AI enrichment falls back to logs when the AI module handlers are unavailable.
     /// </remarks>
+    [MetaNode(Id = "realtime-news-stream", Name = "Realtime News Stream Module", Description = "Real-time fractal news streaming module that ingests external news sources and transforms them through fractal analysis aligned with belief systems")]
     public class RealtimeNewsStreamModule : ModuleBase
     {
         private readonly HttpClient _httpClient;
@@ -42,11 +33,27 @@ namespace CodexBootstrap.Modules
         public override string Name => "Realtime News Stream Module";
         public override string Description => "Real-time fractal news streaming module that ingests external news sources and transforms them through fractal analysis aligned with belief systems";
         public override string Version => "1.0.0";
+
+        public override Node GetModuleNode()
+        {
+            return CreateModuleNode(
+                moduleId: "realtime-news-stream",
+                name: Name,
+                version: Version,
+                description: Description,
+                tags: new[] { "news", "realtime", "rss", "ingestion", "fractal", "streaming" },
+                capabilities: new[] { 
+                    "rss-ingestion", "api-ingestion", "fractal-analysis", "real-time-streaming",
+                    "news-source-management", "content-filtering", "belief-system-alignment"
+                },
+                spec: "codex.spec.realtime-news-stream"
+            );
+        }
         private readonly Timer _ingestionTimer;
         private readonly Timer _cleanupTimer;
         private CrossModuleCommunicator? _moduleCommunicator;
-        private AIModuleTemplates? _aiTemplates;
-        private readonly int _ingestionIntervalMinutes = 15;
+        private AIModuleTemplates? _aiTemplates = null;
+        private readonly int _ingestionIntervalMinutes = int.TryParse(Environment.GetEnvironmentVariable("NEWS_INGESTION_INTERVAL_MIN"), out var iv) && iv > 0 ? iv : 15;
         private readonly int _cleanupIntervalHours = 24;
         private readonly int _maxItemsPerSource = 50; // Increased from 10
         private readonly ConcurrentDictionary<string, bool> _processedNewsIds = new(); // Track processed news to prevent duplicates
@@ -67,7 +74,7 @@ namespace CodexBootstrap.Modules
         private CrossModuleCommunicator ModuleCommunicator => _moduleCommunicator ??= new CrossModuleCommunicator(_logger);
 
         // Lazy-loaded AI templates (requires _apiRouter to be set)
-        private AIModuleTemplates AITemplates => _aiTemplates ??= new AIModuleTemplates(_apiRouter ?? new MockApiRouter(), _logger);
+        private AIModuleTemplates? AITemplates => _aiTemplates;
 
         // AI Module call templates
         private class AIModuleTemplates
@@ -83,14 +90,18 @@ namespace CodexBootstrap.Modules
 
             public async Task<ConceptExtractionResult?> ExtractConceptsAsync(
                 string content, 
-                int maxConcepts = 5)
+                int maxConcepts = 5,
+                string? model = null,
+                string? provider = null)
             {
                 try
                 {
                     var request = new
                     {
                         content = content,
-                        maxConcepts = maxConcepts
+                        maxConcepts = maxConcepts,
+                        model = model,
+                        provider = provider
                     };
 
                     var requestJson = JsonSerializer.Serialize(request);
@@ -107,16 +118,38 @@ namespace CodexBootstrap.Modules
                             
                             if (resultElement.TryGetProperty("success", out var success) && success.GetBoolean())
                             {
-                                if (resultElement.TryGetProperty("data", out var data))
+                                var concepts = new List<string>();
+                                if (resultElement.TryGetProperty("concepts", out var arr) && arr.ValueKind == JsonValueKind.Array)
                                 {
-                                    return JsonSerializer.Deserialize<ConceptExtractionResult>(data.GetRawText());
+                                    foreach (var c in arr.EnumerateArray())
+                                    {
+                                        var s = c.GetString();
+                                        if (!string.IsNullOrWhiteSpace(s)) concepts.Add(s!);
+                                    }
                                 }
+
+                                var confidence = resultElement.TryGetProperty("confidence", out var conf) && conf.ValueKind == JsonValueKind.Number
+                                    ? conf.GetDouble()
+                                    : 0.5;
+
+                                var levels = new List<string>();
+                                if (resultElement.TryGetProperty("ontologyLevels", out var lv) && lv.ValueKind == JsonValueKind.Array)
+                                {
+                                    foreach (var l in lv.EnumerateArray())
+                                    {
+                                        var s = l.GetString();
+                                        if (!string.IsNullOrWhiteSpace(s)) levels.Add(s!);
+                                    }
+                                }
+
+                                return new ConceptExtractionResult
+                                {
+                                    Concepts = concepts,
+                                    Confidence = confidence,
+                                    OntologyLevels = levels
+                                };
                             }
                         }
-                    }
-                    else
-                    {
-                        _logger.Warn("AI module extract-concepts handler not found");
                     }
                 }
                 catch (Exception ex)
@@ -271,20 +304,15 @@ namespace CodexBootstrap.Modules
                 SeedDefaultOntologyAxes();
                 LoadOntologyAxes();
             }
-            InitializeNewsSources();
-        }
-
-        public override Node GetModuleNode()
-        {
-            return CreateModuleNode(
-                moduleId: "realtime-news-stream-module",
-                name: Name,
-                version: Version,
-                description: Description,
-                tags: new[] { "news", "streaming", "realtime", "fractal" },
-                capabilities: new[] { "rss-ingestion", "api-ingestion", "fractal-analysis", "real-time-streaming" },
-                spec: "codex.spec.realtime-news-stream"
-            );
+            // Load news sources exclusively from configuration (registry/file), no hard-coded lists
+            try
+            {
+                _ = Task.Run(async () => await _configManager.LoadConfigurationsAsync());
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"Failed to kick off configuration load for news sources: {ex.Message}");
+            }
         }
 
         public override void Register(INodeRegistry registry)
@@ -293,23 +321,51 @@ namespace CodexBootstrap.Modules
             
             Initialize();
             
-            // Gate ingestion via environment flag (default: enabled)
+            // Gate ingestion via environment flag (default: disabled)
             var enabledEnv = Environment.GetEnvironmentVariable("NEWS_INGESTION_ENABLED");
-            var ingestionEnabled = string.IsNullOrWhiteSpace(enabledEnv) || enabledEnv.Equals("true", StringComparison.OrdinalIgnoreCase) || enabledEnv == "1";
+            // Consider both standard env vars; some hosts set only one
+            var dotnetEnv = Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT");
+            var aspnetEnv = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+            var isTesting = string.Equals(dotnetEnv, "Testing", StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(aspnetEnv, "Testing", StringComparison.OrdinalIgnoreCase);
+            // If explicitly enabled, honor it even in Testing to allow controlled runs
+            var isExplicitlyEnabled = string.Equals(enabledEnv, "true", StringComparison.OrdinalIgnoreCase) || enabledEnv == "1";
+            var ingestionEnabled = isExplicitlyEnabled;
 
             if (ingestionEnabled)
             {
+                // Compute configurable startup delay
+                var delayEnv = Environment.GetEnvironmentVariable("NEWS_INGESTION_START_DELAY_SEC");
+                int delaySeconds = 120;
+                if (!string.IsNullOrWhiteSpace(delayEnv) && int.TryParse(delayEnv, out var parsedDelay) && parsedDelay >= 0)
+                {
+                    delaySeconds = parsedDelay;
+                }
+
                 // Start the timers when module is registered
-                _ingestionTimer.Change(TimeSpan.Zero, TimeSpan.FromMinutes(_ingestionIntervalMinutes));
+                _ingestionTimer.Change(TimeSpan.FromSeconds(delaySeconds), TimeSpan.FromMinutes(_ingestionIntervalMinutes));
                 _cleanupTimer.Change(TimeSpan.FromHours(1), TimeSpan.FromHours(_cleanupIntervalHours));
                 
-                // Start initial news ingestion
-                _ = Task.Run(async () => await IngestNewsFromSources(null));
-                _logger.Info("RealtimeNewsStreamModule ingestion enabled (NEWS_INGESTION_ENABLED=true)");
+                // Start initial news ingestion after a delay to allow server startup to complete
+                _ = Task.Run(async () => 
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(delaySeconds));
+                    await IngestNewsFromSources(null);
+                });
+                var envLabel = dotnetEnv ?? aspnetEnv ?? "unknown";
+                if (isTesting)
+                {
+                    _logger.Warn($"RealtimeNewsStreamModule ingestion enabled in Testing environment due to NEWS_INGESTION_ENABLED=true (env={envLabel}, startDelaySec={delaySeconds})");
+                }
+                else
+                {
+                    _logger.Info($"RealtimeNewsStreamModule ingestion enabled (env={envLabel}, startDelaySec={delaySeconds})");
+                }
             }
             else
             {
-                _logger.Warn("RealtimeNewsStreamModule ingestion disabled via NEWS_INGESTION_ENABLED=false");
+                var envLabel = dotnetEnv ?? aspnetEnv ?? "unknown";
+                _logger.Warn($"RealtimeNewsStreamModule ingestion disabled (env={envLabel}, NEWS_INGESTION_ENABLED={enabledEnv ?? "<null>"})");
             }
         }
 
@@ -323,6 +379,25 @@ namespace CodexBootstrap.Modules
         {
             _logger.Info("Registering HTTP endpoints for Real-Time News Stream Module");
             // HTTP endpoints are registered via ApiRoute attributes
+        }
+
+        // Manual trigger to run ingestion immediately
+        [ApiRoute("POST", "/news/ingestion/run", "Run News Ingestion", "Manually trigger ingestion cycle across all sources", "codex.news.ingestion")]
+        public async Task<object> RunNewsIngestionNow()
+        {
+            try
+            {
+                var before = Registry.GetNodesByType(NEWS_ITEM_NODE_TYPE).Count();
+                await IngestNewsFromSources(null);
+                var after = Registry.GetNodesByType(NEWS_ITEM_NODE_TYPE).Count();
+                var added = Math.Max(0, after - before);
+                return new { success = true, added, total = after };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Manual ingestion trigger failed: {ex.Message}", ex);
+                return new ErrorResponse($"Ingestion failed: {ex.Message}");
+            }
         }
 
         public void Unregister()
@@ -348,90 +423,9 @@ namespace CodexBootstrap.Modules
 
         private void InitializeNewsSources()
         {
-            var newsSources = new[]
-            {
-                new NewsSource
-                {
-                    Id = "wired",
-                    Name = "Wired",
-                    Type = "rss",
-                    Url = "https://www.wired.com/feed/rss",
-                    Categories = Array.Empty<string>(),
-                    IsActive = true,
-                    UpdateIntervalMinutes = 30
-                },
-                new NewsSource
-                {
-                    Id = "hackernews",
-                    Name = "Hacker News",
-                    Type = "api",
-                    Url = "https://hacker-news.firebaseio.com/v0/topstories.json",
-                    Categories = Array.Empty<string>(),
-                    IsActive = true,
-                    UpdateIntervalMinutes = 30
-                },
-                new NewsSource
-                {
-                    Id = "arstechnica",
-                    Name = "Ars Technica",
-                    Type = "rss",
-                    Url = "https://feeds.arstechnica.com/arstechnica/index/",
-                    Categories = Array.Empty<string>(),
-                    IsActive = true,
-                    UpdateIntervalMinutes = 25
-                },
-                new NewsSource
-                {
-                    Id = "techcrunch",
-                    Name = "TechCrunch",
-                    Type = "rss",
-                    Url = "https://techcrunch.com/feed/",
-                    Categories = Array.Empty<string>(),
-                    IsActive = true,
-                    UpdateIntervalMinutes = 15
-                },
-                new NewsSource
-                {
-                    Id = "hacker-news",
-                    Name = "Hacker News",
-                    Type = "rss",
-                    Url = "https://hnrss.org/frontpage",
-                    Categories = Array.Empty<string>(),
-                    IsActive = true,
-                    UpdateIntervalMinutes = 20
-                }
-            };
-
-            foreach (var source in newsSources)
-            {
-                var sourceNode = new Node(
-                    Id: $"news-source-{source.Id}",
-                    TypeId: NEWS_SOURCE_NODE_TYPE,
-                    State: ContentState.Ice,
-                    Locale: "en-US",
-                    Title: source.Name,
-                    Description: $"News source: {source.Name}",
-                    Content: new ContentRef(
-                        MediaType: "application/json",
-                        InlineJson: JsonSerializer.Serialize(source),
-                        InlineBytes: null,
-                        ExternalUri: null
-                    ),
-                    Meta: new Dictionary<string, object>
-                    {
-                        ["sourceId"] = source.Id,
-                        ["name"] = source.Name,
-                        ["type"] = source.Type,
-                        ["url"] = source.Url,
-                        ["isActive"] = source.IsActive,
-                        ["updateIntervalMinutes"] = source.UpdateIntervalMinutes
-                    }
-                );
-
-                Registry.Upsert(sourceNode);
-            }
-
-            _logger.Info($"Initialized {newsSources.Length} news sources as nodes");
+            // Deprecated: hard-coded sources removed. Sources are loaded exclusively from news-sources.json via ConfigurationManager.
+            _logger.Info("InitializeNewsSources called; no-op as sources are config-driven.");
+            return;
         }
 
         private async Task IngestNewsFromSourceAsync(NewsSource source)
@@ -472,14 +466,20 @@ namespace CodexBootstrap.Modules
                     .Where(n => n.Meta?.ContainsKey("isActive") == true && (bool)n.Meta["isActive"])
                     .ToList();
 
-                // Process sources sequentially to avoid collection modification issues
-                foreach (var sourceNode in sourceNodes)
+                _logger.Info($"Processing {sourceNodes.Count} active news sources in parallel");
+
+                // Process sources in parallel with controlled concurrency and telemetry
+                var semaphoreSlim = new SemaphoreSlim(10, 10); // Allow max 10 concurrent requests
+                var tasks = sourceNodes.Select(async sourceNode =>
                 {
+                    await semaphoreSlim.WaitAsync();
                     try
                     {
                         var source = JsonSerializer.Deserialize<NewsSource>(sourceNode.Content?.InlineJson ?? "{}");
                         if (source != null)
                         {
+                            var startedAt = DateTime.UtcNow;
+                            var beforeCount = Registry.GetNodesByType(NEWS_ITEM_NODE_TYPE).Count();
                             if (source.Type == "rss")
                             {
                                 await IngestRssFeed(source);
@@ -488,15 +488,34 @@ namespace CodexBootstrap.Modules
                             {
                                 await IngestApiFeed(source);
                             }
+                            var duration = DateTime.UtcNow - startedAt;
+                            var afterCount = Registry.GetNodesByType(NEWS_ITEM_NODE_TYPE).Count();
+                            var ingested = Math.Max(0, afterCount - beforeCount);
+                            _logger.Info($"Source '{source.Name}' completed in {duration.TotalSeconds:F1}s, items: {ingested}");
                         }
                     }
                     catch (Exception ex)
                     {
                         _logger.Error($"Error ingesting from source {sourceNode.Meta?["name"]}: {ex.Message}", ex);
                     }
-                }
+                    finally
+                    {
+                        semaphoreSlim.Release();
+                    }
+                });
 
+                // Wait for all tasks to complete with timeout
+                var timeoutTask = Task.Delay(TimeSpan.FromMinutes(10)); // 10-minute timeout for all sources
+                var completedTask = await Task.WhenAny(Task.WhenAll(tasks), timeoutTask);
+                
+                if (completedTask == timeoutTask)
+                {
+                    _logger.Warn("News ingestion timed out after 10 minutes");
+                }
+                else
+                {
                 _logger.Info("Completed news ingestion cycle");
+                }
             }
             catch (Exception ex)
             {
@@ -513,18 +532,28 @@ namespace CodexBootstrap.Modules
             const int maxRetries = 3;
             const int baseDelayMs = 1000;
             
+            _logger.Info($"🔄 Starting RSS ingestion for source: {source.Name} ({source.Url})");
+            
             for (int attempt = 0; attempt < maxRetries; attempt++)
             {
                 try
                 {
+                    _logger.Debug($"📡 Attempt {attempt + 1}/{maxRetries} for source {source.Name}");
+                    
                     // Create HttpClient with proper headers to avoid bot detection
                     using var httpClient = new HttpClient();
+                    httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("LivingCodex/1.0 (+https://livingcodex.org)");
+                    httpClient.DefaultRequestHeaders.Accept.ParseAdd("application/rss+xml, application/atom+xml, application/xml, text/xml, */*;q=0.1");
                     httpClient.DefaultRequestHeaders.Add("User-Agent", "Living-Codex-NewsBot/1.0 (https://living-codex.com)");
                     httpClient.DefaultRequestHeaders.Add("Accept", "application/rss+xml, application/xml, text/xml");
                     httpClient.Timeout = TimeSpan.FromSeconds(30);
                     
                     // Get the RSS content with proper error handling
+                    var startTime = DateTime.UtcNow;
                     var response = await httpClient.GetAsync(source.Url);
+                    var requestDuration = DateTime.UtcNow - startTime;
+                    
+                    _logger.Debug($"📊 HTTP request for {source.Name} completed in {requestDuration.TotalMilliseconds:F0}ms - Status: {response.StatusCode}");
                     
                     if (!response.IsSuccessStatusCode)
                     {
@@ -536,51 +565,134 @@ namespace CodexBootstrap.Modules
                         
                         if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
                         {
-                            _logger.Warn($"RSS feed {source.Name} rate limited (429). Attempt {attempt + 1}/{maxRetries}");
-                            if (attempt < maxRetries - 1)
-                            {
-                                await Task.Delay(baseDelayMs * (int)Math.Pow(2, attempt));
-                                continue;
-                            }
+                            _logger.Warn($"RSS feed {source.Name} rate limited (429). Skipping this source without retry.");
+                            return;
                         }
                         
-                        _logger.Warn($"RSS feed {source.Name} returned status {response.StatusCode}. Skipping this source.");
-                        return;
+                        if ((int)response.StatusCode == 301 || (int)response.StatusCode == 302 || (int)response.StatusCode == 307 || (int)response.StatusCode == 308)
+                        {
+                            var redirect = response.Headers.Location?.ToString();
+                            if (!string.IsNullOrWhiteSpace(redirect))
+                            {
+                                _logger.Warn($"RSS feed {source.Name} redirected. Following to {redirect}");
+                                var redirected = await httpClient.GetAsync(redirect);
+                                if (redirected.IsSuccessStatusCode)
+                                {
+                                    response = redirected;
+                                }
+                                else
+                                {
+                                    _logger.Warn($"Redirected URL for {source.Name} returned status {redirected.StatusCode}. Skipping this source.");
+                                    return;
+                                }
+                            }
+                            else
+                            {
+                                _logger.Warn($"RSS feed {source.Name} returned redirect without Location header. Skipping this source.");
+                                return;
+                            }
+                        }
+                        else
+                        {
+                            _logger.Warn($"RSS feed {source.Name} returned status {response.StatusCode}. Skipping this source.");
+                            return;
+                        }
                     }
                     
                     var content = await response.Content.ReadAsStringAsync();
-                    using var reader = XmlReader.Create(new StringReader(content));
-                    var feed = SyndicationFeed.Load(reader);
-
-                foreach (var item in feed.Items.Take(_maxItemsPerSource).ToList())
-                {
-                    var deterministicIdSeed = !string.IsNullOrEmpty(item.Id)
-                        ? item.Id
-                        : (item.Links.FirstOrDefault()?.Uri?.ToString() ?? (item.Title?.Text ?? ""));
-                    var stableId = ComputeDeterministicId($"rss:{source.Id}:{deterministicIdSeed}");
-
-                    var newsItem = new NewsItem
+                    // If server responded with HTML, try to discover RSS link in HTML head
+                    var contentType = response.Content.Headers.ContentType?.MediaType ?? "";
+                    if (contentType.Contains("html", StringComparison.OrdinalIgnoreCase))
                     {
-                        Id = $"rss-{source.Id}-{stableId}",
-                        Title = item.Title?.Text ?? "",
-                        Content = item.Summary?.Text ?? "",
-                        Source = source.Name,
-                        Url = item.Links.FirstOrDefault()?.Uri?.ToString() ?? "",
-                        PublishedAt = item.PublishDate,
-                        Tags = ExtractTagsFromContent(item.Title?.Text + " " + item.Summary?.Text),
-                        Metadata = new Dictionary<string, object>
+                        var discovered = ExtractRssLinkFromHtml(content);
+                        if (!string.IsNullOrWhiteSpace(discovered))
                         {
-                            ["sourceType"] = "RSS",
-                            ["sourceId"] = source.Id,
-                            ["rssId"] = item.Id
+                            _logger.Warn($"{source.Name} returned HTML; discovered RSS link {discovered}. Following.");
+                            response = await httpClient.GetAsync(discovered);
+                            if (!response.IsSuccessStatusCode)
+                            {
+                                _logger.Warn($"Discovered RSS link for {source.Name} returned status {response.StatusCode}. Skipping this source.");
+                                return;
+                            }
+                            content = await response.Content.ReadAsStringAsync();
                         }
+                    }
+                    // Secure XML settings: ignore DTDs, no external resolution
+                    var xmlSettings = new XmlReaderSettings
+                    {
+                        DtdProcessing = DtdProcessing.Ignore,
+                        XmlResolver = null
                     };
-
-                    await ProcessNewsItem(newsItem);
-                }
-                
-                // Success - break out of retry loop
-                break;
+                    try
+                    {
+                        using var reader = XmlReader.Create(new StringReader(content), xmlSettings);
+                        var feed = SyndicationFeed.Load(reader);
+                        var feedItems = feed.Items?.ToList() ?? new List<SyndicationItem>();
+                        _logger.Info($"RSS feed {source.Name} parsed {feedItems.Count} items (processing up to {_maxItemsPerSource}).");
+                        
+                        foreach (var item in feedItems.Take(_maxItemsPerSource))
+                        {
+                            var publish = item.PublishDate == default ? DateTimeOffset.UtcNow : item.PublishDate;
+                            var deterministicIdSeed = !string.IsNullOrEmpty(item.Id)
+                                ? item.Id
+                                : (item.Links.FirstOrDefault()?.Uri?.ToString() ?? (item.Title?.Text ?? ""));
+                            var stableId = ComputeDeterministicId($"rss:{source.Id}:{deterministicIdSeed}");
+                            
+                            var newsItem = new NewsItem
+                            {
+                                Id = $"rss-{source.Id}-{stableId}",
+                                Title = item.Title?.Text ?? "",
+                                Content = item.Summary?.Text ?? "",
+                                Source = source.Name,
+                                Url = item.Links.FirstOrDefault()?.Uri?.ToString() ?? "",
+                                PublishedAt = publish,
+                                Tags = ExtractTagsFromContent((item.Title?.Text ?? "") + " " + (item.Summary?.Text ?? "")),
+                                Metadata = new Dictionary<string, object>
+                                {
+                                    ["sourceType"] = "RSS",
+                                    ["sourceId"] = source.Id,
+                                    ["rssId"] = item.Id
+                                }
+                            };
+                            
+                            await ProcessNewsItem(newsItem);
+                        }
+                        
+                        // Success - break out of retry loop
+                        break;
+                    }
+                    catch (XmlException xex)
+                    {
+                        // Try RDF (RSS 1.0) fallback
+                        if (content.Contains("rdf:RDF", StringComparison.OrdinalIgnoreCase) || content.Contains("http://www.w3.org/1999/02/22-rdf-syntax-ns#", StringComparison.OrdinalIgnoreCase))
+                        {
+                            _logger.Warn($"{source.Name} appears to use RDF/RSS1.0. Falling back to RDF parser: {xex.Message}");
+                            var rdfItems = ParseRdfRss(content);
+                            _logger.Info($"RDF feed {source.Name} parsed {rdfItems.Count} items (processing up to {_maxItemsPerSource}).");
+                            foreach (var ri in rdfItems.Take(_maxItemsPerSource))
+                            {
+                                var stableId = ComputeDeterministicId($"rdf:{source.Id}:{ri.Link ?? ri.Title}");
+                                var newsItem = new NewsItem
+                                {
+                                    Id = $"rss-{source.Id}-{stableId}",
+                                    Title = ri.Title ?? "",
+                                    Content = ri.Description ?? "",
+                                    Source = source.Name,
+                                    Url = ri.Link ?? "",
+                                    PublishedAt = ri.PublishDate ?? DateTimeOffset.UtcNow,
+                                    Tags = ExtractTagsFromContent(((ri.Title ?? "") + " " + (ri.Description ?? ""))),
+                                    Metadata = new Dictionary<string, object> { ["sourceType"] = "RSS", ["sourceId"] = source.Id }
+                                };
+                                await ProcessNewsItem(newsItem);
+                            }
+                            break;
+                        }
+                        else
+                        {
+                            _logger.Warn($"{source.Name} returned unsupported feed format: {xex.Message}");
+                            return;
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -596,6 +708,48 @@ namespace CodexBootstrap.Modules
                     await Task.Delay(baseDelayMs * (int)Math.Pow(2, attempt));
                 }
             }
+        }
+
+        // Simple RDF (RSS 1.0) parser extracting minimal fields
+        private List<(string? Title, string? Link, string? Description, DateTimeOffset? PublishDate)> ParseRdfRss(string xml)
+        {
+            var list = new List<(string?, string?, string?, DateTimeOffset?)>();
+            try
+            {
+                var doc = XDocument.Parse(xml, LoadOptions.PreserveWhitespace);
+                XNamespace rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
+                XNamespace rss = "http://purl.org/rss/1.0/";
+                XNamespace dc = "http://purl.org/dc/elements/1.1/";
+                foreach (var item in doc.Descendants(rss + "item"))
+                {
+                    var title = item.Element(rss + "title")?.Value;
+                    var link = item.Element(rss + "link")?.Value;
+                    var desc = item.Element(rss + "description")?.Value;
+                    DateTimeOffset? pub = null;
+                    var dcDate = item.Element(dc + "date")?.Value;
+                    if (DateTimeOffset.TryParse(dcDate, out var p)) pub = p;
+                    list.Add((title, link, desc, pub));
+                }
+            }
+            catch { /* ignore */ }
+            return list;
+        }
+
+        // Attempt to extract an RSS/Atom link from an HTML page (common when feeds redirect to landing pages)
+        private string? ExtractRssLinkFromHtml(string html)
+        {
+            try
+            {
+                // Very lightweight discovery using regex; adequate for common <link rel="alternate" type="application/rss+xml" href="...">
+                var pattern = "<link[^>]+rel=\\\"alternate\\\"[^>]+type=\\\"(application/(?:rss|atom)\\+xml|application/xml|text/xml)\\\"[^>]+href=\\\"([^\\\"]+)\\\"";
+                var match = System.Text.RegularExpressions.Regex.Match(html, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (match.Success)
+                {
+                    return match.Groups[1].Value;
+                }
+            }
+            catch { }
+            return null;
         }
 
         private async Task IngestApiFeed(NewsSource source)
@@ -694,7 +848,7 @@ namespace CodexBootstrap.Modules
                 var newsNode = new Node(
                     Id: $"news-item-{newsItem.Id}",
                     TypeId: NEWS_ITEM_NODE_TYPE,
-                    State: ContentState.Water,
+                    State: ContentState.Ice,
                     Locale: "en-US",
                     Title: newsItem.Title,
                     Description: $"News item from {newsItem.Source}",
@@ -709,7 +863,7 @@ namespace CodexBootstrap.Modules
                         ["newsId"] = newsItem.Id,
                         ["title"] = newsItem.Title,
                         ["source"] = newsItem.Source,
-                        ["publishedAt"] = newsItem.PublishedAt,
+                        ["publishedAt"] = newsItem.PublishedAt.UtcDateTime,
                         ["url"] = newsItem.Url
                     }
                 );
@@ -726,7 +880,7 @@ namespace CodexBootstrap.Modules
                     var fractalNode = new Node(
                         Id: $"fractal-news-{fractalNews.Id}",
                         TypeId: FRACTAL_NEWS_NODE_TYPE,
-                        State: ContentState.Water,
+                        State: ContentState.Ice,
                         Locale: "en-US",
                         Title: fractalNews.Headline,
                         Description: $"Fractal analysis of {newsItem.Title}",
@@ -749,7 +903,14 @@ namespace CodexBootstrap.Modules
 
                     Registry.Upsert(fractalNode);
 
-                    _logger.Info($"Processed news item: {newsItem.Title} from {newsItem.Source}");
+                    // Extract concepts and ensure ontology links
+                    var concepts = await ExtractConceptsForNews(newsItem, fractalNews);
+                    foreach (var concept in concepts)
+                    {
+                        EnsureConceptAndTopology(concept, newsItem, fractalNews);
+                    }
+
+                    _logger.Info($"Processed news item: {newsItem.Title} from {newsItem.Source} (concepts: {concepts.Count})");
                 }
             }
             catch (Exception ex)
@@ -795,14 +956,26 @@ namespace CodexBootstrap.Modules
             {
                 _logger.Debug($"Attempting AI concept extraction for news item: {newsItem.Title}");
 
+                // Cache-first: reuse existing analysis
+                var cached = TryLoadConceptAnalysisFromCache(newsItem.Id);
+                if (cached != null)
+                {
+                    _logger.Info($"Using cached concept analysis for news item: {newsItem.Id}");
+                    return cached;
+                }
+
                 var content = newsItem.Title + " " + newsItem.Content;
-                var result = await AITemplates.ExtractConceptsAsync(content, 5);
+                // Choose cheap model/provider via env vars
+                var provider = Environment.GetEnvironmentVariable("NEWS_AI_PROVIDER"); // e.g., "ollama" or "openai"
+                var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL");       // e.g., "llama3.1:8b" or "gpt-4o-mini"
+
+                var result = await AITemplates.ExtractConceptsAsync(content, 5, model, provider);
                 
                 if (result != null)
                 {
                     _logger.Info($"AI concept extraction successful for: {newsItem.Title} (confidence: {result.Confidence})");
                     
-                    return new ConceptAnalysis
+                    var analysis = new ConceptAnalysis
                     {
                         Id = $"concept-{Guid.NewGuid():N}",
                         NewsItemId = newsItem.Id,
@@ -813,10 +986,15 @@ namespace CodexBootstrap.Modules
                         Metadata = new Dictionary<string, object>
                         {
                             ["source"] = "ai-module",
+                            ["provider"] = provider ?? "auto",
+                            ["model"] = model ?? "auto",
                             ["originalTitle"] = newsItem.Title,
                             ["processingTime"] = DateTimeOffset.UtcNow
                         }
                     };
+
+                    SaveConceptAnalysisToCache(newsItem.Id, analysis);
+                    return analysis;
                 }
                 else
                 {
@@ -828,8 +1006,56 @@ namespace CodexBootstrap.Modules
                 _logger.Error($"Error in AI concept extraction for {newsItem.Title}: {ex.Message}", ex);
             }
 
-            _logger.Info($"Falling back to local concept extraction for: {newsItem.Title}");
-            return await FallbackConceptExtraction(newsItem);
+            // Deterministic heuristic extraction (no mock/sample)
+            var heuristic = await HeuristicConceptExtraction(newsItem);
+            SaveConceptAnalysisToCache(newsItem.Id, heuristic);
+            return heuristic;
+        }
+
+        private ConceptAnalysis? TryLoadConceptAnalysisFromCache(string newsId)
+        {
+            var cacheId = $"concept-analysis-{newsId}";
+            var node = Registry.GetNode(cacheId);
+            if (node?.Content?.InlineJson != null)
+            {
+                try
+                {
+                    return JsonSerializer.Deserialize<ConceptAnalysis>(node.Content.InlineJson);
+                }
+                catch { }
+            }
+            return null;
+        }
+
+        private void SaveConceptAnalysisToCache(string newsId, ConceptAnalysis analysis)
+        {
+            try
+            {
+                var node = new Node(
+                    Id: $"concept-analysis-{newsId}",
+                    TypeId: "codex.news.concept-analysis",
+                    State: ContentState.Ice,
+                    Locale: "en-US",
+                    Title: $"Concept analysis for {newsId}",
+                    Description: "Cached concept extraction result",
+                    Content: new ContentRef(
+                        MediaType: "application/json",
+                        InlineJson: JsonSerializer.Serialize(analysis),
+                        InlineBytes: null,
+                        ExternalUri: null
+                    ),
+                    Meta: new Dictionary<string, object>
+                    {
+                        ["newsId"] = newsId,
+                        ["cachedAt"] = DateTimeOffset.UtcNow
+                    }
+                );
+                Registry.Upsert(node);
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"Failed to cache concept analysis for {newsId}: {ex.Message}");
+            }
         }
 
         private async Task<ScoringAnalysis> PerformAIScoringAnalysis(ConceptAnalysis conceptAnalysis, NewsItem newsItem)
@@ -873,8 +1099,19 @@ namespace CodexBootstrap.Modules
                 _logger.Error($"Error in AI scoring analysis for {newsItem.Title}: {ex.Message}", ex);
             }
 
-            _logger.Info($"Falling back to local scoring analysis for: {newsItem.Title}");
-            return await FallbackScoringAnalysis(conceptAnalysis, newsItem);
+            // Deterministic neutral scoring when AI unavailable
+            return new ScoringAnalysis
+            {
+                Id = $"scoring-{Guid.NewGuid():N}",
+                NewsItemId = newsItem.Id,
+                ConceptAnalysisId = conceptAnalysis.Id,
+                AbundanceScore = 0,
+                ConsciousnessScore = 0,
+                UnityScore = 0,
+                OverallScore = 0,
+                ScoredAt = DateTimeOffset.UtcNow,
+                Metadata = new Dictionary<string, object> { ["source"] = "deterministic" }
+            };
         }
 
         private async Task<FractalTransformation> PerformAIFractalTransformation(NewsItem newsItem, ConceptAnalysis conceptAnalysis, ScoringAnalysis scoringAnalysis)
@@ -921,8 +1158,18 @@ namespace CodexBootstrap.Modules
                 _logger.Error($"Error in AI fractal transformation for {newsItem.Title}: {ex.Message}", ex);
             }
 
-            _logger.Info($"Falling back to local fractal transformation for: {newsItem.Title}");
-            return await FallbackFractalTransformation(newsItem, conceptAnalysis, scoringAnalysis);
+            // Deterministic minimal transformation
+            return new FractalTransformation
+            {
+                Id = $"fractal-{Guid.NewGuid():N}",
+                NewsItemId = newsItem.Id,
+                Headline = newsItem.Title,
+                BeliefSystemTranslation = string.Empty,
+                Summary = newsItem.Content ?? string.Empty,
+                ImpactAreas = Array.Empty<string>(),
+                AmplificationFactors = new Dictionary<string, double>(),
+                Metadata = new Dictionary<string, object> { ["source"] = "deterministic" }
+            };
         }
 
         private double CalculateAbundanceScore(List<string> concepts, NewsItem newsItem)
@@ -1404,6 +1651,23 @@ namespace CodexBootstrap.Modules
 
                 Registry.Upsert(updatedSourceNode);
 
+                // Persist to configuration
+                var sourceConfig = new NewsSourceConfig
+                {
+                    Id = source.Id,
+                    Name = source.Name,
+                    Type = source.Type,
+                    Url = source.Url,
+                    Categories = source.Categories?.ToArray() ?? Array.Empty<string>(),
+                    OntologyLevels = OntologyLevelHelper.DetermineOntologyLevelsFromCategories(source.Categories?.ToList() ?? new List<string>()),
+                    IsActive = source.IsActive,
+                    UpdateIntervalMinutes = source.UpdateIntervalMinutes,
+                    Priority = 1,
+                    LastIngested = null,
+                    Metadata = new Dictionary<string, object>()
+                };
+                await _configManager.UpdateNewsSourceAsync(sourceConfig);
+
                 _logger.Info($"Updated news source: {source.Name} ({source.Id})");
 
                 return new
@@ -1447,6 +1711,9 @@ namespace CodexBootstrap.Modules
                 }
 
                 Registry.RemoveNode(sourceNode.Id);
+
+                // Persist removal to configuration
+                await _configManager.RemoveNewsSourceAsync(id);
 
                 _logger.Info($"Removed news source: {id}");
 
@@ -1520,21 +1787,34 @@ namespace CodexBootstrap.Modules
                         ExternalUri: null
                     ),
                     Meta: new Dictionary<string, object>(sourceNode.Meta ?? new Dictionary<string, object>())
-                    {
-                        ["isActive"] = source.IsActive
-                    }
                 );
-
                 Registry.Upsert(updatedSourceNode);
 
-                _logger.Info($"Toggled news source {id}: {(source.IsActive ? "enabled" : "disabled")}");
+                // Persist to configuration
+                var sourceConfig = new NewsSourceConfig
+                {
+                    Id = source.Id,
+                    Name = source.Name,
+                    Type = source.Type,
+                    Url = source.Url,
+                    Categories = source.Categories?.ToArray() ?? Array.Empty<string>(),
+                    OntologyLevels = OntologyLevelHelper.DetermineOntologyLevelsFromCategories(source.Categories?.ToList() ?? new List<string>()),
+                    IsActive = source.IsActive,
+                    UpdateIntervalMinutes = source.UpdateIntervalMinutes,
+                    Priority = 1,
+                    LastIngested = null,
+                    Metadata = new Dictionary<string, object>()
+                };
+                await _configManager.UpdateNewsSourceAsync(sourceConfig);
+
+                _logger.Info($"Toggled news source '{id}' to IsActive={source.IsActive}");
 
                 return new
                 {
                     success = true,
                     sourceId = id,
                     isActive = source.IsActive,
-                    message = $"News source {(source.IsActive ? "enabled" : "disabled")} successfully"
+                    message = "News source toggled successfully"
                 };
             }
             catch (Exception ex)
@@ -1934,6 +2214,81 @@ namespace CodexBootstrap.Modules
             var bytes = Encoding.UTF8.GetBytes(seed);
             var hash = sha1.ComputeHash(bytes);
             return Convert.ToHexString(hash)[..12].ToLowerInvariant();
+        }
+
+        private async Task<ConceptAnalysis> HeuristicConceptExtraction(NewsItem newsItem)
+        {
+            var text = ($"{newsItem.Title} {newsItem.Content}").ToLowerInvariant();
+            var concepts = new List<string>();
+            void add(string c){ if(!string.IsNullOrWhiteSpace(c) && !concepts.Contains(c)) concepts.Add(c); }
+            if (text.Contains("quantum")) add("quantum");
+            if (text.Contains("physics")) add("physics");
+            if (text.Contains("artificial intelligence") || text.Contains(" ai ") || text.StartsWith("ai ")) add("artificial-intelligence");
+            if (text.Contains("machine learning")) add("machine-learning");
+            if (text.Contains("space") || text.Contains("astronomy") || text.Contains("nasa")) add("space");
+            if (text.Contains("biology") || text.Contains("genetic")) add("biology");
+            if (text.Contains("energy") || text.Contains("battery")) add("energy");
+            if (text.Contains("climate") || text.Contains("sustainab")) add("environment");
+            if (text.Contains("technology") || text.Contains("software") || text.Contains("comput")) add("technology");
+            if (text.Contains("science")) add("science");
+            return new ConceptAnalysis
+            {
+                Id = $"concept-{Guid.NewGuid():N}",
+                NewsItemId = newsItem.Id,
+                Concepts = concepts,
+                Confidence = concepts.Count > 0 ? 0.6 : 0.0,
+                OntologyLevels = new List<string>(),
+                ExtractedAt = DateTimeOffset.UtcNow,
+                Metadata = new Dictionary<string, object> { ["source"] = "heuristic" }
+            };
+        }
+
+        private async Task<List<string>> ExtractConceptsForNews(NewsItem newsItem, FractalNewsItem fractal)
+        {
+            var analysis = await PerformAIConceptExtraction(newsItem);
+            return analysis.Concepts ?? new List<string>();
+        }
+
+        private void EnsureConceptAndTopology(string concept, NewsItem newsItem, FractalNewsItem fractal)
+        {
+            var conceptNodeId = $"discovered-concept-{concept}";
+            var existing = Registry.GetNode(conceptNodeId);
+            if (existing == null)
+            {
+                var node = new Node(
+                    Id: conceptNodeId,
+                    TypeId: "codex.concept.discovered",
+                    State: ContentState.Ice,
+                    Locale: "en-US",
+                    Title: concept,
+                    Description: $"Concept discovered from news: {newsItem.Title}",
+                    Content: new ContentRef("application/json", JsonSerializer.Serialize(new { concept, newsId = newsItem.Id }), null, null),
+                    Meta: new Dictionary<string, object> { ["source"] = newsItem.Source, ["discoveredAt"] = DateTimeOffset.UtcNow }
+                );
+                Registry.Upsert(node);
+            }
+
+            var ucoreTarget = MapConceptToUCore(concept);
+            if (ucoreTarget != null)
+            {
+                Registry.Upsert(new Edge(conceptNodeId, ucoreTarget, "is-a", 1.0, new Dictionary<string, object>()));
+            }
+
+            Registry.Upsert(new Edge(conceptNodeId, $"fractal-news-{fractal.Id}", "relates-to", 0.5, new Dictionary<string, object>()));
+        }
+
+        private string? MapConceptToUCore(string concept)
+        {
+            var c = concept.ToLowerInvariant();
+            if (c.Contains("quantum") || c.Contains("physics")) return "u-core-concept-science";
+            if (c.Contains("artificial-intelligence") || c.Contains("machine-learning")) return "u-core-concept-technology";
+            if (c.Contains("space") || c.Contains("astronomy")) return "u-core-concept-science";
+            if (c.Contains("biology") || c.Contains("genetic")) return "u-core-concept-science";
+            if (c.Contains("energy") || c.Contains("battery")) return "u-core-concept-energy";
+            if (c.Contains("environment") || c.Contains("climate")) return "u-core-concept-science";
+            if (c.Contains("technology")) return "u-core-concept-technology";
+            if (c.Contains("science")) return "u-core-concept-science";
+            return "u-core-concept-knowledge";
         }
     }
 

@@ -187,7 +187,7 @@ export const defaultAtoms = {
       projection: 'list',
       itemComponent: 'ConceptStreamCard',
       adapters: {
-        list: { method: 'POST', path: '/concept/discover' },
+        list: { method: 'POST', path: '/concepts/browse' },
         people: { method: 'POST', path: '/users/discover' }
       },
       actions: ['action.attune', 'action.amplify', 'action.reflect', 'action.weave'],

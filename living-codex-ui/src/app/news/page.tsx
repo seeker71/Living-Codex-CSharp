@@ -143,30 +143,30 @@ export default function NewsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navigation />
       
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">📰 News Feed</h1>
-          <p className="text-gray-600">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">📰 News Feed</h1>
+          <p className="text-gray-600 dark:text-gray-300">
             Personalized news based on your concept interactions and interests
           </p>
         </div>
 
         {/* Controls */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Category Selection */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                 Category
               </label>
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="input-standard"
               >
                 <option value="personalized">🎯 Personalized</option>
                 <option value="trending">📈 Trending</option>
@@ -181,13 +181,13 @@ export default function NewsPage() {
 
             {/* Time Range */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                 Time Range
               </label>
               <select
                 value={timeRange}
                 onChange={(e) => setTimeRange(parseInt(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="input-standard"
               >
                 <option value={1}>Last Hour</option>
                 <option value={6}>Last 6 Hours</option>
@@ -199,7 +199,7 @@ export default function NewsPage() {
 
             {/* Search */}
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                 Search Topics
               </label>
               <div className="flex space-x-2">
@@ -226,9 +226,9 @@ export default function NewsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main News Feed */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg border border-gray-200">
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
               <div className="p-6 border-b border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-900">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                   {selectedCategory === 'personalized' ? '🎯 Your Personalized Feed' :
                    selectedCategory === 'trending' ? '📈 Trending Topics' :
                    `📰 ${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)} News`}
@@ -330,15 +330,15 @@ export default function NewsPage() {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">📊 News Stats</h3>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Articles Today</span>
+                  <span className="text-gray-600 dark:text-gray-300">Articles Today</span>
                   <span className="font-medium">{newsItems.length}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Time Range</span>
+                  <span className="text-gray-600 dark:text-gray-300">Time Range</span>
                   <span className="font-medium">{timeRange}h</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Category</span>
+                  <span className="text-gray-600 dark:text-gray-300">Category</span>
                   <span className="font-medium capitalize">{selectedCategory}</span>
                 </div>
               </div>
@@ -350,7 +350,7 @@ export default function NewsPage() {
               <div className="space-y-2">
                 {Array.from(new Set(newsItems.map(item => item.source))).slice(0, 5).map((source, index) => (
                   <div key={index} className="flex items-center justify-between">
-                    <span className="text-gray-600">{source}</span>
+                    <span className="text-gray-600 dark:text-gray-300">{source}</span>
                     <span className="text-sm text-gray-500">
                       {newsItems.filter(item => item.source === source).length}
                     </span>

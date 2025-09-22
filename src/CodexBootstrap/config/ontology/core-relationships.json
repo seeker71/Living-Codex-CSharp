@@ -1,0 +1,252 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "description": "Core relationships that define the fundamental connections in the U-CORE ontology",
+    "lastUpdated": "2025-09-22T00:00:00Z"
+  },
+  "relationships": [
+    {
+      "id": "resonates-with",
+      "name": "Resonates With",
+      "description": "Harmonic resonance relationship indicating vibrational alignment",
+      "fromConcept": "*",
+      "toConcept": "*",
+      "weight": 0.9,
+      "bidirectional": true,
+      "transitive": false,
+      "symmetric": true,
+      "reflexive": false
+    },
+    {
+      "id": "aligns-with",
+      "name": "Aligns With",
+      "description": "Alignment relationship indicating structural correspondence",
+      "fromConcept": "*",
+      "toConcept": "*",
+      "weight": 0.8,
+      "bidirectional": true,
+      "transitive": false,
+      "symmetric": true,
+      "reflexive": false
+    },
+    {
+      "id": "emerges-from",
+      "name": "Emerges From",
+      "description": "Emergence relationship indicating complex arising from simpler components",
+      "fromConcept": "*",
+      "toConcept": "*",
+      "weight": 0.7,
+      "bidirectional": false,
+      "transitive": false,
+      "symmetric": false,
+      "reflexive": false
+    },
+    {
+      "id": "projects-to",
+      "name": "Projects To",
+      "description": "Projection relationship indicating manifestation across dimensions",
+      "fromConcept": "*",
+      "toConcept": "*",
+      "weight": 0.9,
+      "bidirectional": false,
+      "transitive": false,
+      "symmetric": false,
+      "reflexive": false
+    },
+    {
+      "id": "measures",
+      "name": "Measures",
+      "description": "Measurement relationship indicating quantification or assessment",
+      "fromConcept": "*",
+      "toConcept": "*",
+      "weight": 0.85,
+      "bidirectional": false,
+      "transitive": false,
+      "symmetric": false,
+      "reflexive": false
+    },
+    {
+      "id": "participates-in",
+      "name": "Participates In",
+      "description": "Participation relationship indicating active involvement",
+      "fromConcept": "*",
+      "toConcept": "*",
+      "weight": 0.75,
+      "bidirectional": false,
+      "transitive": false,
+      "symmetric": false,
+      "reflexive": false
+    },
+    {
+      "id": "structured-by",
+      "name": "Structured By",
+      "description": "Structural relationship indicating organizational pattern",
+      "fromConcept": "*",
+      "toConcept": "*",
+      "weight": 0.8,
+      "bidirectional": false,
+      "transitive": false,
+      "symmetric": false,
+      "reflexive": false
+    },
+    {
+      "id": "described-by",
+      "name": "Described By",
+      "description": "Descriptive relationship indicating characterization",
+      "fromConcept": "*",
+      "toConcept": "*",
+      "weight": 0.8,
+      "bidirectional": false,
+      "transitive": false,
+      "symmetric": false,
+      "reflexive": false
+    },
+    {
+      "id": "implements",
+      "name": "Implements",
+      "description": "Implementation relationship indicating realization of abstract concepts",
+      "fromConcept": "*",
+      "toConcept": "*",
+      "weight": 0.8,
+      "bidirectional": false,
+      "transitive": false,
+      "symmetric": false,
+      "reflexive": false
+    },
+    {
+      "id": "integrates",
+      "name": "Integrates",
+      "description": "Integration relationship indicating synthesis and unification",
+      "fromConcept": "*",
+      "toConcept": "*",
+      "weight": 0.9,
+      "bidirectional": false,
+      "transitive": false,
+      "symmetric": false,
+      "reflexive": false
+    },
+    {
+      "id": "is-a",
+      "name": "Is A",
+      "description": "Taxonomic relationship indicating type hierarchy",
+      "fromConcept": "*",
+      "toConcept": "*",
+      "weight": 1.0,
+      "bidirectional": false,
+      "transitive": true,
+      "symmetric": false,
+      "reflexive": false
+    },
+    {
+      "id": "part-of",
+      "name": "Part Of",
+      "description": "Mereological relationship indicating whole-part structure",
+      "fromConcept": "*",
+      "toConcept": "*",
+      "weight": 0.8,
+      "bidirectional": false,
+      "transitive": true,
+      "symmetric": false,
+      "reflexive": false
+    },
+    {
+      "id": "causes",
+      "name": "Causes",
+      "description": "Causal relationship indicating cause-effect dynamics",
+      "fromConcept": "*",
+      "toConcept": "*",
+      "weight": 0.9,
+      "bidirectional": false,
+      "transitive": false,
+      "symmetric": false,
+      "reflexive": false
+    },
+    {
+      "id": "influences",
+      "name": "Influences",
+      "description": "Influence relationship indicating partial causal effect",
+      "fromConcept": "*",
+      "toConcept": "*",
+      "weight": 0.6,
+      "bidirectional": false,
+      "transitive": false,
+      "symmetric": false,
+      "reflexive": false
+    },
+    {
+      "id": "relates-to",
+      "name": "Relates To",
+      "description": "General associative relationship",
+      "fromConcept": "*",
+      "toConcept": "*",
+      "weight": 0.4,
+      "bidirectional": true,
+      "transitive": false,
+      "symmetric": true,
+      "reflexive": false
+    },
+    {
+      "id": "enables",
+      "name": "Enables",
+      "description": "Enablement relationship indicating facilitation",
+      "fromConcept": "*",
+      "toConcept": "*",
+      "weight": 0.7,
+      "bidirectional": false,
+      "transitive": false,
+      "symmetric": false,
+      "reflexive": false
+    },
+    {
+      "id": "manifests-as",
+      "name": "Manifests As",
+      "description": "Manifestation relationship indicating expression or appearance",
+      "fromConcept": "*",
+      "toConcept": "*",
+      "weight": 0.8,
+      "bidirectional": false,
+      "transitive": false,
+      "symmetric": false,
+      "reflexive": false
+    },
+    {
+      "id": "emerges-from",
+      "name": "Emerges From",
+      "description": "Emergence relationship indicating complex arising",
+      "fromConcept": "*",
+      "toConcept": "*",
+      "weight": 0.9,
+      "bidirectional": false,
+      "transitive": false,
+      "symmetric": false,
+      "reflexive": false
+    },
+    {
+      "id": "transcends",
+      "name": "Transcends",
+      "description": "Transcendence relationship indicating going beyond limitations",
+      "fromConcept": "*",
+      "toConcept": "*",
+      "weight": 0.8,
+      "bidirectional": false,
+      "transitive": false,
+      "symmetric": false,
+      "reflexive": false
+    },
+    {
+      "id": "contains",
+      "name": "Contains",
+      "description": "Containment relationship indicating inclusion",
+      "fromConcept": "*",
+      "toConcept": "*",
+      "weight": 0.7,
+      "bidirectional": false,
+      "transitive": true,
+      "symmetric": false,
+      "reflexive": false
+    }
+  ]
+}
+
+
+

@@ -17,7 +17,9 @@ public static class TestInfrastructure
         var iceStorage = new TestIceStorageBackend();
         var waterStorage = new TestWaterStorageBackend();
         var logger = CreateTestLogger();
-        return new NodeRegistry(iceStorage, waterStorage, logger);
+        var registry = new NodeRegistry(iceStorage, waterStorage, logger);
+        registry.InitializeAsync().Wait();
+        return registry;
     }
 
     /// <summary>
@@ -34,8 +36,8 @@ public static class TestInfrastructure
 /// </summary>
 public class TestIceStorageBackend : IIceStorageBackend
 {
-    private readonly Dictionary<string, Node> _nodes = new();
-    private readonly Dictionary<string, Edge> _edges = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Node> _nodes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Edge> _edges = new(StringComparer.OrdinalIgnoreCase);
 
     public Task InitializeAsync() => Task.CompletedTask;
     public Task<Node?> GetIceNodeAsync(string id) => Task.FromResult(_nodes.TryGetValue(id, out var node) ? node : null);
@@ -46,7 +48,7 @@ public class TestIceStorageBackend : IIceStorageBackend
     }
     public Task DeleteIceNodeAsync(string id)
     {
-        _nodes.Remove(id);
+        _nodes.TryRemove(id, out _);
         return Task.CompletedTask;
     }
     public Task<IEnumerable<Node>> GetAllIceNodesAsync() => Task.FromResult(_nodes.Values.AsEnumerable());
@@ -66,7 +68,7 @@ public class TestIceStorageBackend : IIceStorageBackend
     public Task DeleteEdgeAsync(string fromId, string toId, string role)
     {
         var key = $"{fromId}-{toId}-{role}";
-        _edges.Remove(key);
+        _edges.TryRemove(key, out _);
         return Task.CompletedTask;
     }
     public Task<bool> IsAvailableAsync() => Task.FromResult(true);
@@ -111,8 +113,8 @@ public class TestIceStorageBackend : IIceStorageBackend
 /// </summary>
 public class TestWaterStorageBackend : IWaterStorageBackend
 {
-    private readonly Dictionary<string, Node> _nodes = new();
-    private readonly Dictionary<string, Edge> _edges = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Node> _nodes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Edge> _edges = new(StringComparer.OrdinalIgnoreCase);
 
     public Task InitializeAsync() => Task.CompletedTask;
     public Task<Node?> GetWaterNodeAsync(string id) => Task.FromResult(_nodes.TryGetValue(id, out var node) ? node : null);
@@ -123,7 +125,7 @@ public class TestWaterStorageBackend : IWaterStorageBackend
     }
     public Task DeleteWaterNodeAsync(string id)
     {
-        _nodes.Remove(id);
+        _nodes.TryRemove(id, out _);
         return Task.CompletedTask;
     }
     public Task CleanupExpiredNodesAsync()
@@ -175,7 +177,7 @@ public class TestWaterStorageBackend : IWaterStorageBackend
     public Task DeleteWaterEdgeAsync(string fromId, string toId, string role)
     {
         var key = $"{fromId}-{toId}-{role}";
-        _edges.Remove(key);
+        _edges.TryRemove(key, out _);
         return Task.CompletedTask;
     }
 
@@ -190,14 +192,14 @@ public class TestWaterStorageBackend : IWaterStorageBackend
 /// </summary>
 public class TestLogger : ICodexLogger
 {
-    public void Debug(string message) { }
-    public void Debug(string message, Exception ex) { }
-    public void Info(string message) { }
-    public void Info(string message, Exception ex) { }
-    public void Warn(string message) { }
-    public void Warn(string message, Exception ex) { }
-    public void Error(string message) { }
-    public void Error(string message, Exception? ex = null) { }
-    public void Fatal(string message) { }
-    public void Fatal(string message, Exception ex) { }
+    public void Debug(string message) { Console.WriteLine($"[DEBUG] {message}"); }
+    public void Debug(string message, Exception ex) { Console.WriteLine($"[DEBUG] {message}: {ex}"); }
+    public void Info(string message) { Console.WriteLine($"[INFO] {message}"); }
+    public void Info(string message, Exception ex) { Console.WriteLine($"[INFO] {message}: {ex}"); }
+    public void Warn(string message) { Console.WriteLine($"[WARN] {message}"); }
+    public void Warn(string message, Exception ex) { Console.WriteLine($"[WARN] {message}: {ex}"); }
+    public void Error(string message) { Console.WriteLine($"[ERROR] {message}"); }
+    public void Error(string message, Exception? ex = null) { Console.WriteLine($"[ERROR] {message}: {ex}"); }
+    public void Fatal(string message) { Console.WriteLine($"[FATAL] {message}"); }
+    public void Fatal(string message, Exception ex) { Console.WriteLine($"[FATAL] {message}: {ex}"); }
 }

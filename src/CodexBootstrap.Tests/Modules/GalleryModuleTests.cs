@@ -24,6 +24,7 @@ public class GalleryModuleTests : IClassFixture<TestServerFixture>
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        await registry.InitializeAsync();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new GalleryModule(registry, logger, httpClient);
@@ -33,11 +34,20 @@ public class GalleryModuleTests : IClassFixture<TestServerFixture>
 
         // Assert
         Assert.NotNull(result);
-        var resultObj = result as dynamic;
-        Assert.True(resultObj?.success);
-        var items = resultObj?.items;
+        if (result is CodexBootstrap.Core.ErrorResponse errorResponse)
+        {
+            Assert.True(false, $"Method returned error: {errorResponse.Error}");
+        }
+        var resultType = result.GetType();
+        var successProp = resultType.GetProperty("success");
+        var itemsProp = resultType.GetProperty("items");
+        Assert.NotNull(successProp);
+        Assert.NotNull(itemsProp);
+        var success = (bool)successProp.GetValue(result)!;
+        var items = itemsProp.GetValue(result);
+        Assert.True(success);
         Assert.NotNull(items);
-        Assert.Empty(items);
+        Assert.Empty((IEnumerable<object>)items!);
     }
 
     [Fact]
@@ -45,6 +55,7 @@ public class GalleryModuleTests : IClassFixture<TestServerFixture>
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        await registry.InitializeAsync();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new GalleryModule(registry, logger, httpClient);
@@ -65,10 +76,23 @@ public class GalleryModuleTests : IClassFixture<TestServerFixture>
 
         // Assert
         Assert.NotNull(result);
-        var resultObj = result as dynamic;
-        Assert.True(resultObj?.success);
-        Assert.NotNull(resultObj?.itemId);
-        Assert.Equal("Gallery item created successfully", resultObj?.message);
+        if (result is CodexBootstrap.Core.ErrorResponse errorResponse)
+        {
+            Assert.True(false, $"Method returned error: {errorResponse.Error}");
+        }
+        var resultType = result.GetType();
+        var successProp = resultType.GetProperty("success");
+        var itemIdProp = resultType.GetProperty("itemId");
+        var messageProp = resultType.GetProperty("message");
+        Assert.NotNull(successProp);
+        Assert.NotNull(itemIdProp);
+        Assert.NotNull(messageProp);
+        var success = (bool)successProp.GetValue(result)!;
+        var itemId = itemIdProp.GetValue(result)?.ToString();
+        var message = messageProp.GetValue(result)?.ToString();
+        Assert.True(success);
+        Assert.False(string.IsNullOrEmpty(itemId));
+        Assert.Equal("Gallery item created successfully", message);
     }
 
     [Fact]
@@ -76,6 +100,7 @@ public class GalleryModuleTests : IClassFixture<TestServerFixture>
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        await registry.InitializeAsync();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new GalleryModule(registry, logger, httpClient);
@@ -102,6 +127,7 @@ public class GalleryModuleTests : IClassFixture<TestServerFixture>
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        await registry.InitializeAsync();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new GalleryModule(registry, logger, httpClient);
@@ -128,6 +154,7 @@ public class GalleryModuleTests : IClassFixture<TestServerFixture>
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        await registry.InitializeAsync();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new GalleryModule(registry, logger, httpClient);
@@ -147,6 +174,7 @@ public class GalleryModuleTests : IClassFixture<TestServerFixture>
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        await registry.InitializeAsync();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new GalleryModule(registry, logger, httpClient);
@@ -172,6 +200,7 @@ public class GalleryModuleTests : IClassFixture<TestServerFixture>
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        registry.InitializeAsync().Wait();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new GalleryModule(registry, logger, httpClient);

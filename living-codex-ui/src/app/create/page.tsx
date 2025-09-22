@@ -251,14 +251,14 @@ export default function CreatePage() {
   const moods = ['inspiring', 'peaceful', 'energetic', 'mystical', 'joyful', 'contemplative'];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navigation />
       
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">✨ Concept Creation</h1>
-          <p className="text-gray-600">
+          <p className="text-gray-600 dark:text-gray-300">
             Create new concepts with AI assistance and generate visual representations
           </p>
         </div>
@@ -313,7 +313,7 @@ export default function CreatePage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Basic Information */}
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Basic Information</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Basic Information</h3>
                     
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -324,7 +324,7 @@ export default function CreatePage() {
                         value={conceptName}
                         onChange={(e) => setConceptName(e.target.value)}
                         placeholder="e.g., Quantum Consciousness Bridge"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="input-standard"
                       />
                     </div>
 
@@ -337,7 +337,7 @@ export default function CreatePage() {
                         onChange={(e) => setConceptDescription(e.target.value)}
                         placeholder="Describe your concept in detail..."
                         rows={4}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="input-standard"
                       />
                     </div>
 
@@ -348,7 +348,7 @@ export default function CreatePage() {
                       <select
                         value={conceptDomain}
                         onChange={(e) => setConceptDomain(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="input-standard"
                       >
                         {domains.map(domain => (
                           <option key={domain} value={domain}>
@@ -361,7 +361,7 @@ export default function CreatePage() {
 
                   {/* Advanced Properties */}
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Advanced Properties</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Advanced Properties</h3>
                     
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -438,7 +438,7 @@ export default function CreatePage() {
               <div className="space-y-6">
                 <div className="text-center mb-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">🤖 AI Concept Assistant</h3>
-                  <p className="text-gray-600">
+                  <p className="text-gray-600 dark:text-gray-300">
                     Describe your idea and get AI-powered concept suggestions and improvements
                   </p>
                 </div>
@@ -452,7 +452,7 @@ export default function CreatePage() {
                     onChange={(e) => setAiPrompt(e.target.value)}
                     placeholder="I want to create a concept about..."
                     rows={4}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="input-standard"
                   />
                 </div>
 
@@ -473,7 +473,7 @@ export default function CreatePage() {
                     <div className="space-y-2">
                       {aiSuggestions.map((suggestion, index) => (
                         <div key={index} className="flex items-center justify-between bg-white p-3 rounded-md">
-                          <span className="text-gray-700">{suggestion}</span>
+                          <span className="text-gray-700 dark:text-gray-200">{suggestion}</span>
                           <button
                             onClick={() => applySuggestion(suggestion)}
                             className="px-3 py-1 bg-purple-600 text-white text-sm rounded-md hover:bg-purple-700"
@@ -529,7 +529,7 @@ export default function CreatePage() {
               <div className="space-y-6">
                 <div className="text-center mb-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">🎨 Visual Concept Creation</h3>
-                  <p className="text-gray-600">
+                  <p className="text-gray-600 dark:text-gray-300">
                     Generate visual representations of your concept with AI-powered image creation
                   </p>
                 </div>
@@ -546,7 +546,7 @@ export default function CreatePage() {
                       <select
                         value={imageStyle}
                         onChange={(e) => setImageStyle(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="input-standard"
                       >
                         {styles.map(style => (
                           <option key={style} value={style}>
@@ -563,7 +563,7 @@ export default function CreatePage() {
                       <select
                         value={imageMood}
                         onChange={(e) => setImageMood(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="input-standard"
                       >
                         {moods.map(mood => (
                           <option key={mood} value={mood}>
@@ -587,7 +587,7 @@ export default function CreatePage() {
                         value={imageColors.join(', ')}
                         onChange={(e) => setImageColors(e.target.value.split(',').map(c => c.trim()))}
                         placeholder="blue, gold, white"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="input-standard"
                       />
                     </div>
 
@@ -600,7 +600,7 @@ export default function CreatePage() {
                         value={imageElements.join(', ')}
                         onChange={(e) => setImageElements(e.target.value.split(',').map(e => e.trim()))}
                         placeholder="sacred geometry, light, fractals"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="input-standard"
                       />
                     </div>
                   </div>

@@ -1,435 +1,579 @@
-'use client';
+'use client'
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Navigation } from '@/components/ui/Navigation';
-import { useAuth } from '@/contexts/AuthContext';
-import { useContributorEnergy, usePersonalNewsStream, useUserConcepts, usePersonalContributionsFeed, useTrackInteraction } from '@/lib/hooks';
+import React, { useState, useEffect } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
 
-interface UserStats {
-  energyLevel: number;
-  totalContributions: number;
-  resonanceLevel: number;
-  totalValue: number;
-  lastUpdated: string;
+interface UserProfile {
+  userId: string
+  displayName: string
+  email: string
+  location?: string
+  latitude?: number
+  longitude?: number
+  interests?: string[]
+  contributions?: string[]
+  avatarUrl?: string
+  metadata?: Record<string, any>
 }
 
-interface NewsItem {
-  id: string;
-  title: string;
-  description: string;
-  url?: string;
-  timestamp: string;
-  resonanceScore?: number;
-  conceptTags?: string[];
+interface BeliefSystem {
+  userId: string
+  framework: string
+  principles: string[]
+  values: string[]
+  language: string
+  culturalContext: string
+  spiritualTradition?: string
+  scientificBackground?: string
+  resonanceThreshold: number
 }
 
 export default function ProfilePage() {
-  const { user, isAuthenticated, logout, isLoading: authLoading } = useAuth();
-  const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
-  const trackInteraction = useTrackInteraction();
+  const { user } = useAuth()
+  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [beliefSystem, setBeliefSystem] = useState<BeliefSystem | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [activeTab, setActiveTab] = useState<'profile' | 'interests' | 'beliefs' | 'location'>('profile')
+  const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null)
 
-  // Use hooks for data fetching
-  const { data: userStats, isLoading: statsLoading } = useContributorEnergy(user?.id || '');
-  const { data: newsStream, isLoading: newsLoading } = usePersonalNewsStream(user?.id || '', 20);
-  const { data: contributionsData, isLoading: contributionsLoading } = usePersonalContributionsFeed(user?.id || '', 10);
-  const { data: userConcepts, isLoading: conceptsLoading } = useUserConcepts(user?.id || '');
+  // Form states
+  const [displayName, setDisplayName] = useState('')
+  const [email, setEmail] = useState('')
+  const [location, setLocation] = useState('')
+  const [interests, setInterests] = useState<string[]>([])
+  const [newInterest, setNewInterest] = useState('')
+  const [framework, setFramework] = useState('')
+  const [principles, setPrinciples] = useState<string[]>([])
+  const [values, setValues] = useState<string[]>([])
+  const [language, setLanguage] = useState('en')
+  const [culturalContext, setCulturalContext] = useState('')
+  const [spiritualTradition, setSpiritualTradition] = useState('')
+  const [scientificBackground, setScientificBackground] = useState('')
+  const [resonanceThreshold, setResonanceThreshold] = useState(0.7)
 
-  const loading = statsLoading || newsLoading || contributionsLoading || conceptsLoading;
-
-  // Track page visit
   useEffect(() => {
-    if (isAuthenticated && user) {
-      trackInteraction('profile-page', 'page-visit', {
-        section: 'profile',
-        userDisplayName: user.displayName
-      });
+    if (user?.id) {
+      loadUserProfile()
+      loadBeliefSystem()
     }
-  }, [isAuthenticated, user, trackInteraction]);
+  }, [user?.id])
 
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push('/auth');
+  const loadUserProfile = async () => {
+    try {
+      // Try to get user from the discovery endpoint first
+      const response = await fetch(`http://localhost:5002/users/discover`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: 1 })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.users && data.users.length > 0) {
+          const userProfile = data.users.find((u: any) => u.userId === user?.id) || data.users[0]
+          setProfile(userProfile)
+          
+          // Populate form fields
+          setDisplayName(userProfile.displayName || user?.username || '')
+          setEmail(userProfile.email || user?.email || '')
+          setLocation(userProfile.location || '')
+          setInterests(userProfile.interests || [])
+        }
+      } else {
+        // Fallback: create profile from current user data
+        const fallbackProfile: UserProfile = {
+          userId: user?.id || '',
+          displayName: user?.username || '',
+          email: user?.email || '',
+          location: '',
+          interests: [],
+          contributions: []
+        }
+        setProfile(fallbackProfile)
+        setDisplayName(fallbackProfile.displayName)
+        setEmail(fallbackProfile.email)
+      }
+    } catch (error) {
+      console.error('Error loading user profile:', error)
     }
-  }, [isAuthenticated, authLoading, router]);
+  }
 
-  // Extract news items from the response
-  const newsFeed = newsStream?.success && newsStream.data ? 
-    (newsStream.data as any).newsItems || [] : [];
+  const loadBeliefSystem = async () => {
+    try {
+      const response = await fetch(`http://localhost:5002/concept/user-belief-system/${user?.id}`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.beliefSystemId) {
+          setBeliefSystem({
+            userId: data.userId,
+            framework: data.framework || '',
+            principles: data.principles || [],
+            values: data.values || [],
+            language: 'en',
+            culturalContext: '',
+            resonanceThreshold: 0.7
+          })
+          
+          // Populate belief system form
+          setFramework(data.framework || '')
+          setPrinciples(data.principles || [])
+          setValues(data.values || [])
+        }
+      }
+    } catch (error) {
+      console.error('Error loading belief system:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  // Extract user concepts for interaction tracking
-  const conceptInteractions = userConcepts?.success && userConcepts.data ?
-    (userConcepts.data as any).concepts || [] : [];
+  const saveProfile = async () => {
+    setSaving(true)
+    setMessage(null)
+    
+    try {
+      const profileData = {
+        displayName,
+        email,
+        metadata: {
+          location,
+          interests: interests.join(','),
+          contributions: profile?.contributions?.join(',') || ''
+        }
+      }
 
-  if (authLoading) {
+      const response = await fetch(`http://localhost:5002/identity/${user?.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profileData)
+      })
+
+      if (response.ok) {
+        setMessage({ type: 'success', text: 'Profile updated successfully!' })
+        await loadUserProfile() // Reload to get updated data
+      } else {
+        const error = await response.text()
+        setMessage({ type: 'error', text: `Failed to update profile: ${error}` })
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: `Error updating profile: ${error}` })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const saveBeliefSystem = async () => {
+    setSaving(true)
+    setMessage(null)
+    
+    try {
+      const beliefData = {
+        userId: user?.id,
+        framework,
+        principles,
+        values,
+        language,
+        culturalContext,
+        spiritualTradition,
+        scientificBackground,
+        coreValues: values.reduce((acc, val, idx) => ({ ...acc, [val]: idx + 1 }), {}),
+        translationPreferences: { [language]: 1.0 },
+        resonanceThreshold
+      }
+
+      const response = await fetch(`http://localhost:5002/userconcept/belief-system/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(beliefData)
+      })
+
+      if (response.ok) {
+        setMessage({ type: 'success', text: 'Belief system updated successfully!' })
+        await loadBeliefSystem() // Reload to get updated data
+      } else {
+        const error = await response.text()
+        setMessage({ type: 'error', text: `Failed to update belief system: ${error}` })
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: `Error updating belief system: ${error}` })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const addInterest = () => {
+    if (newInterest.trim() && !interests.includes(newInterest.trim())) {
+      setInterests([...interests, newInterest.trim()])
+      setNewInterest('')
+    }
+  }
+
+  const removeInterest = (interest: string) => {
+    setInterests(interests.filter(i => i !== interest))
+  }
+
+  const addPrinciple = () => {
+    const principle = prompt('Enter a principle:')
+    if (principle && !principles.includes(principle)) {
+      setPrinciples([...principles, principle])
+    }
+  }
+
+  const addValue = () => {
+    const value = prompt('Enter a value:')
+    if (value && !values.includes(value)) {
+      setValues([...values, value])
+    }
+  }
+
+  if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-page text-foreground flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-medium-contrast">Loading profile...</p>
+        </div>
       </div>
-    );
+    )
   }
 
-  if (!isAuthenticated || !user) {
-    return null; // Will redirect
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-page text-foreground flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-medium-contrast">Please log in to view your profile.</p>
+        </div>
+      </div>
+    )
   }
-
-  const handleLogout = () => {
-    logout();
-    router.push('/');
-  };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-gray-900">Living Codex</h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Navigation />
-              <button
-                onClick={handleLogout}
-                className="text-gray-600 hover:text-gray-900 text-sm font-medium"
-              >
-                Sign Out
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-page text-foreground">
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-4xl mx-auto">
+          <h1 className="text-3xl font-bold text-high-contrast mb-8">My Profile</h1>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Profile Header */}
-        <div className="mb-8">
-          <div className="flex items-center space-x-4">
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-              <span className="text-2xl font-bold text-white">
-                {(user.displayName || user.username || 'U').charAt(0).toUpperCase()}
-              </span>
+          {message && (
+            <div className={`mb-6 p-4 rounded-lg ${
+              message.type === 'success' 
+                ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' 
+                : 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100'
+            }`}>
+              {message.text}
             </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">{user.displayName || user.username || 'User'}</h1>
-              <p className="text-gray-600">@{user.username || 'unknown'}</p>
-              <p className="text-sm text-gray-500">
-                Member since {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Unknown'}
-              </p>
-            </div>
-          </div>
-        </div>
+          )}
 
-        {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="text-sm text-red-700">{error}</div>
+          {/* Tab Navigation */}
+          <div className="border-b border-gray-200 dark:border-gray-700 mb-8">
+            <nav className="-mb-px flex space-x-8">
+              {[
+                { id: 'profile', label: '👤 Profile', icon: '👤' },
+                { id: 'interests', label: '💡 Interests', icon: '💡' },
+                { id: 'beliefs', label: '🧠 Belief System', icon: '🧠' },
+                { id: 'location', label: '📍 Location', icon: '📍' }
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === tab.id
+                      ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                      : 'border-transparent text-medium-contrast hover:text-high-contrast hover:border-gray-300'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
           </div>
-        )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Energy Balance */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                ⚡ Energy Balance
-              </h2>
+          {/* Profile Tab */}
+          {activeTab === 'profile' && (
+            <div className="bg-card border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-high-contrast mb-6">Basic Information</h2>
               
-              {loading ? (
-                <div className="space-y-4">
-                  <div className="animate-pulse bg-gray-200 rounded h-8"></div>
-                  <div className="animate-pulse bg-gray-200 rounded h-4"></div>
-                  <div className="animate-pulse bg-gray-200 rounded h-4"></div>
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-medium-contrast mb-2">
+                    Display Name
+                  </label>
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    className="input-standard w-full"
+                    placeholder="Your display name"
+                  />
                 </div>
-              ) : userStats?.success && userStats.data ? (
-                <div className="space-y-4">
-                  <div className="text-center mb-6">
-                    <div className="text-4xl font-bold text-indigo-600 mb-2">
-                      {(userStats.data as any).energyLevel.toFixed(1)}
-                    </div>
-                    <div className="text-sm text-gray-600">Current Energy Level</div>
-                  </div>
 
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Contributions</span>
-                      <span className="font-medium">{(userStats.data as any).totalContributions}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Resonance Level</span>
-                      <span className="font-medium">{(userStats.data as any).resonanceLevel.toFixed(1)}%</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Total Value</span>
-                      <span className="font-medium">{(userStats.data as any).totalValue.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Concepts Linked</span>
-                      <span className="font-medium">{conceptInteractions.length}</span>
-                    </div>
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-medium-contrast mb-2">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="input-standard w-full"
+                    placeholder="your.email@example.com"
+                  />
+                </div>
 
-                  <div className="mt-6">
-                    <div className="flex justify-between text-sm text-gray-600 mb-2">
-                      <span>Energy Progress</span>
-                      <span>{(userStats.data as any).energyLevel.toFixed(1)}</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-3">
-                      <div 
-                        className="bg-gradient-to-r from-indigo-500 to-purple-500 h-3 rounded-full transition-all duration-500"
-                        style={{ width: `${Math.min(((userStats.data as any).energyLevel / 10) * 100, 100)}%` }}
-                      ></div>
-                    </div>
-                  </div>
+                <div className="flex justify-end">
+                  <button
+                    onClick={saveProfile}
+                    disabled={saving}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg disabled:opacity-50"
+                  >
+                    {saving ? 'Saving...' : 'Save Profile'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
-                  <div className="mt-6 p-4 bg-indigo-50 rounded-lg">
-                    <div className="text-sm text-indigo-800">
-                      💡 Last updated: {new Date((userStats.data as any).lastUpdated).toLocaleString()}
-                    </div>
-                  </div>
-
-                  <div className="mt-4">
+          {/* Interests Tab */}
+          {activeTab === 'interests' && (
+            <div className="bg-card border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-high-contrast mb-6">My Interests</h2>
+              
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-medium-contrast mb-2">
+                    Add Interest
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newInterest}
+                      onChange={(e) => setNewInterest(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && addInterest()}
+                      className="input-standard flex-1"
+                      placeholder="e.g., machine learning, philosophy, music"
+                    />
                     <button
-                      onClick={() => window.location.href = '/resonance'}
-                      className="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 transition-colors"
+                      onClick={addInterest}
+                      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"
                     >
-                      View Resonance Field
+                      Add
                     </button>
                   </div>
                 </div>
-              ) : (
-                <div className="text-center text-gray-500 py-8">
-                  <div className="text-4xl mb-4">🌱</div>
-                  <div>Start contributing to build your energy profile</div>
-                </div>
-              )}
-            </div>
-          </div>
 
-          {/* Recent Contributions */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">
-                  ⚡ Recent Contributions
-                </h2>
-                <span className="text-sm text-gray-500">
-                  Your activity
-                </span>
+                <div>
+                  <h3 className="text-lg font-medium text-high-contrast mb-3">Current Interests</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {interests.map((interest) => (
+                      <span
+                        key={interest}
+                        className="bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100 px-3 py-1 rounded-full text-sm flex items-center gap-2"
+                      >
+                        {interest}
+                        <button
+                          onClick={() => removeInterest(interest)}
+                          className="text-blue-600 dark:text-blue-300 hover:text-red-500"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                    {interests.length === 0 && (
+                      <p className="text-medium-contrast italic">No interests added yet.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    onClick={saveProfile}
+                    disabled={saving}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg disabled:opacity-50"
+                  >
+                    {saving ? 'Saving...' : 'Save Interests'}
+                  </button>
+                </div>
               </div>
+            </div>
+          )}
 
-              {contributionsLoading ? (
-                <div className="space-y-3">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="animate-pulse bg-gray-200 rounded-lg h-16"></div>
-                  ))}
+          {/* Belief System Tab */}
+          {activeTab === 'beliefs' && (
+            <div className="bg-card border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-high-contrast mb-6">Belief System</h2>
+              
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-medium-contrast mb-2">
+                    Framework
+                  </label>
+                  <input
+                    type="text"
+                    value={framework}
+                    onChange={(e) => setFramework(e.target.value)}
+                    className="input-standard w-full"
+                    placeholder="e.g., Scientific Materialism, Buddhist Philosophy, Stoicism"
+                  />
                 </div>
-              ) : contributionsData?.success && (contributionsData.data as any)?.contributions?.length > 0 ? (
-                <div className="space-y-3 max-h-64 overflow-y-auto">
-                  {(contributionsData.data as any).contributions.map((contribution: any, index: number) => (
-                    <div key={index} className="border-l-4 border-green-500 pl-4 py-2">
-                      <div className="font-medium text-gray-900">{contribution.description || 'Contribution'}</div>
-                      <div className="text-sm text-gray-600">
-                        {contribution.contributionType} • {contribution.entityType}
-                      </div>
-                      <div className="text-xs text-gray-400 mt-1">
-                        Value: {contribution.value} • Abundance: {contribution.abundanceMultiplier?.toFixed(2)}x
-                      </div>
-                      <div className="text-xs text-gray-400">
-                        {new Date(contribution.timestamp).toLocaleString()}
-                      </div>
-                    </div>
-                  ))}
+
+                <div>
+                  <label className="block text-sm font-medium text-medium-contrast mb-2">
+                    Cultural Context
+                  </label>
+                  <input
+                    type="text"
+                    value={culturalContext}
+                    onChange={(e) => setCulturalContext(e.target.value)}
+                    className="input-standard w-full"
+                    placeholder="e.g., Western, Eastern, Indigenous, Mixed"
+                  />
                 </div>
-              ) : (
-                <div className="text-center text-gray-500 py-8">
-                  <div className="text-4xl mb-4">⚡</div>
-                  <div className="text-lg font-medium mb-2">No Contributions Yet</div>
-                  <p className="text-sm">
-                    Start interacting with the system to see your contributions here.
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-medium-contrast mb-2">
+                      Spiritual Tradition
+                    </label>
+                    <input
+                      type="text"
+                      value={spiritualTradition}
+                      onChange={(e) => setSpiritualTradition(e.target.value)}
+                      className="input-standard w-full"
+                      placeholder="Optional"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-medium-contrast mb-2">
+                      Scientific Background
+                    </label>
+                    <input
+                      type="text"
+                      value={scientificBackground}
+                      onChange={(e) => setScientificBackground(e.target.value)}
+                      className="input-standard w-full"
+                      placeholder="Optional"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-medium-contrast mb-2">
+                    Resonance Threshold: {resonanceThreshold}
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={resonanceThreshold}
+                    onChange={(e) => setResonanceThreshold(parseFloat(e.target.value))}
+                    className="w-full"
+                  />
+                  <p className="text-sm text-medium-contrast mt-1">
+                    How aligned concepts need to be with your beliefs to resonate with you.
                   </p>
                 </div>
-              )}
-            </div>
-          </div>
 
-          {/* Personal News Feed */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">
-                  📰 Personal News Feed
-                </h2>
-                <span className="text-sm text-gray-500">
-                  Real-time • Concepts you&apos;ve interacted with
-                </span>
-              </div>
-
-              {loading ? (
-                <div className="space-y-4">
-                  {[...Array(5)].map((_, i) => (
-                    <div key={i} className="animate-pulse">
-                      <div className="bg-gray-200 rounded-lg h-24"></div>
-                    </div>
-                  ))}
-                </div>
-              ) : newsFeed.length > 0 ? (
-                <div className="space-y-4">
-                  {newsFeed.map((item: any) => (
-                    <div key={item.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h3 className="font-medium text-gray-900 mb-2">
-                            {item.title}
-                          </h3>
-                          <p className="text-sm text-gray-600 mb-3">
-                            {item.description}
-                          </p>
-                          
-                          {item.conceptTags && item.conceptTags.length > 0 && (
-                            <div className="flex flex-wrap gap-2 mb-3">
-                              {item.conceptTags.map((tag: any, index: number) => (
-                                <span
-                                  key={index}
-                                  className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                                >
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          
-                          <div className="flex items-center justify-between text-xs text-gray-500">
-                            <span>{new Date(item.timestamp).toLocaleString()}</span>
-                            {item.resonanceScore && (
-                              <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded">
-                                Resonance: {(item.resonanceScore * 100).toFixed(1)}%
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        
-                        {item.url && (
-                          <div className="ml-4">
-                            <a
-                              href={item.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-                            >
-                              Read More →
-                            </a>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center text-gray-500 py-12">
-                  <div className="text-4xl mb-4">📡</div>
-                  <div className="text-lg font-medium mb-2">Your Personal Feed is Empty</div>
-                  <p className="text-sm mb-6">
-                    Start exploring concepts and contributing to see personalized content here
-                  </p>
-                  <div className="space-x-4">
-                    <button
-                      onClick={() => router.push('/discover')}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-                    >
-                      Discover Concepts
-                    </button>
-                    <button
-                      onClick={() => router.push('/graph')}
-                      className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors"
-                    >
-                      Explore Graph
-                    </button>
+                <div>
+                  <h3 className="text-lg font-medium text-high-contrast mb-3">Principles</h3>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {principles.map((principle, idx) => (
+                      <span
+                        key={idx}
+                        className="bg-purple-100 text-purple-800 dark:bg-purple-800 dark:text-purple-100 px-3 py-1 rounded-full text-sm"
+                      >
+                        {principle}
+                      </span>
+                    ))}
                   </div>
+                  <button
+                    onClick={addPrinciple}
+                    className="text-blue-600 dark:text-blue-400 hover:underline text-sm"
+                  >
+                    + Add Principle
+                  </button>
                 </div>
-              )}
-            </div>
 
-            {/* Linked Concepts */}
-            {conceptInteractions.length > 0 && (
-              <div className="mt-6 bg-white rounded-lg border border-gray-200 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  🔗 Your Linked Concepts
-                </h3>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {conceptInteractions.slice(0, 6).map((concept: any, index: number) => (
-                    <div key={index} className="bg-blue-50 rounded-lg p-3">
-                      <div className="font-medium text-blue-900 text-sm">
-                        {concept.name || concept.conceptId || 'Unknown Concept'}
-                      </div>
-                      <div className="text-xs text-blue-700 mt-1">
-                        {concept.relation || 'attuned'} • {concept.domain || 'general'}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                
-                {conceptInteractions.length > 6 && (
-                  <div className="mt-3 text-center">
-                    <button
-                      onClick={() => router.push('/discover')}
-                      className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-                    >
-                      View all {conceptInteractions.length} concepts →
-                    </button>
+                <div>
+                  <h3 className="text-lg font-medium text-high-contrast mb-3">Values</h3>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {values.map((value, idx) => (
+                      <span
+                        key={idx}
+                        className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 px-3 py-1 rounded-full text-sm"
+                      >
+                        {value}
+                      </span>
+                    ))}
                   </div>
-                )}
-              </div>
-            )}
+                  <button
+                    onClick={addValue}
+                    className="text-blue-600 dark:text-blue-400 hover:underline text-sm"
+                  >
+                    + Add Value
+                  </button>
+                </div>
 
-            {/* Recent Activity */}
-            <div className="mt-6 bg-white rounded-lg border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                🔄 Recent Activity
-              </h3>
+                <div className="flex justify-end">
+                  <button
+                    onClick={saveBeliefSystem}
+                    disabled={saving}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg disabled:opacity-50"
+                  >
+                    {saving ? 'Saving...' : 'Save Belief System'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Location Tab */}
+          {activeTab === 'location' && (
+            <div className="bg-card border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-high-contrast mb-6">Location</h2>
               
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3 text-sm">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-gray-600">Joined Living Codex</span>
-                  <span className="text-gray-400">•</span>
-                  <span className="text-gray-500">
-                    {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Unknown'}
-                  </span>
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-medium-contrast mb-2">
+                    Location
+                  </label>
+                  <input
+                    type="text"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    className="input-standard w-full"
+                    placeholder="e.g., San Francisco, CA, USA"
+                  />
+                  <p className="text-sm text-medium-contrast mt-1">
+                    Used for local news, events, and connecting with nearby users.
+                  </p>
                 </div>
-                
-                {userStats?.success && (userStats.data as any).totalContributions > 0 && (
-                  <div className="flex items-center space-x-3 text-sm">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <span className="text-gray-600">Made {(userStats.data as any).totalContributions} contributions</span>
-                    <span className="text-gray-400">•</span>
-                    <span className="text-gray-500">{new Date((userStats.data as any).lastUpdated).toLocaleDateString()}</span>
-                  </div>
-                )}
-                
-                {conceptInteractions.length > 0 && (
-                  <div className="flex items-center space-x-3 text-sm">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-gray-600">Linked to {conceptInteractions.length} concepts</span>
-                    <span className="text-gray-400">•</span>
-                    <span className="text-gray-500">Active interactions</span>
-                  </div>
-                )}
-                
-                <div className="flex items-center space-x-3 text-sm">
-                  <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                  <span className="text-gray-600">Current resonance level</span>
-                  <span className="text-gray-400">•</span>
-                  <span className="text-gray-500">
-                    {userStats?.success ? `${(userStats.data as any).resonanceLevel.toFixed(1)}%` : 'Calculating...'}
-                  </span>
+
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                  <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-2">
+                    🔒 Privacy Note
+                  </h3>
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                    Your location is used only for personalization and discovery. 
+                    You can control who sees your location in your privacy settings.
+                  </p>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    onClick={saveProfile}
+                    disabled={saving}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg disabled:opacity-50"
+                  >
+                    {saving ? 'Saving...' : 'Save Location'}
+                  </button>
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
-      </main>
+      </div>
     </div>
-  );
+  )
 }

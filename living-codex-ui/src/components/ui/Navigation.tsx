@@ -19,6 +19,7 @@ export function Navigation() {
     { href: '/discover', label: 'Discover', icon: '🔍' },
     { href: '/news', label: 'News', icon: '📰' },
     { href: '/ontology', label: 'Ontology', icon: '🧠' },
+    { href: '/code', label: 'Code', icon: '💻' },
     { href: '/graph', label: 'Graph', icon: '🕸️' },
     { href: '/resonance', label: 'Resonance', icon: '🌊' },
     { href: '/about', label: 'About', icon: 'ℹ️' },

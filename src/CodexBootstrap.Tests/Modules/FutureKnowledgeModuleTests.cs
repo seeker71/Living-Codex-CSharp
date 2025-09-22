@@ -20,10 +20,11 @@ public class FutureKnowledgeModuleTests : IClassFixture<TestServerFixture>
     }
 
     [Fact]
-    public async Task RetrieveFutureKnowledge_WithoutImplementation_ReturnsError()
+    public async Task RetrieveFutureKnowledge_WithImplementation_ReturnsSuccess()
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        await registry.InitializeAsync();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new FutureKnowledgeModule(registry, logger, httpClient);
@@ -40,23 +41,40 @@ public class FutureKnowledgeModuleTests : IClassFixture<TestServerFixture>
 
         // Assert
         Assert.NotNull(result);
-        var errorResponse = result as CodexBootstrap.Core.ErrorResponse;
-        Assert.NotNull(errorResponse);
-        Assert.Equal("Future knowledge retrieval not yet implemented", errorResponse.Error);
+        
+        // Use reflection to access the anonymous object properties
+        var resultType = result.GetType();
+        var successProperty = resultType.GetProperty("success");
+        var messageProperty = resultType.GetProperty("message");
+        var queryProperty = resultType.GetProperty("query");
+        
+        Assert.NotNull(successProperty);
+        Assert.NotNull(messageProperty);
+        Assert.NotNull(queryProperty);
+        
+        var success = (bool)successProperty.GetValue(result)!;
+        var message = (string)messageProperty.GetValue(result)!;
+        var query = (string)queryProperty.GetValue(result)!;
+        
+        Assert.True(success);
+        Assert.Equal("Future knowledge retrieved successfully", message);
+        Assert.Equal("What will happen to consciousness research?", query);
     }
 
     [Fact]
-    public async Task ApplyFutureKnowledge_WithoutImplementation_ReturnsError()
+    public async Task ApplyFutureKnowledge_WithNonExistentKnowledge_ReturnsError()
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        await registry.InitializeAsync();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new FutureKnowledgeModule(registry, logger, httpClient);
 
         var request = new FutureKnowledgeApplicationRequest(
             KnowledgeId: "test-knowledge",
-            TargetContext: "current-research",
+            Context: "current-research",
+            ApplicationMethod: "integration",
             Parameters: null
         );
 
@@ -67,14 +85,15 @@ public class FutureKnowledgeModuleTests : IClassFixture<TestServerFixture>
         Assert.NotNull(result);
         var errorResponse = result as CodexBootstrap.Core.ErrorResponse;
         Assert.NotNull(errorResponse);
-        Assert.Equal("Knowledge application not yet implemented", errorResponse.Error);
+        Assert.Equal("Knowledge node 'test-knowledge' not found", errorResponse.Error);
     }
 
     [Fact]
-    public async Task DiscoverPatterns_WithoutImplementation_ReturnsError()
+    public async Task DiscoverPatterns_WithImplementation_ReturnsSuccess()
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        await registry.InitializeAsync();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new FutureKnowledgeModule(registry, logger, httpClient);
@@ -90,22 +109,35 @@ public class FutureKnowledgeModuleTests : IClassFixture<TestServerFixture>
 
         // Assert
         Assert.NotNull(result);
-        var errorResponse = result as CodexBootstrap.Core.ErrorResponse;
-        Assert.NotNull(errorResponse);
-        Assert.Equal("Pattern discovery not yet implemented", errorResponse.Error);
+        
+        // Use reflection to access the anonymous object properties
+        var resultType = result.GetType();
+        var successProperty = resultType.GetProperty("success");
+        var messageProperty = resultType.GetProperty("message");
+        
+        Assert.NotNull(successProperty);
+        Assert.NotNull(messageProperty);
+        
+        var success = (bool)successProperty.GetValue(result)!;
+        var message = (string)messageProperty.GetValue(result)!;
+        
+        Assert.True(success);
+        Assert.Equal("Pattern discovery completed successfully", message);
     }
 
     [Fact]
-    public async Task AnalyzePatterns_WithoutImplementation_ReturnsError()
+    public async Task AnalyzePatterns_WithNonExistentPattern_ReturnsError()
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        await registry.InitializeAsync();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new FutureKnowledgeModule(registry, logger, httpClient);
 
         var request = new PatternAnalysisRequest(
             PatternId: "test-pattern",
+            AnalysisDepth: "deep",
             Metrics: new[] { "significance", "impact" }
         );
 
@@ -116,14 +148,15 @@ public class FutureKnowledgeModuleTests : IClassFixture<TestServerFixture>
         Assert.NotNull(result);
         var errorResponse = result as CodexBootstrap.Core.ErrorResponse;
         Assert.NotNull(errorResponse);
-        Assert.Equal("Pattern analysis not yet implemented", errorResponse.Error);
+        Assert.Equal("Pattern 'test-pattern' not found", errorResponse.Error);
     }
 
     [Fact]
-    public async Task GetTrendingPatterns_WithoutImplementation_ReturnsError()
+    public async Task GetTrendingPatterns_WithImplementation_ReturnsSuccess()
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        await registry.InitializeAsync();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new FutureKnowledgeModule(registry, logger, httpClient);
@@ -133,23 +166,36 @@ public class FutureKnowledgeModuleTests : IClassFixture<TestServerFixture>
 
         // Assert
         Assert.NotNull(result);
-        var errorResponse = result as CodexBootstrap.Core.ErrorResponse;
-        Assert.NotNull(errorResponse);
-        Assert.Equal("Trending patterns not yet implemented", errorResponse.Error);
+        
+        // Use reflection to access the anonymous object properties
+        var resultType = result.GetType();
+        var successProperty = resultType.GetProperty("success");
+        var messageProperty = resultType.GetProperty("message");
+        
+        Assert.NotNull(successProperty);
+        Assert.NotNull(messageProperty);
+        
+        var success = (bool)successProperty.GetValue(result)!;
+        var message = (string)messageProperty.GetValue(result)!;
+        
+        Assert.True(success);
+        Assert.Equal("Trending patterns retrieved successfully", message);
     }
 
     [Fact]
-    public async Task GeneratePrediction_WithoutImplementation_ReturnsError()
+    public async Task GeneratePrediction_WithNonExistentPattern_ReturnsError()
     {
         // Arrange
         var registry = TestInfrastructure.CreateTestNodeRegistry();
+        await registry.InitializeAsync();
         var logger = TestInfrastructure.CreateTestLogger();
         var httpClient = new HttpClient();
         var module = new FutureKnowledgeModule(registry, logger, httpClient);
 
         var request = new PatternPredictionRequest(
             PatternId: "test-pattern",
-            TimeHorizon: 10,
+            TimeHorizon: "6-months",
+            Confidence: 0.8,
             Parameters: null
         );
 
@@ -160,7 +206,7 @@ public class FutureKnowledgeModuleTests : IClassFixture<TestServerFixture>
         Assert.NotNull(result);
         var errorResponse = result as CodexBootstrap.Core.ErrorResponse;
         Assert.NotNull(errorResponse);
-        Assert.Equal("Prediction generation not yet implemented", errorResponse.Error);
+        Assert.Equal("Pattern 'test-pattern' not found", errorResponse.Error);
     }
 
     [Fact]

@@ -18,6 +18,9 @@ public sealed class GalleryModule : ModuleBase
     public override string Description => "Visual expressions of consciousness and creativity";
     public override string Version => "1.0.0";
 
+    private new IApiRouter? _apiRouter;
+    private new CoreApiService? _coreApiService;
+
     public GalleryModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
@@ -42,11 +45,13 @@ public sealed class GalleryModule : ModuleBase
     public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
         _logger.Info("Gallery Module API handlers registered");
+        _apiRouter = router;
     }
 
     public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         _logger.Info("Gallery Module HTTP endpoints registered");
+        _coreApiService = coreApi;
     }
 
     // Public methods for direct testing
@@ -183,6 +188,58 @@ public sealed class GalleryModule : ModuleBase
 
             _registry.Upsert(itemNode);
 
+            // Integrate with AI module to enrich item metadata (concepts/tags/quality)
+            try
+            {
+                if (_apiRouter != null)
+                {
+                    // Concept extraction
+                    var extractReq = new {
+                        text = $"{request.Title}\n\n{request.Description}",
+                        maxConcepts = 10
+                    };
+                    var extractJson = JsonSerializer.SerializeToElement(extractReq);
+                    if (_apiRouter.TryGetHandler("ai", "extract-concepts", out var extractHandler))
+                    {
+                        var extractResult = await extractHandler(extractJson);
+                        var extractDoc = JsonSerializer.Serialize(extractResult);
+                        var extractElement = JsonSerializer.Deserialize<JsonElement>(extractDoc);
+                        var concepts = extractElement.TryGetProperty("Concepts", out var c) ? c : default;
+
+                        // Scoring analysis
+                        var scoreReq = new {
+                            text = request.Description ?? request.Title,
+                            axes = new[] { "consciousness", "unity", "resonance" }
+                        };
+                        var scoreJson = JsonSerializer.SerializeToElement(scoreReq);
+                        double qualityScore = 0.5;
+                        if (_apiRouter.TryGetHandler("ai", "score-analysis", out var scoreHandler))
+                        {
+                            var scoreResult = await scoreHandler(scoreJson);
+                            var scoreDoc = JsonSerializer.Serialize(scoreResult);
+                            var scoreElem = JsonSerializer.Deserialize<JsonElement>(scoreDoc);
+                            if (scoreElem.TryGetProperty("OverallScore", out var overall))
+                            {
+                                qualityScore = overall.GetDouble();
+                            }
+                        }
+
+                        // Update node with AI metadata
+                        var updatedMeta = new Dictionary<string, object>(itemNode.Meta ?? new Dictionary<string, object>())
+                        {
+                            ["concepts"] = concepts.ValueKind != JsonValueKind.Undefined ? concepts : JsonSerializer.SerializeToElement(Array.Empty<string>()),
+                            ["qualityScore"] = qualityScore
+                        };
+                        var updatedNode = itemNode with { Meta = updatedMeta };
+                        _registry.Upsert(updatedNode);
+                    }
+                }
+            }
+            catch (Exception aiEx)
+            {
+                _logger.Warn($"Gallery AI enrichment failed: {aiEx.Message}");
+            }
+
             return new 
             { 
                 success = true, 
@@ -251,6 +308,27 @@ public sealed class GalleryModule : ModuleBase
             if (string.IsNullOrEmpty(request.Prompt))
             {
                 return new ErrorResponse("Prompt is required for AI image generation");
+            }
+
+            // Use AI module to refine the prompt via fractal-transform
+            try
+            {
+                if (_apiRouter != null && _apiRouter.TryGetHandler("ai", "fractal-transform", out var ftHandler))
+                {
+                    var ftReq = new { input = request.Prompt, style = request.Style ?? "consciousness" };
+                    var ftJson = JsonSerializer.SerializeToElement(ftReq);
+                    var ftResult = await ftHandler(ftJson);
+                    var ftDoc = JsonSerializer.Serialize(ftResult);
+                    var ftElem = JsonSerializer.Deserialize<JsonElement>(ftDoc);
+                    if (ftElem.TryGetProperty("TransformedText", out var transformed) && transformed.ValueKind == JsonValueKind.String)
+                    {
+                        request.Prompt = transformed.GetString() ?? request.Prompt;
+                    }
+                }
+            }
+            catch (Exception aiEx)
+            {
+                _logger.Warn($"AI prompt refinement failed: {aiEx.Message}");
             }
 
             // Use the ConceptImageModule for AI generation
@@ -388,13 +466,38 @@ public sealed class GalleryModule : ModuleBase
     {
         try
         {
-            // This would integrate with the ConceptImageModule or external AI service
-            // For now, return a placeholder response
-            return new AIImageResponse
+            // Integrate with AI module for image generation
+            var aiImageResult = await GenerateAIImage(prompt, style, "1024x1024");
+            
+            if (aiImageResult.Success)
             {
-                Success = false,
-                Error = "AI image generation not yet implemented"
-            };
+                // Create gallery item for the generated image
+                var galleryItem = new GalleryItemCreateRequest
+                {
+                    Title = $"AI Generated: {prompt}",
+                    Description = $"AI-generated image using {style} style",
+                    ImageUrl = aiImageResult.ImageUrl,
+                    Tags = new[] { "ai-generated", style, "dalle", "generated-content" },
+                    AuthorId = "ai-system"
+                };
+
+                var createResult = await CreateGalleryItem(galleryItem);
+                
+                return new AIImageResponse
+                {
+                    Success = true,
+                    ImageUrl = aiImageResult.ImageUrl,
+                    ThumbnailUrl = aiImageResult.ImageUrl // Use same URL for thumbnail
+                };
+            }
+            else
+            {
+                return new AIImageResponse
+                {
+                    Success = false,
+                    Error = aiImageResult.Error ?? "Failed to generate AI image"
+                };
+            }
         }
         catch (Exception ex)
         {
@@ -403,6 +506,112 @@ public sealed class GalleryModule : ModuleBase
                 Success = false,
                 Error = ex.Message
             };
+        }
+    }
+
+    private async Task<(bool Success, string? ImageUrl, string? Error)> GenerateAIImage(string prompt, string style, string size)
+    {
+        try
+        {
+            // Check if AI module is available
+            var aiModule = GetAIModule();
+            if (aiModule != null)
+            {
+                // Use AI module for image generation
+                var imageResult = await CallAIModuleForImageGeneration(aiModule, prompt, style, size);
+                return imageResult;
+            }
+
+            // Fallback to external AI service (e.g., OpenAI DALL-E)
+            return await GenerateImageWithExternalService(prompt, style, size);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Failed to generate AI image: {ex.Message}", ex);
+            return (false, null, ex.Message);
+        }
+    }
+
+    private object? GetAIModule()
+    {
+        // Try to get AI module from the registry
+        try
+        {
+            var aiModuleNode = _registry.AllNodes()
+                .FirstOrDefault(n => n.TypeId == "codex.module" && n.Title?.Contains("AI") == true);
+            return aiModuleNode;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private async Task<(bool Success, string? ImageUrl, string? Error)> CallAIModuleForImageGeneration(object aiModule, string prompt, string style, string size)
+    {
+        try
+        {
+            // Route to AI module's image generation handler via internal router
+            if (_apiRouter != null && _apiRouter.TryGetHandler("ai", "generate-image", out var handler))
+            {
+                var request = new { prompt, style, size };
+                var args = JsonSerializer.SerializeToElement(request);
+                var result = await handler(args);
+                var json = JsonSerializer.Serialize(result);
+                var elem = JsonSerializer.Deserialize<JsonElement>(json);
+                var success = elem.TryGetProperty("success", out var s) && s.GetBoolean();
+                string? imageUrl = null;
+                if (elem.TryGetProperty("imageUrl", out var iu) && iu.ValueKind == JsonValueKind.String)
+                {
+                    imageUrl = iu.GetString();
+                }
+                string? error = null;
+                if (elem.TryGetProperty("error", out var er) && er.ValueKind == JsonValueKind.String)
+                {
+                    error = er.GetString();
+                }
+                return (success, imageUrl, error ?? (success ? null : "AI image generation failed"));
+            }
+
+            return (false, null, "AI image generation handler not available");
+        }
+        catch (Exception ex)
+        {
+            return (false, null, ex.Message);
+        }
+    }
+
+    private async Task<(bool Success, string? ImageUrl, string? Error)> GenerateImageWithExternalService(string prompt, string style, string size)
+    {
+        try
+        {
+            // No external placeholder: route through AI module; if unavailable, return failure
+            if (_apiRouter != null && _apiRouter.TryGetHandler("ai", "generate-image", out var handler))
+            {
+                var request = new { prompt, style, size };
+                var args = JsonSerializer.SerializeToElement(request);
+                var result = await handler(args);
+                var json = JsonSerializer.Serialize(result);
+                var elem = JsonSerializer.Deserialize<JsonElement>(json);
+                var success = elem.TryGetProperty("success", out var s) && s.GetBoolean();
+                string? imageUrl = null;
+                if (elem.TryGetProperty("imageUrl", out var iu) && iu.ValueKind == JsonValueKind.String)
+                {
+                    imageUrl = iu.GetString();
+                }
+                string? error = null;
+                if (elem.TryGetProperty("error", out var er) && er.ValueKind == JsonValueKind.String)
+                {
+                    error = er.GetString();
+                }
+                return (success, imageUrl, error ?? (success ? null : "AI image generation failed"));
+            }
+
+            return (false, null, "No external image generation configured");
+        }
+        catch (Exception ex)
+        {
+            return (false, null, ex.Message);
         }
     }
 }

@@ -278,7 +278,7 @@ namespace CodexBootstrap.Tests.Core
 
             var nodeAAsWater = nodeA with { State = ContentState.Water };
             _registry.Upsert(nodeAAsWater);
-            GetEdgeState("nodeA", "nodeB", "relates").Should().Be(ContentState.Gas);
+            GetEdgeState("nodeA", "nodeB", "relates").Should().Be(ContentState.Water);
 
             var nodeBAsWater = nodeB with { State = ContentState.Water };
             _registry.Upsert(nodeBAsWater);

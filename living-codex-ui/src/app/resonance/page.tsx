@@ -70,12 +70,12 @@ export default function ResonancePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <header className="bg-white border-b border-gray-200">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
               <div className="flex items-center">
-                <h1 className="text-2xl font-bold text-gray-900">Living Codex</h1>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Living Codex</h1>
               </div>
               <Navigation />
             </div>
@@ -93,13 +93,13 @@ export default function ResonancePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200">
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-gray-900">Living Codex</h1>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Living Codex</h1>
             </div>
             <Navigation />
           </div>
@@ -112,7 +112,7 @@ export default function ResonancePage() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             Resonance Field
           </h1>
-          <p className="text-gray-600">
+          <p className="text-gray-600 dark:text-gray-300">
             Explore the collective resonance and energy patterns across the Living Codex
           </p>
         </div>
@@ -186,7 +186,7 @@ export default function ResonancePage() {
                 </div>
               </div>
             ) : (
-              <div className="text-gray-500">No collective resonance data available</div>
+              <div className="text-gray-500 dark:text-gray-400">No collective resonance data available</div>
             )}
           </div>
 

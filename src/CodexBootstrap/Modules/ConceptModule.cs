@@ -54,6 +54,72 @@ public class ConceptModule : ModuleBase
     }
 
     /// <summary>
+    /// Browse existing concepts with resonance-based discovery
+    /// </summary>
+    [Post("/concepts/browse", "concepts-browse", "Browse existing concepts by resonance criteria", "codex.concept")]
+    [ApiResponse(200, "Success")]
+    public async Task<object> BrowseConcepts([ApiParameter("request", "Concept browse criteria", Required = false, Location = "body")] ConceptBrowseRequest? request = null)
+    {
+        try
+        {
+            // Get all concept nodes
+            var conceptNodes = _registry.GetNodesByType("codex.concept");
+            
+            var concepts = conceptNodes.Select(node => new
+            {
+                id = node.Id,
+                name = node.Meta?.GetValueOrDefault("name")?.ToString() ?? node.Title ?? "Unknown",
+                description = node.Meta?.GetValueOrDefault("description")?.ToString() ?? node.Description ?? "",
+                domain = node.Meta?.GetValueOrDefault("domain")?.ToString() ?? "General",
+                complexity = int.TryParse(node.Meta?.GetValueOrDefault("complexity")?.ToString(), out var complexity) ? complexity : 0,
+                tags = node.Meta?.GetValueOrDefault("tags")?.ToString()?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? new string[0],
+                createdAt = node.Meta?.GetValueOrDefault("createdAt") is DateTime dt ? dt : DateTime.UtcNow,
+                updatedAt = node.Meta?.GetValueOrDefault("updatedAt") is DateTime ut ? ut : DateTime.UtcNow,
+                resonance = CalculateResonance(node, request?.axes ?? new[] { "resonance" }),
+                energy = CalculateEnergy(node, request?.joy ?? 0.7),
+                isInterested = false, // This would come from user data
+                interestCount = 0     // This would come from user data
+            }).ToList();
+
+            // Apply resonance filtering and ranking
+            if (request != null)
+            {
+                // Filter by resonance threshold
+                var resonanceThreshold = request.joy * 0.5; // Joy influences resonance threshold
+                concepts = concepts.Where(c => c.resonance >= resonanceThreshold).ToList();
+                
+                // Apply serendipity (randomness factor)
+                if (request.serendipity > 0.5)
+                {
+                    var random = new Random();
+                    concepts = concepts.OrderBy(c => random.NextDouble()).ToList();
+                }
+                else
+                {
+                    // Order by resonance and energy
+                    concepts = concepts.OrderByDescending(c => c.resonance * c.energy).ToList();
+                }
+                
+                // Limit results based on joy (higher joy = more results)
+                var maxResults = Math.Max(1, (int)(request.joy * 20)); // 1-20 results based on joy
+                concepts = concepts.Take(maxResults).ToList();
+            }
+
+            return new { 
+                success = true,
+                discoveredConcepts = concepts,
+                totalDiscovered = concepts.Count,
+                message = "Concept browsing completed successfully"
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error browsing concepts: {ex.Message}", ex);
+            return new ErrorResponse($"Failed to browse concepts: {ex.Message}");
+        }
+    }
+
+    /// <summary>
     /// Get all concepts
     /// </summary>
     [Get("/concepts", "concepts-list", "Get all concepts", "codex.concept")]
@@ -806,6 +872,57 @@ public class ConceptModule : ModuleBase
     }
 
     #endregion
+
+    // Helper methods for concept browsing
+    private double CalculateResonance(Node node, string[] axes)
+    {
+        try
+        {
+            var baseResonance = 0.75; // Default resonance
+            var nodeContent = node.Title + " " + node.Description;
+            var nodeTags = node.Meta?.GetValueOrDefault("tags")?.ToString() ?? "";
+            
+            // Calculate resonance based on axis alignment
+            var resonanceBoost = 0.0;
+            foreach (var axis in axes)
+            {
+                if (nodeContent.ToLowerInvariant().Contains(axis.ToLowerInvariant()) ||
+                    nodeTags.ToLowerInvariant().Contains(axis.ToLowerInvariant()))
+                {
+                    resonanceBoost += 0.1;
+                }
+            }
+            
+            return Math.Min(1.0, baseResonance + resonanceBoost);
+        }
+        catch
+        {
+            return 0.75; // Default fallback
+        }
+    }
+    
+    private double CalculateEnergy(Node node, double joy)
+    {
+        try
+        {
+            var baseEnergy = 500.0;
+            
+            // Energy influenced by joy and node complexity
+            var complexity = 0;
+            if (node.Meta?.TryGetValue("complexity", out var complexityObj) == true)
+            {
+                int.TryParse(complexityObj.ToString(), out complexity);
+            }
+            
+            // Higher joy amplifies energy, complexity adds depth
+            var energyMultiplier = 0.5 + (joy * 1.0) + (complexity * 0.1);
+            return baseEnergy * energyMultiplier;
+        }
+        catch
+        {
+            return 500.0; // Default fallback
+        }
+    }
 }
 
 // Request/Response DTOs for each API
@@ -892,3 +1009,10 @@ public record UserConceptTranslationResponse(bool Success, string OriginalConcep
 
 [ResponseType("codex.concept.user-belief-system-get-response", "UserBeliefSystemGetResponse", "Response for getting user belief system")]
 public record UserBeliefSystemGetResponse(bool Success, string UserId, string? BeliefSystemId, string? Framework, string[] Principles, string[] Values, string? CreatedAt, string Message);
+
+[RequestType("codex.concept.browse-request", "ConceptBrowseRequest", "Request for browsing existing concepts")]
+public record ConceptBrowseRequest(
+    string[]? axes = null,
+    double joy = 0.7,
+    double serendipity = 0.5
+);

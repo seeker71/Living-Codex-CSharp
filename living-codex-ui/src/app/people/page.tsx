@@ -126,30 +126,30 @@ export default function PeoplePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navigation />
       
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">🌍 People Discovery</h1>
-          <p className="text-gray-600">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">🌍 People Discovery</h1>
+          <p className="text-gray-600 dark:text-gray-300">
             Discover people through resonance overlap, shared interests, and concept contributions
           </p>
         </div>
 
         {/* Discovery Controls */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Discovery Type */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                 Discovery Method
               </label>
               <select
                 value={discoveryType}
                 onChange={(e) => setDiscoveryType(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="input-standard"
               >
                 <option value="interests">🎯 By Interests</option>
                 <option value="location">📍 By Location</option>
@@ -159,7 +159,7 @@ export default function PeoplePage() {
 
             {/* Search Input */}
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                 {discoveryType === 'interests' ? 'Interests (comma-separated)' :
                  discoveryType === 'location' ? 'Location' : 'Concept ID'}
               </label>
@@ -177,7 +177,7 @@ export default function PeoplePage() {
                   discoveryType === 'location' ? 'San Francisco, CA' :
                   'concept-ai-123'
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="input-standard"
                 onKeyPress={(e) => e.key === 'Enter' && discoverUsers()}
               />
             </div>
@@ -197,7 +197,7 @@ export default function PeoplePage() {
           {/* Location Radius (only for location discovery) */}
           {discoveryType === 'location' && (
             <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                 Search Radius: {radiusKm} km
               </label>
               <input
@@ -220,9 +220,9 @@ export default function PeoplePage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Results */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg border border-gray-200">
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
               <div className="p-6 border-b border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-900">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                   🌍 Discovered People ({discoveredUsers.length})
                 </h2>
               </div>
@@ -350,16 +350,16 @@ export default function PeoplePage() {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">📊 Discovery Stats</h3>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">People Found</span>
+                  <span className="text-gray-600 dark:text-gray-300">People Found</span>
                   <span className="font-medium">{discoveredUsers.length}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Method</span>
+                  <span className="text-gray-600 dark:text-gray-300">Method</span>
                   <span className="font-medium capitalize">{discoveryType}</span>
                 </div>
                 {discoveryType === 'location' && (
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Radius</span>
+                    <span className="text-gray-600 dark:text-gray-300">Radius</span>
                     <span className="font-medium">{radiusKm} km</span>
                   </div>
                 )}
@@ -464,9 +464,9 @@ export default function PeoplePage() {
         {/* Concept Contributors Section */}
         {conceptContributors.length > 0 && (
           <div className="mt-8">
-            <div className="bg-white rounded-lg border border-gray-200">
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
               <div className="p-6 border-b border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-900">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                   🧠 Concept Contributors ({conceptContributors.length})
                 </h2>
               </div>

@@ -223,7 +223,7 @@ export default function NodeDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         <Navigation />
         <div className="max-w-6xl mx-auto px-4 py-8">
           <div className="text-center py-12">
@@ -237,7 +237,7 @@ export default function NodeDetailPage() {
 
   if (error || !node) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         <Navigation />
         <div className="max-w-6xl mx-auto px-4 py-8">
           <div className="text-center py-12">
@@ -257,7 +257,7 @@ export default function NodeDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navigation />
       
       <div className="max-w-6xl mx-auto px-4 py-8">
@@ -274,7 +274,7 @@ export default function NodeDetailPage() {
               <div>
                 <div className="flex items-center space-x-3 mb-2">
                   <span className="text-3xl">{getNodeTypeIcon(node.typeId)}</span>
-                  <h1 className="text-3xl font-bold text-gray-900">
+                  <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
                     {editMode ? (
                       <input
                         type="text"
@@ -362,7 +362,7 @@ export default function NodeDetailPage() {
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h3>
                     <div className="space-y-3">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">Title</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">Title</label>
                         {editMode ? (
                           <input
                             type="text"
@@ -376,7 +376,7 @@ export default function NodeDetailPage() {
                       </div>
                       
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">Description</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">Description</label>
                         {editMode ? (
                           <textarea
                             value={editedNode.description || ''}
@@ -390,12 +390,12 @@ export default function NodeDetailPage() {
                       </div>
                       
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">Type</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">Type</label>
                         <p className="mt-1 text-gray-900">{node.typeId}</p>
                       </div>
                       
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">State</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">State</label>
                         <span className={`inline-block mt-1 px-3 py-1 bg-${getStateColor(node.state)}-100 text-${getStateColor(node.state)}-800 rounded-md text-sm font-medium`}>
                           {node.state}
                         </span>
@@ -407,18 +407,18 @@ export default function NodeDetailPage() {
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">System Information</h3>
                     <div className="space-y-3">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">Node ID</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">Node ID</label>
                         <p className="mt-1 text-gray-900 font-mono text-sm">{node.id}</p>
                       </div>
                       
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">Locale</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">Locale</label>
                         <p className="mt-1 text-gray-900">{node.locale}</p>
                       </div>
                       
                       {node.createdAt && (
                         <div>
-                          <label className="block text-sm font-medium text-gray-700">Created</label>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">Created</label>
                           <p className="mt-1 text-gray-600 text-sm">
                             {new Date(node.createdAt).toLocaleString()}
                           </p>
@@ -427,7 +427,7 @@ export default function NodeDetailPage() {
                       
                       {node.updatedAt && (
                         <div>
-                          <label className="block text-sm font-medium text-gray-700">Updated</label>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">Updated</label>
                           <p className="mt-1 text-gray-600 text-sm">
                             {new Date(node.updatedAt).toLocaleString()}
                           </p>
@@ -442,7 +442,7 @@ export default function NodeDetailPage() {
             {/* Content Tab */}
             {activeTab === 'content' && (
               <div className="space-y-6">
-                <h3 className="text-lg font-semibold text-gray-900">Content</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Content</h3>
                 
                 {node.content ? (
                   <div className="space-y-4">
@@ -498,7 +498,7 @@ export default function NodeDetailPage() {
             {activeTab === 'relationships' && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                     Relationships ({relatedNodes.length})
                   </h3>
                 </div>
@@ -561,7 +561,7 @@ export default function NodeDetailPage() {
             {/* Metadata Tab */}
             {activeTab === 'metadata' && (
               <div className="space-y-6">
-                <h3 className="text-lg font-semibold text-gray-900">Metadata</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Metadata</h3>
                 
                 {node.meta && Object.keys(node.meta).length > 0 ? (
                   <div className="space-y-4">

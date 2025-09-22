@@ -33,10 +33,10 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
   };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6 max-w-md mx-auto">
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 max-w-md mx-auto">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome Back</h2>
-        <p className="text-gray-600">Sign in to your Living Codex account</p>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Welcome Back</h2>
+        <p className="text-gray-600 dark:text-gray-300">Sign in to your Living Codex account</p>
       </div>
 
       {error && (
@@ -47,7 +47,7 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
             Username
           </label>
           <input
@@ -56,14 +56,14 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="input-standard"
             placeholder="Enter your username"
             disabled={isLoading}
           />
         </div>
 
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
             Password
           </label>
           <input
@@ -72,7 +72,7 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="input-standard"
             placeholder="Enter your password"
             disabled={isLoading}
           />

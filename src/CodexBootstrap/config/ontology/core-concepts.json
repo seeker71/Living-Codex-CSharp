@@ -1,0 +1,298 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "description": "Core universal concepts that form the foundation of the U-CORE ontology",
+    "lastUpdated": "2025-09-22T00:00:00Z"
+  },
+  "concepts": [
+    {
+      "id": "entity",
+      "name": "Entity",
+      "description": "Fundamental U-Core concept - anything that exists or can be conceived",
+      "typeId": "codex.ucore.base",
+      "level": 0,
+      "keywords": ["entity", "being", "thing", "existence", "object"],
+      "parentConcepts": [],
+      "childConcepts": ["activity", "agent", "resource"],
+      "axes": ["ontological", "ucore"]
+    },
+    {
+      "id": "activity",
+      "name": "Activity",
+      "description": "Fundamental U-Core concept - processes, actions, or events",
+      "typeId": "codex.ucore.base",
+      "level": 0,
+      "keywords": ["activity", "process", "action", "event", "behavior"],
+      "parentConcepts": ["entity"],
+      "childConcepts": ["learning", "creating", "transforming"],
+      "axes": ["temporal", "causal", "ucore"]
+    },
+    {
+      "id": "agent",
+      "name": "Agent",
+      "description": "Fundamental U-Core concept - entities that can act or cause change",
+      "typeId": "codex.ucore.base",
+      "level": 0,
+      "keywords": ["agent", "actor", "doer", "cause", "initiator"],
+      "parentConcepts": ["entity"],
+      "childConcepts": ["human", "ai", "organization", "system"],
+      "axes": ["causal", "intentional", "ucore"]
+    },
+    {
+      "id": "role",
+      "name": "Role",
+      "description": "Fundamental U-Core concept - functions or positions in contexts",
+      "typeId": "codex.ucore.base",
+      "level": 0,
+      "keywords": ["role", "function", "position", "responsibility", "capacity"],
+      "parentConcepts": ["entity"],
+      "childConcepts": ["learner", "teacher", "creator", "guardian"],
+      "axes": ["social", "functional", "ucore"]
+    },
+    {
+      "id": "resource",
+      "name": "Resource",
+      "description": "Fundamental U-Core concept - means available for use or support",
+      "typeId": "codex.ucore.base",
+      "level": 0,
+      "keywords": ["resource", "means", "asset", "material", "support"],
+      "parentConcepts": ["entity"],
+      "childConcepts": ["knowledge", "energy", "matter", "time", "space"],
+      "axes": ["material", "instrumental", "ucore"]
+    },
+    {
+      "id": "place",
+      "name": "Place",
+      "description": "Fundamental U-Core concept - locations or spatial contexts",
+      "typeId": "codex.ucore.base",
+      "level": 0,
+      "keywords": ["place", "location", "space", "environment", "context"],
+      "parentConcepts": ["entity"],
+      "childConcepts": ["physical-space", "virtual-space", "mental-space"],
+      "axes": ["spatial", "contextual", "ucore"]
+    },
+    {
+      "id": "time",
+      "name": "Time",
+      "description": "Fundamental U-Core concept - temporal dimension and duration",
+      "typeId": "codex.ucore.base",
+      "level": 0,
+      "keywords": ["time", "temporal", "duration", "sequence", "moment"],
+      "parentConcepts": ["entity"],
+      "childConcepts": ["past", "present", "future", "eternity"],
+      "axes": ["temporal", "chronological", "ucore"]
+    },
+    {
+      "id": "intent",
+      "name": "Intent",
+      "description": "Fundamental U-Core concept - purpose, goal, or aimed direction",
+      "typeId": "codex.ucore.base",
+      "level": 0,
+      "keywords": ["intent", "purpose", "goal", "aim", "direction"],
+      "parentConcepts": ["entity"],
+      "childConcepts": ["vision", "mission", "objective", "aspiration"],
+      "axes": ["intentional", "teleological", "ucore"]
+    },
+    {
+      "id": "rule",
+      "name": "Rule",
+      "description": "Fundamental U-Core concept - principles or guidelines that govern",
+      "typeId": "codex.ucore.base",
+      "level": 0,
+      "keywords": ["rule", "principle", "law", "guideline", "constraint"],
+      "parentConcepts": ["entity"],
+      "childConcepts": ["natural-law", "social-norm", "logical-rule"],
+      "axes": ["normative", "regulatory", "ucore"]
+    },
+    {
+      "id": "agreement",
+      "name": "Agreement",
+      "description": "Fundamental U-Core concept - mutual understanding or consensus",
+      "typeId": "codex.ucore.base",
+      "level": 0,
+      "keywords": ["agreement", "consensus", "contract", "understanding", "accord"],
+      "parentConcepts": ["entity"],
+      "childConcepts": ["treaty", "covenant", "protocol", "standard"],
+      "axes": ["social", "contractual", "ucore"]
+    },
+    {
+      "id": "obligation",
+      "name": "Obligation",
+      "description": "Fundamental U-Core concept - duties or responsibilities",
+      "typeId": "codex.ucore.base",
+      "level": 0,
+      "keywords": ["obligation", "duty", "responsibility", "commitment", "bond"],
+      "parentConcepts": ["entity"],
+      "childConcepts": ["moral-duty", "legal-obligation", "promise"],
+      "axes": ["ethical", "binding", "ucore"]
+    },
+    {
+      "id": "measurement",
+      "name": "Measurement",
+      "description": "Fundamental U-Core concept - quantification or assessment",
+      "typeId": "codex.ucore.base",
+      "level": 0,
+      "keywords": ["measurement", "metric", "assessment", "evaluation", "quantification"],
+      "parentConcepts": ["entity"],
+      "childConcepts": ["progress", "quality", "performance", "value"],
+      "axes": ["quantitative", "evaluative", "ucore"]
+    },
+    {
+      "id": "existence",
+      "name": "Existence",
+      "description": "The fundamental state of being or reality",
+      "typeId": "codex.concept.fundamental",
+      "level": 0,
+      "keywords": ["being", "reality", "existence", "is", "entity"],
+      "parentConcepts": [],
+      "childConcepts": ["consciousness", "matter", "energy", "information"],
+      "axes": ["ontological", "metaphysical"]
+    },
+    {
+      "id": "consciousness",
+      "name": "Consciousness",
+      "description": "The state of being aware and able to think and perceive",
+      "typeId": "codex.concept.fundamental",
+      "level": 1,
+      "keywords": ["awareness", "consciousness", "mind", "perception", "cognition"],
+      "parentConcepts": ["existence"],
+      "childConcepts": ["thought", "emotion", "memory", "attention"],
+      "axes": ["consciousness", "phenomenological"]
+    },
+    {
+      "id": "matter",
+      "name": "Matter",
+      "description": "Physical substance that occupies space and has mass",
+      "typeId": "codex.concept.fundamental",
+      "level": 1,
+      "keywords": ["matter", "substance", "physical", "material", "mass"],
+      "parentConcepts": ["existence"],
+      "childConcepts": ["atoms", "molecules", "particles", "fields"],
+      "axes": ["physical", "material"]
+    },
+    {
+      "id": "energy",
+      "name": "Energy",
+      "description": "The capacity to do work or cause change",
+      "typeId": "codex.concept.fundamental",
+      "level": 1,
+      "keywords": ["energy", "force", "power", "potential", "kinetic"],
+      "parentConcepts": ["existence"],
+      "childConcepts": ["thermal", "electrical", "mechanical", "chemical"],
+      "axes": ["energetic", "dynamic"]
+    },
+    {
+      "id": "information",
+      "name": "Information",
+      "description": "Data that has meaning and can be processed or transmitted",
+      "typeId": "codex.concept.fundamental",
+      "level": 1,
+      "keywords": ["information", "data", "knowledge", "meaning", "signal"],
+      "parentConcepts": ["existence"],
+      "childConcepts": ["knowledge", "wisdom", "understanding", "learning"],
+      "axes": ["informational", "cognitive"]
+    },
+    {
+      "id": "space",
+      "name": "Space",
+      "description": "The three-dimensional extent in which objects exist and events occur",
+      "typeId": "codex.concept.fundamental",
+      "level": 1,
+      "keywords": ["space", "dimension", "location", "position", "geometry"],
+      "parentConcepts": ["existence"],
+      "childConcepts": ["distance", "volume", "area", "coordinates"],
+      "axes": ["spatial", "geometric"]
+    },
+    {
+      "id": "time",
+      "name": "Time",
+      "description": "The indefinite continued progress of existence and events",
+      "typeId": "codex.concept.fundamental",
+      "level": 1,
+      "keywords": ["time", "duration", "sequence", "temporal", "chronological"],
+      "parentConcepts": ["existence"],
+      "childConcepts": ["past", "present", "future", "causality"],
+      "axes": ["temporal", "chronological"]
+    },
+    {
+      "id": "causality",
+      "name": "Causality",
+      "description": "The relationship between cause and effect",
+      "typeId": "codex.concept.fundamental",
+      "level": 2,
+      "keywords": ["causality", "cause", "effect", "influence", "relationship"],
+      "parentConcepts": ["time", "information"],
+      "childConcepts": ["determinism", "probability", "emergence"],
+      "axes": ["causal", "relational"]
+    },
+    {
+      "id": "emergence",
+      "name": "Emergence",
+      "description": "The arising of novel properties from complex systems",
+      "typeId": "codex.concept.systems",
+      "level": 2,
+      "keywords": ["emergence", "complexity", "systems", "properties", "novel"],
+      "parentConcepts": ["causality", "information"],
+      "childConcepts": ["complexity", "self-organization", "adaptation"],
+      "axes": ["emergent", "systemic"]
+    },
+    {
+      "id": "knowledge",
+      "name": "Knowledge",
+      "description": "Information that has been learned, understood, and can be applied",
+      "typeId": "codex.concept.cognitive",
+      "level": 2,
+      "keywords": ["knowledge", "understanding", "learning", "education", "wisdom"],
+      "parentConcepts": ["information", "consciousness"],
+      "childConcepts": ["science", "philosophy", "technology", "art"],
+      "axes": ["epistemological", "cognitive"]
+    },
+    {
+      "id": "science",
+      "name": "Science",
+      "description": "Systematic study of the natural world through observation and experimentation",
+      "typeId": "codex.concept.domain",
+      "level": 3,
+      "keywords": ["science", "research", "experiment", "hypothesis", "theory"],
+      "parentConcepts": ["knowledge"],
+      "childConcepts": ["physics", "chemistry", "biology", "mathematics"],
+      "axes": ["scientific", "empirical"]
+    },
+    {
+      "id": "technology",
+      "name": "Technology",
+      "description": "Application of scientific knowledge for practical purposes",
+      "typeId": "codex.concept.domain",
+      "level": 3,
+      "keywords": ["technology", "innovation", "engineering", "tools", "systems"],
+      "parentConcepts": ["knowledge", "science"],
+      "childConcepts": ["computing", "artificial-intelligence", "robotics", "biotechnology"],
+      "axes": ["technological", "applied"]
+    },
+    {
+      "id": "philosophy",
+      "name": "Philosophy",
+      "description": "The study of fundamental questions about existence, knowledge, values, and meaning",
+      "typeId": "codex.concept.domain",
+      "level": 3,
+      "keywords": ["philosophy", "wisdom", "ethics", "metaphysics", "logic"],
+      "parentConcepts": ["knowledge"],
+      "childConcepts": ["ethics", "metaphysics", "epistemology", "aesthetics"],
+      "axes": ["philosophical", "rational"]
+    },
+    {
+      "id": "spirituality",
+      "name": "Spirituality",
+      "description": "The search for meaning, purpose, and connection to something greater",
+      "typeId": "codex.concept.domain",
+      "level": 3,
+      "keywords": ["spirituality", "meaning", "purpose", "transcendence", "sacred"],
+      "parentConcepts": ["consciousness", "philosophy"],
+      "childConcepts": ["meditation", "contemplation", "mysticism", "religion"],
+      "axes": ["spiritual", "transcendent"]
+    }
+  ]
+}
+
+
+
