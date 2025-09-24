@@ -14,12 +14,14 @@ namespace CodexBootstrap.Core
         private readonly LLMClient _llmClient;
         private readonly PromptTemplateRepository _promptRepo;
         private readonly Core.ICodexLogger _logger;
+        private readonly CancellationTokenSource? _shutdownCts;
 
-        public LLMOrchestrator(LLMClient llmClient, PromptTemplateRepository promptRepo, Core.ICodexLogger logger)
+        public LLMOrchestrator(LLMClient llmClient, PromptTemplateRepository promptRepo, Core.ICodexLogger logger, CancellationTokenSource? shutdownCts = null)
         {
             _llmClient = llmClient;
             _promptRepo = promptRepo;
             _logger = logger;
+            _shutdownCts = shutdownCts;
         }
 
         /// <summary>
@@ -28,6 +30,9 @@ namespace CodexBootstrap.Core
         public async Task<LLMOperationResult> ExecuteAsync(string templateId, Dictionary<string, object> parameters, CodexBootstrap.Modules.LLMConfig? overrideConfig = null)
         {
             _logger.Debug($"LLMOrchestrator.ExecuteAsync called with templateId: {templateId}");
+            
+            // Note: We don't check for shutdown cancellation here to allow AI operations to complete
+            // The HTTP client will handle cancellation if needed
             var startTime = DateTimeOffset.UtcNow;
             try
             {
@@ -41,15 +46,18 @@ namespace CodexBootstrap.Core
                 var prompt = template.Render(parameters);
                 var config = overrideConfig ?? template.DefaultLLMConfig;
 
-                // Check if LLM is available (provider-aware)
-                var isAvailable = await _llmClient.IsServiceAvailableAsync(config);
-                if (!isAvailable)
-                {
-                    _logger.Warn($"LLM service not available for template '{templateId}', using fallback");
-                    return LLMOperationResult.CreateFallback($"LLM service unavailable for template '{templateId}'", parameters);
-                }
+                // Route-level AI audit logs
+                var providerForLog = string.IsNullOrWhiteSpace(config.Provider) ? "auto" : config.Provider;
+                var modelForLog = string.IsNullOrWhiteSpace(config.Model) ? "auto" : config.Model;
+                var baseUrlForLog = string.IsNullOrWhiteSpace(config.BaseUrl) ? "(default)" : config.BaseUrl;
+                _logger.Info($"AI_PRECALL template={templateId} provider={providerForLog} model={modelForLog} baseUrl={baseUrlForLog} chars={prompt?.Length ?? 0}");
 
-                var response = await _llmClient.QueryAsync(prompt, config);
+                // Skip availability check during startup - let the actual call fail gracefully if service is unavailable
+                // This prevents AI calls during module loading
+                _logger.Debug($"Skipping LLM availability check for template '{templateId}' - will check during actual call");
+
+                var response = await _llmClient.QueryAsync(prompt, config, _shutdownCts?.Token ?? CancellationToken.None);
+                _logger.Info($"AI_CALL template={templateId} provider={providerForLog} model={modelForLog} baseUrl={baseUrlForLog} success={response.Success} chars={response.Response?.Length ?? 0}");
                 var executionTime = DateTimeOffset.UtcNow - startTime;
 
                 return new LLMOperationResult(
@@ -109,6 +117,41 @@ namespace CodexBootstrap.Core
         }
 
         /// <summary>
+        /// Sanitize JSON response by removing common formatting issues
+        /// </summary>
+        private static string SanitizeJsonResponse(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+                return json;
+
+            // Check if this is an error message instead of JSON
+            if (json.StartsWith("Error calling LLM:") || 
+                json.StartsWith("OpenAI error:") || 
+                json.StartsWith("The operation was canceled") ||
+                json.StartsWith("LLM unavailable"))
+            {
+                return json; // Return as-is for error handling
+            }
+
+            // Remove code fences
+            json = System.Text.RegularExpressions.Regex.Replace(json, @"```(?:json)?\s*", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            json = System.Text.RegularExpressions.Regex.Replace(json, @"```\s*$", "", System.Text.RegularExpressions.RegexOptions.Multiline);
+
+            // Remove double braces at start/end
+            json = json.Trim();
+            if (json.StartsWith("{{") && json.EndsWith("}}"))
+            {
+                json = json.Substring(1, json.Length - 2);
+            }
+
+            // Remove extra whitespace and newlines
+            json = System.Text.RegularExpressions.Regex.Replace(json, @"\s+", " ");
+            json = json.Trim();
+
+            return json;
+        }
+
+        /// <summary>
         /// Parse structured response from LLM and return a standardized API response
         /// </summary>
         public object ParseStructuredResponse<T>(LLMOperationResult result, string? operationName = null) where T : class
@@ -121,13 +164,20 @@ namespace CodexBootstrap.Core
             {
                 var errorMessage = result.Error ?? "Unknown LLM operation error";
                 _logger.Error($"LLM operation failed{(operationName != null ? $" for {operationName}" : "")}: {errorMessage}");
+                
+                // Check if this is a timeout error
+                var isTimeoutError = errorMessage.Contains("The operation was canceled") || 
+                                   errorMessage.Contains("timeout") || 
+                                   errorMessage.Contains("timed out");
+                
                 return new
                 {
                     success = false,
                     error = errorMessage,
-                    details = "LLM operation failed",
+                    details = isTimeoutError ? "The LLM operation timed out" : "LLM operation failed",
                     confidence = result.Confidence,
                     isFallback = result.IsFallback,
+                    isTimeout = isTimeoutError,
                     timestamp = result.Timestamp,
                     tracking = new
                     {
@@ -263,7 +313,9 @@ namespace CodexBootstrap.Core
 
                 if (!string.IsNullOrEmpty(jsonToParse))
                 {
-                    _logger.Debug($"Attempting to deserialize JSON: {jsonToParse}");
+                    // Sanitize JSON: remove double braces, code fences, and extra whitespace
+                    jsonToParse = SanitizeJsonResponse(jsonToParse);
+                    _logger.Debug($"Attempting to deserialize sanitized JSON: {jsonToParse}");
 
                     // Check if we're expecting an object but got an array
                     if (jsonToParse.TrimStart().StartsWith("[") && !typeof(T).IsArray && !typeof(T).IsGenericType)

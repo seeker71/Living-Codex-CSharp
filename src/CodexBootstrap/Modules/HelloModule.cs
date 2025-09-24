@@ -32,15 +32,7 @@ public sealed class HelloModule : ModuleBase
         );
     }
 
-    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
-    {
-        // API handlers are now registered via attribute-based routing
-    }
-
-    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
-    {
-        // HTTP endpoints are now registered via attribute-based routing
-    }
+    // No overrides for RegisterApiHandlers/RegisterHttpEndpoints to ensure base wiring runs.
 
     /// <summary>
     /// Echo endpoint - returns the input arguments

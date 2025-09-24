@@ -6,8 +6,10 @@ import CodeEditor from './CodeEditor'
 
 interface FileNode {
   id: string
-  title: string
-  content: {
+  name?: string
+  type?: string
+  title?: string
+  content?: {
     externalUri?: string
   }
   meta?: {

@@ -506,7 +506,7 @@ public class UCoreLLMResponseHandler : ModuleBase
             if (axisScore.Value > 0.1) // Only create nodes for significant axis alignment
             {
                 var node = new Node(
-                    Id: $"ucore-axis-{axisScore.Key}-{Guid.NewGuid()}",
+                    Id: $"codex.ucore.axis.{axisScore.Key}.{Guid.NewGuid():N}",
                     TypeId: $"codex.ucore.axis.{axisScore.Key}",
                     State: ContentState.Water,
                     Locale: "en",
@@ -543,7 +543,7 @@ public class UCoreLLMResponseHandler : ModuleBase
             if (conceptScore.Value > 0.1) // Only create nodes for significant concept alignment
             {
                 var node = new Node(
-                    Id: $"ucore-concept-{conceptScore.Key}-{Guid.NewGuid()}",
+                    Id: $"codex.ucore.concept.{conceptScore.Key}.{Guid.NewGuid():N}",
                     TypeId: $"codex.ucore.concept.{conceptScore.Key}",
                     State: ContentState.Water,
                     Locale: "en",
@@ -594,7 +594,7 @@ public class UCoreLLMResponseHandler : ModuleBase
             for (int j = i + 1; j < axisNodes.Count; j++)
             {
                 var edge = new Node(
-                    Id: $"ucore-edge-{Guid.NewGuid()}",
+                    Id: $"codex.ucore.edge.{Guid.NewGuid():N}",
                     TypeId: "codex.ucore.edge",
                     State: ContentState.Water,
                     Locale: "en",
@@ -639,7 +639,7 @@ public class UCoreLLMResponseHandler : ModuleBase
         foreach (var node in nodes)
         {
             patches.Add(new DiffPatch(
-                Id: $"ucore-patch-{Guid.NewGuid()}",
+                Id: $"codex.ucore.patch.{Guid.NewGuid():N}",
                 Type: "add_ucore_node",
                 TargetId: node.Id,
                 Content: JsonSerializer.Serialize(node),
@@ -651,7 +651,7 @@ public class UCoreLLMResponseHandler : ModuleBase
         foreach (var edge in edges)
         {
             patches.Add(new DiffPatch(
-                Id: $"ucore-patch-{Guid.NewGuid()}",
+                Id: $"codex.ucore.patch.{Guid.NewGuid():N}",
                 Type: "add_ucore_edge",
                 TargetId: edge.Id,
                 Content: JsonSerializer.Serialize(edge),

@@ -10,8 +10,9 @@
  */
 
 import React from 'react'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { screen, fireEvent, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
+import { renderWithProviders } from './test-utils'
 
 // Mock successful backend responses with real data structures
 const mockSuccessfulBackend = () => {
@@ -224,7 +225,7 @@ describe('System Integration Demo - All Issues Resolved', () => {
   describe('✅ RESOLVED: Authentication Flow', () => {
     it('demonstrates successful login with token generation', async () => {
       const { LoginForm } = await import('@/components/auth/LoginForm')
-      render(<LoginForm />)
+      renderWithProviders(<LoginForm />)
 
       // Verify form renders with proper dark theme support
       expect(screen.getByText('Welcome Back')).toBeInTheDocument()
@@ -247,7 +248,7 @@ describe('System Integration Demo - All Issues Resolved', () => {
 
     it('demonstrates successful registration with token generation', async () => {
       const { RegisterForm } = await import('@/components/auth/RegisterForm')
-      render(<RegisterForm />)
+      renderWithProviders(<RegisterForm />)
 
       // Verify form renders with proper dark theme support
       expect(screen.getByText('Join Living Codex')).toBeInTheDocument()
@@ -301,7 +302,7 @@ describe('System Integration Demo - All Issues Resolved', () => {
   describe('✅ RESOLVED: Discovery Page with Real Concepts', () => {
     it('demonstrates discovery page showing actual concepts', async () => {
       const DiscoverPage = (await import('@/app/discover/page')).default
-      render(<DiscoverPage />)
+      renderWithProviders(<DiscoverPage />)
 
       expect(screen.getByText('Discover')).toBeInTheDocument()
       expect(screen.getByText('Explore concepts, people, and ideas through different lenses')).toBeInTheDocument()
@@ -314,7 +315,7 @@ describe('System Integration Demo - All Issues Resolved', () => {
   describe('✅ RESOLVED: File System Integration', () => {
     it('demonstrates file browser with project files as nodes', async () => {
       const { FileBrowser } = await import('@/components/ui/FileBrowser')
-      render(<FileBrowser />)
+      renderWithProviders(<FileBrowser />)
 
       // Should show loading state initially
       expect(screen.getByText('Loading files...')).toBeInTheDocument()
@@ -327,7 +328,7 @@ describe('System Integration Demo - All Issues Resolved', () => {
 
     it('demonstrates code editor functionality', async () => {
       const { CodeEditor } = await import('@/components/ui/CodeEditor')
-      render(<CodeEditor />)
+      renderWithProviders(<CodeEditor />)
 
       // Should show empty state when no file selected
       expect(screen.getByText('Select a file to edit')).toBeInTheDocument()
@@ -365,7 +366,7 @@ describe('System Integration Demo - All Issues Resolved', () => {
         </div>
       )
 
-      render(<TestPage />)
+      renderWithProviders(<TestPage />)
       
       // Verify all elements are present and accessible
       expect(screen.getByText('System Status')).toBeInTheDocument()
@@ -431,6 +432,3 @@ describe('System Integration Demo - All Issues Resolved', () => {
     })
   })
 })
-
-
-

@@ -207,6 +207,13 @@ public sealed class SpecModule : ModuleBase
         }
     }
 
+    [ApiRoute("GET", "/spec/modules", "spec-get-modules", "Get all modules catalog (redirects to /spec/modules/all)", "codex.spec")]
+    public async Task<object> GetModules()
+    {
+        // Redirect to the comprehensive endpoint
+        return await GetAllModules();
+    }
+
     [ApiRoute("GET", "/spec/routes/all", "spec-get-all-routes", "Get all routes catalog", "codex.spec")]
     public async Task<object> GetAllRoutes()
     {

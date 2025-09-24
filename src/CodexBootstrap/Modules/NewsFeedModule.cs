@@ -24,6 +24,7 @@ public sealed class NewsFeedModule : ModuleBase
         : base(registry, logger)
     {
         _httpClient = httpClient;
+        _logger.Info("NewsFeedModule constructor called");
     }
 
     /// <summary>
@@ -63,7 +64,8 @@ public sealed class NewsFeedModule : ModuleBase
     [ApiRoute("GET", "/news/feed/{userId}", "Get User News Feed", "Get personalized news feed for a user based on their interests", "codex.news-feed")]
     public async Task<object> GetUserNewsFeed(
         [ApiParameter("userId", "User ID to get news feed for", Required = true, Location = "path")] string userId,
-        [ApiParameter("limit", "Number of news items to return", Required = false, Location = "query")] int limit = 20,
+        [ApiParameter("limit", "Number of news items to return", Required = false, Location = "query")] int limit = 50,
+        [ApiParameter("skip", "Number of items to skip for pagination", Required = false, Location = "query")] int skip = 0,
         [ApiParameter("hoursBack", "Number of hours to look back for news", Required = false, Location = "query")] int hoursBack = 24)
     {
         try
@@ -91,10 +93,12 @@ public sealed class NewsFeedModule : ModuleBase
                 userInterests = new List<string> { "technology", "science", "business", "politics", "health" };
             }
 
-            // Get news items based on user interests
-            var newsItems = await GetNewsFeedItemsForInterests(userInterests, userLocation, userContributions, limit, hoursBack);
+            // Build full candidate list then page server-side
+            var allItems = await BuildNewsItems(userInterests, userLocation, userContributions, hoursBack);
+            var totalCount = allItems.Count;
+            var paged = allItems.Skip(Math.Max(0, skip)).Take(Math.Max(1, Math.Min(limit, 500))).ToList();
 
-            return new NewsFeedResponse(newsItems, newsItems.Count, "Personalized news feed");
+            return new NewsFeedResponse(paged, totalCount, "Personalized news feed");
         }
         catch (Exception ex)
         {
@@ -109,15 +113,17 @@ public sealed class NewsFeedModule : ModuleBase
     {
         try
         {
-            var newsItems = await GetNewsFeedItemsForInterests(
-                request.Interests ?? new List<string>(),
-                request.Location,
-                request.Contributions ?? new List<string>(),
-                request.Limit ?? 20,
-                request.HoursBack ?? 24
-            );
+            var interests = request.Interests ?? new List<string>();
+            var contributions = request.Contributions ?? new List<string>();
+            var limit = request.Limit ?? 20;
+            var hoursBack = request.HoursBack ?? 24;
+            var skip = request.Skip ?? 0;
 
-            return new NewsFeedResponse(newsItems, newsItems.Count, "News search results");
+            var allItems = await BuildNewsItems(interests, request.Location, contributions, hoursBack);
+            var totalCount = allItems.Count;
+            var paged = allItems.Skip(Math.Max(0, skip)).Take(Math.Max(1, Math.Min(limit, 500))).ToList();
+
+            return new NewsFeedResponse(paged, totalCount, "News search results");
         }
         catch (Exception ex)
         {
@@ -129,7 +135,7 @@ public sealed class NewsFeedModule : ModuleBase
     // Get trending topics based on recent news
     [ApiRoute("GET", "/news/trending", "Get Trending Topics", "Get trending topics from recent news", "codex.news-feed")]
     public async Task<object> GetTrendingTopics(
-        [ApiParameter("query", "Number of trending topics to return", Required = false, Location = "query")] int limit = 10,
+        [ApiParameter("query", "Number of trending topics to return", Required = false, Location = "query")] int limit = 20,
         [ApiParameter("query", "Number of hours to analyze for trends", Required = false, Location = "query")] int hoursBack = 24)
     {
         try
@@ -175,7 +181,7 @@ public sealed class NewsFeedModule : ModuleBase
     [ApiRoute("GET", "/news/related/{id}", "Get Related News", "Get related news items", "codex.news-feed")]
     public async Task<object> GetRelatedNews(
         [ApiParameter("id", "News item ID", Required = true, Location = "path")] string id,
-        [ApiParameter("query", "Number of related items to return", Required = false, Location = "query")] int limit = 10)
+        [ApiParameter("query", "Number of related items to return", Required = false, Location = "query")] int limit = 20)
     {
         try
         {
@@ -185,14 +191,23 @@ public sealed class NewsFeedModule : ModuleBase
                 return new ErrorResponse("Source news item not found");
             }
 
-            // Get other news items and calculate similarity
-            var allNewsNodes = Registry.GetNodesByType("codex.news.item")
+            // Get all nodes and filter by type
+            // Use efficient type-specific query
+            var allNewsNodes = Registry.GetNodesByType("codex.news.item").ToList();
+            if (!allNewsNodes.Any())
+            {
+                var fromStorage = await Registry.GetNodesByTypeAsync("codex.news.item");
+                allNewsNodes = fromStorage.ToList();
+            }
+            
+            // Filter out the current item and calculate similarity
+            var relatedNewsNodes = allNewsNodes
                 .Where(n => n.Id != id)
                 .OrderByDescending(n => CalculateNewsSimilarity(sourceNode, n))
                 .Take(limit)
                 .ToList();
 
-            var relatedItems = allNewsNodes
+            var relatedItems = relatedNewsNodes
                 .Select(MapNodeToNewsFeedItem)
                 .Where(item => item != null)
                 .Cast<NewsFeedItem>()
@@ -215,7 +230,7 @@ public sealed class NewsFeedModule : ModuleBase
         {
             // Create a read tracking node
             var readNode = new Node(
-                Id: $"read-{request.UserId}-{request.NewsId}",
+                Id: $"codex.news.read.{request.UserId}.{request.NewsId}.{Guid.NewGuid():N}",
                 TypeId: "codex.news.read",
                 State: ContentState.Water,
                 Locale: "en-US",
@@ -244,11 +259,21 @@ public sealed class NewsFeedModule : ModuleBase
     [ApiRoute("GET", "/news/read/{userId}", "Get Read News", "Get read news items for user", "codex.news-feed")]
     public async Task<object> GetReadNews(
         [ApiParameter("userId", "User ID", Required = true, Location = "path")] string userId,
-        [ApiParameter("query", "Number of items to return", Required = false, Location = "query")] int limit = 20)
+        [ApiParameter("query", "Number of items to return", Required = false, Location = "query")] int limit = 50)
     {
         try
         {
-            var readNodes = Registry.GetNodesByType("codex.news.read")
+            // Get all nodes and filter by type
+            // Use efficient type-specific query for read news
+            var readNodes = Registry.GetNodesByType("codex.news.read").ToList();
+            if (!readNodes.Any())
+            {
+                var fromStorage = await Registry.GetNodesByTypeAsync("codex.news.read");
+                readNodes = fromStorage.ToList();
+            }
+            
+            // Filter by user
+            readNodes = readNodes
                 .Where(n => n.Meta?.GetValueOrDefault("userId")?.ToString() == userId)
                 .OrderByDescending(n => n.Meta?.GetValueOrDefault("readAt"))
                 .Take(limit)
@@ -285,18 +310,28 @@ public sealed class NewsFeedModule : ModuleBase
     [ApiRoute("GET", "/news/unread/{userId}", "Get Unread News", "Get unread news items for user", "codex.news-feed")]
     public async Task<object> GetUnreadNews(
         [ApiParameter("userId", "User ID", Required = true, Location = "path")] string userId,
-        [ApiParameter("query", "Number of items to return", Required = false, Location = "query")] int limit = 20)
+        [ApiParameter("query", "Number of items to return", Required = false, Location = "query")] int limit = 50)
     {
         try
         {
-            // Get all news items
-            var allNewsNodes = Registry.GetNodesByType("codex.news.item")
-                .OrderByDescending(n => n.Meta?.GetValueOrDefault("publishedAt"))
-                .Take(limit * 2)
-                .ToList();
+            // Get all nodes and filter by type
+            // Use efficient type-specific queries
+            var allNewsNodes = Registry.GetNodesByType("codex.news.item").ToList();
+            if (!allNewsNodes.Any())
+            {
+                var fromStorage = await Registry.GetNodesByTypeAsync("codex.news.item");
+                allNewsNodes = fromStorage.ToList();
+            }
+            
+            var readNodes = Registry.GetNodesByType("codex.news.read").ToList();
+            if (!readNodes.Any())
+            {
+                var fromStorage = await Registry.GetNodesByTypeAsync("codex.news.read");
+                readNodes = fromStorage.ToList();
+            }
 
-            // Get read news IDs
-            var readNewsIds = Registry.GetNodesByType("codex.news.read")
+            // Get read news IDs for this user
+            var readNewsIds = readNodes
                 .Where(n => n.Meta?.GetValueOrDefault("userId")?.ToString() == userId)
                 .Select(n => n.Meta?.GetValueOrDefault("newsId")?.ToString())
                 .Where(id => !string.IsNullOrEmpty(id))
@@ -323,25 +358,71 @@ public sealed class NewsFeedModule : ModuleBase
     // Get latest news items (utility endpoint for UI/testing)
     [ApiRoute("GET", "/news/latest", "Get Latest News", "Get latest news items across all sources", "codex.news-feed")]
     public async Task<object> GetLatestNews(
-        [ApiParameter("query", "Number of items to return", Required = false, Location = "query")] int limit = 20)
+        [ApiParameter("limit", "Number of items to return", Required = false, Location = "query")] int limit = 20,
+        [ApiParameter("skip", "Number of items to skip", Required = false, Location = "query")] int skip = 0)
     {
         try
         {
-            var items = Registry
-                .GetNodesByType("codex.news.item")
+            // Use efficient type-specific query instead of AllNodes + filtering
+            var newsNodes = _registry.GetNodesByType("codex.news.item").ToList();
+            if (!newsNodes.Any())
+            {
+                // Fallback to async if in-memory cache is empty
+                var fromStorage = await _registry.GetNodesByTypeAsync("codex.news.item");
+                newsNodes = fromStorage.ToList();
+            }
+            
+            _logger.Info($"Found {newsNodes.Count} news nodes in registry");
+            
+            var totalCount = newsNodes.Count;
+            var items = newsNodes
                 .OrderByDescending(n => n.Meta?.GetValueOrDefault("publishedAt"))
-                .Take(Math.Max(1, Math.Min(limit, 100)))
+                .Skip(skip)
+                .Take(Math.Max(1, Math.Min(limit, 500)))
                 .Select(MapNodeToNewsFeedItem)
                 .Where(i => i != null)
                 .Cast<NewsFeedItem>()
                 .ToList();
+                
+            _logger.Info($"Successfully mapped {items.Count} news items");
 
-            return new NewsFeedResponse(items, items.Count, "Latest news items");
+            return new NewsFeedResponse(items, totalCount, "Latest news items");
         }
         catch (Exception ex)
         {
             _logger.Error($"Error getting latest news: {ex.Message}", ex);
             return new ErrorResponse($"Error getting latest news: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("GET", "/news/stats", "Get News Stats", "Get news totals and source breakdown with optional filters", "codex.news-feed")]
+    public async Task<object> GetNewsStats(
+        [ApiParameter("hoursBack", "Number of hours to look back for news", Required = false, Location = "query")] int hoursBack = 24,
+        [ApiParameter("search", "Search term to filter topics", Required = false, Location = "query")] string? search = null)
+    {
+        try
+        {
+            var interests = string.IsNullOrWhiteSpace(search) ? new List<string>() : new List<string> { search! };
+            var allItems = await BuildNewsItems(interests, null, new List<string>(), hoursBack);
+            var totalCount = allItems.Count;
+            var sources = allItems
+                .GroupBy(i => string.IsNullOrWhiteSpace(i.Source) ? "Unknown" : i.Source)
+                .OrderByDescending(g => g.Count())
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            return new
+            {
+                success = true,
+                message = "News stats computed",
+                totalCount,
+                hoursBack,
+                sources
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error computing news stats: {ex.Message}", ex);
+            return new ErrorResponse($"Error computing news stats: {ex.Message}");
         }
     }
 
@@ -353,94 +434,83 @@ public sealed class NewsFeedModule : ModuleBase
         int limit, 
         int hoursBack)
     {
+        var all = await BuildNewsItems(interests, location, contributions, hoursBack);
+        return all.Take(limit).ToList();
+    }
+
+    private async Task<List<NewsFeedItem>> BuildNewsItems(
+        List<string> interests,
+        string? location,
+        List<string> contributions,
+        int hoursBack)
+    {
         var newsItems = new List<NewsFeedItem>();
-        
+
         try
         {
-            // Get news from internal news nodes instead of external APIs
             var cutoffDate = DateTime.UtcNow.AddHours(-hoursBack);
-            
-            // First, let's get all news nodes to see what we have
-            var allNewsNodes = Registry.GetNodesByType("codex.news.item").ToList();
-            _logger.Info($"Found {allNewsNodes.Count} news nodes in registry");
-            
-            // Debug: Let's check if we can find any nodes with common types
-            var conceptNodes = Registry.GetNodesByType("codex.concept").ToList();
-            var moduleNodes = Registry.GetNodesByType("codex.module").ToList();
-            _logger.Info($"Found {conceptNodes.Count} concept nodes and {moduleNodes.Count} module nodes in registry");
-            
-            var newsNodes = allNewsNodes
-                .Where(n => 
-                {
-                    try
-                    {
-                        var publishedAt = n.Meta?.GetValueOrDefault("publishedAt");
-                        if (publishedAt is DateTime publishedDate)
-                        {
-                            return publishedDate >= cutoffDate;
-                        }
-                        return false;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.Error($"Error checking publishedAt for node {n.Id}: {ex.Message}");
-                        return false;
-                    }
-                })
-                .OrderByDescending(n => 
-                {
-                    try
-                    {
-                        return n.Meta?.GetValueOrDefault("publishedAt") as DateTime? ?? DateTime.MinValue;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.Error($"Error ordering node {n.Id}: {ex.Message}");
-                        return DateTime.MinValue;
-                    }
-                })
-                .Take(limit * 2) // Get more to account for filtering
-                .ToList();
 
-            _logger.Info($"Filtered to {newsNodes.Count} recent news nodes");
+            // Use prefix to include any news variants (e.g., codex.news.item, codex.news.something)
+            var allNewsNodes = Registry.GetNodesByTypePrefix("codex.news").ToList();
+            if (!allNewsNodes.Any())
+            {
+                var fromStorage = await Registry.GetNodesByTypeAsync("codex.news.item");
+                allNewsNodes = fromStorage.ToList();
+            }
 
-            // Convert nodes to NewsFeedItem objects
-            foreach (var node in newsNodes)
+            // Robust publishedAt parsing (DateTime, DateTimeOffset, string ISO)
+            DateTime? GetPublishedAt(Node n)
             {
                 try
                 {
-                    var newsItem = MapNodeToNewsFeedItem(node);
-                    if (newsItem != null)
+                    var raw = n.Meta?.GetValueOrDefault("publishedAt");
+                    if (raw is DateTime dt) return dt.ToUniversalTime();
+                    if (raw is DateTimeOffset dto) return dto.UtcDateTime;
+                    if (raw is string s && DateTime.TryParse(s, out var parsed))
                     {
-                        newsItems.Add(newsItem);
+                        return DateTime.SpecifyKind(parsed, DateTimeKind.Utc);
                     }
                 }
-                catch (Exception ex)
+                catch { }
+                return null;
+            }
+
+            var newsNodes = allNewsNodes
+                .Where(n =>
                 {
-                    _logger.Error($"Error mapping node {node.Id} to NewsFeedItem: {ex.Message}");
+                    var pub = GetPublishedAt(n);
+                    // If missing publishedAt, include conservatively so items are not dropped
+                    return pub == null || pub.Value >= cutoffDate;
+                })
+                .OrderByDescending(n => GetPublishedAt(n) ?? DateTime.MinValue)
+                .ToList();
+
+            foreach (var node in newsNodes)
+            {
+                var newsItem = MapNodeToNewsFeedItem(node);
+                if (newsItem != null)
+                {
+                    newsItems.Add(newsItem);
                 }
             }
 
-            // Filter by interests if provided
             if (interests.Any())
             {
                 newsItems = newsItems
-                    .Where(item => interests.Any(interest => 
+                    .Where(item => interests.Any(interest =>
                         item.Title.Contains(interest, StringComparison.OrdinalIgnoreCase) ||
                         item.Description.Contains(interest, StringComparison.OrdinalIgnoreCase) ||
                         (item.Content?.Contains(interest, StringComparison.OrdinalIgnoreCase) ?? false)))
                     .ToList();
             }
 
-            // Sort by relevance score and take top items
             newsItems = newsItems
                 .OrderByDescending(item => CalculateRelevanceScore(item, interests, contributions))
-                .Take(limit)
                 .ToList();
         }
         catch (Exception ex)
         {
-            _logger.Error($"Error getting news items for interests: {ex.Message}", ex);
+            _logger.Error($"Error building news items: {ex.Message}", ex);
         }
 
         return newsItems;
@@ -521,6 +591,7 @@ public sealed class NewsFeedModule : ModuleBase
                     foreach (var article in articles.EnumerateArray())
                     {
                         newsItems.Add(new NewsFeedItem(
+                            Id: $"newsapi-{Guid.NewGuid():N}",
                             Title: article.GetProperty("title").GetString() ?? "",
                             Description: article.GetProperty("description").GetString() ?? "",
                             Url: article.GetProperty("url").GetString() ?? "",
@@ -542,6 +613,7 @@ public sealed class NewsFeedModule : ModuleBase
                     foreach (var doc in docs.EnumerateArray())
                     {
                         newsItems.Add(new NewsFeedItem(
+                            Id: $"nytimes-{Guid.NewGuid():N}",
                             Title: doc.GetProperty("headline").GetProperty("main").GetString() ?? "",
                             Description: doc.TryGetProperty("abstract", out var abstractText) ? abstractText.GetString() : "",
                             Url: doc.GetProperty("web_url").GetString() ?? "",
@@ -562,6 +634,7 @@ public sealed class NewsFeedModule : ModuleBase
                     foreach (var result in results.EnumerateArray())
                     {
                         newsItems.Add(new NewsFeedItem(
+                            Id: $"guardian-{Guid.NewGuid():N}",
                             Title: result.GetProperty("webTitle").GetString() ?? "",
                             Description: result.TryGetProperty("fields", out var fields) && 
                                        fields.TryGetProperty("trailText", out var trailText) ? trailText.GetString() : "",
@@ -627,9 +700,18 @@ public sealed class NewsFeedModule : ModuleBase
         
         try
         {
-            // Get recent news items from internal nodes
+            // Get all nodes and filter by type
+            // Use efficient type-specific query
+            var newsNodes = Registry.GetNodesByType("codex.news.item").ToList();
+            if (!newsNodes.Any())
+            {
+                var fromStorage = await Registry.GetNodesByTypeAsync("codex.news.item");
+                newsNodes = fromStorage.ToList();
+            }
+            
+            // Filter by time range
             var cutoffDate = DateTime.UtcNow.AddHours(-hoursBack);
-            var newsNodes = Registry.GetNodesByType("codex.news.item")
+            newsNodes = newsNodes
                 .Where(n => n.Meta?.GetValueOrDefault("publishedAt") is DateTime publishedAt && publishedAt >= cutoffDate)
                 .OrderByDescending(n => n.Meta?.GetValueOrDefault("publishedAt"))
                 .Take(100) // Get more items for trend analysis
@@ -735,12 +817,38 @@ public sealed class NewsFeedModule : ModuleBase
                 published = DateTime.UtcNow;
             }
 
+            // Resolve URL from common metadata keys
+            string ResolveUrl(Node n)
+            {
+                var keys = new[] { "url", "link", "sourceUrl", "originUrl" };
+                foreach (var k in keys)
+                {
+                    var val = n.Meta?.GetValueOrDefault(k)?.ToString();
+                    if (!string.IsNullOrWhiteSpace(val)) return val!;
+                }
+                return "";
+            }
+
+            var url = ResolveUrl(node);
+            var rawSource = node.Meta?.GetValueOrDefault("source")?.ToString();
+            var normalizedSource = NormalizeSource(rawSource, url);
+            if (string.Equals(normalizedSource, "Unknown", StringComparison.OrdinalIgnoreCase))
+            {
+                // Try alternate meta keys to derive a better source name
+                var alt = node.Meta?.GetValueOrDefault("siteName")?.ToString()
+                          ?? node.Meta?.GetValueOrDefault("publisher")?.ToString()
+                          ?? node.Meta?.GetValueOrDefault("sourceName")?.ToString();
+                if (!string.IsNullOrWhiteSpace(alt))
+                    normalizedSource = alt!;
+            }
+
             return new NewsFeedItem(
+                Id: node.Id,
                 Title: node.Title ?? "",
                 Description: node.Description ?? "",
-                Url: node.Meta?.GetValueOrDefault("url")?.ToString() ?? "",
+                Url: url,
                 PublishedAt: published,
-                Source: node.Meta?.GetValueOrDefault("source")?.ToString() ?? "Unknown",
+                Source: normalizedSource,
                 Author: node.Meta?.GetValueOrDefault("author")?.ToString(),
                 ImageUrl: node.Meta?.GetValueOrDefault("imageUrl")?.ToString(),
                 Content: node.Meta?.GetValueOrDefault("content")?.ToString()
@@ -750,6 +858,69 @@ public sealed class NewsFeedModule : ModuleBase
         {
             _logger.Error($"Error mapping node to NewsFeedItem: {ex.Message}", ex);
             return null;
+        }
+    }
+
+    private string NormalizeSource(string? source, string? url)
+    {
+        try
+        {
+            var s = (source ?? "").Trim();
+            if (string.Equals(s, "unknown", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(s, "ai", StringComparison.OrdinalIgnoreCase) ||
+                string.IsNullOrWhiteSpace(s))
+            {
+                // Derive from URL host
+                if (!string.IsNullOrWhiteSpace(url) && Uri.TryCreate(url, UriKind.Absolute, out var uri))
+                {
+                    var host = uri.Host.ToLowerInvariant();
+                    // Strip common subdomains
+                    foreach (var sub in new[] { "www.", "m.", "amp.", "feedproxy." })
+                    {
+                        if (host.StartsWith(sub)) host = host.Substring(sub.Length);
+                    }
+
+                    // Known mappings
+                    if (host.Contains("ycombinator") || host.Contains("hackernews")) return "Hacker News";
+                    if (host.Contains("nytimes")) return "New York Times";
+                    if (host.Contains("guardian")) return "The Guardian";
+                    if (host.Contains("bbc")) return "BBC";
+                    if (host.Contains("reuters")) return "Reuters";
+                    if (host.Contains("bloomberg")) return "Bloomberg";
+                    if (host.Contains("washingtonpost")) return "The Washington Post";
+                    if (host.Contains("wsj")) return "Wall Street Journal";
+                    if (host.Contains("apnews") || host.Contains("associatedpress")) return "AP News";
+                    if (host.Contains("theverge")) return "The Verge";
+                    if (host.Contains("techcrunch")) return "TechCrunch";
+
+                    // Convert host to brand name (take second-level domain, capitalize words)
+                    var parts = host.Split('.');
+                    var core = parts.Length >= 2 ? parts[parts.Length - 2] : host;
+                    core = System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(core.Replace('-', ' '));
+                    return core;
+                }
+                return "Unknown";
+            }
+
+            // Clean simple lowercase tokens
+            if (s.Length <= 3) // too short, likely not a brand
+            {
+                if (!string.IsNullOrWhiteSpace(url) && Uri.TryCreate(url, UriKind.Absolute, out var uri2))
+                {
+                    var host2 = uri2.Host.ToLowerInvariant();
+                    var parts2 = host2.Split('.');
+                    var core2 = parts2.Length >= 2 ? parts2[parts2.Length - 2] : host2;
+                    core2 = System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(core2.Replace('-', ' '));
+                    return core2;
+                }
+                return "Unknown";
+            }
+
+            return s;
+        }
+        catch
+        {
+            return string.IsNullOrWhiteSpace(source) ? "Unknown" : source;
         }
     }
 
@@ -776,11 +947,13 @@ public record NewsSearchRequest(
     string? Location = null,
     List<string>? Contributions = null,
     int? Limit = 20,
-    int? HoursBack = 24
+    int? HoursBack = 24,
+    int? Skip = 0
 );
 
 [MetaNode(Id = "codex.news-feed.news-item", Name = "News Item", Description = "A news item from external sources")]
 public record NewsFeedItem(
+    string Id,
     string Title,
     string Description,
     string Url,

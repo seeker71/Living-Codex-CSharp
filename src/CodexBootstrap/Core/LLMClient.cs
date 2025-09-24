@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using System.Threading;
 using CodexBootstrap.Core;
 
 namespace CodexBootstrap.Core;
@@ -50,40 +51,52 @@ public class LLMClient
         try
         {
             var provider = (config.Provider ?? "").ToLowerInvariant();
+            var forceOllamaEnv = Environment.GetEnvironmentVariable("USE_OLLAMA_ONLY");
+            var forceOllama = string.Equals(forceOllamaEnv ?? "true", "true", StringComparison.OrdinalIgnoreCase);
+            if (forceOllama)
+            {
+                provider = "ollama";
+            }
             if (provider == "openai")
             {
-                // Minimal check against OpenAI models endpoint
-                using var client = new HttpClient();
-                var request = new HttpRequestMessage(HttpMethod.Get, $"{config.BaseUrl.TrimEnd('/')}/models");
-                if (!string.IsNullOrEmpty(config.ApiKey))
+                // Check if API key is available and not empty
+                if (string.IsNullOrEmpty(config.ApiKey))
                 {
-                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.ApiKey);
+                    _logger.Warn("OpenAI API key is not configured");
+                    return false;
                 }
-                var response = await client.SendAsync(request);
+                
+                // Use the configured HttpClient with proper timeout
+                var request = new HttpRequestMessage(HttpMethod.Get, $"{config.BaseUrl.TrimEnd('/')}/models");
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.ApiKey);
+                
+                var response = await _httpClient.SendAsync(request);
                 return response.IsSuccessStatusCode;
             }
             if (provider == "cursor")
             {
                 // Cursor Background Agent API availability check
-                using var client = new HttpClient();
-                var request = new HttpRequestMessage(HttpMethod.Get, $"{config.BaseUrl.TrimEnd('/')}/health");
-                if (!string.IsNullOrEmpty(config.ApiKey))
+                if (string.IsNullOrEmpty(config.ApiKey))
                 {
-                    request.Headers.Add("X-API-Key", config.ApiKey);
+                    _logger.Warn("Cursor API key is not configured");
+                    return false;
                 }
-                var response = await client.SendAsync(request);
+                
+                var request = new HttpRequestMessage(HttpMethod.Get, $"{config.BaseUrl.TrimEnd('/')}/health");
+                request.Headers.Add("X-API-Key", config.ApiKey);
+                
+                var response = await _httpClient.SendAsync(request);
                 return response.IsSuccessStatusCode;
             }
             
             // Default to Ollama check
-            using (var client = new HttpClient())
-            {
-                var response = await client.GetAsync("http://localhost:11434/api/tags");
-                return response.IsSuccessStatusCode;
-            }
+            var ollamaRequest = new HttpRequestMessage(HttpMethod.Get, "http://localhost:11434/api/tags");
+            var ollamaResponse = await _httpClient.SendAsync(ollamaRequest);
+            return ollamaResponse.IsSuccessStatusCode;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.Warn($"LLM service availability check failed for {config.Provider}: {ex.Message}");
             return false;
         }
     }
@@ -91,11 +104,17 @@ public class LLMClient
     /// <summary>
     /// Send a query to the LLM
     /// </summary>
-    public async Task<LLMResponse> QueryAsync(string prompt, CodexBootstrap.Modules.LLMConfig config)
+    public async Task<LLMResponse> QueryAsync(string prompt, CodexBootstrap.Modules.LLMConfig config, CancellationToken cancellationToken = default)
     {
         try
         {
             var provider = (config.Provider ?? "").ToLowerInvariant();
+            var forceOllamaEnv = Environment.GetEnvironmentVariable("USE_OLLAMA_ONLY");
+            var forceOllama = string.Equals(forceOllamaEnv ?? "true", "true", StringComparison.OrdinalIgnoreCase);
+            if (forceOllama)
+            {
+                provider = "ollama";
+            }
 
             if (provider == "openai")
             {
@@ -107,9 +126,8 @@ public class LLMClient
                     {
                         new { role = "user", content = prompt }
                     },
-                    temperature = config.Temperature,
-                    top_p = config.TopP,
-                    max_tokens = config.MaxTokens
+                    // Omit temperature/top_p for OpenAI chat to avoid unsupported_value errors on some models
+                    max_completion_tokens = config.MaxTokens
                 };
 
                 var json = JsonSerializer.Serialize(body);
@@ -123,28 +141,36 @@ public class LLMClient
                 }
 
                 _logger.Info($"Sending OpenAI chat completion with model {config.Model}");
-                var response = await _httpClient.SendAsync(request);
+                var response = await _httpClient.SendAsync(request, cancellationToken);
                 if (!response.IsSuccessStatusCode)
                 {
                     var err = await response.Content.ReadAsStringAsync();
                     _logger.Error($"OpenAI request failed: {response.StatusCode} - {err}");
 
-                    // Model fallback on 404 or model-not-found
+                    // Retry on 500 errors (server issues) or model fallback on 404
                     var status = (int)response.StatusCode;
-                    if (status == 404 || err.IndexOf("model", StringComparison.OrdinalIgnoreCase) >= 0)
+                    if (status == 500)
                     {
-                        var fallbackCandidates = new[]
+                        _logger.Warn($"OpenAI server error (500), retrying in 2 seconds...");
+                        await Task.Delay(2000);
+                        
+                        // Retry the same request
+                        var retryResponse = await _httpClient.SendAsync(request, cancellationToken);
+                        if (retryResponse.IsSuccessStatusCode)
                         {
-                            Environment.GetEnvironmentVariable("OPENAI_CODEGEN_MODEL"),
-                            "gpt-5-high-fast",
-                            "gpt-5",
-                            "gpt-5-codex",
-                            "gpt-5",
-                            "gpt-4.1",
-                            "gpt-4o",
-                            "gpt-4.1-mini",
-                            "gpt-4o-mini"
-                        };
+                            var retryContent = await retryResponse.Content.ReadAsStringAsync();
+                            return LLMResponseParsers.ParseOpenAIChatResponse(retryContent, config.Model);
+                        }
+                        else
+                        {
+                            var retryErr = await retryResponse.Content.ReadAsStringAsync();
+                            _logger.Error($"OpenAI retry also failed: {retryResponse.StatusCode} - {retryErr}");
+                        }
+                    }
+                    else if (status == 404 || err.IndexOf("model", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        // Task-aware fallback models
+                        var fallbackCandidates = GetFallbackModelsForTask(config.Model);
 
                         foreach (var candidate in fallbackCandidates)
                         {
@@ -158,9 +184,7 @@ public class LLMClient
                             {
                                 model = candidate,
                                 messages = new object[] { new { role = "user", content = prompt } },
-                                temperature = config.Temperature,
-                                top_p = config.TopP,
-                                max_tokens = config.MaxTokens
+                                max_completion_tokens = config.MaxTokens
                             };
                             var retryJson = JsonSerializer.Serialize(retryBody);
                             var retryReq = new HttpRequestMessage(HttpMethod.Post, $"{config.BaseUrl.TrimEnd('/')}/chat/completions")
@@ -230,7 +254,7 @@ public class LLMClient
                     prompt = prompt,
                     model = config.Model,
                     temperature = config.Temperature,
-                    max_tokens = config.MaxTokens,
+                    max_completion_tokens = config.MaxTokens,
                     stream = false
                 };
 
@@ -302,7 +326,7 @@ public class LLMClient
                     {
                         temperature = config.Temperature,
                         top_p = config.TopP,
-                        max_tokens = config.MaxTokens
+                        max_completion_tokens = config.MaxTokens
                     }
                 };
 
@@ -346,6 +370,32 @@ public class LLMClient
     }
 
     /// <summary>
+    /// Get appropriate fallback models based on the current model name
+    /// </summary>
+    private static string[] GetFallbackModelsForTask(string currentModel)
+    {
+        // If it's a code generation model, use code-specific fallbacks
+        if (currentModel.Contains("codex") || currentModel.Contains("code"))
+        {
+            return new[]
+            {
+                Environment.GetEnvironmentVariable("OPENAI_CODEGEN_MODEL") ?? "gpt-4o",
+                "gpt-4o", // Good for code generation
+                "gpt-4o-mini" // Cheaper fallback
+            };
+        }
+        
+        // For news analysis and other non-code tasks, use cheap, fast models
+        return new[]
+        {
+            Environment.GetEnvironmentVariable("OPENAI_DEFAULT_MODEL") ?? "gpt-4o-mini",
+            "gpt-4o-mini", // Cheapest, fastest for news analysis
+            "gpt-4o", // Slightly better quality
+            "gpt-4.1-mini" // Alternative cheap option
+        };
+    }
+
+    /// <summary>
     /// Check if the LLM service is available
     /// </summary>
     public async Task<bool> IsAvailableAsync()
@@ -359,6 +409,39 @@ public class LLMClient
         {
             return false;
         }
+    }
+}
+
+/// <summary>
+/// Helpers for parsing provider-specific responses
+/// </summary>
+internal static class LLMResponseParsers
+{
+    public static LLMResponse ParseOpenAIChatResponse(string json, string model)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var contentText = doc.RootElement.GetProperty("choices")[0]
+            .GetProperty("message")
+            .GetProperty("content")
+            .GetString() ?? string.Empty;
+
+        int tokensUsed = 0;
+        if (doc.RootElement.TryGetProperty("usage", out var usage))
+        {
+            if (usage.TryGetProperty("total_tokens", out var totalTokens))
+            {
+                tokensUsed = totalTokens.GetInt32();
+            }
+        }
+
+        return new LLMResponse
+        {
+            Success = true,
+            Response = contentText,
+            Confidence = 0.85,
+            Model = model,
+            TokensUsed = tokensUsed
+        };
     }
 }
 

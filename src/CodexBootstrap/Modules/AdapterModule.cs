@@ -310,8 +310,7 @@ public sealed class AdapterModule : ModuleBase
 
     public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
-        // Adapter module doesn't need any custom HTTP endpoints
-        // All functionality is exposed through the generic /route endpoint
+        // Adapter module exposes content hydration endpoint for external URIs
     }
 
     [ApiRoute("POST", "/adapters/register", "adapter-register", "Register a new content adapter", "codex.adapters")]
@@ -394,6 +393,119 @@ public sealed class AdapterModule : ModuleBase
         catch (Exception ex)
         {
             return new ErrorResponse($"Failed to list adapters: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Resolve a node's ContentRef using registered adapters and return renderable content
+    /// </summary>
+    [ApiRoute("GET", "/adapters/content/{nodeId}", "adapter-content", "Resolve node content via adapters", "codex.adapters")]
+    public async Task<object> GetAdapterContent(
+        [ApiParameter("nodeId", "Node ID to resolve", Required = true, Location = "path")] string nodeId)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(nodeId))
+            {
+                return new ErrorResponse("nodeId is required");
+            }
+
+            if (!_registry.TryGet(nodeId, out var node))
+            {
+                return new ErrorResponse($"Node '{nodeId}' not found");
+            }
+
+            var contentRef = node.Content;
+            if (contentRef == null)
+            {
+                return new ErrorResponse($"Node '{nodeId}' has no content");
+            }
+
+            // If inline content is already present, return it directly
+            if (!string.IsNullOrEmpty(contentRef.InlineJson))
+            {
+                return new
+                {
+                    success = true,
+                    nodeId = node.Id,
+                    mediaType = contentRef.MediaType ?? "text/plain",
+                    content = contentRef.InlineJson,
+                    source = "inlineJson"
+                };
+            }
+
+            if (contentRef.InlineBytes != null && contentRef.InlineBytes.Length > 0)
+            {
+                // Return base64 for UI rendering when bytes are present
+                var base64 = Convert.ToBase64String(contentRef.InlineBytes);
+                return new
+                {
+                    success = true,
+                    nodeId = node.Id,
+                    mediaType = contentRef.MediaType ?? "application/octet-stream",
+                    content = base64,
+                    encoding = "base64",
+                    source = "inlineBytes"
+                };
+            }
+
+            // External URI handling via adapters
+            if (contentRef.ExternalUri != null)
+            {
+                var scheme = contentRef.ExternalUri.Scheme.ToLowerInvariant();
+
+                // For file nodes, prefer the filesystem module's path for efficiency if available
+                if (scheme == "file")
+                {
+                    // If this is a file node, try to read the file directly from metadata path
+                    var absolutePath = node.Meta?.GetValueOrDefault("absolutePath")?.ToString();
+                    if (!string.IsNullOrEmpty(absolutePath) && File.Exists(absolutePath))
+                    {
+                        var text = await File.ReadAllTextAsync(absolutePath);
+                        return new
+                        {
+                            success = true,
+                            nodeId = node.Id,
+                            mediaType = contentRef.MediaType ?? "text/plain",
+                            content = text,
+                            source = "filesystem"
+                        };
+                    }
+                }
+
+                var adapter = GetAdapter(scheme);
+                if (adapter == null)
+                {
+                    return new ErrorResponse($"No adapter registered for scheme '{scheme}'");
+                }
+
+                var result = await adapter.HydrateAsync(contentRef);
+                if (result is null)
+                {
+                    return new ErrorResponse("Adapter failed to hydrate content");
+                }
+
+                // Attempt to normalize known shapes
+                var content = result.GetType().GetProperty("content")?.GetValue(result) ?? result;
+                var mediaType = (result.GetType().GetProperty("mediaType")?.GetValue(result) as string)
+                                ?? contentRef.MediaType
+                                ?? "text/plain";
+
+                return new
+                {
+                    success = true,
+                    nodeId = node.Id,
+                    mediaType,
+                    content,
+                    source = $"adapter:{scheme}"
+                };
+            }
+
+            return new ErrorResponse("ContentRef has neither inline content nor externalUri");
+        }
+        catch (Exception ex)
+        {
+            return new ErrorResponse($"Failed to resolve adapter content: {ex.Message}");
         }
     }
 }

@@ -3,6 +3,10 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import CodeEditor from '../CodeEditor'
 
+jest.mock('@/components/renderers/ContentRenderer', () => ({
+  ContentRenderer: () => <div data-testid="content-renderer" />
+}))
+
 // Mock fetch globally
 const mockFetch = jest.fn()
 global.fetch = mockFetch
@@ -33,7 +37,11 @@ describe('CodeEditor', () => {
       meta: {
         fileName: 'test.cs',
         relativePath: 'src/test.cs',
-        size: 100
+        size: 100,
+        lastEditedBy: 'developer'
+      },
+      content: {
+        mediaType: 'text/plain'
       }
     }
     
@@ -69,6 +77,9 @@ describe('CodeEditor', () => {
       meta: {
         fileName: 'test.cs',
         relativePath: 'src/test.cs'
+      },
+      content: {
+        mediaType: 'text/plain'
       }
     }
     
@@ -124,7 +135,7 @@ describe('CodeEditor', () => {
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
-        '/api/filesystem/content/test-node',
+        expect.stringContaining('/filesystem/content/test-node'),
         expect.objectContaining({
           method: 'PUT',
           headers: {
@@ -159,6 +170,9 @@ describe('CodeEditor', () => {
       meta: {
         fileName: 'test.cs',
         isReadOnly: true
+      },
+      content: {
+        mediaType: 'text/plain'
       }
     }
     
@@ -192,6 +206,9 @@ describe('CodeEditor', () => {
       title: 'test.cs',
       meta: {
         fileName: 'test.cs'
+      },
+      content: {
+        mediaType: 'text/plain'
       }
     }
     
@@ -236,6 +253,9 @@ describe('CodeEditor', () => {
         size: 1024,
         lastModified: '2023-01-01T12:00:00Z',
         lastEditedBy: 'developer'
+      },
+      content: {
+        mediaType: 'text/plain'
       }
     }
     

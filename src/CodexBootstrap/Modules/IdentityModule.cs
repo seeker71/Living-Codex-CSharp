@@ -260,7 +260,7 @@ public sealed class IdentityModule : ModuleBase
 
             // Create user node
             var userNode = new Node(
-                Id: $"user.{request.Username}",
+                Id: $"codex.user.{request.Username}.{Guid.NewGuid():N}",
                 TypeId: "codex.user",
                 State: ContentState.Ice,
                 Locale: "en",
@@ -296,16 +296,17 @@ public sealed class IdentityModule : ModuleBase
             Registry.Upsert(userNode);
 
             // Create email index edge for fast lookup
-            var emailIndexEdge = new Edge(
-                FromId: "email-index",
-                ToId: userNode.Id,
-                Role: "email-index",
-                Weight: 1.0,
-                Meta: new Dictionary<string, object>
+            var emailIndexEdge = NodeHelpers.CreateEdge(
+                fromId: "email-index",
+                toId: userNode.Id,
+                role: "email-index",
+                weight: 1.0,
+                meta: new Dictionary<string, object>
                 {
                     ["email"] = request.Email,
                     ["username"] = request.Username
-                }
+                },
+                roleId: NodeHelpers.TryResolveRoleId(Registry, "email-index")
             );
             Registry.Upsert(emailIndexEdge);
 
@@ -392,7 +393,7 @@ public sealed class IdentityModule : ModuleBase
             
             // Create session node
             var sessionNode = new Node(
-                Id: $"session.{sessionToken}",
+                Id: $"codex.session.{sessionToken}.{Guid.NewGuid():N}",
                 TypeId: "codex.session",
                 State: ContentState.Ice,
                 Locale: "en",
@@ -848,17 +849,18 @@ public sealed class IdentityModule : ModuleBase
 
     private void CreateEmailIndex(string email, string userId, string username)
     {
-        var emailIndexEdge = new Edge(
-            FromId: "email-index",
-            ToId: userId,
-            Role: "email-index",
-            Weight: 1.0,
-            Meta: new Dictionary<string, object>
+        var emailIndexEdge = NodeHelpers.CreateEdge(
+            fromId: "email-index",
+            toId: userId,
+            role: "email-index",
+            weight: 1.0,
+            meta: new Dictionary<string, object>
             {
                 ["email"] = email.ToLowerInvariant(),
                 ["username"] = username,
                 ["createdAt"] = DateTime.UtcNow
-            }
+            },
+            roleId: NodeHelpers.TryResolveRoleId(Registry, "email-index")
         );
         Registry.Upsert(emailIndexEdge);
     }

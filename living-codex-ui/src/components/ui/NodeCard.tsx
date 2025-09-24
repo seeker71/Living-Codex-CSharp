@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { ChevronDownIcon, ChevronRightIcon, LinkIcon, ExternalLinkIcon, EyeIcon, CodeBracketIcon } from '@heroicons/react/24/outline'
+import { ChevronDownIcon, ChevronRightIcon, LinkIcon, ArrowTopRightOnSquareIcon, EyeIcon, CodeBracketIcon } from '@heroicons/react/24/outline'
 
 export interface Node {
   id: string
@@ -84,14 +84,14 @@ export default function NodeCard({
     setLoading(true)
     try {
       // Load outgoing edges
-      const outgoingResponse = await fetch(`http://localhost:5002/storage-endpoints/edges/from/${node.id}`)
+      const outgoingResponse = await fetch(`http://localhost:5002/storage-endpoints/edges/from/${encodeURIComponent(node.id)}`)
       if (outgoingResponse.ok) {
         const outgoingData = await outgoingResponse.json()
         setOutgoingEdges(outgoingData.edges || [])
       }
 
       // Load incoming edges  
-      const incomingResponse = await fetch(`http://localhost:5002/storage-endpoints/edges/to/${node.id}`)
+      const incomingResponse = await fetch(`http://localhost:5002/storage-endpoints/edges/to/${encodeURIComponent(node.id)}`)
       if (incomingResponse.ok) {
         const incomingData = await incomingResponse.json()
         setIncomingEdges(incomingData.edges || [])
@@ -109,7 +109,7 @@ export default function NodeCard({
 
       const nodePromises = Array.from(nodeIds).map(async (nodeId) => {
         try {
-          const response = await fetch(`http://localhost:5002/storage-endpoints/nodes/${nodeId}`)
+          const response = await fetch(`http://localhost:5002/storage-endpoints/nodes/${encodeURIComponent(nodeId)}`)
           if (response.ok) {
             const data = await response.json()
             return { id: nodeId, node: data.node }
@@ -198,7 +198,7 @@ export default function NodeCard({
               rel="noopener noreferrer"
               className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-2"
             >
-              <ExternalLinkIcon className="w-4 h-4" />
+              <ArrowTopRightOnSquareIcon className="w-4 h-4" />
               {externalUri}
             </a>
             {mediaType && (

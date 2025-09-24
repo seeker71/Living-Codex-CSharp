@@ -18,8 +18,7 @@ public sealed class GalleryModule : ModuleBase
     public override string Description => "Visual expressions of consciousness and creativity";
     public override string Version => "1.0.0";
 
-    private new IApiRouter? _apiRouter;
-    private new CoreApiService? _coreApiService;
+    // Use base _apiRouter/_coreApiService from ModuleBase
 
     public GalleryModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
@@ -42,17 +41,7 @@ public sealed class GalleryModule : ModuleBase
         );
     }
 
-    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
-    {
-        _logger.Info("Gallery Module API handlers registered");
-        _apiRouter = router;
-    }
-
-    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
-    {
-        _logger.Info("Gallery Module HTTP endpoints registered");
-        _coreApiService = coreApi;
-    }
+    // No overrides for RegisterApiHandlers/RegisterHttpEndpoints to ensure base wiring runs.
 
     // Public methods for direct testing
     public async Task<object> ListGalleryItems(int? limit = 20, string? filter = null, string? sort = "resonance")
@@ -155,7 +144,7 @@ public sealed class GalleryModule : ModuleBase
                 return new ErrorResponse("Title and image URL are required");
             }
 
-            var itemId = $"gallery-item-{Guid.NewGuid():N}";
+            var itemId = $"codex.gallery.item.{Guid.NewGuid():N}";
             var itemNode = new Node(
                 Id: itemId,
                 TypeId: "codex.gallery.item",
@@ -538,7 +527,7 @@ public sealed class GalleryModule : ModuleBase
         try
         {
             var aiModuleNode = _registry.AllNodes()
-                .FirstOrDefault(n => n.TypeId == "codex.module" && n.Title?.Contains("AI") == true);
+                .FirstOrDefault(n => n.TypeId == "codex.meta/module" && n.Title?.Contains("AI") == true);
             return aiModuleNode;
         }
         catch

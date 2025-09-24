@@ -59,34 +59,15 @@ public class ServiceDiscoveryModule : ModuleBase
     /// </summary>
     private void RegisterApiGatewayNodes(INodeRegistry registry)
     {
-        // Register API Gateway module node
-        var apiGatewayNode = new Node(
-            Id: "codex.api-gateway",
-            TypeId: "codex.module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "API Gateway Module",
-            Description: "Integrated API Gateway functionality within Service Discovery Module - provides routing, load balancing, and service discovery",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    version = "1.0.0",
-                    capabilities = new[] { "service-discovery", "load-balancing", "routing", "health-monitoring", "circuit-breaker" },
-                    endpoints = new[] { "route-request", "load-balance", "gateway-health", "discover-route" },
-                    integration = "integrated-with-service-discovery"
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["name"] = "API Gateway Module",
-                ["version"] = "1.0.0",
-                ["type"] = "gateway",
-                ["parentModule"] = "codex.service.discovery",
-                ["capabilities"] = new[] { "service-discovery", "load-balancing", "routing", "health-monitoring" }
-            }
+        // Register API Gateway module node using CreateModuleNode
+        var apiGatewayNode = CreateModuleNode(
+            moduleId: "codex.api-gateway",
+            name: "API Gateway Module",
+            version: "1.0.0",
+            description: "Integrated API Gateway functionality within Service Discovery Module - provides routing, load balancing, and service discovery",
+            tags: new[] { "api-gateway", "routing", "load-balancing", "service-discovery" },
+            capabilities: new[] { "service-discovery", "load-balancing", "routing", "health-monitoring", "circuit-breaker" },
+            spec: "codex.spec.api-gateway"
         );
         registry.Upsert(apiGatewayNode);
 
@@ -116,7 +97,7 @@ public class ServiceDiscoveryModule : ModuleBase
         foreach (var route in routes)
         {
             var routeNode = new Node(
-                Id: $"api-gateway.route.{route.name}",
+                Id: $"codex.service-discovery.route.{route.name}.{Guid.NewGuid():N}",
                 TypeId: "codex.meta/route",
                 State: ContentState.Ice,
                 Locale: "en",
@@ -167,7 +148,7 @@ public class ServiceDiscoveryModule : ModuleBase
         foreach (var dto in dtos)
         {
             var dtoNode = new Node(
-                Id: $"api-gateway.dto.{dto.name}",
+                Id: $"codex.service-discovery.dto.{dto.name}.{Guid.NewGuid():N}",
                 TypeId: "codex.meta/type",
                 State: ContentState.Ice,
                 Locale: "en",
@@ -214,7 +195,7 @@ public class ServiceDiscoveryModule : ModuleBase
         foreach (var cls in classes)
         {
             var classNode = new Node(
-                Id: $"api-gateway.class.{cls.name}",
+                Id: $"codex.service-discovery.class.{cls.name}.{Guid.NewGuid():N}",
                 TypeId: "codex.meta/type",
                 State: ContentState.Ice,
                 Locale: "en",
@@ -410,7 +391,7 @@ public class ServiceDiscoveryModule : ModuleBase
 
             // Store as node in registry for persistence
             var serviceNode = new Node(
-                Id: $"service:{request.ServiceId}",
+                Id: $"codex.service.{request.ServiceId}.{Guid.NewGuid():N}",
                 TypeId: "service",
                 State: ContentState.Water,
                 Locale: "en",
@@ -545,7 +526,7 @@ public class ServiceDiscoveryModule : ModuleBase
 
             // Update node in registry
             var serviceNode = new Node(
-                Id: $"service:{request.ServiceId}",
+                Id: $"codex.service.{request.ServiceId}.{Guid.NewGuid():N}",
                 TypeId: "service",
                 State: ContentState.Water,
                 Locale: "en",

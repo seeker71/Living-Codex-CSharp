@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { ConceptStreamCard } from './ConceptStreamCard';
+import { Card, CardContent } from '@/components/ui/Card';
+import { PaginationControls } from '@/components/ui/PaginationControls';
 import { useConceptDiscovery, useUserDiscovery } from '@/lib/hooks';
 import { UILens } from '@/lib/atoms';
 
@@ -14,6 +16,9 @@ interface StreamLensProps {
 
 export function StreamLens({ lens, controls = {}, userId, className = '' }: StreamLensProps) {
   const [items, setItems] = useState<any[]>([]);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 12;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,10 +27,14 @@ export function StreamLens({ lens, controls = {}, userId, className = '' }: Stre
     axes: controls.axes || ['resonance'],
     joy: controls.joy || 0.7,
     serendipity: controls.serendipity || 0.5,
+    take: pageSize,
+    skip: (currentPage - 1) * pageSize,
   });
 
   const userQuery = useUserDiscovery({
     interests: controls.axes || ['resonance'],
+    take: pageSize,
+    skip: (currentPage - 1) * pageSize,
   });
 
 
@@ -37,7 +46,9 @@ export function StreamLens({ lens, controls = {}, userId, className = '' }: Stre
       try {
         // Combine concepts and users into a unified stream
         const concepts = conceptQuery.data?.concepts || conceptQuery.data?.discoveredConcepts || [];
+        const conceptTotal = (conceptQuery.data?.totalCount ?? conceptQuery.data?.totalDiscovered) || concepts.length;
         const users = userQuery.data?.users || [];
+        const usersTotal = userQuery.data?.totalCount || users.length;
         
         // Transform and merge data
         const conceptItems = concepts.map((concept: any) => ({
@@ -65,6 +76,7 @@ export function StreamLens({ lens, controls = {}, userId, className = '' }: Stre
         }
 
         setItems(combinedItems);
+        setTotalCount(conceptTotal + usersTotal);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load stream');
       } finally {
@@ -122,6 +134,19 @@ export function StreamLens({ lens, controls = {}, userId, className = '' }: Stre
           onAction={handleAction}
         />
       ))}
+
+      {totalCount > pageSize && (
+        <Card>
+          <CardContent className="p-4">
+            <PaginationControls
+              currentPage={currentPage}
+              pageSize={pageSize}
+              totalCount={totalCount}
+              onPageChange={setCurrentPage}
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

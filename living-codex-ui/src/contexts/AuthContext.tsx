@@ -70,9 +70,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
           // Validate token with backend
           const response = await endpoints.validateToken(storedToken);
           
-          if (response.success) {
+          const data: any = response.data || {};
+          if (response.success && (data.isValid === true || typeof data.user === 'object')) {
+            // Use the user data from the validation response if available
+            const validatedUser = data.user || user;
             setAuthState({
-              user,
+              user: validatedUser,
               token: storedToken,
               isLoading: false,
               isAuthenticated: true,
@@ -113,7 +116,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       if (response.success && response.data) {
         const responseData = response.data as any;
+        console.log('🔍 Login responseData structure:', JSON.stringify(responseData, null, 2));
+        
+        // Check if the backend response itself indicates success
+        if (!responseData.success) {
+          console.error('❌ Backend login failed:', responseData.message);
+          return { success: false, error: responseData.message || 'Login failed' };
+        }
+        
         const { token, user: userData } = responseData;
+        
+        console.log('🔍 Extracted token:', token);
+        console.log('🔍 Extracted userData:', userData);
         
         if (!token) {
           console.error('❌ No token in response:', responseData);
@@ -164,7 +178,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       if (response.success && response.data) {
         const responseData = response.data as any;
+        console.log('🔍 Register responseData structure:', JSON.stringify(responseData, null, 2));
+        
+        // Check if the backend response itself indicates success
+        if (!responseData.success) {
+          console.error('❌ Backend registration failed:', responseData.message);
+          return { success: false, error: responseData.message || 'Registration failed' };
+        }
+        
         const { token, user: userData } = responseData;
+        
+        console.log('🔍 Extracted token:', token);
+        console.log('🔍 Extracted userData:', userData);
         
         if (token && userData) {
           // Registration successful with immediate login
@@ -186,6 +211,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
             isLoading: false,
             isAuthenticated: true,
           });
+
+          // Refresh profile from backend to ensure email/displayName are synced
+          try {
+            const prof = await endpoints.getUserProfile(user.id);
+            if (prof.success && (prof.data as any)?.profile) {
+              const p = (prof.data as any).profile;
+              const updated: User = {
+                id: p.id || user.id,
+                username: p.username || user.username,
+                email: p.email || user.email,
+                displayName: p.displayName || user.displayName,
+                createdAt: p.createdAt || user.createdAt,
+                isActive: user.isActive,
+              };
+              localStorage.setItem('auth_user', JSON.stringify(updated));
+              setAuthState(prev => ({ ...prev, user: updated }));
+            }
+          } catch {}
 
           console.log('✅ Registration successful for:', user.username);
           return { success: true };

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { RouteStatusBadge, type RouteStatus } from './RouteStatusBadge'
+import { buildApiUrl } from '@/lib/config'
 
 interface FileNode {
   id: string
@@ -11,10 +12,81 @@ interface FileNode {
   absolutePath: string
   size: number
   lastModified: string
+  meta?: {
+    fileName?: string
+    relativePath?: string
+    absolutePath?: string
+    size?: number
+    lastModified?: string
+    isReadOnly?: boolean
+  }
   contentRef: {
     mediaType?: string
     externalUri?: string
     hasInlineContent?: boolean
+  }
+}
+
+type RawFileNode = {
+  id: string
+  name?: string
+  title?: string
+  type?: string
+  typeId?: string
+  relativePath?: string
+  absolutePath?: string
+  size?: number
+  lastModified?: string
+  meta?: {
+    fileName?: string
+    relativePath?: string
+    absolutePath?: string
+    size?: number
+    lastModified?: string
+    isReadOnly?: boolean
+  }
+  content?: {
+    mediaType?: string
+    externalUri?: string
+    inlineJson?: unknown
+    inlineBytes?: unknown
+  }
+  contentRef?: {
+    mediaType?: string
+    externalUri?: string
+    hasInlineContent?: boolean
+  }
+}
+
+const normalizeFileNode = (node: RawFileNode): FileNode => {
+  const meta = node.meta ?? {}
+  const fallbackName = node.name || node.title || meta.fileName || node.id
+  const relativePath = node.relativePath || meta.relativePath || fallbackName || ''
+  const absolutePath = node.absolutePath || meta.absolutePath || relativePath
+
+  return {
+    id: node.id,
+    name: fallbackName || '',
+    type: node.type || node.typeId || 'file',
+    relativePath,
+    absolutePath,
+    size: typeof node.size === 'number' ? node.size : meta.size ?? 0,
+    lastModified: node.lastModified || meta.lastModified || new Date().toISOString(),
+    meta: {
+      ...meta,
+      fileName: meta.fileName || fallbackName,
+      relativePath,
+      absolutePath,
+      size: meta.size ?? node.size ?? 0,
+      lastModified: meta.lastModified || node.lastModified,
+    },
+    contentRef: {
+      mediaType: node.contentRef?.mediaType ?? node.content?.mediaType,
+      externalUri: node.contentRef?.externalUri ?? node.content?.externalUri,
+      hasInlineContent:
+        node.contentRef?.hasInlineContent ??
+        Boolean(node.content?.inlineJson || node.content?.inlineBytes),
+    },
   }
 }
 
@@ -53,15 +125,19 @@ export function FileBrowser({
     setError(null)
     
     try {
-      const response = await fetch('http://localhost:5002/filesystem/files')
+      const response = await fetch(buildApiUrl('/filesystem/files?limit=1000'))
       if (!response.ok) {
         throw new Error(`Failed to load files: ${response.statusText}`)
       }
       
       const data = await response.json()
-      const nodes: FileNode[] = data.files || data.nodes || []
-      setFileNodes(nodes)
-      setTreeStructure(buildTreeStructure(nodes))
+      const rawNodes: RawFileNode[] = Array.isArray(data)
+        ? data
+        : data.files || data.nodes || []
+
+      const normalizedNodes = rawNodes.map(normalizeFileNode)
+      setFileNodes(normalizedNodes)
+      setTreeStructure(buildTreeStructure(normalizedNodes))
       setStatus('FullyTested')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load files')
@@ -77,7 +153,7 @@ export function FileBrowser({
 
     // First pass: create all directory nodes
     nodes.forEach(node => {
-      const relativePath = node.relativePath || ''
+      const relativePath = node.relativePath || node.meta?.relativePath || node.name || ''
       if (!relativePath) return // Skip nodes without valid paths
       const pathParts = relativePath.split('/').filter(part => part.length > 0)
       
@@ -205,6 +281,9 @@ export function FileBrowser({
               <span className={`text-gray-600 dark:text-gray-400 ${isSelected ? 'font-medium' : ''}`}>
                 {node.name}
               </span>
+              {node.fileNode?.meta?.isReadOnly && (
+                <span className="text-xs text-gray-400">🔒</span>
+              )}
               {node.fileNode?.contentRef?.hasInlineContent === false && (
                 <span className="text-xs text-blue-500">🔗</span>
               )}

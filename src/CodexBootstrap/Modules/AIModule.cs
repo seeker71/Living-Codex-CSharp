@@ -91,11 +91,17 @@ namespace CodexBootstrap.Modules
             Environment.GetEnvironmentVariable("OPENAI_CODEGEN_MODEL") ?? "gpt-5-codex",
             0.2f, 8192, 0.95f, Environment.GetEnvironmentVariable("OPENAI_BASE_URL") ?? "https://api.openai.com/v1");
 
-        // OpenAI default (non-codegen) configuration defaults to GPT-5 mini if available
+        // OpenAI default (non-codegen) configuration - use cheap, fast model for news analysis
         public static readonly LLMConfig OpenAI_Default = CreateConfig(
             "openai-default", "OpenAI Default (Non-Code)", "openai",
-            Environment.GetEnvironmentVariable("OPENAI_DEFAULT_MODEL") ?? "gpt-5-mini",
-            0.3f, 4096, 0.9f, Environment.GetEnvironmentVariable("OPENAI_BASE_URL") ?? "https://api.openai.com/v1");
+            Environment.GetEnvironmentVariable("OPENAI_DEFAULT_MODEL") ?? "gpt-4o-mini",
+            0.3f, 2048, 0.9f, Environment.GetEnvironmentVariable("OPENAI_BASE_URL") ?? "https://api.openai.com/v1");
+
+        // OpenAI news analysis configuration - optimized for fast, cheap news processing
+        public static readonly LLMConfig OpenAI_NewsAnalysis = CreateConfig(
+            "openai-news-analysis", "OpenAI News Analysis", "openai",
+            Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "gpt-4o-mini",
+            0.2f, 1024, 0.8f, Environment.GetEnvironmentVariable("OPENAI_BASE_URL") ?? "https://api.openai.com/v1");
 
         // Cursor Background Agent API configurations
         public static readonly LLMConfig Cursor_Default = CreateConfig(
@@ -110,6 +116,23 @@ namespace CodexBootstrap.Modules
         // Get configuration for a specific task
         public static LLMConfig GetConfigForTask(string task, string? preferredProvider = null, string? preferredModel = null)
         {
+            // Force local Ollama usage while the system stabilizes
+            var forceOllamaEnv = Environment.GetEnvironmentVariable("USE_OLLAMA_ONLY");
+            var forceOllama = string.Equals(forceOllamaEnv ?? "true", "true", StringComparison.OrdinalIgnoreCase);
+            if (forceOllama)
+            {
+                var normalized = task.ToLowerInvariant();
+                return normalized switch
+                {
+                    "concept-extraction" => MacM1_ConceptExtraction,
+                    "scoring-analysis" => MacM1_ConceptExtraction,
+                    "fractal-transformation" => MacM1_FractalTransform,
+                    "fractal-transform" => MacM1_FractalTransform,
+                    "future-query" => MacM1_FutureQuery,
+                    _ => MacM1_ConceptExtraction
+                };
+            }
+
             // If specific model/provider requested, use them
             if (!string.IsNullOrEmpty(preferredProvider) && !string.IsNullOrEmpty(preferredModel))
             {
@@ -136,9 +159,19 @@ namespace CodexBootstrap.Modules
                                 normalizedTask == "ui-component-generation" ||
                                 normalizedTask == "ui-pattern-evolution";
 
+            var isNewsAnalysisTask = normalizedTask == "concept-extraction" ||
+                                    normalizedTask == "scoring-analysis" ||
+                                    normalizedTask == "fractal-transformation" ||
+                                    normalizedTask == "fractal-transform";
+
             if (isOpenAIConfigured)
             {
-                return isCodeGenTask ? OpenAI_CodeGeneration : OpenAI_Default;
+                if (isCodeGenTask)
+                    return OpenAI_CodeGeneration;
+                else if (isNewsAnalysisTask)
+                    return OpenAI_NewsAnalysis;
+                else
+                    return OpenAI_Default;
             }
             if (isCursorConfigured)
             {
@@ -197,13 +230,13 @@ namespace CodexBootstrap.Modules
         public override string Description => "Streamlined AI functionality with configurable prompts and reusable patterns";
         public override string Version => "2.0.0";
 
-        public AIModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+        public AIModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, CancellationTokenSource? shutdownCts = null) 
             : base(registry, logger)
         {
             // Initialize LLM infrastructure
             var llmClient = new LLMClient(httpClient, logger);
             _promptRepo = new PromptTemplateRepository(registry);
-            _llmOrchestrator = new LLMOrchestrator(llmClient, _promptRepo, logger);
+            _llmOrchestrator = new LLMOrchestrator(llmClient, _promptRepo, logger, shutdownCts);
             
             // Register default prompt templates
             RegisterPromptTemplates();
@@ -588,7 +621,8 @@ IMPORTANT: Return ONLY a valid JSON object with the evolved template, no markdow
         [ApiRoute("GET", "/ai/health", "ai-health", "AI Module health check", "ai-module")]
         public async Task<object> HandleHealthAsync(Dictionary<string, string> parameters)
         {
-            var llmAvailable = await new LLMClient(new HttpClient(), _logger).IsServiceAvailableAsync();
+            // Simple health check without making AI calls during startup
+            // AI service availability should be checked lazily when actually needed
             var promptCount = _promptRepo.GetTemplatesByCategory("analysis").Count + 
                              _promptRepo.GetTemplatesByCategory("transformation").Count + 
                              _promptRepo.GetTemplatesByCategory("future").Count;
@@ -598,7 +632,7 @@ IMPORTANT: Return ONLY a valid JSON object with the evolved template, no markdow
                 success = true,
                 module = Name,
                 version = Version,
-                llmServiceAvailable = llmAvailable,
+                llmServiceConfigured = true, // Assume configured, check lazily when needed
                 promptTemplatesLoaded = promptCount,
                 timestamp = DateTimeOffset.UtcNow
             };
@@ -615,6 +649,7 @@ IMPORTANT: Return ONLY a valid JSON object with the evolved template, no markdow
                 }
 
                 var config = LLMConfigurations.GetConfigForTask("concept-extraction", request.Provider, request.Model);
+                _logger.Info($"AI_CALL extract-concepts provider={config.Provider} model={config.Model} baseUrl={config.BaseUrl} chars={request.Content.Length}");
                 var result = await _llmOrchestrator.ExecuteAsync("concept-extraction", new Dictionary<string, object>
                 {
                     ["content"] = request.Content
@@ -640,6 +675,7 @@ IMPORTANT: Return ONLY a valid JSON object with the evolved template, no markdow
                 }
 
                 var config = LLMConfigurations.GetConfigForTask("fractal-transformation", request.Provider, request.Model);
+                _logger.Info($"AI_CALL fractal-transform provider={config.Provider} model={config.Model} baseUrl={config.BaseUrl} chars={request.Content.Length}");
                 var result = await _llmOrchestrator.ExecuteAsync("fractal-transformation", new Dictionary<string, object>
                 {
                     ["content"] = request.Content,
@@ -666,6 +702,7 @@ IMPORTANT: Return ONLY a valid JSON object with the evolved template, no markdow
                 }
 
                 var config = LLMConfigurations.GetConfigForTask("scoring-analysis", request.Provider, request.Model);
+                _logger.Info($"AI_CALL score-analysis provider={config.Provider} model={config.Model} baseUrl={config.BaseUrl} chars={request.Content.Length}");
                 var result = await _llmOrchestrator.ExecuteAsync("scoring-analysis", new Dictionary<string, object>
                 {
                     ["content"] = request.Content,

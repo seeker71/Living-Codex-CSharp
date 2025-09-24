@@ -72,6 +72,11 @@ public class NodeRegistry : INodeRegistry
             if (loadedIceNodes != null)
             {
                 iceNodes = loadedIceNodes.ToList();
+                _logger.Info($"Loaded {iceNodes.Count} Ice nodes from storage backend");
+            }
+            else
+            {
+                _logger.Warn("Ice storage backend returned null nodes");
             }
         }
         catch (Exception ex)
@@ -85,6 +90,11 @@ public class NodeRegistry : INodeRegistry
             if (loadedWaterNodes != null)
             {
                 waterNodes = loadedWaterNodes.ToList();
+                _logger.Info($"Loaded {waterNodes.Count} Water nodes from storage backend");
+            }
+            else
+            {
+                _logger.Warn("Water storage backend returned null nodes");
             }
         }
         catch (Exception ex)
@@ -137,6 +147,10 @@ public class NodeRegistry : INodeRegistry
 
             hydratedIceCount = _iceNodes.Count;
             hydratedWaterCount = _waterNodes.Count;
+            var totalHydratedCount = hydratedIceCount + hydratedWaterCount;
+
+            _logger.Info($"NodeRegistry initialization complete - RAM collections: Ice={hydratedIceCount}, Water={hydratedWaterCount}, Total={totalHydratedCount}");
+            _logger.Info($"Skipped {skippedWaterCount} Water nodes (already in Ice collection)");
 
             // Load edges from storage
             await LoadEdgesFromStorageAsync();
@@ -214,6 +228,9 @@ public class NodeRegistry : INodeRegistry
             _logger.Warn($"Registry not initialized, but storing node {node.Id} anyway");
         }
 
+        // Determine if this is a new node before mutating collections
+        var isNewNode = !_iceNodes.ContainsKey(node.Id) && !_waterNodes.ContainsKey(node.Id) && !_gasNodes.ContainsKey(node.Id);
+
         _lock.EnterWriteLock();
         try
         {
@@ -267,6 +284,94 @@ public class NodeRegistry : INodeRegistry
 
         // Log after releasing the lock to avoid potential deadlocks
         _logger.Info($"Successfully cached {node.State} node {node.Id} in memory");
+
+        // Enforce edges only for brand-new nodes
+        if (isNewNode)
+        {
+            try
+            {
+                EnforceEdgesForNewNode(node);
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"Edge enforcement failed for new node {node.Id}: {ex.Message}");
+            }
+        }
+    }
+
+    private void EnforceEdgesForNewNode(Node node)
+    {
+        // 1) Identity self-edge
+        var identityEdge = NodeHelpers.CreateEdge(
+            node.Id,
+            node.Id,
+            role: "identity",
+            weight: 1.0,
+            meta: new Dictionary<string, object> { ["relationship"] = "identity-self" }
+        );
+        Upsert(identityEdge);
+
+        // 2) Instance-of edge to the node's declared typeId (so meta nodes aggregate instances)
+        var metaTypeId = node.TypeId;
+        if (!string.IsNullOrWhiteSpace(metaTypeId))
+        {
+            var instanceEdge = NodeHelpers.CreateEdge(
+                node.Id,
+                metaTypeId!,
+                role: "instance-of",
+                weight: 1.0,
+                meta: new Dictionary<string, object> { ["relationship"] = "node-instance-of-type" },
+                roleId: NodeHelpers.TryResolveRoleId(this, "instance-of")
+            );
+            Upsert(instanceEdge);
+        }
+
+        // 3) Derived relationship from parentNodeId -> node
+        if (node.Meta != null && node.Meta.TryGetValue("parentNodeId", out var parentObj))
+        {
+            var parentId = parentObj?.ToString();
+            if (!string.IsNullOrWhiteSpace(parentId))
+            {
+                var derivedEdge = NodeHelpers.CreateEdge(
+                    parentId!,
+                    node.Id,
+                    role: "has_content",
+                    weight: 1.0,
+                    meta: new Dictionary<string, object> { ["relationship"] = "node-has-content" },
+                    roleId: NodeHelpers.TryResolveRoleId(this, "has_content")
+                );
+                Upsert(derivedEdge);
+            }
+        }
+
+        // 4) Content type relationship node -> contentType
+        var mediaType = node.Content?.MediaType;
+        if (!string.IsNullOrWhiteSpace(mediaType))
+        {
+            string contentTypeId = mediaType switch
+            {
+                "text/plain" => "codex.meta/type/text",
+                "text/markdown" => "codex.meta/type/markdown",
+                "application/json" => "codex.meta/type/json",
+                "text/html" => "codex.meta/type/html",
+                "image/png" => "codex.meta/type/image",
+                "image/jpeg" => "codex.meta/type/image",
+                "image/svg+xml" => "codex.meta/type/svg",
+                "video/mp4" => "codex.meta/type/video",
+                "audio/mp3" => "codex.meta/type/audio",
+                _ => "codex.meta/type/content"
+            };
+
+            var contentTypeEdge = NodeHelpers.CreateEdge(
+                node.Id,
+                contentTypeId,
+                role: "has_content_type",
+                weight: 1.0,
+                meta: new Dictionary<string, object> { ["relationship"] = "node-has-content-type", ["mediaType"] = mediaType! },
+                roleId: NodeHelpers.TryResolveRoleId(this, "has_content_type")
+            );
+            Upsert(contentTypeEdge);
+        }
     }
 
     private void CacheNodeInMemory(Node node)
@@ -301,10 +406,8 @@ public class NodeRegistry : INodeRegistry
         _lock.EnterWriteLock();
         try
         {
-            if (!_isInitialized)
-            {
-                throw new InvalidOperationException("Registry not initialized. Call InitializeAsync() first.");
-            }
+            // Allow edge upsert even before full initialization.
+            // Edges will be kept in memory and persisted once initialization completes.
 
             var edgeKey = BuildEdgeKey(edge.FromId, edge.ToId, edge.Role);
             if (_edgeRecords.TryGetValue(edgeKey, out var record))
@@ -333,11 +436,14 @@ public class NodeRegistry : INodeRegistry
             }
             else
             {
-                var desiredState = DetermineDesiredEdgeState(edge.FromId, edge.ToId);
+                var desiredState = _isInitialized ? DetermineDesiredEdgeState(edge.FromId, edge.ToId) : ContentState.Gas;
                 record = new EdgeRecord(edge, desiredState);
                 _edgeRecords[edgeKey] = record;
                 IndexEdge(edgeKey, edge);
-                HandleEdgeStateEntry(edgeKey, record, desiredState);
+                if (_isInitialized)
+                {
+                    HandleEdgeStateEntry(edgeKey, record, desiredState);
+                }
             }
         }
         finally
@@ -726,11 +832,26 @@ public class NodeRegistry : INodeRegistry
             _lock.ExitReadLock();
         }
 
+        // Log RAM collection counts for debugging
+        var iceCount = _iceNodes.Count;
+        var waterCount = _waterNodes.Count;
+        var gasCount = _gasNodes.Count;
+        var totalRamCount = iceCount + waterCount + gasCount;
+        
+        _logger.Info($"GetNodesByType('{typeId}') - RAM collections: Ice={iceCount}, Water={waterCount}, Gas={gasCount}, Total={totalRamCount}");
+
         // Return nodes from all local collections
         var allNodes = new List<Node>();
-        allNodes.AddRange(_iceNodes.Values.Where(n => n.TypeId == typeId));
-        allNodes.AddRange(_waterNodes.Values.Where(n => n.TypeId == typeId));
-        allNodes.AddRange(_gasNodes.Values.Where(n => n.TypeId == typeId));
+        var iceMatches = _iceNodes.Values.Where(n => n.TypeId == typeId).ToList();
+        var waterMatches = _waterNodes.Values.Where(n => n.TypeId == typeId).ToList();
+        var gasMatches = _gasNodes.Values.Where(n => n.TypeId == typeId).ToList();
+        
+        allNodes.AddRange(iceMatches);
+        allNodes.AddRange(waterMatches);
+        allNodes.AddRange(gasMatches);
+        
+        _logger.Info($"GetNodesByType('{typeId}') - Found in RAM: Ice={iceMatches.Count}, Water={waterMatches.Count}, Gas={gasMatches.Count}, Total={allNodes.Count}");
+        
         return allNodes;
     }
 
@@ -753,7 +874,51 @@ public class NodeRegistry : INodeRegistry
         var waterNodes = await _waterStorage.GetWaterNodesByTypeAsync(typeId);
         var gasNodes = _gasNodes.Values.Where(n => n.TypeId == typeId);
 
-        return iceNodes.Concat(waterNodes).Concat(gasNodes);
+        var iceList = iceNodes.ToList();
+        var waterList = waterNodes.ToList();
+        var gasList = gasNodes.ToList();
+        
+        _logger.Info($"GetNodesByTypeAsync('{typeId}') - Storage backend counts: Ice={iceList.Count}, Water={waterList.Count}, Gas={gasList.Count}, Total={iceList.Count + waterList.Count + gasList.Count}");
+
+        return iceList.Concat(waterList).Concat(gasList);
+    }
+
+    public IEnumerable<Node> GetNodesByTypePrefix(string typeIdPrefix)
+    {
+        _lock.EnterReadLock();
+        try
+        {
+            if (!_isInitialized)
+            {
+                throw new InvalidOperationException("Registry not initialized. Call InitializeAsync() first.");
+            }
+        }
+        finally
+        {
+            _lock.ExitReadLock();
+        }
+
+        // Log RAM collection counts for debugging
+        var iceCount = _iceNodes.Count;
+        var waterCount = _waterNodes.Count;
+        var gasCount = _gasNodes.Count;
+        var totalRamCount = iceCount + waterCount + gasCount;
+        
+        _logger.Info($"GetNodesByTypePrefix('{typeIdPrefix}') - RAM collections: Ice={iceCount}, Water={waterCount}, Gas={gasCount}, Total={totalRamCount}");
+
+        // Return nodes from all local collections matching the prefix
+        var allNodes = new List<Node>();
+        var iceMatches = _iceNodes.Values.Where(n => n.TypeId != null && n.TypeId.StartsWith(typeIdPrefix)).ToList();
+        var waterMatches = _waterNodes.Values.Where(n => n.TypeId != null && n.TypeId.StartsWith(typeIdPrefix)).ToList();
+        var gasMatches = _gasNodes.Values.Where(n => n.TypeId != null && n.TypeId.StartsWith(typeIdPrefix)).ToList();
+        
+        allNodes.AddRange(iceMatches);
+        allNodes.AddRange(waterMatches);
+        allNodes.AddRange(gasMatches);
+        
+        _logger.Info($"GetNodesByTypePrefix('{typeIdPrefix}') - Found in RAM: Ice={iceMatches.Count}, Water={waterMatches.Count}, Gas={gasMatches.Count}, Total={allNodes.Count}");
+        
+        return allNodes;
     }
 
     public IEnumerable<Node> GetNodesByState(ContentState state)

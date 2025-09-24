@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using System.Text.Json;
 using CodexBootstrap.Core;
 using CodexBootstrap.Runtime;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace CodexBootstrap.Modules;
 
@@ -60,6 +62,63 @@ public class FileSystemModule : ModuleBase, IDisposable
         {
             _logger.Error($"Failed to setup file system watcher: {ex.Message}");
         }
+
+        // Start automatic file system initialization in background
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(2000); // Wait 2 seconds for system to stabilize
+                await InitializeFileSystemInBackground();
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Failed to initialize file system in background: {ex.Message}");
+            }
+        });
+    }
+
+    /// <summary>
+    /// Initialize file system nodes in background - replaces manual initialization endpoint
+    /// </summary>
+    private async Task InitializeFileSystemInBackground()
+    {
+        try
+        {
+            _logger.Info($"FileSystemModule: Starting automatic file system initialization for {_projectRoot}");
+            
+            var createdNodes = 0;
+            var updatedNodes = 0;
+            var errors = new List<string>();
+
+            await foreach (var filePath in GetAllProjectFilesAsync())
+            {
+                try
+                {
+                    var result = await CreateOrUpdateFileNode(filePath);
+                    if (result.created)
+                        createdNodes++;
+                    else
+                        updatedNodes++;
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"{filePath}: {ex.Message}");
+                    _logger.Error($"Failed to create node for {filePath}: {ex.Message}");
+                }
+            }
+
+            _logger.Info($"FileSystemModule: Background initialization completed - Created: {createdNodes}, Updated: {updatedNodes}, Errors: {errors.Count}");
+            
+            if (errors.Count > 0)
+            {
+                _logger.Warn($"FileSystemModule: {errors.Count} files failed to initialize. First few errors: {string.Join("; ", errors.Take(5))}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"FileSystemModule: Background initialization failed: {ex.Message}");
+        }
     }
 
     public override string Name => "File System";
@@ -85,7 +144,7 @@ public class FileSystemModule : ModuleBase, IDisposable
     /// <summary>
     /// Initialize all project files as nodes in the registry
     /// </summary>
-    [ApiRoute("POST", "/filesystem/initialize", "filesystem-initialize", "Initialize all project files as nodes", "codex.filesystem")]
+    // Removed manual initialization endpoint - file system now initializes automatically in background
     public async Task<object> InitializeFileSystemNodes()
     {
         try
@@ -100,31 +159,36 @@ public class FileSystemModule : ModuleBase, IDisposable
                 {
                     var result = await CreateOrUpdateFileNode(filePath);
                     if (result.created)
+                    {
                         createdNodes++;
+                    }
                     else
+                    {
                         updatedNodes++;
+                    }
                 }
                 catch (Exception ex)
                 {
                     errors.Add($"{filePath}: {ex.Message}");
-                    _logger.Error($"Failed to create node for {filePath}: {ex.Message}");
+                    _logger.Debug($"InitializeFileSystemNodes error for {filePath}: {ex.Message}");
                 }
             }
 
             return new
             {
                 success = true,
-                message = "File system initialization completed",
+                message = "File system initialization complete",
                 projectRoot = _projectRoot,
                 createdNodes,
                 updatedNodes,
-                errors = errors.Take(10).ToArray(), // Limit error list
-                totalErrors = errors.Count
+                totalProcessed = createdNodes + updatedNodes,
+                errors = errors.Take(10).ToArray(),
+                errorCount = errors.Count
             };
         }
         catch (Exception ex)
         {
-            return new ErrorResponse($"Failed to initialize file system: {ex.Message}");
+            return new ErrorResponse($"Failed to initialize file system nodes: {ex.Message}");
         }
     }
 
@@ -138,8 +202,8 @@ public class FileSystemModule : ModuleBase, IDisposable
     {
         try
         {
-            var allNodes = _registry.AllNodes().ToList();
-            var fileNodes = allNodes.Where(n => n.TypeId.StartsWith("codex.file/")).ToList();
+            // Use efficient prefix query for file nodes (codex.file/csharp, codex.file/typescript, etc.)
+            var fileNodes = _registry.GetNodesByTypePrefix("codex.file/").ToList();
 
             // Apply filters
             if (!string.IsNullOrEmpty(type))
@@ -647,8 +711,8 @@ public class FileSystemModule : ModuleBase, IDisposable
         var extension = Path.GetExtension(absolutePath).TrimStart('.');
         var fileInfo = new FileInfo(absolutePath);
 
-        // Generate consistent node ID based on relative path
-        var nodeId = $"file:{relativePath.Replace('\\', '/').Replace('/', '.')}";
+        // Generate consistent, namespaced node ID using a hash of the relative path
+        var nodeId = FileNodeId(relativePath);
 
         // Determine file type
         var fileType = GetFileType(extension);
@@ -691,13 +755,30 @@ public class FileSystemModule : ModuleBase, IDisposable
         var existed = _registry.TryGet(nodeId, out var _);
         _registry.Upsert(node);
 
+        // Ensure baseline relationship from filesystem module to file node
+        // This guarantees each file node has at least one edge/relationship for UI rendering
+        var moduleNodeId = "codex.filesystem";
+        var baselineEdge = new Edge(
+            FromId: moduleNodeId,
+            ToId: nodeId,
+            Role: "contains",
+            Weight: 1.0,
+            Meta: new Dictionary<string, object>
+            {
+                ["relationship"] = "module-contains-file",
+                ["directory"] = meta.GetValueOrDefault("directory") ?? "",
+                ["projectRoot"] = _projectRoot
+            }
+        );
+        _registry.Upsert(baselineEdge);
+
         return (nodeId, !existed);
     }
 
     private async Task<object> CreateSearchResult(string filePath, string matchType, object matchData)
     {
         var relativePath = Path.GetRelativePath(_projectRoot, filePath);
-        var nodeId = $"file:{relativePath.Replace('\\', '/').Replace('/', '.')}";
+        var nodeId = FileNodeId(relativePath);
 
         return new
         {
@@ -913,6 +994,23 @@ public class FileSystemModule : ModuleBase, IDisposable
         return result;
     }
 
+    // === Helpers for stable, unique file node IDs ===
+    private static string ComputePathHash(string path)
+    {
+        var normalized = path.Replace('\\', '/');
+        using var sha = SHA256.Create();
+        var bytes = Encoding.UTF8.GetBytes(normalized);
+        var hash = sha.ComputeHash(bytes);
+        // Use 16 hex chars (64 bits) for brevity; adjust if collision risk changes
+        return Convert.ToHexString(hash).ToLowerInvariant().Substring(0, 16);
+    }
+
+    private static string FileNodeId(string relativePath)
+    {
+        var h = ComputePathHash(relativePath);
+        return $"codex.filesystem.file.{h}";
+    }
+
     private string? FindProjectRoot()
     {
         var current = Environment.CurrentDirectory;
@@ -964,6 +1062,7 @@ public class FileSystemModule : ModuleBase, IDisposable
             "cs" => "csharp",
             "tsx" or "ts" => "typescript",
             "jsx" or "js" => "javascript",
+            "py" => "python",
             "json" => "json",
             "md" => "markdown",
             "yml" or "yaml" => "yaml",
@@ -977,6 +1076,63 @@ public class FileSystemModule : ModuleBase, IDisposable
             "dockerfile" => "docker",
             "gitignore" => "gitignore",
             "config" => "config",
+            // Image files
+            "svg" => "svg",
+            "png" => "png",
+            "jpg" or "jpeg" => "jpeg",
+            "gif" => "gif",
+            "bmp" => "bmp",
+            "webp" => "webp",
+            "ico" => "ico",
+            "tiff" or "tif" => "tiff",
+            // Video files
+            "mp4" => "mp4",
+            "avi" => "avi",
+            "mov" => "mov",
+            "wmv" => "wmv",
+            "flv" => "flv",
+            "webm" => "webm",
+            "mkv" => "mkv",
+            // Audio files
+            "mp3" => "mp3",
+            "wav" => "wav",
+            "flac" => "flac",
+            "aac" => "aac",
+            "ogg" => "ogg",
+            // Test result files
+            "trx" => "trx",
+            // Archive files
+            "zip" => "zip",
+            "rar" => "rar",
+            "7z" => "7z",
+            "tar" => "tar",
+            "gz" => "gz",
+            // Document files
+            "pdf" => "pdf",
+            "doc" => "doc",
+            "docx" => "docx",
+            "xls" => "xls",
+            "xlsx" => "xlsx",
+            "ppt" => "ppt",
+            "pptx" => "pptx",
+            "rtf" => "rtf",
+            "odt" => "odt",
+            "ods" => "ods",
+            "odp" => "odp",
+            // Font files
+            "ttf" => "ttf",
+            "otf" => "otf",
+            "woff" => "woff",
+            "woff2" => "woff2",
+            "eot" => "eot",
+            // Other common files
+            "log" => "log",
+            "ini" => "ini",
+            "conf" => "conf",
+            "properties" => "properties",
+            "env" => "env",
+            "lock" => "lock",
+            "toml" => "toml",
             _ => "unknown"
         };
     }
@@ -988,6 +1144,7 @@ public class FileSystemModule : ModuleBase, IDisposable
             "cs" => "text/x-csharp",
             "tsx" or "ts" => "text/typescript",
             "jsx" or "js" => "text/javascript",
+            "py" => "text/x-python",
             "json" => "application/json",
             "md" => "text/markdown",
             "yml" or "yaml" => "application/x-yaml",
@@ -998,6 +1155,66 @@ public class FileSystemModule : ModuleBase, IDisposable
             "txt" => "text/plain",
             "sql" => "application/sql",
             "sh" => "application/x-sh",
+            "dockerfile" => "text/x-dockerfile",
+            "gitignore" => "text/plain",
+            "config" => "text/plain",
+            // Image files
+            "svg" => "image/svg+xml",
+            "png" => "image/png",
+            "jpg" or "jpeg" => "image/jpeg",
+            "gif" => "image/gif",
+            "bmp" => "image/bmp",
+            "webp" => "image/webp",
+            "ico" => "image/x-icon",
+            "tiff" or "tif" => "image/tiff",
+            // Video files
+            "mp4" => "video/mp4",
+            "avi" => "video/x-msvideo",
+            "mov" => "video/quicktime",
+            "wmv" => "video/x-ms-wmv",
+            "flv" => "video/x-flv",
+            "webm" => "video/webm",
+            "mkv" => "video/x-matroska",
+            // Audio files
+            "mp3" => "audio/mpeg",
+            "wav" => "audio/wav",
+            "flac" => "audio/flac",
+            "aac" => "audio/aac",
+            "ogg" => "audio/ogg",
+            // Test result files
+            "trx" => "application/xml", // TRX files are XML-based test result files
+            // Archive files
+            "zip" => "application/zip",
+            "rar" => "application/x-rar-compressed",
+            "7z" => "application/x-7z-compressed",
+            "tar" => "application/x-tar",
+            "gz" => "application/gzip",
+            // Document files
+            "pdf" => "application/pdf",
+            "doc" => "application/msword",
+            "docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "xls" => "application/vnd.ms-excel",
+            "xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "ppt" => "application/vnd.ms-powerpoint",
+            "pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "rtf" => "application/rtf",
+            "odt" => "application/vnd.oasis.opendocument.text",
+            "ods" => "application/vnd.oasis.opendocument.spreadsheet",
+            "odp" => "application/vnd.oasis.opendocument.presentation",
+            // Font files
+            "ttf" => "font/ttf",
+            "otf" => "font/otf",
+            "woff" => "font/woff",
+            "woff2" => "font/woff2",
+            "eot" => "application/vnd.ms-fontobject",
+            // Other common files
+            "log" => "text/plain",
+            "ini" => "text/plain",
+            "conf" => "text/plain",
+            "properties" => "text/plain",
+            "env" => "text/plain",
+            "lock" => "text/plain",
+            "toml" => "text/x-toml",
             _ => "text/plain"
         };
     }
@@ -1005,7 +1222,12 @@ public class FileSystemModule : ModuleBase, IDisposable
     private bool IsTextFile(string filePath)
     {
         var extension = Path.GetExtension(filePath).ToLower();
-        var textExtensions = new[] { ".cs", ".ts", ".tsx", ".js", ".jsx", ".json", ".md", ".txt", ".yml", ".yaml", ".xml", ".html", ".css", ".scss", ".sql", ".sh", ".config" };
+        var textExtensions = new[] { 
+            ".cs", ".ts", ".tsx", ".js", ".jsx", ".py", ".json", ".md", ".txt", 
+            ".yml", ".yaml", ".xml", ".html", ".css", ".scss", ".sql", ".sh", 
+            ".config", ".gitignore", ".dockerfile", ".log", ".ini", ".conf", 
+            ".properties", ".env", ".lock", ".toml", ".trx", ".svg" // SVG is text-based
+        };
         return textExtensions.Contains(extension);
     }
 
@@ -1047,7 +1269,7 @@ public class FileSystemModule : ModuleBase, IDisposable
         try
         {
             var relativePath = Path.GetRelativePath(_projectRoot, e.FullPath);
-            var nodeId = $"file:{relativePath.Replace('\\', '/').Replace('/', '.')}";
+            var nodeId = FileNodeId(relativePath);
             
             if (_registry.TryGet(nodeId, out var node))
             {

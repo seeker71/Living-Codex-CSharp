@@ -58,6 +58,9 @@ public class EdgeMetaNode
     [MetaNodeFieldAttribute("role", "string", Required = true, Description = "Edge role")]
     public string Role { get; set; } = string.Empty;
 
+    [MetaNodeFieldAttribute("roleId", "string", Description = "Relationship type node id (codex.relationship.core)")]
+    public string? RoleId { get; set; }
+
     [MetaNodeFieldAttribute("weight", "number", Description = "Edge weight")]
     public double? Weight { get; set; }
 

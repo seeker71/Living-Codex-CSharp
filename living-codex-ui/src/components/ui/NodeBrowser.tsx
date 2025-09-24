@@ -67,9 +67,9 @@ export default function NodeBrowser({
         setNodes(data.nodes)
         
         // Extract unique types
-        const types = [...new Set(data.nodes.map((node: Node) => node.typeId))]
-          .filter(Boolean)
-          .sort()
+        const types = [...new Set<string>(data.nodes.map((node: Node) => node.typeId as string))]
+          .filter(Boolean) as string[]
+        types.sort()
         setAvailableTypes(types)
       } else {
         throw new Error(data.error || 'Failed to load nodes')

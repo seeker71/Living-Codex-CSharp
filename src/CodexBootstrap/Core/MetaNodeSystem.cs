@@ -147,6 +147,59 @@ public static class MetaNodeSystem
         return nodes;
     }
 
+    /// <summary>
+    /// Ensures that for every distinct Node.TypeId present in the registry there exists a corresponding meta-node
+    /// with id equal to that typeId and typeId "codex.meta/type". Creates missing ones using a generic schema.
+    /// </summary>
+    public static void EnsureTypeMetaNodes(INodeRegistry registry, ICodexLogger? logger = null)
+    {
+        try
+        {
+            // Collect all distinct typeIds from existing nodes
+            var allNodes = registry.AllNodes().ToList();
+            if (allNodes.Count == 0)
+            {
+                var asyncAll = registry.AllNodesAsync().GetAwaiter().GetResult();
+                allNodes = asyncAll.ToList();
+            }
+
+            var distinctTypeIds = allNodes
+                .Select(n => n.TypeId)
+                .Where(t => !string.IsNullOrWhiteSpace(t))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            // Existing meta type nodes in registry
+            var existingTypeMeta = registry.GetNodesByType("codex.meta/type")
+                .Select(n => n.Id)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var created = 0;
+            foreach (var typeId in distinctTypeIds)
+            {
+                if (existingTypeMeta.Contains(typeId))
+                {
+                    continue;
+                }
+
+                // Derive a friendly name/description from the typeId (e.g., codex.concept.domain -> Concept Domain)
+                var lastSegment = typeId.Split(new[] { '/', '.' }, StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? typeId;
+                var name = char.ToUpperInvariant(lastSegment[0]) + (lastSegment.Length > 1 ? lastSegment.Substring(1).Replace('-', ' ') : string.Empty);
+                var description = $"Auto-generated meta-node for type '{typeId}'";
+
+                var metaNode = NodeHelpers.CreateTypeMetaNode(typeId, name, description, fields: null);
+                registry.Upsert(metaNode);
+                created++;
+            }
+
+            logger?.Info($"EnsureTypeMetaNodes: created {created} new type meta-nodes");
+        }
+        catch (Exception ex)
+        {
+            logger?.Warn($"EnsureTypeMetaNodes encountered an error: {ex.Message}");
+        }
+    }
+
     private static Node CreateNodeTypeMetaNode()
     {
         return NodeHelpers.CreateTypeMetaNode("codex.meta/type/node", "Node", 
@@ -171,6 +224,7 @@ public static class MetaNodeSystem
                 new FieldSpec("fromId", "string", true, "Source node identifier"),
                 new FieldSpec("toId", "string", true, "Target node identifier"),
                 new FieldSpec("role", "string", true, "Edge role"),
+                new FieldSpec("roleId", "string", false, "Relationship type node id (codex.relationship.core)"),
                 new FieldSpec("weight", "number", false, "Edge weight"),
                 new FieldSpec("meta", "object", false, "Edge metadata")
             });

@@ -196,6 +196,20 @@ export const defaultAtoms = {
     },
     {
       type: 'codex.ui.lens',
+      id: 'lens.threads',
+      name: 'Threads Lens',
+      projection: 'threads',
+      itemComponent: 'ThreadsLens',
+      adapters: {
+        list: { method: 'GET', path: '/threads/list' },
+        create: { method: 'POST', path: '/threads/create' }
+      },
+      actions: ['action.attune'],
+      status: 'Prototype'
+    },
+    
+    {
+      type: 'codex.ui.lens',
       id: 'lens.gallery',
       name: 'Gallery Lens',
       projection: 'masonry',
@@ -206,6 +220,30 @@ export const defaultAtoms = {
       },
       actions: ['action.attune', 'action.amplify'],
       status: 'Simple'
+    },
+    {
+      type: 'codex.ui.lens',
+      id: 'lens.nearby',
+      name: 'Nearby Lens',
+      projection: 'map',
+      itemComponent: 'NearbyLens',
+      adapters: {
+        list: { method: 'POST', path: '/users/discover' }
+      },
+      actions: ['action.attune'],
+      status: 'Beta'
+    },
+    {
+      type: 'codex.ui.lens',
+      id: 'lens.swipe',
+      name: 'Swipe Lens',
+      projection: 'carousel',
+      itemComponent: 'SwipeLens',
+      adapters: {
+        list: { method: 'POST', path: '/concept/discover' }
+      },
+      actions: ['action.attune', 'action.amplify'],
+      status: 'Beta'
     }
   ] as UILens[],
 

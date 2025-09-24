@@ -57,33 +57,14 @@ public class IntelligentCachingModule : ModuleBase
     private void RegisterIntelligentCachingNodes(INodeRegistry registry)
     {
         // Register Intelligent Caching module node
-        var intelligentCachingNode = new Node(
-            Id: "codex.intelligent-caching",
-            TypeId: "codex.module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Intelligent Caching Module",
-            Description: "Advanced caching system with predictive pre-loading and performance optimization",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    version = "1.0.0",
-                    capabilities = new[] { "predictive-preloading", "usage-pattern-analysis", "cache-optimization", "performance-monitoring", "smart-invalidation" },
-                    endpoints = new[] { "preload-concepts", "analyze-patterns", "optimize-cache", "get-metrics", "invalidate-cache" },
-                    integration = "performance-optimization"
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["name"] = "Intelligent Caching Module",
-                ["version"] = "1.0.0",
-                ["type"] = "caching",
-                ["parentModule"] = "codex.intelligent-caching",
-                ["capabilities"] = new[] { "predictive-preloading", "usage-pattern-analysis", "cache-optimization", "performance-monitoring" }
-            }
+        var intelligentCachingNode = CreateModuleNode(
+            moduleId: "codex.intelligent-caching",
+            name: "Intelligent Caching Module",
+            version: "1.0.0",
+            description: "Advanced caching system with predictive pre-loading and performance optimization",
+            tags: new[] { "caching", "performance", "optimization", "predictive" },
+            capabilities: new[] { "predictive-preloading", "usage-pattern-analysis", "cache-optimization", "performance-monitoring", "smart-invalidation" },
+            spec: "codex.spec.intelligent-caching"
         );
         registry.Upsert(intelligentCachingNode);
 
@@ -114,7 +95,7 @@ public class IntelligentCachingModule : ModuleBase
         foreach (var route in routes)
         {
             var routeNode = new Node(
-                Id: $"intelligent-caching.route.{route.name}",
+                Id: $"codex.intelligent-caching.route.{route.name}.{Guid.NewGuid():N}",
                 TypeId: "codex.meta/route",
                 State: ContentState.Ice,
                 Locale: "en",
@@ -169,7 +150,7 @@ public class IntelligentCachingModule : ModuleBase
         foreach (var dto in dtos)
         {
             var dtoNode = new Node(
-                Id: $"intelligent-caching.dto.{dto.name}",
+                Id: $"codex.intelligent-caching.dto.{dto.name}.{Guid.NewGuid():N}",
                 TypeId: "codex.meta/type",
                 State: ContentState.Ice,
                 Locale: "en",

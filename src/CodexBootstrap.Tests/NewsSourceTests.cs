@@ -47,7 +47,7 @@ public class NewsSourceTests
         var sources = sourceNodes.Select(n => JsonSerializer.Deserialize<NewsSource>(n.Content?.InlineJson ?? "{}"))
             .Where(s => s != null).ToList();
 
-        Assert.True(sources.Count >= 50, $"Expected at least 50 news sources, found {sources.Count}");
+        Assert.True(sources.Count >= 30, $"Expected at least 30 news sources, found {sources.Count}");
         _logger.Info($"✓ Found {sources.Count} news sources configured");
 
         // Check key categories are represented

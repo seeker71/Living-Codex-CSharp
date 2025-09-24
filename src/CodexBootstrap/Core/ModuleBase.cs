@@ -114,11 +114,15 @@ public abstract class ModuleBase : IModule
     
     public virtual void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
+        if (router == null)
+        {
+            throw new ArgumentNullException(nameof(router));
+        }
         // Store the router for use by modules
         _apiRouter = router;
         
         // Default implementation - modules can override to register API handlers
-        _logger.Info($"API handlers registered for module: {Name}");
+        _logger.Info($"ModuleBase.RegisterApiHandlers called for module: {Name} (type: {GetType().Name})");
     }
     
     public virtual void RegisterHttpEndpoints(WebApplication app, INodeRegistry nodeRegistry, CoreApiService coreApi, ModuleLoader moduleLoader)

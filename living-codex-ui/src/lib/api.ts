@@ -101,10 +101,14 @@ export async function apiCall<T = unknown>(
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
 
+      // Get auth token from localStorage
+      const authToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      
       const fetchOptions: RequestInit = {
         method,
         headers: {
           'Content-Type': 'application/json',
+          ...(authToken && { 'Authorization': `Bearer ${authToken}` }),
           ...headers,
         },
         signal: controller.signal,
@@ -248,7 +252,14 @@ export const endpoints = {
     api.post('/auth/change-password', { userId, currentPassword, newPassword }),
   
   // Concepts
-  getConcepts: () => api.get('/concepts'),
+  getConcepts: (params?: { searchTerm?: string; skip?: number; take?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.searchTerm) qs.set('searchTerm', params.searchTerm);
+    if (params?.skip !== undefined) qs.set('skip', String(params.skip));
+    if (params?.take !== undefined) qs.set('take', String(params.take));
+    const suffix = qs.toString();
+    return api.get(`/concepts${suffix ? `?${suffix}` : ''}`);
+  },
   createConcept: (concept: Record<string, unknown>) => api.post('/concepts', concept),
   
   // Users and contributions
@@ -258,23 +269,30 @@ export const endpoints = {
   
   // User-concept interactions
   attuneToConcept: (userId: string, conceptId: string) => 
-    api.post('/concept/user/link', { userId, conceptId, relation: 'attuned' }),
+    api.post('/userconcept/link', { userId, conceptId, relationshipType: 'attuned', strength: 1.0 }),
   unattuneConcept: (userId: string, conceptId: string) => 
-    api.post('/concept/user/unlink', { userId, conceptId }),
+    api.post('/userconcept/unlink', { userId, conceptId }),
   
   // News
   getTrendingTopics: (limit = 10, hoursBack = 24) => 
     api.get(`/news/trending?limit=${limit}&hoursBack=${hoursBack}`),
-  getNewsFeed: (userId: string, limit = 20, hoursBack = 24) =>
-    api.get(`/news/feed/${userId}?limit=${limit}&hoursBack=${hoursBack}`),
+  getNewsFeed: (userId: string, limit = 20, hoursBack = 24, skip = 0) =>
+    api.get(`/news/feed/${userId}?limit=${limit}&skip=${skip}&hoursBack=${hoursBack}`),
   getPersonalNewsStream: (userId: string, limit = 20) =>
     api.get(`/news/feed/${userId}?limit=${limit}`),
   getPersonalContributionsFeed: (userId: string, limit = 20) =>
     api.get(`/contributions/user/${userId}?limit=${limit}&sortBy=timestamp&sortDescending=true`),
-  searchNews: (query: Record<string, unknown>) => api.post('/news/search', query),
+  searchNews: (query: { interests?: string[]; location?: string; contributions?: string[]; limit?: number; hoursBack?: number; skip?: number; }) => api.post('/news/search', query),
+  getNewsStats: (hoursBack = 24, search?: string) => {
+    const params = new URLSearchParams();
+    params.set('hoursBack', String(hoursBack));
+    if (search) params.set('search', search);
+    const qs = params.toString();
+    return api.get(`/news/stats${qs ? `?${qs}` : ''}`);
+  },
   
   // User-concept relationships
-  getUserConcepts: (userId: string) => api.get(`/concept/user/${userId}`),
+  getUserConcepts: (userId: string) => api.get(`/userconcept/user-concepts/${userId}`),
   
   // Contributions
   recordContribution: (contribution: {
@@ -317,6 +335,33 @@ export const endpoints = {
   getEdges: (limit?: number) => {
     const params = new URLSearchParams();
     if (limit) params.set('limit', limit.toString());
+    const queryString = params.toString();
+    return api.get(`/storage-endpoints/edges${queryString ? `?${queryString}` : ''}`);
+  },
+  searchEdgesAdvanced: (searchRequest: {
+    fromId?: string;
+    toId?: string;
+    nodeId?: string;
+    role?: string;
+    relationship?: string;
+    minWeight?: number;
+    maxWeight?: number;
+    searchTerm?: string;
+    take?: number;
+    skip?: number;
+  }) => {
+    const params = new URLSearchParams();
+    if (searchRequest.fromId) params.set('fromId', searchRequest.fromId);
+    if (searchRequest.toId) params.set('toId', searchRequest.toId);
+    if (searchRequest.nodeId) params.set('nodeId', searchRequest.nodeId);
+    if (searchRequest.role) params.set('role', searchRequest.role);
+    if (searchRequest.relationship) params.set('relationship', searchRequest.relationship);
+    if (searchRequest.minWeight !== undefined) params.set('minWeight', searchRequest.minWeight.toString());
+    if (searchRequest.maxWeight !== undefined) params.set('maxWeight', searchRequest.maxWeight.toString());
+    if (searchRequest.searchTerm) params.set('searchTerm', searchRequest.searchTerm);
+    if (searchRequest.take) params.set('take', searchRequest.take.toString());
+    if (searchRequest.skip) params.set('skip', searchRequest.skip.toString());
+    
     const queryString = params.toString();
     return api.get(`/storage-endpoints/edges${queryString ? `?${queryString}` : ''}`);
   },

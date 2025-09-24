@@ -269,8 +269,8 @@ public class GraphQueryModule : ModuleBase
                     var content = await File.ReadAllTextAsync(specFile);
 
                     var fileNode = new Node(
-                        Id: $"file:{relativePath.Replace(Path.DirectorySeparatorChar, '.')}",
-                        TypeId: "codex.file",
+                        Id: $"codex.filesystem.file.{Guid.NewGuid():N}",
+                        TypeId: "codex.file/markdown",
                         State: ContentState.Ice,
                         Locale: "en",
                         Title: fileName,

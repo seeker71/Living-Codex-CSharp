@@ -212,15 +212,41 @@ public static class NodeHelpers
     /// Creates an edge between two nodes
     /// </summary>
     public static Edge CreateEdge(string fromId, string toId, string role, double? weight = null, 
-        Dictionary<string, object>? meta = null)
+        Dictionary<string, object>? meta = null, string? roleId = null)
     {
+        var m = meta ?? new Dictionary<string, object>();
+        if (roleId != null)
+        {
+            m["roleId"] = roleId;
+        }
         return new Edge(
             FromId: fromId,
             ToId: toId,
             Role: role,
+            RoleId: roleId,
             Weight: weight ?? 1.0,
-            Meta: meta ?? new Dictionary<string, object>()
+            Meta: m
         );
+    }
+
+    /// <summary>
+    /// Attempts to resolve a relationship role string to a relationship type node id (codex.relationship.core)
+    /// </summary>
+    public static string? TryResolveRoleId(INodeRegistry registry, string role)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(role)) return null;
+            var rels = registry.GetNodesByType("codex.relationship.core");
+            var match = rels.FirstOrDefault(n => string.Equals(n.Title, role, StringComparison.OrdinalIgnoreCase))
+                        ?? rels.FirstOrDefault(n => (n.Meta != null && n.Meta.TryGetValue("name", out var v) && string.Equals(v?.ToString(), role, StringComparison.OrdinalIgnoreCase)))
+                        ?? rels.FirstOrDefault(n => n.Id.EndsWith(role, StringComparison.OrdinalIgnoreCase));
+            return match?.Id;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>

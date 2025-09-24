@@ -71,15 +71,15 @@ All meta-node TypeIds now follow the `codex.meta/` prefix convention:
 18. **Interface-Based Access**: All code now accesses registry through INodeRegistry interface
 
 ### 🚨 Remaining Production Blockers
-1. **UI Feature Gap**: 60% of backend capabilities lack UI interfaces (news, ontology, people, portals, creation, node details)
-2. **Advanced Lenses Missing**: 8 lens types not implemented (Threads, Gallery, Chats, Circles, Swipe, Nearby, Live, Making)
-3. **UX Primitives Incomplete**: Core interaction primitives missing (Weave, Reflect, Invite, Global Controls)
-4. **Test Suite Modernization**: Test suite needs updates to match current API structure and interfaces
+1. **Backend contract validation**: The UI assumes a rich set of endpoints on `localhost:5002`. Missing handlers degrade to empty states without surfacing actionable errors; contracts must be hardened before shipping.
+2. **Advanced lens coverage**: Stream, Threads, Chats, Gallery, Nearby, and Swipe lenses are wired in Discover, but Nearby/Swipe rely on `/users/discover` and `/concept/discover` quality, and Chats depends on `/threads/*` responses. Additional lenses (Circles, Live, etc.) remain outstanding.
+3. **Realtime and notification plumbing**: Portal, news, and hot-reload views poll on intervals. WebSocket/SSE backends and client subscriptions remain TODOs.
+4. **Automated UI regression coverage**: Jest smoke tests exist, but no storybook/Playwright coverage protects multi-step flows (news filters, portal creation, code editing).
 
-### 🎯 **UI-BACKEND FEATURE PARITY ANALYSIS**
-**Backend Capability**: 52 modules with comprehensive API coverage
-**UI Coverage**: 8 routes implemented (40% of intended functionality)
-**Gap**: 60% of backend features lack UI interfaces
+### 🎯 UI & Backend Alignment
+- The ground-truth UI specification lives in `specs/LIVING_UI_SPEC.md` and reflects the current Next.js implementation.
+- Confirmed routes: `/`, `/discover`, `/news`, `/resonance`, `/ontology`, `/about`, `/graph`, `/nodes`, `/node/[id]`, `/edge/[fromId]/[toId]`, `/people`, `/create`, `/portals`, `/profile`, `/auth`, `/code`, `/dev`.
+- Remaining UI gaps are now focused on surfacing backend failures, wiring real-time updates, and expanding lens coverage rather than building missing pages from scratch.
 
 ### 🤖 AI Model Policy (Sept 2025)
 - **Primary Provider**: OpenAI (gpt-5-codex for code, gpt-5-mini for analysis)
@@ -105,18 +105,14 @@ All meta-node TypeIds now follow the `codex.meta/` prefix convention:
 - Backend: `dotnet watch run` via `./start-server-dev.sh` on port 5002
 - Spec watching: enabled by `hotreload.json` in `src/CodexBootstrap`
 
-#### **Available But Not Exposed**
-- **News Intelligence**: NewsFeedModule, RealtimeNewsStreamModule → No dedicated `/news` page
-- **Ontology Exploration**: ConceptRegistryModule, UCoreLLMResponseHandler → No `/ontology` browser
-- **People Discovery**: UserDiscoveryModule → No `/people` interface  
-- **Portal System**: PortalModule, TemporalConsciousnessModule → No `/portals` interface
-- **Concept Creation**: ConceptModule, AIModule → No `/create` guided flow
-- **Node Deep-Dive**: StorageEndpointsModule → No `/node/[id]` detail pages
-- **Real-time Features**: RealtimeModule, PushNotificationModule → Limited real-time UI integration
-3. **Error Handling**: Basic try-catch without comprehensive recovery mechanisms
-4. **Persistence**: Data lost on restart, needs database integration
-5. **Monitoring**: No alerting, dashboards, or observability
-6. **Scalability**: In-memory only, distributed support needs testing
+#### **Backend Modules Still Underutilised**
+- **Realtime & notifications**: RealtimeModule, PushNotificationModule wired via polling only.
+- **Future knowledge**: AIModule extensions beyond concept creation are stubbed.
+- **Spec-driven hot reload**: `/self-update/*` endpoints power the Dev dashboard but need production-grade permissioning and auditing.
+- **Error handling**: Basic try/catch without recovery orchestration; failures rely on console logs.
+- **Persistence**: Data is in-memory; durable storage and migrations remain outstanding.
+- **Monitoring**: No alerting, dashboards, or observability hooks.
+- **Scalability**: Multi-node support and cache invalidation policies untested.
 
 ### ⚠️ Implementation Limitations (Current State)
 - **~~Node Lifecycle & Edges~~**: ✅ **RESOLVED** - Enhanced edge persistence system now stores edges in the more fluid backend when endpoints are in different states (Gas > Water > Ice). Edges can only link from inside out, not outside in.
@@ -595,7 +591,8 @@ The Concept Resonance Module implements advanced harmonic symbol comparison usin
 
 ### Core System Routes (15 routes)
 - `GET /health` - System health status
-- `GET /spec/modules` - List all modules
+- `GET /spec/modules` - List all modules (redirects to /spec/modules/all)
+- `GET /spec/modules/all` - Comprehensive module catalog with detailed metadata
 - `GET /spec/modules/with-specs` - Modules with spec references
 - `GET /spec/routes/all` - All registered routes
 - `GET /spec/atoms` - Spec atoms

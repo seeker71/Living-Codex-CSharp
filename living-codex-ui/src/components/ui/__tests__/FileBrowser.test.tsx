@@ -167,7 +167,13 @@ describe('FileBrowser', () => {
 
     fireEvent.click(screen.getByText('Program.cs'))
 
-    expect(onFileSelect).toHaveBeenCalledWith('file1', mockNodes[0])
+    expect(onFileSelect).toHaveBeenCalledWith(
+      'file1',
+      expect.objectContaining({
+        id: 'file1',
+        meta: expect.objectContaining({ fileName: 'Program.cs' }),
+      })
+    )
   })
 
   it('highlights selected file', async () => {

@@ -1,25 +1,22 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
-using System.Threading.Tasks;
 using CodexBootstrap.Core;
 using CodexBootstrap.Runtime;
 
 namespace CodexBootstrap.Modules;
 
 /// <summary>
-/// Threads Module - Deep conversations and collaborative exploration
-/// Enables threaded discussions around concepts, ideas, and consciousness exploration
+/// Threads Module - discussion threads and replies as nodes/edges
 /// </summary>
-[MetaNode(Id = "codex.threads", Name = "Threads Module", Description = "Deep conversations and collaborative exploration")]
 public sealed class ThreadsModule : ModuleBase
 {
     public override string Name => "Threads Module";
-    public override string Description => "Deep conversations and collaborative exploration";
+    public override string Description => "Discussion threads and replies";
     public override string Version => "1.0.0";
 
-    public ThreadsModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
-        : base(registry, logger)
+    public ThreadsModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) : base(registry, logger)
     {
     }
 
@@ -30,336 +27,241 @@ public sealed class ThreadsModule : ModuleBase
             name: Name,
             version: Version,
             description: Description,
-            tags: new[] { "threads", "discussion", "collaboration", "exploration", "conversation" },
-            capabilities: new[] { 
-                "thread-creation", "reply-management", "discussion-tracking",
-                "resonance-scoring", "collaboration-facilitation"
-            },
+            tags: new[] { "threads", "discussion", "replies" },
+            capabilities: new[] { "create_thread", "list_threads", "create_reply" },
             spec: "codex.spec.threads"
         );
     }
 
     public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
     {
-        _logger.Info("Threads Module API handlers registered");
+        _logger.Info("Threads API handlers registered");
     }
 
     public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
-        _logger.Info("Threads Module HTTP endpoints registered");
+        _logger.Info("Threads HTTP endpoints registered");
     }
 
-    // Public methods for direct testing
-    public async Task<object> ListThreads(int? limit = 20)
-    {
-        return await ListThreadsImpl(limit);
-    }
-
-    public async Task<object> CreateThread(ThreadCreateRequest request)
-    {
-        return await CreateThreadImpl(request);
-    }
-
-    public async Task<object> GetThread(string threadId)
-    {
-        return await GetThreadImpl(threadId);
-    }
-
-    public async Task<object> AddReply(string threadId, ThreadReplyRequest request)
-    {
-        return await AddReplyImpl(threadId, request);
-    }
-
-    // List threads
-    [ApiRoute("GET", "/threads/list", "list-threads", "Get list of discussion threads", "codex.threads")]
-    public async Task<object> ListThreadsImpl([ApiParameter("limit", "Number of threads to return", Required = false)] int? limit = 20)
+    [ApiRoute("GET", "/threads/list", "ListThreads", "List recent discussion threads", "codex.threads")]
+    public async Task<object> ListThreadsAsync()
     {
         try
         {
-            var threadNodes = _registry.AllNodes()
-                .Where(n => n.TypeId == "codex.thread")
-                .OrderByDescending(n => n.Meta?.GetValueOrDefault("createdAt"))
-                .Take(limit ?? 20)
+            var threadNodes = _registry.GetNodesByTypePrefix("codex.thread/")
+                .OrderByDescending(n =>
+                {
+                    if (n.Meta != null && n.Meta.TryGetValue("createdAt", out var createdObj) && createdObj is DateTimeOffset cdt)
+                    {
+                        return cdt;
+                    }
+                    return DateTimeOffset.MinValue;
+                })
+                .Take(100)
                 .ToList();
 
-            var threads = threadNodes.Select(n => new
-            {
-                id = n.Id,
-                title = n.Title,
-                content = n.Description,
-                author = new
-                {
-                    id = n.Meta?.GetValueOrDefault("authorId")?.ToString() ?? "",
-                    name = n.Meta?.GetValueOrDefault("authorName")?.ToString() ?? "Unknown",
-                    avatar = n.Meta?.GetValueOrDefault("authorAvatar")?.ToString()
-                },
-                createdAt = n.Meta?.GetValueOrDefault("createdAt")?.ToString(),
-                updatedAt = n.Meta?.GetValueOrDefault("updatedAt")?.ToString(),
-                replies = GetThreadReplies(n.Id),
-                resonance = GetResonanceScore(n.Id),
-                axes = GetThreadAxes(n),
-                isResolved = n.Meta?.GetValueOrDefault("isResolved")?.ToString() == "true"
-            }).ToList();
+            var result = new List<object>();
 
-            return new { success = true, threads, totalCount = threads.Count };
+            foreach (var thread in threadNodes)
+            {
+                var threadId = thread.Id;
+                var replies = _registry.GetEdgesFrom(threadId)
+                    .Where(e => e.Role == "has_reply")
+                    .Select(e => _registry.GetNode(e.ToId))
+                    .Where(n => n != null)
+                    .Cast<Node>()
+                    .ToList();
+
+                var authorId = thread.Meta.TryGetValue("authorId", out var a) ? a?.ToString() : null;
+                var author = ResolveUser(authorId);
+
+                result.Add(new
+                {
+                    id = thread.Id,
+                    title = thread.Title,
+                    content = thread.Description ?? ExtractInlineText(thread.Content),
+                    author = author,
+                    createdAt = thread.Meta.TryGetValue("createdAt", out var created) ? created : DateTimeOffset.UtcNow,
+                    updatedAt = thread.Meta.TryGetValue("updatedAt", out var updated) ? updated : DateTimeOffset.UtcNow,
+                    replies = replies.Select(r => new
+                    {
+                        id = r.Id,
+                        content = r.Description ?? ExtractInlineText(r.Content),
+                        author = ResolveUser(r.Meta.TryGetValue("authorId", out var ra) ? ra?.ToString() : null),
+                        createdAt = r.Meta.TryGetValue("createdAt", out var rc) ? rc : DateTimeOffset.UtcNow,
+                        resonance = r.Meta.TryGetValue("resonance", out var rr) ? Convert.ToDouble(rr) : 0.0,
+                        isAccepted = r.Meta.TryGetValue("isAccepted", out var ia) && ia is bool && (bool)ia
+                    }),
+                    resonance = thread.Meta.TryGetValue("resonance", out var tr) ? Convert.ToDouble(tr) : 0.5,
+                    axes = thread.Meta.TryGetValue("axes", out var axes) && axes is IEnumerable<object> list
+                        ? list.Select(x => x.ToString() ?? "").Where(s => !string.IsNullOrWhiteSpace(s)).ToArray()
+                        : Array.Empty<string>(),
+                    isResolved = thread.Meta.TryGetValue("isResolved", out var ir) && ir is bool rb && rb
+                });
+            }
+
+            return new { success = true, threads = result };
         }
         catch (Exception ex)
         {
             _logger.Error($"Error listing threads: {ex.Message}", ex);
-            return new ErrorResponse($"Error listing threads: {ex.Message}");
+            return new ErrorResponse($"Failed to list threads: {ex.Message}");
         }
     }
 
-    // Create new thread
-    [ApiRoute("POST", "/threads/create", "create-thread", "Create a new discussion thread", "codex.threads")]
-    public async Task<object> CreateThreadImpl([ApiParameter("body", "Thread creation request", Required = true, Location = "body")] ThreadCreateRequest request)
+    [ApiRoute("POST", "/threads/create", "CreateThread", "Create a new discussion thread", "codex.threads")]
+    public async Task<object> CreateThreadAsync([ApiParameter("request", "Thread creation request")] CreateThreadRequest request)
     {
         try
         {
-            if (string.IsNullOrEmpty(request.Title) || string.IsNullOrEmpty(request.Content))
+            if (string.IsNullOrWhiteSpace(request.Title) || string.IsNullOrWhiteSpace(request.Content) || string.IsNullOrWhiteSpace(request.AuthorId))
             {
-                return new ErrorResponse("Title and content are required");
+                return new ErrorResponse("Title, Content, and AuthorId are required");
             }
 
             var threadId = $"thread-{Guid.NewGuid():N}";
-            var threadNode = new Node(
+
+            var meta = new Dictionary<string, object>
+            {
+                ["moduleId"] = "codex.threads",
+                ["createdAt"] = DateTimeOffset.UtcNow,
+                ["updatedAt"] = DateTimeOffset.UtcNow,
+                ["axes"] = request.Axes ?? Array.Empty<string>(),
+                ["isResolved"] = false,
+                ["resonance"] = 0.5
+            };
+
+            meta["authorId"] = request.AuthorId!;
+
+            var node = new Node(
                 Id: threadId,
-                TypeId: "codex.thread",
+                TypeId: "codex.thread/root",
                 State: ContentState.Water,
-                Locale: "en-US",
+                Locale: "en",
                 Title: request.Title,
                 Description: request.Content,
-                Content: new ContentRef(
-                    MediaType: "application/json",
-                    InlineJson: JsonSerializer.Serialize(request),
-                    InlineBytes: null,
-                    ExternalUri: null
-                ),
-                Meta: new Dictionary<string, object>
-                {
-                    ["authorId"] = request.AuthorId ?? "",
-                    ["authorName"] = request.AuthorName ?? "Anonymous",
-                    ["authorAvatar"] = request.AuthorAvatar ?? "",
-                    ["createdAt"] = DateTime.UtcNow,
-                    ["updatedAt"] = DateTime.UtcNow,
-                    ["axes"] = request.Axes ?? new[] { "consciousness", "unity" },
-                    ["isResolved"] = false
-                }
+                Content: new ContentRef(MediaType: "application/json", InlineJson: JsonSerializer.Serialize(new { content = request.Content }), InlineBytes: null, ExternalUri: null),
+                Meta: meta
             );
 
-            _registry.Upsert(threadNode);
+            _registry.Upsert(node);
 
-            return new 
-            { 
-                success = true, 
-                threadId = threadId,
-                message = "Thread created successfully"
-            };
+            return new { success = true, threadId = threadId };
         }
         catch (Exception ex)
         {
             _logger.Error($"Error creating thread: {ex.Message}", ex);
-            return new ErrorResponse($"Error creating thread: {ex.Message}");
+            return new ErrorResponse($"Failed to create thread: {ex.Message}");
         }
     }
 
-    // Get thread details
-    [ApiRoute("GET", "/threads/{threadId}", "get-thread", "Get detailed information about a thread", "codex.threads")]
-    public async Task<object> GetThreadImpl([ApiParameter("threadId", "Thread ID", Required = true, Location = "path")] string threadId)
+    [ApiRoute("POST", "/threads/reply", "CreateReply", "Create a reply to a thread", "codex.threads")]
+    public async Task<object> CreateReplyAsync([ApiParameter("request", "Reply creation request")] CreateReplyRequest request)
     {
         try
         {
-            if (!_registry.TryGet(threadId, out var threadNode))
+            if (string.IsNullOrWhiteSpace(request.ThreadId) || string.IsNullOrWhiteSpace(request.Content) || string.IsNullOrWhiteSpace(request.AuthorId))
             {
-                return new ErrorResponse("Thread not found");
+                return new ErrorResponse("ThreadId, Content, and AuthorId are required");
             }
 
-            var replies = GetThreadReplies(threadId);
-            var resonance = GetResonanceScore(threadId);
-
-            return new
-            {
-                success = true,
-                thread = new
-                {
-                    id = threadNode.Id,
-                    title = threadNode.Title,
-                    content = threadNode.Description,
-                    author = new
-                    {
-                        id = threadNode.Meta?.GetValueOrDefault("authorId")?.ToString() ?? "",
-                        name = threadNode.Meta?.GetValueOrDefault("authorName")?.ToString() ?? "Unknown",
-                        avatar = threadNode.Meta?.GetValueOrDefault("authorAvatar")?.ToString()
-                    },
-                    createdAt = threadNode.Meta?.GetValueOrDefault("createdAt")?.ToString(),
-                    updatedAt = threadNode.Meta?.GetValueOrDefault("updatedAt")?.ToString(),
-                    replies,
-                    resonance,
-                    axes = GetThreadAxes(threadNode),
-                    isResolved = threadNode.Meta?.GetValueOrDefault("isResolved")?.ToString() == "true"
-                }
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"Error getting thread: {ex.Message}", ex);
-            return new ErrorResponse($"Error getting thread: {ex.Message}");
-        }
-    }
-
-    // Add reply to thread
-    [ApiRoute("POST", "/threads/{threadId}/reply", "add-reply", "Add a reply to a thread", "codex.threads")]
-    public async Task<object> AddReplyImpl(
-        [ApiParameter("threadId", "Thread ID", Required = true, Location = "path")] string threadId,
-        [ApiParameter("body", "Reply request", Required = true, Location = "body")] ThreadReplyRequest request)
-    {
-        try
-        {
-            if (!_registry.TryGet(threadId, out var threadNode))
+            if (_registry.GetNode(request.ThreadId) == null)
             {
                 return new ErrorResponse("Thread not found");
-            }
-
-            if (string.IsNullOrEmpty(request.Content))
-            {
-                return new ErrorResponse("Reply content is required");
             }
 
             var replyId = $"reply-{Guid.NewGuid():N}";
+
+            var meta = new Dictionary<string, object>
+            {
+                ["moduleId"] = "codex.threads",
+                ["createdAt"] = DateTimeOffset.UtcNow,
+                ["resonance"] = 0.0,
+                ["isAccepted"] = false
+            };
+
+            meta["authorId"] = request.AuthorId!;
+
             var replyNode = new Node(
                 Id: replyId,
-                TypeId: "codex.thread.reply",
+                TypeId: "codex.thread/reply",
                 State: ContentState.Water,
-                Locale: "en-US",
-                Title: $"Reply to {threadNode.Title}",
+                Locale: "en",
+                Title: $"Reply to {request.ThreadId}",
                 Description: request.Content,
-                Content: new ContentRef(
-                    MediaType: "application/json",
-                    InlineJson: JsonSerializer.Serialize(request),
-                    InlineBytes: null,
-                    ExternalUri: null
-                ),
-                Meta: new Dictionary<string, object>
-                {
-                    ["threadId"] = threadId,
-                    ["authorId"] = request.AuthorId ?? "",
-                    ["authorName"] = request.AuthorName ?? "Anonymous",
-                    ["authorAvatar"] = request.AuthorAvatar ?? "",
-                    ["createdAt"] = DateTime.UtcNow,
-                    ["isAccepted"] = false,
-                    ["resonance"] = CalculateReplyResonance(request.Content)
-                }
+                Content: new ContentRef(MediaType: "application/json", InlineJson: JsonSerializer.Serialize(new { content = request.Content }), InlineBytes: null, ExternalUri: null),
+                Meta: meta
             );
 
             _registry.Upsert(replyNode);
+            _registry.Upsert(new Edge(
+                FromId: request.ThreadId,
+                ToId: replyId,
+                Role: "has_reply",
+                Weight: 1.0,
+                Meta: new Dictionary<string, object>()
+            ));
 
-            // Update thread's updatedAt timestamp
-            var updatedMeta = new Dictionary<string, object>(threadNode.Meta ?? new Dictionary<string, object>())
-            {
-                ["updatedAt"] = DateTime.UtcNow
-            };
-            var updatedThreadNode = threadNode with { Meta = updatedMeta };
-            _registry.Upsert(updatedThreadNode);
-
-            return new 
-            { 
-                success = true, 
-                replyId = replyId,
-                message = "Reply added successfully"
-            };
+            return new { success = true, replyId = replyId };
         }
         catch (Exception ex)
         {
-            _logger.Error($"Error adding reply: {ex.Message}", ex);
-            return new ErrorResponse($"Error adding reply: {ex.Message}");
+            _logger.Error($"Error creating reply: {ex.Message}", ex);
+            return new ErrorResponse($"Failed to create reply: {ex.Message}");
         }
     }
 
-    // Helper methods
-    private List<object> GetThreadReplies(string threadId)
+    private static string ExtractInlineText(ContentRef content)
     {
-        var replyNodes = _registry.AllNodes()
-            .Where(n => n.TypeId == "codex.thread.reply" && 
-                       n.Meta?.GetValueOrDefault("threadId")?.ToString() == threadId)
-            .OrderBy(n => n.Meta?.GetValueOrDefault("createdAt"))
-            .ToList();
-
-        return replyNodes.Select(n => new
+        if (!string.IsNullOrEmpty(content.InlineJson))
         {
-            id = n.Id,
-            content = n.Description,
-            author = new
+            try
             {
-                id = n.Meta?.GetValueOrDefault("authorId")?.ToString() ?? "",
-                name = n.Meta?.GetValueOrDefault("authorName")?.ToString() ?? "Unknown",
-                avatar = n.Meta?.GetValueOrDefault("authorAvatar")?.ToString()
-            },
-            createdAt = n.Meta?.GetValueOrDefault("createdAt")?.ToString(),
-            resonance = Convert.ToDouble(n.Meta?.GetValueOrDefault("resonance") ?? 0.5),
-            isAccepted = n.Meta?.GetValueOrDefault("isAccepted")?.ToString() == "true"
-        }).Cast<object>().ToList();
+                var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(content.InlineJson);
+                if (dict != null && dict.TryGetValue("content", out var c))
+                {
+                    return c?.ToString() ?? string.Empty;
+                }
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+        return string.Empty;
     }
 
-    private double GetResonanceScore(string threadId)
+    private object ResolveUser(string? userId)
     {
-        // Calculate resonance based on replies, engagement, and content quality
-        var replies = GetThreadReplies(threadId);
-        var baseResonance = 0.5;
-        
-        if (replies.Count > 0)
+        if (string.IsNullOrWhiteSpace(userId))
         {
-            var avgReplyResonance = replies.Average(r => Convert.ToDouble(r.GetType().GetProperty("resonance")?.GetValue(r) ?? 0.5));
-            baseResonance = Math.Min(0.95, baseResonance + (avgReplyResonance * 0.3));
+            return new { id = "anonymous", name = "Anonymous", avatar = "/public/vercel.svg" };
         }
 
-        return baseResonance;
-    }
-
-    private string[] GetThreadAxes(Node threadNode)
-    {
-        var axesMeta = threadNode.Meta?.GetValueOrDefault("axes");
-        if (axesMeta is string[] axes)
+        // Try to resolve user profile node if present
+        var userNode = _registry.GetNode(userId);
+        if (userNode != null)
         {
-            return axes;
+            var name = userNode.Title ?? (userNode.Meta.TryGetValue("displayName", out var dn) ? dn?.ToString() : userId);
+            var avatar = userNode.Meta.TryGetValue("avatar", out var av) ? av?.ToString() : null;
+            return new { id = userId, name = name ?? userId, avatar = avatar };
         }
-        return new[] { "consciousness", "unity" };
-    }
 
-    private double CalculateReplyResonance(string content)
-    {
-        // Simple resonance calculation based on content length and keywords
-        var baseResonance = 0.5;
-        
-        if (content.Length > 100)
-            baseResonance += 0.1;
-        if (content.Length > 300)
-            baseResonance += 0.1;
-            
-        var resonanceKeywords = new[] { "consciousness", "unity", "abundance", "resonance", "connection", "exploration" };
-        var keywordCount = resonanceKeywords.Count(keyword => content.ToLower().Contains(keyword));
-        baseResonance += keywordCount * 0.05;
-        
-        return Math.Min(0.95, baseResonance);
+        return new { id = userId, name = userId, avatar = (string?)null };
     }
 }
 
-// Data structures for threads
-[MetaNode(Id = "codex.threads.create-request", Name = "Thread Create Request", Description = "Request to create a new thread")]
-public record ThreadCreateRequest
-{
-    public string Title { get; set; } = "";
-    public string Content { get; set; } = "";
-    public string? AuthorId { get; set; }
-    public string? AuthorName { get; set; }
-    public string? AuthorAvatar { get; set; }
-    public string[]? Axes { get; set; }
-}
+[RequestType("codex.threads.create-thread", "CreateThreadRequest", "Create thread request")]
+public record CreateThreadRequest(
+    string Title,
+    string Content,
+    string? AuthorId,
+    IEnumerable<string>? Axes
+);
 
-[MetaNode(Id = "codex.threads.reply-request", Name = "Thread Reply Request", Description = "Request to add a reply to a thread")]
-public record ThreadReplyRequest
-{
-    public string Content { get; set; } = "";
-    public string? AuthorId { get; set; }
-    public string? AuthorName { get; set; }
-    public string? AuthorAvatar { get; set; }
-}
+[RequestType("codex.threads.create-reply", "CreateReplyRequest", "Create reply request")]
+public record CreateReplyRequest(
+    string ThreadId,
+    string Content,
+    string? AuthorId
+);

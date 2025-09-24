@@ -82,6 +82,23 @@ public sealed class UserContributionsModule : ModuleBase
                 return new ErrorResponse("Entity ID is required");
             }
 
+            // Check for duplicate contributions within the last 60 seconds
+            var recentTime = DateTimeOffset.UtcNow.AddSeconds(-60);
+            var duplicateKey = $"{request.UserId}-{request.EntityId}-{request.ContributionType}-{request.Description}";
+            
+            var existingContribution = _contributions.Values
+                .FirstOrDefault(c => c.UserId == request.UserId 
+                    && c.EntityId == request.EntityId 
+                    && c.ContributionType == request.ContributionType 
+                    && c.Description == request.Description
+                    && c.Timestamp > recentTime);
+            
+            if (existingContribution != null)
+            {
+                _logger.Info($"Duplicate contribution prevented: {existingContribution.Id} by user {request.UserId}");
+                return new { success = true, contributionId = existingContribution.Id, deduped = true };
+            }
+
             var contribution = new Contribution
             {
                 Id = Guid.NewGuid().ToString(),
@@ -100,10 +117,10 @@ public sealed class UserContributionsModule : ModuleBase
                 EnergyLevel = 0m
             };
 
-            // Calculate abundance amplification
-            var abundanceMultiplier = await CalculateAbundanceMultiplier(contribution);
+            // Calculate abundance amplification (synchronous for better performance)
+            var abundanceMultiplier = CalculateAbundanceMultiplier(contribution);
             var collectiveValue = contribution.Value * abundanceMultiplier;
-            var energyLevel = await CalculateContributorEnergyLevel(request.UserId);
+            var energyLevel = CalculateContributorEnergyLevel(request.UserId);
 
             // Update contribution with abundance data
             contribution = contribution with
@@ -115,14 +132,14 @@ public sealed class UserContributionsModule : ModuleBase
 
             _contributions[contribution.Id] = contribution;
 
-            // Record contribution event
-            await RecordContributionEventAsync(contribution);
+            // Record contribution event (synchronous)
+            RecordContributionEvent(contribution);
 
-            // Record abundance event
-            await RecordAbundanceEventAsync(contribution);
+            // Record abundance event (synchronous)
+            RecordAbundanceEventAsync(contribution);
 
-            // Calculate and assign rewards (now with abundance amplification)
-            await CalculateAndAssignRewardsAsync(contribution);
+            // Calculate and assign rewards (synchronous)
+            CalculateAndAssignRewardsAsync(contribution);
 
             _logger.Info($"Contribution recorded: {contribution.Id} by user {request.UserId}");
             return new { success = true, contributionId = contribution.Id };
@@ -297,7 +314,7 @@ public sealed class UserContributionsModule : ModuleBase
             var since30 = DateTimeOffset.UtcNow.AddDays(-30);
             var recentCount = userContributions.Count(c => c.Timestamp >= since30);
 
-            var energyLevel = await CalculateContributorEnergyLevel(userId);
+            var energyLevel = CalculateContributorEnergyLevel(userId);
 
             var userRewards = _userRewards.Values.Where(r => r.UserId == userId).ToList();
             var totalRewards = userRewards.Sum(r => r.Amount);
@@ -567,7 +584,7 @@ public sealed class UserContributionsModule : ModuleBase
     }
 
     // Private helper methods
-    private async Task RecordContributionEventAsync(Contribution contribution)
+    private void RecordContributionEvent(Contribution contribution)
     {
         var contributionEvent = new ContributionEvent
         {
@@ -951,7 +968,7 @@ public sealed class UserContributionsModule : ModuleBase
     }
 
     // Abundance Calculation Methods
-    private async Task<decimal> CalculateAbundanceMultiplier(Contribution contribution)
+    private decimal CalculateAbundanceMultiplier(Contribution contribution)
     {
         // Real async work
         
@@ -967,7 +984,7 @@ public sealed class UserContributionsModule : ModuleBase
         };
 
         // Resonance multiplier based on collective energy
-        var collectiveResonance = await GetCollectiveResonanceLevel();
+        var collectiveResonance = GetCollectiveResonanceLevel();
         var resonanceMultiplier = 1.0m + (collectiveResonance / 100.0m);
 
         // User energy multiplier
@@ -978,7 +995,7 @@ public sealed class UserContributionsModule : ModuleBase
         return Math.Min(baseMultiplier * resonanceMultiplier * energyMultiplier, 10.0m);
     }
 
-    private async Task<decimal> CalculateContributorEnergyLevel(string userId)
+    private decimal CalculateContributorEnergyLevel(string userId)
     {
         // Real async work
         
@@ -1001,7 +1018,7 @@ public sealed class UserContributionsModule : ModuleBase
         return Math.Min(1.0m + frequencyScore + valueScore + collectiveScore, 10.0m);
     }
 
-    private async Task<decimal> GetCollectiveResonanceLevel()
+    private decimal GetCollectiveResonanceLevel()
     {
         // Real async work
         
@@ -1037,12 +1054,12 @@ public sealed class UserContributionsModule : ModuleBase
         _abundanceEvents.Add(abundanceEvent);
 
         // Update contributor energy
-        var energyLevel = await CalculateContributorEnergyLevel(contribution.UserId);
+        var energyLevel = CalculateContributorEnergyLevel(contribution.UserId);
         _contributorEnergies[contribution.UserId] = new ContributorEnergy(
             UserId: contribution.UserId,
             BaseEnergy: 1.0m,
             AmplifiedEnergy: energyLevel,
-            ResonanceLevel: await GetCollectiveResonanceLevel(),
+            ResonanceLevel: GetCollectiveResonanceLevel(),
             LastUpdated: DateTimeOffset.UtcNow
         );
     }
@@ -1612,7 +1629,7 @@ Respond in JSON format with scores and brief explanations.
     {
         try
         {
-            var collectiveResonance = await GetCollectiveResonanceLevel();
+            var collectiveResonance = GetCollectiveResonanceLevel();
             var totalContributors = _contributorEnergies.Count;
             var totalAbundanceEvents = _abundanceEvents.Count;
             var recentAbundanceEvents = _abundanceEvents
@@ -1654,7 +1671,7 @@ Respond in JSON format with scores and brief explanations.
                 return new ErrorResponse("User ID is required");
             }
 
-            var energyLevel = await CalculateContributorEnergyLevel(userId);
+            var energyLevel = CalculateContributorEnergyLevel(userId);
             var contributorEnergy = _contributorEnergies.GetValueOrDefault(userId, 
                 new ContributorEnergy(userId, 1.0m, energyLevel, 0.5m, DateTimeOffset.UtcNow));
 

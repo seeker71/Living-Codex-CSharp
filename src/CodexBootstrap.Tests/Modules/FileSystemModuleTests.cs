@@ -382,6 +382,167 @@ public class FileSystemModuleTests : IDisposable
     }
 
     [Fact]
+    public async Task FileTypeDetection_WithPythonFiles_DetectsCorrectly()
+    {
+        // Arrange - Create Python file
+        var pythonFile = Path.Combine(_testDirectory, "test_script.py");
+        var pythonContent = "#!/usr/bin/env python3\nprint('Hello, World!')\n";
+        await File.WriteAllTextAsync(pythonFile, pythonContent);
+        
+        await _module.InitializeFileSystemNodes();
+
+        // Act - Get Python files
+        var result = await _module.GetAllFileNodes(type: "python");
+
+        // Assert
+        Assert.NotNull(result);
+        
+        if (result is CodexBootstrap.Core.ErrorResponse errorResponse)
+        {
+            Assert.True(false, $"Method returned error: {errorResponse.Error}");
+        }
+        
+        // Use reflection to access the anonymous object properties
+        var resultType = result.GetType();
+        var successProperty = resultType.GetProperty("success");
+        var filesProperty = resultType.GetProperty("files");
+        
+        Assert.NotNull(successProperty);
+        Assert.NotNull(filesProperty);
+        
+        var success = (bool)successProperty.GetValue(result)!;
+        var files = filesProperty.GetValue(result)!;
+        
+        Assert.True(success);
+        Assert.NotNull(files);
+    }
+
+    [Fact]
+    public async Task FileTypeDetection_WithImageFiles_DetectsCorrectly()
+    {
+        // Arrange - Create SVG file (text-based image)
+        var svgFile = Path.Combine(_testDirectory, "test.svg");
+        var svgContent = @"<svg width=""100"" height=""100"" xmlns=""http://www.w3.org/2000/svg"">
+  <circle cx=""50"" cy=""50"" r=""40"" fill=""red""/>
+</svg>";
+        await File.WriteAllTextAsync(svgFile, svgContent);
+        
+        await _module.InitializeFileSystemNodes();
+
+        // Act - Get SVG files
+        var result = await _module.GetAllFileNodes(type: "svg");
+
+        // Assert
+        Assert.NotNull(result);
+        
+        if (result is CodexBootstrap.Core.ErrorResponse errorResponse)
+        {
+            Assert.True(false, $"Method returned error: {errorResponse.Error}");
+        }
+        
+        // Use reflection to access the anonymous object properties
+        var resultType = result.GetType();
+        var successProperty = resultType.GetProperty("success");
+        var filesProperty = resultType.GetProperty("files");
+        
+        Assert.NotNull(successProperty);
+        Assert.NotNull(filesProperty);
+        
+        var success = (bool)successProperty.GetValue(result)!;
+        var files = filesProperty.GetValue(result)!;
+        
+        Assert.True(success);
+        Assert.NotNull(files);
+    }
+
+    [Fact]
+    public async Task FileTypeDetection_WithTrxFiles_DetectsCorrectly()
+    {
+        // Arrange - Create TRX test result file
+        var trxFile = Path.Combine(_testDirectory, "TestResults.trx");
+        var trxContent = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<TestRun id=""test-run-id"" name=""Test Run"" xmlns=""http://microsoft.com/schemas/VisualStudio/TeamTest/2010"">
+  <Times creation=""2024-01-01T00:00:00.0000000+00:00"" queuing=""2024-01-01T00:00:00.0000000+00:00"" start=""2024-01-01T00:00:00.0000000+00:00"" finish=""2024-01-01T00:00:01.0000000+00:00""/>
+  <TestSettings name=""TestSettings"" id=""settings-id""/>
+  <Results>
+    <UnitTestResult testName=""TestMethod"" outcome=""Passed""/>
+  </Results>
+</TestRun>";
+        await File.WriteAllTextAsync(trxFile, trxContent);
+        
+        await _module.InitializeFileSystemNodes();
+
+        // Act - Get TRX files
+        var result = await _module.GetAllFileNodes(type: "trx");
+
+        // Assert
+        Assert.NotNull(result);
+        
+        if (result is CodexBootstrap.Core.ErrorResponse errorResponse)
+        {
+            Assert.True(false, $"Method returned error: {errorResponse.Error}");
+        }
+        
+        // Use reflection to access the anonymous object properties
+        var resultType = result.GetType();
+        var successProperty = resultType.GetProperty("success");
+        var filesProperty = resultType.GetProperty("files");
+        
+        Assert.NotNull(successProperty);
+        Assert.NotNull(filesProperty);
+        
+        var success = (bool)successProperty.GetValue(result)!;
+        var files = filesProperty.GetValue(result)!;
+        
+        Assert.True(success);
+        Assert.NotNull(files);
+    }
+
+    [Fact]
+    public async Task SearchFiles_WithPythonContent_FindsMatches()
+    {
+        // Arrange - Create Python file with searchable content
+        var pythonFile = Path.Combine(_testDirectory, "search_test.py");
+        var pythonContent = "def search_function():\n    print('FINDME: This is a searchable term')\n    return True\n";
+        await File.WriteAllTextAsync(pythonFile, pythonContent);
+        
+        await _module.InitializeFileSystemNodes();
+
+        var searchRequest = new FileSearchRequest
+        {
+            Query = "FINDME",
+            SearchInContent = true,
+            SearchInNames = false,
+            MaxResults = 10
+        };
+
+        // Act
+        var result = await _module.SearchFiles(searchRequest);
+
+        // Assert
+        Assert.NotNull(result);
+        
+        if (result is CodexBootstrap.Core.ErrorResponse errorResponse)
+        {
+            Assert.True(false, $"Method returned error: {errorResponse.Error}");
+        }
+        
+        // Use reflection to access the anonymous object properties
+        var resultType = result.GetType();
+        var successProperty = resultType.GetProperty("success");
+        var resultsProperty = resultType.GetProperty("results");
+        
+        Assert.NotNull(successProperty);
+        Assert.NotNull(resultsProperty);
+        
+        var success = (bool)successProperty.GetValue(result)!;
+        var results = resultsProperty.GetValue(result)!;
+        
+        Assert.True(success);
+        Assert.NotNull(results);
+    }
+
+    [Fact]
     public void FileNode_ShouldHaveCorrectContentRef()
     {
         // Arrange

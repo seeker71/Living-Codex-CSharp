@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AtomFetcher, APIAdapter, UIPage, UILens, UIAction, UIControls } from './atoms';
 import { endpoints } from './api';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 const atomFetcher = new AtomFetcher();
@@ -49,37 +49,36 @@ export function useConceptDiscovery(params: Record<string, unknown> = {}) {
     queryKey: ['concepts', 'discover', params],
     queryFn: async () => {
       try {
-        // Try the discovery endpoint first
+        // Prefer server-side pageable list for performance
+        const take = (params as any)?.take ?? 20;
+        const skip = (params as any)?.skip ?? 0;
+        const searchTerm = (params as any)?.searchTerm as string | undefined;
+
+        // Use new pageable GET /concepts
+        const basic = await endpoints.getConcepts({ searchTerm, skip, take });
+        if (basic.success && basic.data) {
+          const conceptList = (basic.data as any).concepts || [];
+          const totalCount = (basic.data as any).totalCount ?? conceptList.length;
+          return {
+            success: true,
+            discoveredConcepts: conceptList,
+            totalDiscovered: totalCount,
+            message: 'Using pageable concepts endpoint'
+          };
+        }
+
+        // Fallback to discovery endpoint
         const discoveryResult = await apiAdapter.call(
           { method: 'POST', path: '/concept/discover' },
           params
         );
-        
-        // If discovery returns no concepts, fall back to basic concepts
-        if (discoveryResult && Array.isArray(discoveryResult.discoveredConcepts) && discoveryResult.discoveredConcepts.length === 0) {
-          console.log('Discovery endpoint returned no concepts, falling back to basic concepts');
-          const conceptsResult = await apiAdapter.call(
-            { method: 'GET', path: '/concepts' },
-            {}
-          );
-          // Return in discovery format for compatibility
-          return {
-            success: true,
-            discoveredConcepts: conceptsResult.concepts || [],
-            totalDiscovered: conceptsResult.concepts?.length || 0,
-            message: 'Using basic concepts as fallback'
-          };
-        }
-        
         return discoveryResult;
       } catch (error) {
-        // Fall back to basic concepts endpoint on error
-        console.log('Discovery endpoint failed, falling back to basic concepts');
+        // Final fallback: legacy GET /concepts without params
         const conceptsResult = await apiAdapter.call(
           { method: 'GET', path: '/concepts' },
           {}
         );
-        // Return in discovery format for compatibility
         return {
           success: true,
           discoveredConcepts: conceptsResult.concepts || [],
@@ -262,7 +261,7 @@ export function useAdvancedNodeSearch(searchParams: {
     queryKey: ['nodes', 'search', searchParams],
     queryFn: () => endpoints.searchNodesAdvanced(searchParams),
     staleTime: 30 * 1000, // 30 seconds for search results
-    enabled: !!(searchParams.typeIds?.length || searchParams.searchTerm || searchParams.states?.length),
+    // Always enabled - the backend can handle empty search criteria to return all nodes
   });
 }
 
@@ -271,6 +270,25 @@ export function useNodeTypes() {
     queryKey: ['storage', 'types'],
     queryFn: () => endpoints.getNodeTypes(),
     staleTime: 10 * 60 * 1000, // 10 minutes - node types don't change often
+  });
+}
+
+export function useAdvancedEdgeSearch(searchParams: {
+  fromId?: string;
+  toId?: string;
+  nodeId?: string;
+  role?: string;
+  relationship?: string;
+  minWeight?: number;
+  maxWeight?: number;
+  searchTerm?: string;
+  take?: number;
+  skip?: number;
+}) {
+  return useQuery({
+    queryKey: ['edges', 'search', searchParams],
+    queryFn: () => endpoints.searchEdgesAdvanced(searchParams),
+    staleTime: 30 * 1000, // 30 seconds for search results
   });
 }
 
@@ -309,6 +327,7 @@ export function useRecordContribution() {
   
   return useMutation({
     mutationFn: endpoints.recordContribution,
+    retry: 0, // Don't retry failed contributions
     onSuccess: () => {
       // Invalidate related queries to refresh data
       queryClient.invalidateQueries({ queryKey: ['contributions'] });
@@ -331,10 +350,19 @@ export function useUserContributions(userId: string, query?: Record<string, any>
 export function useTrackInteraction() {
   const recordContribution = useRecordContribution();
   const { user } = useAuth();
+  const trackedInteractions = useRef<Set<string>>(new Set());
   
   return useCallback((entityId: string, interactionType: string, metadata?: Record<string, any>) => {
     if (!user?.id) {
       console.warn('Cannot track interaction: user not authenticated');
+      return;
+    }
+    
+    // Create a unique key for this interaction to prevent duplicates
+    const interactionKey = `${entityId}-${interactionType}-${user.id}`;
+    
+    // For page visits, only track once per session
+    if (interactionType === 'page-visit' && trackedInteractions.current.has(interactionKey)) {
       return;
     }
     
@@ -352,6 +380,9 @@ export function useTrackInteraction() {
     };
     
     const contributionType = contributionTypeMap[interactionType] || 'View';
+    
+    // Mark this interaction as tracked
+    trackedInteractions.current.add(interactionKey);
     
     recordContribution.mutate({
       userId: user.id,

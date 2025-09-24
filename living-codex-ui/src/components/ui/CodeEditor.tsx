@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react'
 import { RouteStatusBadge, type RouteStatus } from './RouteStatusBadge'
+import { buildApiUrl } from '@/lib/config'
+import { ContentRenderer } from '@/components/renderers/ContentRenderer'
 
 interface FileNode {
   id: string
@@ -11,6 +13,15 @@ interface FileNode {
   absolutePath: string
   size: number
   lastModified: string
+  meta?: {
+    fileName?: string
+    relativePath?: string
+    absolutePath?: string
+    size?: number
+    lastModified?: string
+    isReadOnly?: boolean
+    lastEditedBy?: string
+  }
   contentRef: {
     mediaType?: string
     externalUri?: string
@@ -32,6 +43,63 @@ interface FileUpdateRequest {
   changeReason?: string
 }
 
+interface StorageNode {
+  id: string
+  name?: string
+  title?: string
+  typeId?: string
+  meta?: {
+    fileName?: string
+    relativePath?: string
+    absolutePath?: string
+    size?: number
+    lastModified?: string
+    isReadOnly?: boolean
+    lastEditedBy?: string
+  }
+  content?: {
+    mediaType?: string
+    externalUri?: string
+    inlineJson?: unknown
+    inlineBytes?: unknown
+  }
+  contentRef?: {
+    mediaType?: string
+    externalUri?: string
+    hasInlineContent?: boolean
+  }
+}
+
+const normalizeStorageNode = (storageNode: StorageNode): FileNode => {
+  const meta = storageNode.meta ?? {}
+  const fileName = meta.fileName || storageNode.name || storageNode.title || storageNode.id
+  const relativePath = meta.relativePath || fileName || ''
+  const absolutePath = meta.absolutePath || relativePath
+
+  return {
+    id: storageNode.id,
+    name: fileName || '',
+    type: storageNode.typeId || 'file',
+    relativePath,
+    absolutePath,
+    size: meta.size ?? 0,
+    lastModified: meta.lastModified || new Date().toISOString(),
+    meta: {
+      ...meta,
+      fileName,
+      relativePath,
+      absolutePath,
+    },
+    contentRef: {
+      mediaType: storageNode.contentRef?.mediaType ?? storageNode.content?.mediaType,
+      externalUri: storageNode.contentRef?.externalUri ?? storageNode.content?.externalUri,
+      hasInlineContent:
+        storageNode.contentRef?.hasInlineContent ??
+        Boolean(storageNode.content?.inlineJson || storageNode.content?.inlineBytes),
+    },
+  }
+}
+
 export function CodeEditor({ 
   nodeId, 
   onSave, 
@@ -47,6 +115,9 @@ export function CodeEditor({
   const [error, setError] = useState<string | null>(null)
   const [hasChanges, setHasChanges] = useState(false)
   const [status, setStatus] = useState<RouteStatus>('Untested')
+  const [mediaType, setMediaType] = useState<string | undefined>(undefined)
+  const [showPreview, setShowPreview] = useState<boolean>(true)
+  const effectiveReadOnly = readOnly || fileNode?.meta?.isReadOnly || false
 
   // Load file content when nodeId changes
   useEffect(() => {
@@ -72,7 +143,7 @@ export function CodeEditor({
     
     try {
       // First get the node metadata from storage endpoints
-      const nodeResponse = await fetch(`http://localhost:5002/storage-endpoints/nodes/${encodeURIComponent(id)}`)
+      const nodeResponse = await fetch(buildApiUrl(`/storage-endpoints/nodes/${encodeURIComponent(id)}`))
       if (!nodeResponse.ok) {
         throw new Error(`Failed to load node: ${nodeResponse.statusText}`)
       }
@@ -80,27 +151,15 @@ export function CodeEditor({
       const nodeData = await nodeResponse.json()
       
       // Convert storage node to FileNode format
-      const storageNode = nodeData.node || nodeData
+      const storageNode: StorageNode | undefined = nodeData.node || nodeData
       if (storageNode) {
-        const fileNode: FileNode = {
-          id: storageNode.id,
-          name: storageNode.meta?.fileName || storageNode.title || storageNode.id,
-          type: storageNode.typeId,
-          relativePath: storageNode.meta?.relativePath || '',
-          absolutePath: storageNode.meta?.absolutePath || '',
-          size: storageNode.meta?.size || 0,
-          lastModified: storageNode.meta?.lastModified || new Date().toISOString(),
-          contentRef: {
-            mediaType: storageNode.content?.mediaType,
-            externalUri: storageNode.content?.externalUri,
-            hasInlineContent: !!storageNode.content?.inlineJson || !!storageNode.content?.inlineBytes
-          }
-        }
-        setFileNode(fileNode)
+        const normalized = normalizeStorageNode(storageNode)
+        setFileNode(normalized)
+        setMediaType(storageNode.content?.mediaType || normalized.contentRef.mediaType)
       }
       
       // Then get the file content
-      const contentResponse = await fetch(`http://localhost:5002/filesystem/content/${encodeURIComponent(id)}`)
+      const contentResponse = await fetch(buildApiUrl(`/filesystem/content/${encodeURIComponent(id)}`))
       if (!contentResponse.ok) {
         throw new Error(`Failed to load content: ${contentResponse.statusText}`)
       }
@@ -120,7 +179,7 @@ export function CodeEditor({
   }
 
   const handleSave = async () => {
-    if (!nodeId || !hasChanges) return
+    if (!nodeId || !hasChanges || effectiveReadOnly) return
 
     setSaving(true)
     setError(null)
@@ -132,7 +191,7 @@ export function CodeEditor({
         changeReason: 'File updated via UI editor'
       }
 
-      const response = await fetch(`http://localhost:5002/filesystem/content/${encodeURIComponent(nodeId)}`, {
+      const response = await fetch(buildApiUrl(`/filesystem/content/${encodeURIComponent(nodeId)}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -214,23 +273,31 @@ export function CodeEditor({
         <div className="flex items-center gap-3">
           <div className="flex flex-col">
             <h3 className="font-medium text-gray-900 dark:text-gray-100">
-              {fileNode?.meta?.fileName || 'Unknown File'}
+              {fileNode?.meta?.fileName || fileNode?.name || 'Unknown File'}
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              {fileNode?.meta?.relativePath}
+              {fileNode?.meta?.relativePath || fileNode?.relativePath}
             </p>
           </div>
           <RouteStatusBadge status={status} size="sm" />
         </div>
         
         <div className="flex items-center gap-2">
+          {isPreviewable(mediaType) && (
+            <button
+              onClick={() => setShowPreview(prev => !prev)}
+              className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
+            >
+              {showPreview ? 'Hide Preview' : 'Show Preview'}
+            </button>
+          )}
           {hasChanges && (
             <span className="text-sm text-orange-600 dark:text-orange-400">
               Unsaved changes
             </span>
           )}
           
-          {!readOnly && (
+          {!effectiveReadOnly && (
             <button
               onClick={handleSave}
               disabled={!hasChanges || saving}
@@ -269,21 +336,33 @@ export function CodeEditor({
               <span>Modified: {new Date(fileNode.lastModified).toLocaleString()}</span>
             )}
             <span>Type: {fileNode.type}</span>
+            {fileNode.meta?.lastEditedBy && (
+              <span>Last edited by: {fileNode.meta.lastEditedBy}</span>
+            )}
           </div>
         </div>
       )}
 
-      {/* Editor */}
+      {/* Editor + Preview */}
       <div className="flex-1 relative">
+        {showPreview && isPreviewable(mediaType) && (
+          <div className="border-b border-gray-200 dark:border-gray-700 p-3">
+            <ContentRenderer
+              content={{ mediaType: mediaType || 'text/plain', inlineJson: content }}
+              nodeId={nodeId || ''}
+              className=""
+            />
+          </div>
+        )}
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          readOnly={readOnly}
+          readOnly={effectiveReadOnly}
           className="w-full h-full p-4 font-mono text-sm bg-transparent border-none resize-none focus:outline-none focus:ring-0 text-gray-900 dark:text-gray-100"
-          placeholder={readOnly ? "File content will appear here..." : "Start typing..."}
+          placeholder={effectiveReadOnly ? "File content will appear here..." : "Start typing..."}
           spellCheck={false}
           style={{
-            minHeight: '400px',
+            minHeight: '300px',
             lineHeight: '1.5'
           }}
         />
@@ -292,12 +371,12 @@ export function CodeEditor({
       {/* Footer */}
       <div className="flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-          <span>Language: {getFileLanguage(fileNode?.meta?.fileName)}</span>
+          <span>Language: {getFileLanguage(fileNode?.meta?.fileName || fileNode?.name)}</span>
           <span>Lines: {content.split('\n').length}</span>
           <span>Characters: {content.length}</span>
         </div>
         
-        {fileNode?.meta?.isReadOnly && (
+        {effectiveReadOnly && (
           <span className="text-xs text-orange-600 dark:text-orange-400">
             Read Only
           </span>
@@ -308,3 +387,17 @@ export function CodeEditor({
 }
 
 export default CodeEditor
+
+function isPreviewable(type?: string) {
+  if (!type) return false
+  const t = type.toLowerCase()
+  return (
+    t.includes('markdown') ||
+    t.includes('text/') ||
+    t.includes('application/json') ||
+    t.includes('html') ||
+    t.includes('xml') ||
+    t.includes('yaml') ||
+    t.includes('toml')
+  )
+}

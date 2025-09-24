@@ -48,16 +48,23 @@ public sealed record Edge(
     string FromId,
     string ToId,
     string Role,
+    string? RoleId,
     double? Weight,
     Dictionary<string, object>? Meta
 )
 {
+    public Edge(string FromId, string ToId, string Role, double? Weight, Dictionary<string, object>? Meta)
+        : this(FromId, ToId, Role, null, Weight, Meta)
+    {
+    }
+
     public Edge DeepClone()
     {
         return new Edge(
             FromId: FromId,
             ToId: ToId,
             Role: Role,
+            RoleId: RoleId,
             Weight: Weight,
             Meta: Meta != null ? new Dictionary<string, object>(Meta) : null
         );

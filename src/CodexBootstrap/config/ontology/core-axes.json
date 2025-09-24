@@ -305,6 +305,60 @@
       "parentAxes": ["axiological", "consciousness"],
       "childAxes": ["transcendent", "mystical", "contemplative"]
     }
+    ,
+    { "id": "metaphysical", "name": "Metaphysical", "description": "Child axis of Ontological focusing on being beyond physical.", "typeId": "codex.ontology.axis", "level": 1, "keywords": ["being", "beyond", "reality"], "dimensions": [], "parentAxes": ["ontological"], "childAxes": [] }
+    ,
+    { "id": "phenomenological", "name": "Phenomenological", "description": "Child axis of Ontological and Consciousness focusing on lived experience.", "typeId": "codex.ontology.axis", "level": 1, "keywords": ["experience", "appearance"], "dimensions": [], "parentAxes": ["ontological", "consciousness"], "childAxes": [] }
+    ,
+    { "id": "cognitive", "name": "Cognitive", "description": "Child axis of Epistemological and Consciousness focusing on knowledge processes.", "typeId": "codex.ontology.axis", "level": 1, "keywords": ["knowledge", "thinking"], "dimensions": [], "parentAxes": ["epistemological", "consciousness"], "childAxes": [] }
+    ,
+    { "id": "rational", "name": "Rational", "description": "Child axis of Epistemological focusing on reason and logic.", "typeId": "codex.ontology.axis", "level": 1, "keywords": ["reason", "logic"], "dimensions": [], "parentAxes": ["epistemological"], "childAxes": [] }
+    ,
+    { "id": "empirical", "name": "Empirical", "description": "Child axis of Epistemological focusing on observation and experiment.", "typeId": "codex.ontology.axis", "level": 1, "keywords": ["observation", "experiment"], "dimensions": [], "parentAxes": ["epistemological"], "childAxes": [] }
+    ,
+    { "id": "ethical", "name": "Ethical", "description": "Child axis of Axiological focusing on morality and value.", "typeId": "codex.ontology.axis", "level": 1, "keywords": ["ethics", "morality"], "dimensions": [], "parentAxes": ["axiological"], "childAxes": [] }
+    ,
+    { "id": "aesthetic", "name": "Aesthetic", "description": "Child axis of Axiological focusing on beauty and form.", "typeId": "codex.ontology.axis", "level": 1, "keywords": ["beauty", "form"], "dimensions": [], "parentAxes": ["axiological"], "childAxes": [] }
+    ,
+    { "id": "chronological", "name": "Chronological", "description": "Child axis of Temporal focusing on ordering in time.", "typeId": "codex.ontology.axis", "level": 2, "keywords": ["sequence", "order"], "dimensions": [], "parentAxes": ["temporal"], "childAxes": [] }
+    ,
+    { "id": "geometric", "name": "Geometric", "description": "Child axis of Spatial focusing on geometry.", "typeId": "codex.ontology.axis", "level": 2, "keywords": ["geometry", "shape"], "dimensions": [], "parentAxes": ["spatial"], "childAxes": [] }
+    ,
+    { "id": "topological", "name": "Topological", "description": "Child axis of Spatial focusing on topology and continuity.", "typeId": "codex.ontology.axis", "level": 2, "keywords": ["topology", "continuity"], "dimensions": [], "parentAxes": ["spatial"], "childAxes": [] }
+    ,
+    { "id": "deterministic", "name": "Deterministic", "description": "Child axis of Causal focusing on necessity of outcomes.", "typeId": "codex.ontology.axis", "level": 3, "keywords": ["determinism"], "dimensions": [], "parentAxes": ["causal"], "childAxes": [] }
+    ,
+    { "id": "probabilistic", "name": "Probabilistic", "description": "Child axis of Causal focusing on chance and probability.", "typeId": "codex.ontology.axis", "level": 3, "keywords": ["probability", "chance"], "dimensions": [], "parentAxes": ["causal"], "childAxes": [] }
+    ,
+    { "id": "semantic", "name": "Semantic", "description": "Child axis of Informational focusing on meaning.", "typeId": "codex.ontology.axis", "level": 2, "keywords": ["meaning", "semantics"], "dimensions": [], "parentAxes": ["informational"], "childAxes": [] }
+    ,
+    { "id": "syntactic", "name": "Syntactic", "description": "Child axis of Informational focusing on structure.", "typeId": "codex.ontology.axis", "level": 2, "keywords": ["syntax", "structure"], "dimensions": [], "parentAxes": ["informational"], "childAxes": [] }
+    ,
+    { "id": "pragmatic", "name": "Pragmatic", "description": "Child axis of Informational focusing on use and context.", "typeId": "codex.ontology.axis", "level": 2, "keywords": ["use", "context"], "dimensions": [], "parentAxes": ["informational"], "childAxes": [] }
+    ,
+    { "id": "dynamic", "name": "Dynamic", "description": "Child axis of Energetic focusing on change and motion.", "typeId": "codex.ontology.axis", "level": 2, "keywords": ["change", "motion"], "dimensions": [], "parentAxes": ["energetic"], "childAxes": [] }
+    ,
+    { "id": "thermodynamic", "name": "Thermodynamic", "description": "Child axis of Energetic focusing on heat and energy flows.", "typeId": "codex.ontology.axis", "level": 2, "keywords": ["heat", "entropy"], "dimensions": [], "parentAxes": ["energetic"], "childAxes": [] }
+    ,
+    { "id": "experiential", "name": "Experiential", "description": "Child axis of Consciousness focusing on lived experience.", "typeId": "codex.ontology.axis", "level": 2, "keywords": ["experience", "subjective"], "dimensions": [], "parentAxes": ["consciousness"], "childAxes": [] }
+    ,
+    { "id": "systemic", "name": "Systemic", "description": "Child axis of Relational focusing on systems.", "typeId": "codex.ontology.axis", "level": 2, "keywords": ["system", "whole"], "dimensions": [], "parentAxes": ["relational"], "childAxes": [] }
+    ,
+    { "id": "network", "name": "Network", "description": "Child axis of Relational focusing on networks.", "typeId": "codex.ontology.axis", "level": 2, "keywords": ["network", "graph"], "dimensions": [], "parentAxes": ["relational"], "childAxes": [] }
+    ,
+    { "id": "social", "name": "Social", "description": "Child axis of Relational focusing on social relationships.", "typeId": "codex.ontology.axis", "level": 2, "keywords": ["social", "society"], "dimensions": [], "parentAxes": ["relational"], "childAxes": [] }
+    ,
+    { "id": "complex", "name": "Complex", "description": "Child axis of Emergent focusing on complexity.", "typeId": "codex.ontology.axis", "level": 3, "keywords": ["complexity"], "dimensions": [], "parentAxes": ["emergent"], "childAxes": [] }
+    ,
+    { "id": "adaptive", "name": "Adaptive", "description": "Child axis of Emergent focusing on adaptation.", "typeId": "codex.ontology.axis", "level": 3, "keywords": ["adaptation"], "dimensions": [], "parentAxes": ["emergent"], "childAxes": [] }
+    ,
+    { "id": "evolutionary", "name": "Evolutionary", "description": "Child axis of Emergent focusing on evolution.", "typeId": "codex.ontology.axis", "level": 3, "keywords": ["evolution"], "dimensions": [], "parentAxes": ["emergent"], "childAxes": [] }
+    ,
+    { "id": "transcendent", "name": "Transcendent", "description": "Child axis of Spiritual focusing on transcendence.", "typeId": "codex.ontology.axis", "level": 3, "keywords": ["transcendence"], "dimensions": [], "parentAxes": ["spiritual"], "childAxes": [] }
+    ,
+    { "id": "mystical", "name": "Mystical", "description": "Child axis of Spiritual focusing on mystical experience.", "typeId": "codex.ontology.axis", "level": 3, "keywords": ["mysticism"], "dimensions": [], "parentAxes": ["spiritual"], "childAxes": [] }
+    ,
+    { "id": "contemplative", "name": "Contemplative", "description": "Child axis of Spiritual focusing on contemplation.", "typeId": "codex.ontology.axis", "level": 3, "keywords": ["contemplation", "meditation"], "dimensions": [], "parentAxes": ["spiritual"], "childAxes": [] }
   ]
 }
 

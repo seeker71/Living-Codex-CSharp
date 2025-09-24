@@ -51,6 +51,7 @@ public class PostgreSqlIceStorageBackend : IIceStorageBackend
                 from_id TEXT NOT NULL,
                 to_id TEXT NOT NULL,
                 role TEXT NOT NULL,
+                role_id TEXT,
                 weight REAL,
                 meta JSONB,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -67,6 +68,7 @@ public class PostgreSqlIceStorageBackend : IIceStorageBackend
             CREATE INDEX IF NOT EXISTS idx_ice_edges_from_id ON ice_edges(from_id);
             CREATE INDEX IF NOT EXISTS idx_ice_edges_to_id ON ice_edges(to_id);
             CREATE INDEX IF NOT EXISTS idx_ice_edges_role ON ice_edges(role);
+            CREATE INDEX IF NOT EXISTS idx_ice_edges_role_id ON ice_edges(role_id);
             CREATE INDEX IF NOT EXISTS idx_ice_edges_meta_gin ON ice_edges USING GIN(meta);
         ";
 
@@ -186,9 +188,10 @@ public class PostgreSqlIceStorageBackend : IIceStorageBackend
         await connection.OpenAsync();
 
         var sql = @"
-            INSERT INTO ice_edges (from_id, to_id, role, weight, meta)
-            VALUES (@fromId, @toId, @role, @weight, @meta)
+            INSERT INTO ice_edges (from_id, to_id, role, role_id, weight, meta)
+            VALUES (@fromId, @toId, @role, @roleId, @weight, @meta)
             ON CONFLICT (from_id, to_id, role) DO UPDATE SET
+                role_id = EXCLUDED.role_id,
                 weight = EXCLUDED.weight,
                 meta = EXCLUDED.meta";
 
@@ -196,6 +199,7 @@ public class PostgreSqlIceStorageBackend : IIceStorageBackend
         command.Parameters.AddWithValue("@fromId", edge.FromId);
         command.Parameters.AddWithValue("@toId", edge.ToId);
         command.Parameters.AddWithValue("@role", edge.Role);
+        command.Parameters.AddWithValue("@roleId", (object?)edge.RoleId ?? DBNull.Value);
         command.Parameters.AddWithValue("@weight", edge.Weight ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("@meta", edge.Meta != null ? JsonSerializer.Serialize(edge.Meta, _jsonOptions) : (object)DBNull.Value);
 
@@ -383,7 +387,7 @@ public class PostgreSqlIceStorageBackend : IIceStorageBackend
         await connection.OpenAsync();
 
         using var writer = await connection.BeginBinaryImportAsync(
-            "COPY ice_edges (from_id, to_id, role, weight, meta) FROM STDIN (FORMAT BINARY)");
+            "COPY ice_edges (from_id, to_id, role, role_id, weight, meta) FROM STDIN (FORMAT BINARY)");
 
         foreach (var edge in edges)
         {
@@ -391,6 +395,7 @@ public class PostgreSqlIceStorageBackend : IIceStorageBackend
             await writer.WriteAsync(edge.FromId);
             await writer.WriteAsync(edge.ToId);
             await writer.WriteAsync(edge.Role);
+            await writer.WriteAsync((object?)edge.RoleId ?? DBNull.Value);
             await writer.WriteAsync(edge.Weight ?? (object)DBNull.Value);
             await writer.WriteAsync(edge.Meta != null ? JsonSerializer.Serialize(edge.Meta, _jsonOptions) : (object)DBNull.Value);
         }
@@ -501,6 +506,7 @@ public class PostgreSqlIceStorageBackend : IIceStorageBackend
             var fromId = reader.GetString(reader.GetOrdinal("from_id"));
             var toId = reader.GetString(reader.GetOrdinal("to_id"));
             var role = reader.GetString(reader.GetOrdinal("role"));
+            var roleId = reader.IsDBNull(reader.GetOrdinal("role_id")) ? null : reader.GetString(reader.GetOrdinal("role_id"));
             double? weight = reader.IsDBNull(reader.GetOrdinal("weight")) ? null : reader.GetDouble(reader.GetOrdinal("weight"));
             
             Dictionary<string, object>? meta = null;
@@ -510,7 +516,7 @@ public class PostgreSqlIceStorageBackend : IIceStorageBackend
                 meta = JsonSerializer.Deserialize<Dictionary<string, object>>(metaJson, _jsonOptions);
             }
 
-            return new Edge(fromId, toId, role, weight, meta);
+            return new Edge(fromId, toId, role, roleId, weight, meta);
         }
         catch (Exception ex)
         {

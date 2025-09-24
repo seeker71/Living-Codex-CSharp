@@ -7,6 +7,10 @@ set -e  # Exit on any error
 
 echo "🚀 Starting Living Codex Server..."
 
+# Cheap AI defaults for news concept extraction (can be overridden)
+export NEWS_AI_PROVIDER="${NEWS_AI_PROVIDER:-ollama}"
+export NEWS_AI_MODEL="${NEWS_AI_MODEL:-llama3.1:8b}"
+
 # Get the script directory and set up paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$SCRIPT_DIR/src/CodexBootstrap"
@@ -39,6 +43,9 @@ echo "📁 Working directory: $(pwd)"
 
 # Create logs directory if it doesn't exist
 mkdir -p "$LOG_DIR"
+
+# Create/refresh a symlink to the latest log for easy tailing
+ln -sfn "$LOG_FILE" "$LOG_DIR/server.log"
 
 # Function to stop any running dotnet processes
 stop_server() {
@@ -137,8 +144,8 @@ test_server() {
     fi
     
     # Test spec endpoints
-    echo "Testing /spec/modules/all..."
-    if curl -s "http://127.0.0.1:$PORT/spec/modules/all" >/dev/null 2>&1; then
+    echo "Testing /spec/modules..."
+    if curl -s "http://127.0.0.1:$PORT/spec/modules" >/dev/null 2>&1; then
         echo "✅ Spec modules endpoint working"
     else
         echo "❌ Spec modules endpoint failed"
@@ -345,7 +352,7 @@ main() {
             echo "🌐 URL: http://127.0.0.1:$PORT"
             echo "📊 Health: http://127.0.0.1:$PORT/health"
             echo "🤖 AI Health: http://127.0.0.1:$PORT/ai/health"
-            echo "📋 Spec: http://127.0.0.1:$PORT/spec/modules/all"
+            echo "📋 Spec: http://127.0.0.1:$PORT/spec/modules"
             echo "📖 Swagger: http://127.0.0.1:$PORT/swagger"
             echo "📝 Logs: $LOG_FILE"
             echo ""

@@ -138,16 +138,7 @@ public class ConceptImageModule : ModuleBase
         );
     }
 
-    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
-    {
-        _apiRouter = router;
-        // API handlers are registered via attributes
-    }
-
-    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
-    {
-        // HTTP endpoints are registered via attributes
-    }
+    // No overrides for RegisterApiHandlers/RegisterHttpEndpoints to ensure base wiring runs.
 
     [ApiRoute("POST", "/image/concept/create", "image-concept-create", "Create a concept for image generation", "codex.image.concept")]
     public async Task<object> CreateConcept([ApiParameter("request", "Concept creation request", Required = true, Location = "body")] ConceptCreationRequest request)
@@ -522,18 +513,212 @@ public class ConceptImageModule : ModuleBase
 
     private async Task<List<string>> GenerateImagesAsync(ImageConfig config, string prompt, int numberOfImages)
     {
-        // This is a simplified implementation
-        // In a real implementation, you would call the actual image generation APIs
+        var images = new List<string>();
         
-        await Task.Delay(2000); // Simulate async operation
+        try
+        {
+            // Try to call real image generation APIs based on provider
+            switch (config.Provider.ToLowerInvariant())
+            {
+                case "openai":
+                    images = await GenerateOpenAIImages(config, prompt, numberOfImages);
+                    break;
+                case "stabilityai":
+                    images = await GenerateStabilityAIImages(config, prompt, numberOfImages);
+                    break;
+                case "local":
+                    images = await GenerateLocalImages(config, prompt, numberOfImages);
+                    break;
+                case "custom":
+                    images = await GenerateCustomImages(config, prompt, numberOfImages);
+                    break;
+                default:
+                    // Fallback to placeholder for unknown providers
+                    images = await GeneratePlaceholderImages(prompt, numberOfImages);
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"Image generation failed for provider {config.Provider}: {ex.Message}");
+            // Fallback to placeholder images
+            images = await GeneratePlaceholderImages(prompt, numberOfImages);
+        }
+
+        return images;
+    }
+
+    private async Task<List<string>> GenerateOpenAIImages(ImageConfig config, string prompt, int numberOfImages)
+    {
+        // Check if API key is available
+        if (string.IsNullOrEmpty(config.ApiKey) || config.ApiKey == "")
+        {
+            _logger.Warn("OpenAI API key not configured, using placeholder");
+            return await GeneratePlaceholderImages(prompt, numberOfImages);
+        }
+
+        // TODO: Implement real OpenAI DALL-E API call
+        // For now, return placeholder but with a note that it's configured
+        _logger.Info($"OpenAI DALL-E configured but not implemented yet for prompt: {prompt}");
+        return await GeneratePlaceholderImages(prompt, numberOfImages);
+    }
+
+    private async Task<List<string>> GenerateStabilityAIImages(ImageConfig config, string prompt, int numberOfImages)
+    {
+        // Check if API key is available
+        if (string.IsNullOrEmpty(config.ApiKey) || config.ApiKey == "")
+        {
+            _logger.Warn("Stability AI API key not configured, using placeholder");
+            return await GeneratePlaceholderImages(prompt, numberOfImages);
+        }
+
+        // TODO: Implement real Stability AI API call
+        _logger.Info($"Stability AI configured but not implemented yet for prompt: {prompt}");
+        return await GeneratePlaceholderImages(prompt, numberOfImages);
+    }
+
+    private async Task<List<string>> GenerateLocalImages(ImageConfig config, string prompt, int numberOfImages)
+    {
+        try
+        {
+            // Try to call local Stable Diffusion service
+            using var httpClient = new HttpClient();
+            httpClient.Timeout = TimeSpan.FromMinutes(5); // Local generation can take time
+
+            var requestBody = new
+            {
+                prompt = prompt,
+                negative_prompt = "blurry, low quality, distorted",
+                width = 512,
+                height = 512,
+                num_inference_steps = 20,
+                guidance_scale = 7.5,
+                num_images = numberOfImages
+            };
+
+            var json = JsonSerializer.Serialize(requestBody);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+            var response = await httpClient.PostAsync($"{config.BaseUrl}/sdapi/v1/txt2img", content);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var responseJson = await response.Content.ReadAsStringAsync();
+                var responseData = JsonSerializer.Deserialize<JsonElement>(responseJson);
+                
+                if (responseData.TryGetProperty("images", out var imagesElement))
+                {
+                    var imageList = new List<string>();
+                    foreach (var imageElement in imagesElement.EnumerateArray())
+                    {
+                        var base64Image = imageElement.GetString();
+                        if (!string.IsNullOrEmpty(base64Image))
+                        {
+                            // Convert base64 to data URL
+                            imageList.Add($"data:image/png;base64,{base64Image}");
+                        }
+                    }
+                    
+                    if (imageList.Any())
+                    {
+                        _logger.Info($"Successfully generated {imageList.Count} images using local Stable Diffusion");
+                        return imageList;
+                    }
+                }
+            }
+            
+            _logger.Warn($"Local Stable Diffusion service not available at {config.BaseUrl}");
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"Local image generation failed: {ex.Message}");
+        }
+
+        return await GeneratePlaceholderImages(prompt, numberOfImages);
+    }
+
+    private async Task<List<string>> GenerateCustomImages(ImageConfig config, string prompt, int numberOfImages)
+    {
+        try
+        {
+            // Try to call custom local service
+            using var httpClient = new HttpClient();
+            httpClient.Timeout = TimeSpan.FromMinutes(5);
+
+            var requestBody = new
+            {
+                prompt = prompt,
+                num_images = numberOfImages,
+                size = config.ImageSize
+            };
+
+            var json = JsonSerializer.Serialize(requestBody);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+            var response = await httpClient.PostAsync($"{config.BaseUrl}/generate", content);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var responseJson = await response.Content.ReadAsStringAsync();
+                var responseData = JsonSerializer.Deserialize<JsonElement>(responseJson);
+                
+                if (responseData.TryGetProperty("images", out var imagesElement))
+                {
+                    var imageList = new List<string>();
+                    foreach (var imageElement in imagesElement.EnumerateArray())
+                    {
+                        var imageUrl = imageElement.GetString();
+                        if (!string.IsNullOrEmpty(imageUrl))
+                        {
+                            imageList.Add(imageUrl);
+                        }
+                    }
+                    
+                    if (imageList.Any())
+                    {
+                        _logger.Info($"Successfully generated {imageList.Count} images using custom service");
+                        return imageList;
+                    }
+                }
+            }
+            
+            _logger.Warn($"Custom image generation service not available at {config.BaseUrl}");
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"Custom image generation failed: {ex.Message}");
+        }
+
+        return await GeneratePlaceholderImages(prompt, numberOfImages);
+    }
+
+    private async Task<List<string>> GeneratePlaceholderImages(string prompt, int numberOfImages)
+    {
+        // Generate sophisticated placeholder images with prompt-based styling
+        await Task.Delay(1000); // Simulate processing time
         
         var images = new List<string>();
         for (int i = 0; i < numberOfImages; i++)
         {
-            // Simulate generated image URL
-            images.Add($"https://example.com/generated-image-{Guid.NewGuid().ToString("N")[..8]}.png");
+            // Create a more sophisticated placeholder that reflects the prompt
+            var promptHash = prompt.GetHashCode();
+            var colors = new[] { "6366f1", "8b5cf6", "ec4899", "f59e0b", "10b981", "ef4444", "f97316", "84cc16" };
+            var colorIndex = Math.Abs(promptHash + i) % colors.Length;
+            var bgColor = colors[colorIndex];
+            
+            // Extract key words from prompt for display
+            var words = prompt.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                             .Where(w => w.Length > 3)
+                             .Take(2)
+                             .Select(w => w.Substring(0, Math.Min(2, w.Length)).ToUpper())
+                             .ToArray();
+            var displayText = words.Length > 0 ? string.Join("", words) : "AI";
+            
+            var placeholderUrl = $"https://via.placeholder.com/400x400/{bgColor}/ffffff?text={Uri.EscapeDataString(displayText)}";
+            images.Add(placeholderUrl);
         }
 
+        _logger.Info($"Generated {images.Count} placeholder images for prompt: {prompt.Substring(0, Math.Min(50, prompt.Length))}...");
         return images;
     }
 

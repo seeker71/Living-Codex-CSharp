@@ -207,16 +207,7 @@ public class ImageAnalysisModule : ModuleBase
         );
     }
 
-    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
-    {
-        _apiRouter = router;
-        // API handlers are registered via attributes
-    }
-
-    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
-    {
-        // HTTP endpoints are registered via attributes
-    }
+    // No overrides for RegisterApiHandlers/RegisterHttpEndpoints to ensure base wiring runs.
 
     [ApiRoute("POST", "/analysis/image", "analysis-image", "Analyze image to extract nodes and edges", "codex.analysis.image")]
     public async Task<object> AnalyzeImage([ApiParameter("request", "Image analysis request", Required = true, Location = "body")] ImageAnalysisRequest request)

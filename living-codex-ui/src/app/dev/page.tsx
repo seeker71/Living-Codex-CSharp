@@ -1,6 +1,5 @@
 'use client';
 
-import { Navigation } from '@/components/ui/Navigation';
 import { HotReloadDashboard } from '@/components/dev/HotReloadDashboard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect } from 'react';
@@ -23,8 +22,6 @@ export default function DevPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Navigation />
-      
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">

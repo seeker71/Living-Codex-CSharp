@@ -102,7 +102,7 @@ public sealed class PhaseModule : ModuleBase
             );
 
             var phaseChangeNode = new Node(
-                Id: $"phase-change-{Guid.NewGuid()}",
+                Id: $"codex.phase.change.{Guid.NewGuid():N}",
                 TypeId: "codex.phase/change",
                 State: ContentState.Ice,
                 Locale: "en",
@@ -177,7 +177,7 @@ public sealed class PhaseModule : ModuleBase
             );
 
             var phaseChangeNode = new Node(
-                Id: $"phase-change-{Guid.NewGuid()}",
+                Id: $"codex.phase.change.{Guid.NewGuid():N}",
                 TypeId: "codex.phase/change",
                 State: ContentState.Ice,
                 Locale: "en",

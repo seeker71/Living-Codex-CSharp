@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Navigation } from '@/components/ui/Navigation';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { PaginationControls } from '@/components/ui/PaginationControls';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTrackInteraction } from '@/lib/hooks';
 import { buildApiUrl } from '@/lib/config';
@@ -34,6 +35,9 @@ export default function PeoplePage() {
   const { user } = useAuth();
   const trackInteraction = useTrackInteraction();
   const [discoveredUsers, setDiscoveredUsers] = useState<UserProfile[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [conceptContributors, setConceptContributors] = useState<ConceptContributor[]>([]);
   const [loading, setLoading] = useState(false);
   const [discoveryType, setDiscoveryType] = useState<string>('interests');
@@ -54,7 +58,7 @@ export default function PeoplePage() {
     
     setLoading(true);
     try {
-      const discoveryRequest: any = { limit: 20 };
+      const discoveryRequest: any = { limit: pageSize, skip: (currentPage - 1) * pageSize };
       
       switch (discoveryType) {
         case 'interests':
@@ -78,6 +82,7 @@ export default function PeoplePage() {
       const data = await response.json();
       if (data.users) {
         setDiscoveredUsers(data.users);
+        if (typeof data.totalCount === 'number') setTotalCount(data.totalCount);
         
         // Track discovery interaction
         if (user?.id) {
@@ -127,7 +132,6 @@ export default function PeoplePage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Navigation />
       
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
@@ -220,14 +224,15 @@ export default function PeoplePage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Results */}
           <div className="lg:col-span-2">
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                  🌍 Discovered People ({discoveredUsers.length})
-                </h2>
-              </div>
+            <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+              <CardHeader>
+                <CardTitle className="text-xl text-gray-900 dark:text-gray-100 flex items-center justify-between">
+                  <span>🌍 Discovered People ({totalCount})</span>
+                </CardTitle>
+              </CardHeader>
 
-              <div className="divide-y divide-gray-200">
+              <CardContent>
+                <div className="divide-y divide-gray-200 dark:divide-gray-700">
                 {loading ? (
                   <div className="p-8 text-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -237,7 +242,7 @@ export default function PeoplePage() {
                   discoveredUsers.map((person, index) => {
                     const resonanceOverlap = calculateResonanceOverlap(person.interests);
                     return (
-                      <div key={index} className="p-6 hover:bg-gray-50">
+                      <div key={index} className="p-6 hover:bg-gray-50 dark:hover:bg-gray-700">
                         <div className="flex items-start space-x-4">
                           {/* Avatar */}
                           <div className="flex-shrink-0">
@@ -257,11 +262,11 @@ export default function PeoplePage() {
                           {/* User Info */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between">
-                              <h3 className="text-lg font-medium text-gray-900">
+                              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
                                 {person.displayName}
                               </h3>
                               <div className="flex items-center space-x-2">
-                                <span className="text-sm text-blue-600 font-medium">
+                                <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">
                                   {resonanceOverlap}% resonance
                                 </span>
                                 <div className={`w-3 h-3 rounded-full ${
@@ -272,25 +277,25 @@ export default function PeoplePage() {
                             </div>
                             
                             {person.location && (
-                              <p className="text-sm text-gray-500 mb-2">
+                              <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
                                 📍 {person.location}
                               </p>
                             )}
                             
                             {person.interests && person.interests.length > 0 && (
                               <div className="mb-3">
-                                <p className="text-sm text-gray-600 mb-1">Interests:</p>
+                                <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">Interests:</p>
                                 <div className="flex flex-wrap gap-1">
                                   {person.interests.slice(0, 5).map((interest, idx) => (
                                     <span
                                       key={idx}
-                                      className="px-2 py-1 bg-blue-100 text-blue-800 rounded-md text-xs"
+                                      className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-md text-xs"
                                     >
                                       {interest}
                                     </span>
                                   ))}
                                   {person.interests.length > 5 && (
-                                    <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-md text-xs">
+                                    <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-md text-xs">
                                       +{person.interests.length - 5} more
                                     </span>
                                   )}
@@ -300,12 +305,12 @@ export default function PeoplePage() {
 
                             {person.contributions && person.contributions.length > 0 && (
                               <div className="mb-3">
-                                <p className="text-sm text-gray-600 mb-1">Recent Contributions:</p>
+                                <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">Recent Contributions:</p>
                                 <div className="flex flex-wrap gap-1">
                                   {person.contributions.slice(0, 3).map((contrib, idx) => (
                                     <span
                                       key={idx}
-                                      className="px-2 py-1 bg-green-100 text-green-800 rounded-md text-xs"
+                                      className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-md text-xs"
                                     >
                                       {contrib}
                                     </span>
@@ -315,13 +320,13 @@ export default function PeoplePage() {
                             )}
 
                             <div className="flex items-center space-x-3 text-sm">
-                              <button className="text-blue-600 hover:text-blue-800 transition-colors">
+                              <button className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors">
                                 🤝 Connect
                               </button>
-                              <button className="text-green-600 hover:text-green-800 transition-colors">
+                              <button className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 transition-colors">
                                 💬 Message
                               </button>
-                              <button className="text-purple-600 hover:text-purple-800 transition-colors">
+                              <button className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 transition-colors">
                                 🔗 View Profile
                               </button>
                             </div>
@@ -331,7 +336,7 @@ export default function PeoplePage() {
                     );
                   })
                 ) : (
-                  <div className="p-8 text-center text-gray-500">
+                  <div className="p-8 text-center text-gray-500 dark:text-gray-400">
                     {discoveryType === 'interests' 
                       ? "Enter interests to discover people with similar passions"
                       : discoveryType === 'location'
@@ -339,15 +344,27 @@ export default function PeoplePage() {
                       : "Enter a concept ID to find contributors"}
                   </div>
                 )}
-              </div>
-            </div>
+                </div>
+
+                {totalCount > pageSize && (
+                  <div className="pt-4">
+                    <PaginationControls
+                      currentPage={currentPage}
+                      pageSize={pageSize}
+                      totalCount={totalCount}
+                      onPageChange={(p) => { setCurrentPage(p); discoverUsers(); }}
+                    />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Discovery Stats */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">📊 Discovery Stats</h3>
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">📊 Discovery Stats</h3>
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-300">People Found</span>
@@ -367,8 +384,8 @@ export default function PeoplePage() {
             </div>
 
             {/* Quick Discovery */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">⚡ Quick Discovery</h3>
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">⚡ Quick Discovery</h3>
               <div className="space-y-3">
                 <button
                   onClick={() => {

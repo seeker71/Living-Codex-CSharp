@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Navigation } from '@/components/ui/Navigation';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/Card';
 import { endpoints } from '@/lib/api';
 
 interface ResonanceData {
@@ -71,16 +71,6 @@ export default function ResonancePage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              <div className="flex items-center">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Living Codex</h1>
-              </div>
-              <Navigation />
-            </div>
-          </div>
-        </header>
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="animate-pulse space-y-4">
             <div className="h-8 bg-gray-200 rounded w-1/4"></div>
@@ -94,18 +84,6 @@ export default function ResonancePage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Living Codex</h1>
-            </div>
-            <Navigation />
-          </div>
-        </div>
-      </header>
-
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Page Header */}
         <div className="mb-8">
@@ -135,11 +113,11 @@ export default function ResonancePage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Collective Resonance */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              🌊 Collective Resonance
-            </h2>
-            
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle>🌊 Collective Resonance</CardTitle>
+            </CardHeader>
+            <CardContent>
             {collectiveData ? (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -188,14 +166,15 @@ export default function ResonancePage() {
             ) : (
               <div className="text-gray-500 dark:text-gray-400">No collective resonance data available</div>
             )}
-          </div>
+            </CardContent>
+          </Card>
 
           {/* Personal Resonance */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              ✨ Your Resonance
-            </h2>
-            
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle>✨ Your Resonance</CardTitle>
+            </CardHeader>
+            <CardContent>
             {contributorData ? (
               <div className="space-y-4">
                 <div className="text-center mb-6">
@@ -248,15 +227,16 @@ export default function ResonancePage() {
                 </button>
               </div>
             )}
-          </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Resonance Insights */}
-        <div className="mt-8 bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            🔮 Resonance Insights
-          </h2>
-          
+        <Card className="mt-8">
+          <CardHeader className="pb-2">
+            <CardTitle>🔮 Resonance Insights</CardTitle>
+          </CardHeader>
+          <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="text-center">
               <div className="text-3xl mb-2">🌊</div>
@@ -285,7 +265,8 @@ export default function ResonancePage() {
               </p>
             </div>
           </div>
-        </div>
+          </CardContent>
+        </Card>
       </main>
     </div>
   );

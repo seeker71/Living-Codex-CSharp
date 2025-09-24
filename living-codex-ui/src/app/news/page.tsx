@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Navigation } from '@/components/ui/Navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { endpoints } from '@/lib/api';
 import { useTrackInteraction } from '@/lib/hooks';
 import { buildApiUrl } from '@/lib/config';
 
 interface NewsItem {
+  id?: string;
+  nodeId?: string;
   title: string;
   description: string;
   url: string;
@@ -16,6 +17,12 @@ interface NewsItem {
   author?: string;
   imageUrl?: string;
   content?: string;
+  meta?: {
+    nodeId?: string;
+    newsId?: string;
+    originalNewsId?: string;
+    [key: string]: unknown;
+  };
 }
 
 interface TrendingTopic {
@@ -29,10 +36,34 @@ export default function NewsPage() {
   const trackInteraction = useTrackInteraction();
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [trendingTopics, setTrendingTopics] = useState<TrendingTopic[]>([]);
+  const [sourceStats, setSourceStats] = useState<Record<string, number>>({});
+  const [statsTotalCount, setStatsTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('personalized');
   const [searchQuery, setSearchQuery] = useState('');
   const [timeRange, setTimeRange] = useState(24);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [pageSize] = useState(20);
+  const [selectedNewsId, setSelectedNewsId] = useState<string | null>(null);
+  const [summaries, setSummaries] = useState<Record<string, string>>({});
+  const [summaryLoading, setSummaryLoading] = useState(false);
+
+  const getNewsNodeId = (item: NewsItem): string | undefined => {
+    const candidates = [
+      item.id,
+      item.nodeId,
+      typeof item.meta?.nodeId === 'string' ? item.meta.nodeId : undefined,
+      typeof item.meta?.newsId === 'string' ? item.meta.newsId : undefined,
+      typeof item.meta?.originalNewsId === 'string' ? item.meta.originalNewsId : undefined,
+      typeof (item as any).newsId === 'string' ? (item as any).newsId : undefined,
+      typeof (item as any).node?.id === 'string' ? (item as any).node.id : undefined,
+    ];
+
+    return candidates
+      .map((value) => (typeof value === 'string' ? value.trim() : undefined))
+      .find((value) => !!value);
+  };
 
   // Track page visit
   useEffect(() => {
@@ -43,28 +74,49 @@ export default function NewsPage() {
 
   // Load news data
   useEffect(() => {
+    setCurrentPage(1); // Reset to first page when filters change
     loadNewsData();
+    loadStats();
   }, [selectedCategory, timeRange, user?.id]); // loadNewsData is stable due to useState setters
+
+  // Load news data when page changes
+  useEffect(() => {
+    if (currentPage > 1) {
+      loadNewsData();
+    }
+  }, [currentPage]);
 
   const loadNewsData = async () => {
     setLoading(true);
     try {
+      const skip = (currentPage - 1) * pageSize;
+      
       if (selectedCategory === 'personalized' && user?.id) {
         // Load personalized news feed
-        const response = await endpoints.getNewsFeed(user.id, 20, timeRange);
+        const response = await endpoints.getNewsFeed(user.id, pageSize, timeRange, skip);
         if (response.success && response.data) {
-          setNewsItems((response.data as any).items || []);
+          const data = response.data as any;
+          setNewsItems(data.items || []);
+          setTotalCount(data.totalCount || 0);
         }
       } else if (selectedCategory === 'trending') {
         // Load trending news
-        const response = await fetch(buildApiUrl(`/news/trending?limit=20&hoursBack=${timeRange}`));
+        const response = await fetch(buildApiUrl(`/news/trending?limit=${pageSize}&hoursBack=${timeRange}`));
         const data = await response.json();
         setTrendingTopics(data.topics || []);
+        setTotalCount(data.topics?.length || 0);
+      } else if (selectedCategory === 'personalized' && !user?.id) {
+        // Fallback to general news when user is not authenticated
+        const response = await fetch(buildApiUrl(`/news/latest?limit=${pageSize}&skip=${skip}`));
+        const data = await response.json();
+        setNewsItems(data.items || []);
+        setTotalCount(data.totalCount || 0);
       } else {
         // Load general news by search
         const searchRequest = {
           interests: selectedCategory === 'all' ? [] : [selectedCategory],
-          limit: 20,
+          limit: pageSize,
+          skip: skip,
           hoursBack: timeRange
         };
         const response = await fetch(buildApiUrl('/news/search'), {
@@ -74,6 +126,7 @@ export default function NewsPage() {
         });
         const data = await response.json();
         setNewsItems(data.items || []);
+        setTotalCount(data.totalCount || 0);
       }
     } catch (error) {
       console.error('Error loading news:', error);
@@ -82,14 +135,33 @@ export default function NewsPage() {
     }
   };
 
+  const loadStats = async () => {
+    try {
+      const search = selectedCategory === 'all' || selectedCategory === 'personalized' || selectedCategory === 'trending'
+        ? undefined
+        : selectedCategory;
+      const res = await endpoints.getNewsStats(timeRange, search);
+      if (res.success && res.data) {
+        const data = res.data as any;
+        setStatsTotalCount(data.totalCount || 0);
+        setSourceStats(data.sources || {});
+      }
+    } catch (e) {
+      // ignore stats errors
+    }
+  };
+
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
     
     setLoading(true);
+    setCurrentPage(1); // Reset to first page for search
     try {
+      const skip = (currentPage - 1) * pageSize;
       const searchRequest = {
         interests: [searchQuery],
-        limit: 20,
+        limit: pageSize,
+        skip: 0,
         hoursBack: timeRange
       };
       const response = await fetch(buildApiUrl('/news/search'), {
@@ -99,6 +171,7 @@ export default function NewsPage() {
       });
       const data = await response.json();
       setNewsItems(data.items || []);
+      setTotalCount(data.totalCount || 0);
       
       // Track search interaction
       if (user?.id) {
@@ -113,22 +186,71 @@ export default function NewsPage() {
 
   const markAsRead = async (newsItem: NewsItem) => {
     if (!user?.id) return;
-    
+
     try {
+      const nodeId = getNewsNodeId(newsItem);
+      const newsIdentifier = nodeId ?? newsItem.url;
+
       await fetch(buildApiUrl('/news/read'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: user.id,
-          newsId: newsItem.url // Using URL as unique identifier
+          newsId: newsIdentifier,
+          nodeId,
         })
       });
-      
+
       // Track read interaction
-      trackInteraction(newsItem.url, 'view', { description: `User read: ${newsItem.title}`, title: newsItem.title, source: newsItem.source });
+      trackInteraction(newsIdentifier, 'view', {
+        description: `User read: ${newsItem.title}`,
+        title: newsItem.title,
+        source: newsItem.source,
+      });
     } catch (error) {
       console.error('Error marking news as read:', error);
     }
+  };
+
+  const resolveAndOpenNode = async (newsItem: NewsItem) => {
+    // Prefer explicit id if present
+    const candidateId = getNewsNodeId(newsItem);
+    if (candidateId) {
+      window.open(`/node/${encodeURIComponent(candidateId)}`, '_blank');
+      return;
+    }
+    // Try to resolve by URL via searchTerm
+    try {
+      const qs = new URLSearchParams();
+      qs.set('searchTerm', newsItem.url || newsItem.title);
+      qs.set('take', '1');
+      const resp = await fetch(buildApiUrl(`/storage-endpoints/nodes?${qs.toString()}`));
+      if (resp.ok) {
+        const data = await resp.json();
+        const node = (data.nodes || [])[0];
+        if (node?.id) {
+          window.open(`/node/${encodeURIComponent(node.id)}`, '_blank');
+          return;
+        }
+      }
+    } catch {}
+    // Fallback to graph preselect
+    const q = encodeURIComponent(newsItem.url || newsItem.title);
+    window.open(`/graph?selectedNode=${q}`, '_blank');
+  };
+
+  const loadSummary = async (newsId: string) => {
+    if (!newsId) return;
+    setSummaryLoading(true);
+    try {
+      const resp = await fetch(buildApiUrl(`/news/summary/${encodeURIComponent(newsId)}`));
+      if (resp.ok) {
+        const data = await resp.json();
+        const text = data?.summary || data?.content || '';
+        setSummaries(prev => ({ ...prev, [newsId]: text }));
+      }
+    } catch {}
+    setSummaryLoading(false);
   };
 
   const formatTimeAgo = (publishedAt: string) => {
@@ -144,7 +266,6 @@ export default function NewsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Navigation />
       
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
@@ -245,13 +366,13 @@ export default function NewsPage() {
                   // Trending Topics View
                   trendingTopics.length > 0 ? (
                     trendingTopics.map((topic, index) => (
-                      <div key={index} className="p-6 hover:bg-gray-50">
+                      <div key={index} className="p-6 hover:bg-gray-50 dark:hover:bg-gray-700">
                         <div className="flex items-center justify-between">
                           <div>
-                            <h3 className="text-lg font-medium text-gray-900">
+                            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
                               #{index + 1} {topic.topic}
                             </h3>
-                            <p className="text-sm text-gray-500">
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
                               {topic.mentionCount} mentions • Trend Score: {topic.trendScore.toFixed(2)}
                             </p>
                           </div>
@@ -269,8 +390,14 @@ export default function NewsPage() {
                 ) : (
                   // News Items View
                   newsItems.length > 0 ? (
-                    newsItems.map((item, index) => (
-                      <article key={index} className="p-6 hover:bg-gray-50">
+                    newsItems.map((item, index) => {
+                      const nodeId = getNewsNodeId(item);
+                      const summaryKey = nodeId ?? item.url;
+                      const summaryText = summaries[summaryKey];
+                      const isSelected = selectedNewsId === summaryKey;
+
+                      return (
+                        <article key={index} className="p-6 hover:bg-gray-50 dark:hover:bg-gray-700">
                         <div className="flex items-start space-x-4">
                           {item.imageUrl && (
                             <img
@@ -280,37 +407,61 @@ export default function NewsPage() {
                             />
                           )}
                           <div className="flex-1 min-w-0">
-                            <h3 className="text-lg font-medium text-gray-900 mb-2">
-                              <a
-                                href={item.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={() => markAsRead(item)}
-                                className="hover:text-blue-600 transition-colors"
+                            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                              <button
+                                onClick={() => {
+                                  setSelectedNewsId(summaryKey);
+                                  loadSummary(summaryKey);
+                                  markAsRead(item);
+                                }}
+                                className="hover:text-blue-600 transition-colors text-left"
+                                title="Select to load summary"
                               >
                                 {item.title}
-                              </a>
+                              </button>
                             </h3>
-                            <p className="text-gray-600 mb-3 line-clamp-2">
+                            <p className="text-gray-600 dark:text-gray-300 mb-3 line-clamp-2">
                               {item.description}
                             </p>
-                            <div className="flex items-center justify-between text-sm text-gray-500">
+                            <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
                               <div className="flex items-center space-x-4">
                                 <span>📰 {item.source}</span>
                                 {item.author && <span>✍️ {item.author}</span>}
                                 <span>🕒 {formatTimeAgo(item.publishedAt)}</span>
                               </div>
-                              <button
-                                onClick={() => markAsRead(item)}
-                                className="text-blue-600 hover:text-blue-800 transition-colors"
-                              >
-                                Mark as Read
-                              </button>
+                              <div className="flex items-center space-x-2">
+                                <button
+                                  onClick={() => resolveAndOpenNode(item)}
+                                  className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 transition-colors"
+                                >
+                                  🔎 View Node
+                                </button>
+                                <button
+                                  onClick={() => markAsRead(item)}
+                                  className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
+                                >
+                                  Mark as Read
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </article>
-                    ))
+                        {/* Inline summary when selected */}
+                        {isSelected && (
+                          <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200">
+                            {summaryLoading && <span>Loading summary...</span>}
+                            {!summaryLoading && (
+                              summaryText ? (
+                                <div>{summaryText}</div>
+                              ) : (
+                                <div>No summary available.</div>
+                              )
+                            )}
+                          </div>
+                        )}
+                        </article>
+                      );
+                    })
                   ) : (
                     <div className="p-8 text-center text-gray-500">
                       {selectedCategory === 'personalized' 
@@ -320,18 +471,75 @@ export default function NewsPage() {
                   )
                 )}
               </div>
+              
+              {/* Pagination Controls */}
+              {selectedCategory !== 'trending' && totalCount > pageSize && (
+                <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-700 dark:text-gray-300">
+                      Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount} articles
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                        className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Previous
+                      </button>
+                      
+                      <div className="flex items-center space-x-1">
+                        {Array.from({ length: Math.min(5, Math.ceil(totalCount / pageSize)) }, (_, i) => {
+                          const page = i + 1;
+                          const maxPages = Math.ceil(totalCount / pageSize);
+                          const startPage = Math.max(1, Math.min(currentPage - 2, maxPages - 4));
+                          const displayPage = startPage + i;
+                          
+                          if (displayPage > maxPages) return null;
+                          
+                          return (
+                            <button
+                              key={displayPage}
+                              onClick={() => setCurrentPage(displayPage)}
+                              className={`px-3 py-1 text-sm border rounded-md ${
+                                currentPage === displayPage
+                                  ? 'bg-blue-600 text-white border-blue-600'
+                                  : 'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                              }`}
+                            >
+                              {displayPage}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.min(Math.ceil(totalCount / pageSize), prev + 1))}
+                        disabled={currentPage >= Math.ceil(totalCount / pageSize)}
+                        className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Quick Stats */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">📊 News Stats</h3>
+            {/* Quick Stats (server-side totals) */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">📊 News Stats</h3>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-300">Articles Today</span>
-                  <span className="font-medium">{newsItems.length}</span>
+                  <span className="text-gray-600 dark:text-gray-300">Total Articles</span>
+                  <span className="font-medium">{statsTotalCount}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-300">Showing</span>
+                  <span className="font-medium">{newsItems.length} on this page</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-300">Time Range</span>
@@ -344,34 +552,32 @@ export default function NewsPage() {
               </div>
             </div>
 
-            {/* News Sources */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">📡 News Sources</h3>
+            {/* News Sources (server-side) */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">📡 News Sources</h3>
               <div className="space-y-2">
-                {Array.from(new Set(newsItems.map(item => item.source))).slice(0, 5).map((source, index) => (
-                  <div key={index} className="flex items-center justify-between">
+                {Object.entries(sourceStats).slice(0, 5).map(([source, count]) => (
+                  <div key={source} className="flex items-center justify-between">
                     <span className="text-gray-600 dark:text-gray-300">{source}</span>
-                    <span className="text-sm text-gray-500">
-                      {newsItems.filter(item => item.source === source).length}
-                    </span>
+                    <span className="text-sm text-gray-500">{count}</span>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* Quick Actions */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">⚡ Quick Actions</h3>
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">⚡ Quick Actions</h3>
               <div className="space-y-3">
                 <button
                   onClick={() => setSelectedCategory('personalized')}
-                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
                 >
                   🎯 My Personalized Feed
                 </button>
                 <button
                   onClick={() => setSelectedCategory('trending')}
-                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
                 >
                   📈 Trending Topics
                 </button>
@@ -380,13 +586,13 @@ export default function NewsPage() {
                     setTimeRange(1);
                     setSelectedCategory('all');
                   }}
-                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
                 >
                   ⚡ Breaking News
                 </button>
                 <button
                   onClick={loadNewsData}
-                  className="w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                  className="w-full text-left px-3 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
                 >
                   🔄 Refresh Feed
                 </button>
@@ -395,21 +601,21 @@ export default function NewsPage() {
 
             {/* User Interests */}
             {user && (
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">🎨 Your Interests</h3>
-                <div className="text-sm text-gray-600">
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">🎨 Your Interests</h3>
+                <div className="text-sm text-gray-600 dark:text-gray-300">
                   <p className="mb-2">News is personalized based on your concept interactions:</p>
                   <div className="flex flex-wrap gap-2">
                     {['technology', 'science', 'business', 'health'].map((interest) => (
                       <span
                         key={interest}
-                        className="px-2 py-1 bg-blue-100 text-blue-800 rounded-md text-xs"
+                        className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-md text-xs"
                       >
                         {interest}
                       </span>
                     ))}
                   </div>
-                  <p className="mt-3 text-xs">
+                  <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
                     💡 Tip: Attune to more concepts to improve your news feed!
                   </p>
                 </div>

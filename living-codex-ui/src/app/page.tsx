@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ResonanceControls } from '@/components/ui/ResonanceControls';
 import { StreamLens } from '@/components/lenses/StreamLens';
-import { Navigation } from '@/components/ui/Navigation';
 import { usePages, useLenses } from '@/lib/hooks';
 import { defaultAtoms } from '@/lib/atoms';
 import { bootstrapUI } from '@/lib/bootstrap';
@@ -37,20 +36,6 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                Living Codex
-              </h1>
-              <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">v0.1</span>
-            </div>
-            <Navigation />
-          </div>
-        </div>
-      </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Hero Section */}

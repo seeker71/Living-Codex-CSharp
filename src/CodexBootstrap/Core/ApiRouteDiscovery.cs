@@ -510,7 +510,7 @@ public static class ApiRouteDiscovery
             var loc = attr?.Location?.ToLowerInvariant();
             if (loc == "body") { bodyParam = p; break; }
         }
-        if (bodyParam == null)
+        if (bodyParam == null && BodyAllowedForVerb(context.Request.Method))
         {
             foreach (var p in parameters)
             {
@@ -546,6 +546,52 @@ public static class ApiRouteDiscovery
                     if (context.Request.RouteValues.TryGetValue(name, out var rv)) raw = rv?.ToString();
                     break;
                 case "query":
+                    // If target type is complex, build an instance by mapping query string keys to properties
+                    if (!IsSimpleType(p.ParameterType))
+                    {
+                        var targetType = Nullable.GetUnderlyingType(p.ParameterType) ?? p.ParameterType;
+                        var instance = Activator.CreateInstance(targetType);
+                        if (instance == null)
+                        {
+                            throw new ApiBindingException($"Unable to create instance of type {targetType.Name} for query binding");
+                        }
+
+                        // Map each query parameter to matching property (case-insensitive)
+                        var props = targetType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                            .Where(prop => prop.CanWrite)
+                            .ToList();
+
+                        foreach (var q in context.Request.Query)
+                        {
+                            var prop = props.FirstOrDefault(pr => string.Equals(pr.Name, q.Key, StringComparison.OrdinalIgnoreCase));
+                            if (prop == null) continue;
+
+                            var destinationType = prop.PropertyType;
+                            // Prefer the first value for single-value properties
+                            var valueString = q.Value.Count > 0 ? q.Value[0] : null;
+                            object? converted = null;
+                            if (valueString != null)
+                            {
+                                try
+                                {
+                                    converted = ConvertToType(valueString, destinationType);
+                                }
+                                catch (Exception ex)
+                                {
+                                    throw new ApiBindingException($"Invalid value '{valueString}' for property {prop.Name} of type {destinationType.Name}: {ex.Message}");
+                                }
+                            }
+
+                            // Only set when we have a value or destination is nullable
+                            if (converted != null || IsNullable(destinationType))
+                            {
+                                prop.SetValue(instance, converted);
+                            }
+                        }
+
+                        args[i] = instance;
+                        continue;
+                    }
                     if (context.Request.Query.TryGetValue(name, out var qv)) raw = qv.FirstOrDefault();
                     break;
                 case "header":

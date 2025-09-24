@@ -1148,34 +1148,15 @@ Please provide a thoughtful translation that adapts the concept to the {request.
     /// </summary>
     private void RegisterCrossServiceTranslationNodes(INodeRegistry registry)
     {
-        // Register Cross-Service Translation module node
-        var crossServiceTranslationNode = new Node(
-            Id: "codex.llm.cross-service-translation",
-            TypeId: "codex.module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Cross-Service Translation Module",
-            Description: "Enhanced LLM translation capabilities for cross-service concept translation and validation",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    version = "1.0.0",
-                    capabilities = new[] { "cross-service-translation", "batch-translation", "translation-validation", "quality-assessment" },
-                    endpoints = new[] { "translate-cross-service", "translate-batch", "translation-status", "translation-validate" },
-                    integration = "enhanced-llm-translation"
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["name"] = "Cross-Service Translation Module",
-                ["version"] = "1.0.0",
-                ["type"] = "translation",
-                ["parentModule"] = "codex.llm.future",
-                ["capabilities"] = new[] { "cross-service-translation", "batch-translation", "translation-validation" }
-            }
+        // Register Cross-Service Translation module node using CreateModuleNode
+        var crossServiceTranslationNode = CreateModuleNode(
+            moduleId: "codex.llm.cross-service-translation",
+            name: "Cross-Service Translation Module",
+            version: "1.0.0",
+            description: "Enhanced LLM translation capabilities for cross-service concept translation and validation",
+            tags: new[] { "translation", "cross-service", "llm", "validation" },
+            capabilities: new[] { "cross-service-translation", "batch-translation", "translation-validation", "quality-assessment" },
+            spec: "codex.spec.cross-service-translation"
         );
         registry.Upsert(crossServiceTranslationNode);
 
@@ -1205,7 +1186,7 @@ Please provide a thoughtful translation that adapts the concept to the {request.
         foreach (var route in routes)
         {
             var routeNode = new Node(
-                Id: $"cross-service-translation.route.{route.name}",
+                Id: $"codex.cross-service-translation.route.{route.name}.{Guid.NewGuid():N}",
                 TypeId: "codex.meta/route",
                 State: ContentState.Ice,
                 Locale: "en",
@@ -1261,7 +1242,7 @@ Please provide a thoughtful translation that adapts the concept to the {request.
         foreach (var dto in dtos)
         {
             var dtoNode = new Node(
-                Id: $"cross-service-translation.dto.{dto.name}",
+                Id: $"codex.cross-service-translation.dto.{dto.name}.{Guid.NewGuid():N}",
                 TypeId: "codex.meta/type",
                 State: ContentState.Ice,
                 Locale: "en",
@@ -1309,7 +1290,7 @@ Please provide a thoughtful translation that adapts the concept to the {request.
         foreach (var cls in classes)
         {
             var classNode = new Node(
-                Id: $"cross-service-translation.class.{cls.name}",
+                Id: $"codex.cross-service-translation.class.{cls.name}.{Guid.NewGuid():N}",
                 TypeId: "codex.meta/type",
                 State: ContentState.Ice,
                 Locale: "en",

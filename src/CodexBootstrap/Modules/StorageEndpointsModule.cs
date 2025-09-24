@@ -108,6 +108,121 @@ public sealed class StorageEndpointsModule : ModuleBase
                 await _storageBackend.StoreNodeAsync(node);
             }
 
+            // Enforce at least one edge for every node upon creation
+            try
+            {
+                // 1) Identity self-edge (node references itself)
+                var identityEdge = NodeHelpers.CreateEdge(
+                    node.Id,
+                    node.Id,
+                    role: "identity",
+                    weight: 1.0,
+                    meta: new Dictionary<string, object> { ["relationship"] = "identity-self" }
+                );
+                _registry.Upsert(identityEdge);
+                if (_storageBackend != null)
+                {
+                    await _storageBackend.StoreEdgeAsync(identityEdge);
+                }
+
+                // 2) Instance-of edge to meta-type node (best-effort generic mapping)
+                string? metaTypeId = null;
+                if (!string.IsNullOrWhiteSpace(node.TypeId))
+                {
+                    if (node.TypeId.StartsWith("codex.meta/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Meta-nodes are instances of the meta-node meta-type
+                        metaTypeId = "codex.meta/type/meta-node";
+                    }
+                    else
+                    {
+                        // Convert logical type (e.g., codex.news.item) to meta type id (codex.meta/type/news-item)
+                        var logical = node.TypeId.Trim();
+                        var typeName = logical.StartsWith("codex.", StringComparison.OrdinalIgnoreCase)
+                            ? logical.Substring("codex.".Length)
+                            : logical;
+                        typeName = typeName.Replace('.', '-').Replace('/', '-');
+                        metaTypeId = $"codex.meta/type/{typeName}";
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(metaTypeId))
+                {
+                    var instanceEdge = NodeHelpers.CreateEdge(
+                        node.Id,
+                        metaTypeId!,
+                        role: "instance-of",
+                        weight: 1.0,
+                        meta: new Dictionary<string, object> { ["relationship"] = "node-instance-of-type" },
+                        roleId: NodeHelpers.TryResolveRoleId(_registry, "instance-of")
+                    );
+                    _registry.Upsert(instanceEdge);
+                    if (_storageBackend != null)
+                    {
+                        await _storageBackend.StoreEdgeAsync(instanceEdge);
+                    }
+                }
+
+                // 3) Derived content relationship if parentNodeId is provided
+                if (node.Meta != null && node.Meta.TryGetValue("parentNodeId", out var parentObj))
+                {
+                    var parentId = parentObj?.ToString();
+                    if (!string.IsNullOrWhiteSpace(parentId))
+                    {
+                        var derivedEdge = NodeHelpers.CreateEdge(
+                            parentId!,
+                            node.Id,
+                            role: "has_content",
+                            weight: 1.0,
+                            meta: new Dictionary<string, object> { ["relationship"] = "node-has-content" },
+                            roleId: NodeHelpers.TryResolveRoleId(_registry, "has_content")
+                        );
+                        _registry.Upsert(derivedEdge);
+                        if (_storageBackend != null)
+                        {
+                            await _storageBackend.StoreEdgeAsync(derivedEdge);
+                        }
+                    }
+                }
+
+                // 4) Content type relationship if MediaType is available (best-effort)
+                var mediaType = node.Content?.MediaType;
+                if (!string.IsNullOrWhiteSpace(mediaType))
+                {
+                    string contentTypeId = mediaType switch
+                    {
+                        "text/plain" => "codex.meta/type/text",
+                        "text/markdown" => "codex.meta/type/markdown",
+                        "application/json" => "codex.meta/type/json",
+                        "text/html" => "codex.meta/type/html",
+                        "image/png" => "codex.meta/type/image",
+                        "image/jpeg" => "codex.meta/type/image",
+                        "image/svg+xml" => "codex.meta/type/svg",
+                        "video/mp4" => "codex.meta/type/video",
+                        "audio/mp3" => "codex.meta/type/audio",
+                        _ => "codex.meta/type/content"
+                    };
+
+                    var contentTypeEdge = NodeHelpers.CreateEdge(
+                        node.Id,
+                        contentTypeId,
+                        role: "has_content_type",
+                        weight: 1.0,
+                        meta: new Dictionary<string, object> { ["relationship"] = "node-has-content-type", ["mediaType"] = mediaType! },
+                        roleId: NodeHelpers.TryResolveRoleId(_registry, "has_content_type")
+                    );
+                    _registry.Upsert(contentTypeEdge);
+                    if (_storageBackend != null)
+                    {
+                        await _storageBackend.StoreEdgeAsync(contentTypeEdge);
+                    }
+                }
+            }
+            catch (Exception edgeEx)
+            {
+                _logger.Warn($"Node created but edge enforcement encountered an issue for {node.Id}: {edgeEx.Message}");
+            }
+
             _logger.Info($"Created node: {node.Id}");
             return new { success = true, node = node };
         }
@@ -203,7 +318,14 @@ public sealed class StorageEndpointsModule : ModuleBase
     }
 
     [ApiRoute("GET", "/storage-endpoints/nodes", "ListNodes", "List nodes with optional filtering", "codex.storage-endpoints")]
-    public async Task<object> ListNodesAsync([ApiParameter("query", "Query parameters")] NodeListQuery? query = null)
+    public async Task<object> ListNodesAsync(
+        [ApiParameter("typeId", "Node type ID filter")] string? typeId = null,
+        [ApiParameter("type", "Node type filter")] string? type = null,
+        [ApiParameter("state", "Node state filter")] ContentState? state = null,
+        [ApiParameter("locale", "Node locale filter")] string? locale = null,
+        [ApiParameter("searchTerm", "Search term filter")] string? searchTerm = null,
+        [ApiParameter("skip", "Number of nodes to skip")] int? skip = null,
+        [ApiParameter("take", "Number of nodes to take")] int? take = null)
     {
         try
         {
@@ -213,36 +335,58 @@ public sealed class StorageEndpointsModule : ModuleBase
                 return new ErrorResponse("Registry is null in StorageEndpointsModule");
             }
             
-            // Handle null query parameter
-            query ??= new NodeListQuery();
+            // Debug logging for query parameters
+            _logger.Info($"ListNodesAsync called with typeId='{typeId}', type='{type}', state={state}, locale='{locale}', searchTerm='{searchTerm}'");
             
             var nodes = _registry.AllNodes().AsEnumerable();
+            if (!nodes.Any())
+            {
+                // Fallback to storage-backed enumeration if in-memory cache is empty
+                var fromStorage = await _registry.AllNodesAsync();
+                nodes = fromStorage.AsEnumerable();
+            }
 
             // Apply filters
-            var requestedTypeId = query.TypeId;
-            if (string.IsNullOrWhiteSpace(requestedTypeId) && !string.IsNullOrWhiteSpace(query.Type))
+            var requestedTypeId = typeId;
+            if (string.IsNullOrWhiteSpace(requestedTypeId) && !string.IsNullOrWhiteSpace(type))
             {
-                requestedTypeId = query.Type;
+                requestedTypeId = type;
             }
 
             if (!string.IsNullOrWhiteSpace(requestedTypeId))
             {
-                nodes = nodes.Where(n => string.Equals(n.TypeId, requestedTypeId, StringComparison.OrdinalIgnoreCase));
+                // Support exact match and prefix match (e.g., "codex.concept" should include "codex.concept.*")
+                var typeIdValue = requestedTypeId.Trim();
+                if (typeIdValue.EndsWith("*"))
+                {
+                    var prefix = typeIdValue.TrimEnd('*');
+                    nodes = nodes.Where(n => n.TypeId != null && n.TypeId.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+                }
+                else
+                {
+                    var filtered = nodes.Where(n => string.Equals(n.TypeId, typeIdValue, StringComparison.OrdinalIgnoreCase));
+                    // If no exact matches, fall back to prefix match
+                    if (!filtered.Any())
+                    {
+                        filtered = nodes.Where(n => n.TypeId != null && n.TypeId.StartsWith(typeIdValue + ".", StringComparison.OrdinalIgnoreCase));
+                    }
+                    nodes = filtered;
+                }
             }
 
-            if (query.State.HasValue)
+            if (state.HasValue)
             {
-                nodes = nodes.Where(n => n.State == query.State.Value);
+                nodes = nodes.Where(n => n.State == state.Value);
             }
 
-            if (!string.IsNullOrEmpty(query.Locale))
+            if (!string.IsNullOrEmpty(locale))
             {
-                nodes = nodes.Where(n => n.Locale == query.Locale);
+                nodes = nodes.Where(n => n.Locale == locale);
             }
 
-            if (!string.IsNullOrEmpty(query.SearchTerm))
+            if (!string.IsNullOrEmpty(searchTerm))
             {
-                var searchLower = query.SearchTerm.ToLowerInvariant();
+                var searchLower = searchTerm.ToLowerInvariant();
                 nodes = nodes.Where(n => 
                     (n.Title?.ToLowerInvariant().Contains(searchLower) == true) ||
                     (n.Description?.ToLowerInvariant().Contains(searchLower) == true));
@@ -250,9 +394,11 @@ public sealed class StorageEndpointsModule : ModuleBase
 
             // Apply pagination
             var totalCount = nodes.Count();
+            var skipValue = skip ?? 0;
+            var takeValue = take ?? 100;
             var pagedNodes = nodes
-                .Skip(query.Skip ?? 0)
-                .Take(query.Take ?? 100)
+                .Skip(skipValue)
+                .Take(takeValue)
                 .ToList();
 
             _logger.Debug($"Listed {pagedNodes.Count} nodes (total: {totalCount})");
@@ -260,8 +406,8 @@ public sealed class StorageEndpointsModule : ModuleBase
                 success = true, 
                 nodes = pagedNodes, 
                 totalCount = totalCount,
-                skip = query.Skip ?? 0,
-                take = query.Take ?? 100
+                skip = skipValue,
+                take = takeValue
             };
         }
         catch (Exception ex)
@@ -284,6 +430,11 @@ public sealed class StorageEndpointsModule : ModuleBase
             }
 
             var nodes = _registry.AllNodes().AsEnumerable();
+            if (!nodes.Any())
+            {
+                var fromStorage = await _registry.AllNodesAsync();
+                nodes = fromStorage.AsEnumerable();
+            }
 
             // Apply search criteria
             if (request.TypeIds?.Any() == true)
@@ -516,46 +667,102 @@ public sealed class StorageEndpointsModule : ModuleBase
     }
 
     [ApiRoute("GET", "/storage-endpoints/edges", "ListEdges", "List edges with optional filtering", "codex.storage-endpoints")]
-    public async Task<object> ListEdgesAsync([ApiParameter("query", "Query parameters")] EdgeListQuery? query = null)
+    public async Task<object> ListEdgesAsync(
+        [ApiParameter("FromId", "Source node ID filter")] string? fromId = null,
+        [ApiParameter("ToId", "Target node ID filter")] string? toId = null,
+        [ApiParameter("NodeId", "Node ID filter (both source and target)")] string? nodeId = null,
+        [ApiParameter("Role", "Edge role filter")] string? role = null,
+        [ApiParameter("Relationship", "Relationship type filter")] string? relationship = null,
+        [ApiParameter("MinWeight", "Minimum weight filter")] double? minWeight = null,
+        [ApiParameter("MaxWeight", "Maximum weight filter")] double? maxWeight = null,
+        [ApiParameter("SearchTerm", "Search term filter")] string? searchTerm = null,
+        [ApiParameter("Skip", "Number of edges to skip")] int? skip = null,
+        [ApiParameter("Take", "Number of edges to take")] int? take = null)
     {
         try
         {
-            // Handle null query parameter
-            query ??= new EdgeListQuery();
-            
             var edges = _registry.AllEdges().AsEnumerable();
 
+            static string? GetMetaString(Dictionary<string, object>? meta, string key)
+            {
+                if (meta == null || !meta.TryGetValue(key, out var value) || value is null)
+                {
+                    return null;
+                }
+
+                return value switch
+                {
+                    string s => s,
+                    JsonElement json when json.ValueKind == JsonValueKind.String => json.GetString(),
+                    JsonElement json => json.ToString(),
+                    _ => value.ToString()
+                };
+            }
+
+            static bool Contains(string? source, string term) =>
+                !string.IsNullOrEmpty(source) && source.Contains(term, StringComparison.OrdinalIgnoreCase);
+
             // Apply filters
-            if (!string.IsNullOrEmpty(query.FromId))
+            if (!string.IsNullOrWhiteSpace(fromId))
             {
-                edges = edges.Where(e => e.FromId == query.FromId);
+                edges = edges.Where(e => string.Equals(e.FromId, fromId, StringComparison.OrdinalIgnoreCase));
             }
 
-            if (!string.IsNullOrEmpty(query.ToId))
+            if (!string.IsNullOrWhiteSpace(toId))
             {
-                edges = edges.Where(e => e.ToId == query.ToId);
+                edges = edges.Where(e => string.Equals(e.ToId, toId, StringComparison.OrdinalIgnoreCase));
             }
 
-            if (!string.IsNullOrEmpty(query.Role))
+            if (!string.IsNullOrWhiteSpace(nodeId))
             {
-                edges = edges.Where(e => e.Role == query.Role);
+                edges = edges.Where(e =>
+                    string.Equals(e.FromId, nodeId, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(e.ToId, nodeId, StringComparison.OrdinalIgnoreCase));
             }
 
-            if (query.MinWeight.HasValue)
+            if (!string.IsNullOrWhiteSpace(role))
             {
-                edges = edges.Where(e => e.Weight >= query.MinWeight.Value);
+                edges = edges.Where(e => string.Equals(e.Role, role, StringComparison.OrdinalIgnoreCase));
             }
 
-            if (query.MaxWeight.HasValue)
+            if (!string.IsNullOrWhiteSpace(relationship))
             {
-                edges = edges.Where(e => e.Weight <= query.MaxWeight.Value);
+                edges = edges.Where(e => string.Equals(
+                    GetMetaString(e.Meta, "relationship"),
+                    relationship,
+                    StringComparison.OrdinalIgnoreCase));
             }
 
-            // Apply pagination
-            var totalCount = edges.Count();
-            var pagedEdges = edges
-                .Skip(query.Skip ?? 0)
-                .Take(query.Take ?? 100)
+            if (minWeight.HasValue)
+            {
+                edges = edges.Where(e => e.Weight >= minWeight.Value);
+            }
+
+            if (maxWeight.HasValue)
+            {
+                edges = edges.Where(e => e.Weight <= maxWeight.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var term = searchTerm!;
+                edges = edges.Where(e =>
+                    Contains(e.FromId, term) ||
+                    Contains(e.ToId, term) ||
+                    Contains(e.Role, term) ||
+                    Contains(GetMetaString(e.Meta, "relationship"), term));
+            }
+
+            // Apply pagination after materialising filtered edges
+            var filteredEdges = edges.ToList();
+
+            var skipValue = Math.Max(0, skip ?? 0);
+            var takeValue = take is > 0 ? take.Value : 100;
+
+            var totalCount = filteredEdges.Count;
+            var pagedEdges = filteredEdges
+                .Skip(skipValue)
+                .Take(takeValue)
                 .ToList();
 
             _logger.Debug($"Listed {pagedEdges.Count} edges (total: {totalCount})");
@@ -563,8 +770,8 @@ public sealed class StorageEndpointsModule : ModuleBase
                 success = true, 
                 edges = pagedEdges, 
                 totalCount = totalCount,
-                skip = query.Skip ?? 0,
-                take = query.Take ?? 100
+                skip = skipValue,
+                take = takeValue
             };
         }
         catch (Exception ex)
@@ -779,9 +986,12 @@ public sealed class StorageEndpointsModule : ModuleBase
     public record EdgeListQuery(
         string? FromId = null,
         string? ToId = null,
+        string? NodeId = null,
         string? Role = null,
+        string? Relationship = null,
         double? MinWeight = null,
         double? MaxWeight = null,
+        string? SearchTerm = null,
         int? Skip = null,
         int? Take = null
     );

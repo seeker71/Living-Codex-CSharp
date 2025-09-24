@@ -54,6 +54,18 @@ namespace CodexBootstrap.Middleware
         {
             try
             {
+                // Handle CORS preflight to avoid 405 on Swagger and other UIs
+                if (string.Equals(context.Request.Method, "OPTIONS", StringComparison.OrdinalIgnoreCase))
+                {
+                    context.Response.StatusCode = 204; // No Content
+                    // Reflect basic CORS headers; full policy is configured via app.UseCors
+                    context.Response.Headers["Access-Control-Allow-Origin"] = context.Request.Headers["Origin"].ToString() ?? "*";
+                    context.Response.Headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,PATCH,DELETE,OPTIONS";
+                    context.Response.Headers["Access-Control-Allow-Headers"] = context.Request.Headers["Access-Control-Request-Headers"].ToString() ?? "Content-Type, Authorization";
+                    context.Response.Headers["Access-Control-Max-Age"] = "86400";
+                    return;
+                }
+
                 // Log the incoming request
                 _logger.Info($"Incoming request: {context.Request.Method} {context.Request.Path} from {context.Connection.RemoteIpAddress}");
 

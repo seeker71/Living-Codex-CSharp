@@ -58,6 +58,7 @@ public class SqliteStorageBackend : IStorageBackend
                 from_id TEXT NOT NULL,
                 to_id TEXT NOT NULL,
                 role TEXT NOT NULL,
+                role_id TEXT,
                 weight REAL,
                 meta TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -71,6 +72,7 @@ public class SqliteStorageBackend : IStorageBackend
             CREATE INDEX IF NOT EXISTS idx_edges_from_id ON edges(from_id);
             CREATE INDEX IF NOT EXISTS idx_edges_to_id ON edges(to_id);
             CREATE INDEX IF NOT EXISTS idx_edges_role ON edges(role);
+            CREATE INDEX IF NOT EXISTS idx_edges_role_id ON edges(role_id);
         ";
 
         using var command1 = new SqliteCommand(createNodesTable, connection);
@@ -181,13 +183,14 @@ public class SqliteStorageBackend : IStorageBackend
         }
 
         var sql = @"
-            INSERT INTO edges (from_id, to_id, role, weight, meta)
-            VALUES (@fromId, @toId, @role, @weight, @meta)";
+            INSERT INTO edges (from_id, to_id, role, role_id, weight, meta)
+            VALUES (@fromId, @toId, @role, @roleId, @weight, @meta)";
 
         using var command = new SqliteCommand(sql, connection);
         command.Parameters.AddWithValue("@fromId", edge.FromId);
         command.Parameters.AddWithValue("@toId", edge.ToId);
         command.Parameters.AddWithValue("@role", edge.Role);
+        command.Parameters.AddWithValue("@roleId", (object?)edge.RoleId ?? DBNull.Value);
         command.Parameters.AddWithValue("@weight", edge.Weight ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("@meta", edge.Meta != null ? JsonSerializer.Serialize(edge.Meta, _jsonOptions) : (object)DBNull.Value);
 
@@ -376,6 +379,7 @@ public class SqliteStorageBackend : IStorageBackend
             var fromId = reader.GetString(reader.GetOrdinal("from_id"));
             var toId = reader.GetString(reader.GetOrdinal("to_id"));
             var role = reader.GetString(reader.GetOrdinal("role"));
+            var roleId = reader.IsDBNull(reader.GetOrdinal("role_id")) ? null : reader.GetString(reader.GetOrdinal("role_id"));
             double? weight = reader.IsDBNull(reader.GetOrdinal("weight")) ? null : reader.GetDouble(reader.GetOrdinal("weight"));
             
             Dictionary<string, object>? meta = null;
@@ -385,7 +389,7 @@ public class SqliteStorageBackend : IStorageBackend
                 meta = JsonSerializer.Deserialize<Dictionary<string, object>>(metaJson, _jsonOptions);
             }
 
-            return new Edge(fromId, toId, role, weight, meta);
+            return new Edge(fromId, toId, role, roleId, weight, meta);
         }
         catch (Exception ex)
         {

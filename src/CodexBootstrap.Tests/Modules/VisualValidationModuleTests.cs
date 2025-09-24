@@ -310,6 +310,9 @@ namespace CodexBootstrap.Tests.Modules
             public Task<IEnumerable<Node>> GetNodesByTypeAsync(string typeId) =>
                 Task.FromResult(GetNodesByType(typeId));
 
+            public IEnumerable<Node> GetNodesByTypePrefix(string typeIdPrefix) =>
+                _nodes.Values.Where(n => n.TypeId != null && n.TypeId.StartsWith(typeIdPrefix, StringComparison.OrdinalIgnoreCase));
+
             public IEnumerable<Node> GetNodesByState(ContentState state) =>
                 _nodes.Values.Where(n => n.State == state);
 

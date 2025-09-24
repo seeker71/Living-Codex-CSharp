@@ -36,6 +36,12 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
       return;
     }
 
+    if (!/[A-Z]/.test(password)) {
+      setError('Password must contain at least one uppercase letter');
+      setIsLoading(false);
+      return;
+    }
+
     const result = await register(username, email, password);
     
     if (result.success) {
@@ -105,7 +111,7 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
             required
             minLength={6}
             className="input-standard"
-            placeholder="Create a password (min 6 characters)"
+            placeholder="Create a password (min 6 chars, 1 uppercase)"
             disabled={isLoading}
           />
         </div>

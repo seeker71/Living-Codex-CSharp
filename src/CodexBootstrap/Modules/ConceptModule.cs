@@ -81,14 +81,26 @@ public class ConceptModule : ModuleBase
                 interestCount = 0     // This would come from user data
             }).ToList();
 
-            // Apply resonance filtering and ranking
+            // Apply filtering, ranking, and pagination
             if (request != null)
             {
-                // Filter by resonance threshold
-                var resonanceThreshold = request.joy * 0.5; // Joy influences resonance threshold
+                // Optional text search
+                if (!string.IsNullOrWhiteSpace(request.searchTerm))
+                {
+                    var term = request.searchTerm.Trim();
+                    concepts = concepts.Where(c =>
+                        (c.name?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                        (c.description?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                        (c.domain?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                        (c.tags?.Any(t => t.Contains(term, StringComparison.OrdinalIgnoreCase)) ?? false)
+                    ).ToList();
+                }
+
+                // Resonance threshold
+                var resonanceThreshold = request.joy * 0.5;
                 concepts = concepts.Where(c => c.resonance >= resonanceThreshold).ToList();
-                
-                // Apply serendipity (randomness factor)
+
+                // Ranking
                 if (request.serendipity > 0.5)
                 {
                     var random = new Random();
@@ -96,19 +108,33 @@ public class ConceptModule : ModuleBase
                 }
                 else
                 {
-                    // Order by resonance and energy
                     concepts = concepts.OrderByDescending(c => c.resonance * c.energy).ToList();
                 }
-                
-                // Limit results based on joy (higher joy = more results)
-                var maxResults = Math.Max(1, (int)(request.joy * 20)); // 1-20 results based on joy
-                concepts = concepts.Take(maxResults).ToList();
+
+                // Total before pagination
+                var total = concepts.Count;
+
+                // Pagination
+                var skip = request.skip ?? 0;
+                var take = request.take ?? 20;
+                if (skip < 0) skip = 0;
+                if (take <= 0) take = 20;
+                concepts = concepts.Skip(skip).Take(take).ToList();
+
+                return new {
+                    success = true,
+                    discoveredConcepts = concepts,
+                    totalDiscovered = total,
+                    message = "Concept browsing completed successfully"
+                };
             }
 
-            return new { 
+            var fallbackTotal = concepts.Count;
+            concepts = concepts.Take(20).ToList();
+            return new {
                 success = true,
                 discoveredConcepts = concepts,
-                totalDiscovered = concepts.Count,
+                totalDiscovered = fallbackTotal,
                 message = "Concept browsing completed successfully"
             };
         }
@@ -124,12 +150,23 @@ public class ConceptModule : ModuleBase
     /// </summary>
     [Get("/concepts", "concepts-list", "Get all concepts", "codex.concept")]
     [ApiResponse(200, "Success")]
-    public async Task<object> GetConcepts()
+    public async Task<object> GetConcepts(
+        [ApiParameter("searchTerm", "Search term filter")] string? searchTerm = null,
+        [ApiParameter("skip", "Number of concepts to skip")] int? skip = null,
+        [ApiParameter("take", "Number of concepts to take")] int? take = null)
     {
         try
         {
-            // Query the registry for all concept nodes
-            var conceptNodes = _registry.GetNodesByType("codex.concept");
+            // Get all nodes and filter by type (same approach as StorageEndpointsModule)
+            var allNodes = _registry.AllNodes();
+            if (!allNodes.Any())
+            {
+                // Fallback to async if in-memory cache is empty
+                var fromStorage = await _registry.AllNodesAsync();
+                allNodes = fromStorage;
+            }
+            
+            var conceptNodes = allNodes.Where(n => n.TypeId != null && n.TypeId.StartsWith("codex.concept"));
             
             var concepts = conceptNodes.Select(node => new
             {
@@ -147,7 +184,31 @@ public class ConceptModule : ModuleBase
                 interestCount = 0     // This would come from user data
             }).ToList();
 
-            return new { concepts = concepts };
+            // Optional search filter
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var term = searchTerm.Trim();
+                concepts = concepts.Where(c =>
+                    (c.name?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (c.description?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (c.domain?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (c.tags?.Any(t => t.Contains(term, StringComparison.OrdinalIgnoreCase)) ?? false)
+                ).ToList();
+            }
+
+            var total = concepts.Count;
+            var effectiveSkip = skip ?? 0;
+            var effectiveTake = take ?? 50;
+            if (effectiveSkip < 0) effectiveSkip = 0;
+            if (effectiveTake <= 0) effectiveTake = 50;
+
+            concepts = concepts
+                .OrderByDescending(c => c.resonance * c.energy)
+                .Skip(effectiveSkip)
+                .Take(effectiveTake)
+                .ToList();
+
+            return new { concepts = concepts, totalCount = total };
         }
         catch (Exception ex)
         {
@@ -325,7 +386,7 @@ public class ConceptModule : ModuleBase
 
             // Create concept node
             var conceptNode = new Node(
-                Id: $"concept.{request.Name}",
+                Id: $"codex.concept.{request.Name}.{Guid.NewGuid():N}",
                 TypeId: "codex.concept",
                 State: ContentState.Ice,
                 Locale: "en",
@@ -537,6 +598,8 @@ public class ConceptModule : ModuleBase
         }
     }
 
+    
+
     /// <summary>
     /// Unlink user from concept
     /// </summary>
@@ -574,6 +637,8 @@ public class ConceptModule : ModuleBase
             );
         }
     }
+
+    
 
     /// <summary>
     /// Get concepts for a user
@@ -616,6 +681,8 @@ public class ConceptModule : ModuleBase
             );
         }
     }
+
+    
 
     /// <summary>
     /// Get users for a concept
@@ -724,7 +791,7 @@ public class ConceptModule : ModuleBase
         try
         {
             var beliefSystemNode = new Node(
-                Id: $"beliefsystem.{request.UserId}",
+                Id: $"codex.userconcept.beliefsystem.{request.UserId}.{Guid.NewGuid():N}",
                 TypeId: "codex.userconcept.beliefsystem",
                 State: ContentState.Water,
                 Locale: "en",
@@ -1014,5 +1081,8 @@ public record UserBeliefSystemGetResponse(bool Success, string UserId, string? B
 public record ConceptBrowseRequest(
     string[]? axes = null,
     double joy = 0.7,
-    double serendipity = 0.5
+    double serendipity = 0.5,
+    string? searchTerm = null,
+    int? skip = null,
+    int? take = null
 );

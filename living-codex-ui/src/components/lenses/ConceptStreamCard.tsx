@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Heart, Share2, MessageCircle, Link2, Zap } from 'lucide-react';
+import { Heart, Share2, MessageCircle, Link2, Zap, Network } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/Card';
 import { useAttune, useAmplify } from '@/lib/hooks';
 
 interface Concept {
@@ -76,86 +77,85 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
   };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex-1">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            {concept.name}
-          </h3>
-          <p className="text-gray-600 text-sm leading-relaxed">
-            {concept.description}
-          </p>
-        </div>
-        
-        {/* Resonance Score */}
-        {concept.resonance && (
-          <div className="ml-4 text-right">
-            <div className="text-2xl font-bold text-purple-600">
-              {Math.round(concept.resonance * 100)}%
+    <Card hover className="transition-shadow">
+      <CardHeader className="pb-2">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <CardTitle className="text-lg text-gray-900 dark:text-gray-100 mb-2">
+              {concept.name}
+            </CardTitle>
+            <CardDescription className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
+              {concept.description}
+            </CardDescription>
+          </div>
+          {concept.resonance && (
+            <div className="ml-4 text-right">
+              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                {Math.round(concept.resonance * 100)}%
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">Resonance</div>
             </div>
-            <div className="text-xs text-gray-500">Resonance</div>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {concept.axes && concept.axes.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {concept.axes.map((axis) => (
+              <span
+                key={axis}
+                className={`px-2 py-1 rounded-full text-xs font-medium ${getAxisColor(axis)} dark:bg-${axis}-900/30 dark:text-${axis}-300`}
+              >
+                {axis}
+              </span>
+            ))}
           </div>
         )}
-      </div>
-
-      {/* Axes Tags */}
-      {concept.axes && concept.axes.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          {concept.axes.map((axis) => (
-            <span
-              key={axis}
-              className={`px-2 py-1 rounded-full text-xs font-medium ${getAxisColor(axis)}`}
-            >
-              {axis}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Actions */}
-      <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-        <div className="flex items-center space-x-4">
+      </CardContent>
+      <CardFooter className="flex items-center justify-between border-t border-gray-100 dark:border-gray-700">
+        <div className="flex items-center space-x-2">
           <button
             onClick={handleAttune}
             disabled={attuneMutation.isPending}
             className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm font-medium transition-colors ${
               isAttuned
-                ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/40'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
             }`}
           >
             <Heart className={`w-4 h-4 ${isAttuned ? 'fill-current' : ''}`} />
             <span>{isAttuned ? 'Attuned' : 'Attune'}</span>
           </button>
-
           <button
             onClick={handleAmplify}
             disabled={amplifyMutation.isPending || isAmplifying}
-            className="flex items-center space-x-1 px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-700 hover:bg-yellow-200 transition-colors"
+            className="flex items-center space-x-1 px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-900/40 transition-colors"
           >
             <Zap className="w-4 h-4" />
             <span>{isAmplifying ? 'Amplifying...' : 'Amplify'}</span>
           </button>
-
-          <button className="flex items-center space-x-1 px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+          <button className="flex items-center space-x-1 px-3 py-1 rounded-full text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
             <MessageCircle className="w-4 h-4" />
             <span>Reflect</span>
           </button>
-
-          <button className="flex items-center space-x-1 px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+          <button className="flex items-center space-x-1 px-3 py-1 rounded-full text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
             <Link2 className="w-4 h-4" />
             <span>Weave</span>
           </button>
+          <button 
+            onClick={() => window.open(`/node/${concept.id}`, '_blank')}
+            className="flex items-center space-x-1 px-3 py-1 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/40 transition-colors"
+          >
+            <Network className="w-4 h-4" />
+            <span>View</span>
+          </button>
         </div>
-
-        {/* Type Badge */}
         {concept.type && (
-          <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+          <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 text-xs rounded-full">
             {concept.type}
           </span>
         )}
-      </div>
-    </div>
+      </CardFooter>
+    </Card>
   );
 }

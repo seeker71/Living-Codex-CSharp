@@ -14,6 +14,8 @@ using CodexBootstrap.Core;
 using CodexBootstrap.Runtime;
 using Microsoft.AspNetCore.Builder;
 using System.Xml.Linq;
+using HtmlAgilityPack;
+using System.Text.RegularExpressions;
 
 namespace CodexBootstrap.Modules
 {
@@ -74,7 +76,26 @@ namespace CodexBootstrap.Modules
         private CrossModuleCommunicator ModuleCommunicator => _moduleCommunicator ??= new CrossModuleCommunicator(_logger);
 
         // Lazy-loaded AI templates (requires _apiRouter to be set)
-        private AIModuleTemplates? AITemplates => _aiTemplates;
+        private AIModuleTemplates? AITemplates 
+        { 
+            get 
+            {
+                _logger.Info($"AITemplates getter called: _aiTemplates={(_aiTemplates != null ? "non-null" : "null")}, _apiRouter={(_apiRouter != null ? "non-null" : "null")}");
+                if (_aiTemplates == null)
+                {
+                    if (_apiRouter != null)
+                    {
+                        _aiTemplates = new AIModuleTemplates(_apiRouter, _logger);
+                        _logger.Info("RealtimeNewsStreamModule: Lazily initialized _aiTemplates on first use");
+                    }
+                    else
+                    {
+                        _logger.Error("AITemplates is null and _apiRouter is null; cannot call AI yet");
+                    }
+                }
+                return _aiTemplates;
+            }
+        }
 
         // AI Module call templates
         private class AIModuleTemplates
@@ -98,10 +119,10 @@ namespace CodexBootstrap.Modules
                 {
                     var request = new
                     {
-                        content = content,
-                        maxConcepts = maxConcepts,
-                        model = model,
-                        provider = provider
+                        Content = content,
+                        MaxConcepts = maxConcepts,
+                        Model = model,
+                        Provider = provider
                     };
 
                     var requestJson = JsonSerializer.Serialize(request);
@@ -109,7 +130,9 @@ namespace CodexBootstrap.Modules
 
                     if (_apiRouter.TryGetHandler("ai", "extract-concepts", out var handler))
                     {
+                        _logger.Info("AIModuleTemplates: Found extract-concepts handler, calling it");
                         var result = await handler(requestElement);
+                        _logger.Info($"AIModuleTemplates: extract-concepts handler returned: {result != null}");
                         if (result != null)
                         {
                             // Parse the result from the AI module
@@ -151,6 +174,10 @@ namespace CodexBootstrap.Modules
                             }
                         }
                     }
+                    else
+                    {
+                        _logger.Warn("AIModuleTemplates: extract-concepts handler not found in router");
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -167,9 +194,9 @@ namespace CodexBootstrap.Modules
                 {
                     var request = new
                     {
-                        content = content,
-                        analysisType = analysisType,
-                        criteria = new[] { "relevance", "quality", "impact" }
+                        Content = content,
+                        AnalysisType = analysisType,
+                        Criteria = new[] { "relevance", "quality", "impact" }
                     };
 
                     var requestJson = JsonSerializer.Serialize(request);
@@ -177,7 +204,9 @@ namespace CodexBootstrap.Modules
 
                     if (_apiRouter.TryGetHandler("ai", "score-analysis", out var handler))
                     {
+                        _logger.Info("AIModuleTemplates: Found score-analysis handler, calling it");
                         var result = await handler(requestElement);
+                        _logger.Info($"AIModuleTemplates: score-analysis handler returned: {result != null}");
                         if (result != null)
                         {
                             // Parse the result from the AI module
@@ -212,7 +241,7 @@ namespace CodexBootstrap.Modules
                 {
                     var request = new
                     {
-                        content = content
+                        Content = content
                     };
 
                     var requestJson = JsonSerializer.Serialize(request);
@@ -220,7 +249,9 @@ namespace CodexBootstrap.Modules
 
                     if (_apiRouter.TryGetHandler("ai", "fractal-transform", out var handler))
                     {
+                        _logger.Info("AIModuleTemplates: Found fractal-transform handler, calling it");
                         var result = await handler(requestElement);
+                        _logger.Info($"AIModuleTemplates: fractal-transform handler returned: {result != null}");
                         if (result != null)
                         {
                             // Parse the result from the AI module
@@ -287,9 +318,55 @@ namespace CodexBootstrap.Modules
             
             // Cross-module communicator will be initialized lazily
             
-            // Initialize timers but don't start them yet - they will be started in StartAsync
+            // Initialize and start automatic news ingestion
             _ingestionTimer = new Timer(async _ => await IngestNewsFromSources(null), null, Timeout.Infinite, Timeout.Infinite);
             _cleanupTimer = new Timer(CleanupOldNews, null, Timeout.Infinite, Timeout.Infinite);
+            
+            // Start automatic news ingestion in background
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(3000); // Wait 3 seconds for system to stabilize
+                    await StartAutomaticNewsIngestion();
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"Failed to start automatic news ingestion: {ex.Message}");
+                }
+            });
+        }
+
+        /// <summary>
+        /// Start automatic news ingestion - replaces manual ingestion endpoint
+        /// </summary>
+        private async Task StartAutomaticNewsIngestion()
+        {
+            try
+            {
+                _logger.Info("RealtimeNewsStreamModule: Starting automatic news ingestion");
+                
+                // Run initial ingestion immediately
+                var before = Registry.GetNodesByType(NEWS_ITEM_NODE_TYPE).Count();
+                await IngestNewsFromSources(null);
+                var after = Registry.GetNodesByType(NEWS_ITEM_NODE_TYPE).Count();
+                var added = Math.Max(0, after - before);
+                
+                _logger.Info($"RealtimeNewsStreamModule: Initial ingestion completed - Added: {added}, Total: {after}");
+                
+                // Start periodic ingestion timer
+                var intervalMs = _ingestionIntervalMinutes * 60 * 1000;
+                _ingestionTimer.Change(intervalMs, intervalMs);
+                _logger.Info($"RealtimeNewsStreamModule: Started periodic ingestion every {_ingestionIntervalMinutes} minutes");
+                
+                // Start cleanup timer (run every 6 hours)
+                _cleanupTimer.Change(TimeSpan.FromHours(6), TimeSpan.FromHours(6));
+                _logger.Info("RealtimeNewsStreamModule: Started periodic cleanup every 6 hours");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"RealtimeNewsStreamModule: Failed to start automatic news ingestion: {ex.Message}");
+            }
         }
 
         // Parameterless constructor for module loader
@@ -334,32 +411,15 @@ namespace CodexBootstrap.Modules
 
             if (ingestionEnabled)
             {
-                // Compute configurable startup delay
-                var delayEnv = Environment.GetEnvironmentVariable("NEWS_INGESTION_START_DELAY_SEC");
-                int delaySeconds = 120;
-                if (!string.IsNullOrWhiteSpace(delayEnv) && int.TryParse(delayEnv, out var parsedDelay) && parsedDelay >= 0)
-                {
-                    delaySeconds = parsedDelay;
-                }
-
-                // Start the timers when module is registered
-                _ingestionTimer.Change(TimeSpan.FromSeconds(delaySeconds), TimeSpan.FromMinutes(_ingestionIntervalMinutes));
-                _cleanupTimer.Change(TimeSpan.FromHours(1), TimeSpan.FromHours(_cleanupIntervalHours));
-                
-                // Start initial news ingestion after a delay to allow server startup to complete
-                _ = Task.Run(async () => 
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(delaySeconds));
-                    await IngestNewsFromSources(null);
-                });
+                // Defer starting timers to RegisterApiHandlers after router is available
                 var envLabel = dotnetEnv ?? aspnetEnv ?? "unknown";
                 if (isTesting)
                 {
-                    _logger.Warn($"RealtimeNewsStreamModule ingestion enabled in Testing environment due to NEWS_INGESTION_ENABLED=true (env={envLabel}, startDelaySec={delaySeconds})");
+                    _logger.Warn($"RealtimeNewsStreamModule ingestion enabled (deferred until API router ready) in Testing (env={envLabel})");
                 }
                 else
                 {
-                    _logger.Info($"RealtimeNewsStreamModule ingestion enabled (env={envLabel}, startDelaySec={delaySeconds})");
+                    _logger.Info($"RealtimeNewsStreamModule ingestion enabled (deferred until API router ready) (env={envLabel})");
                 }
             }
             else
@@ -371,8 +431,64 @@ namespace CodexBootstrap.Modules
 
         public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
         {
-            _logger.Info("Registering API handlers for Real-Time News Stream Module");
-            // API handlers are registered via ApiRoute attributes
+            _logger.Info("RTNSM RegisterApiHandlers ENTRY - Start of method");
+            try
+            {
+                _logger.Info("Registering API handlers for Real-Time News Stream Module");
+                // Ensure base stores the router
+                base.RegisterApiHandlers(router, registry);
+                if (_apiRouter == null)
+                {
+                    _logger.Error("RTNSM: _apiRouter is null right after base.RegisterApiHandlers");
+                    throw new InvalidOperationException("Router not set in base RegisterApiHandlers");
+                }
+                _logger.Info("RTNSM: _apiRouter set to non-null");
+                
+                // Check if ingestion is enabled before proceeding
+                var enabledEnv = Environment.GetEnvironmentVariable("NEWS_INGESTION_ENABLED");
+                _logger.Info($"RTNSM: NEWS_INGESTION_ENABLED={enabledEnv ?? "<null>"}");
+                var isExplicitlyEnabled = string.Equals(enabledEnv, "true", StringComparison.OrdinalIgnoreCase) || enabledEnv == "1";
+                _logger.Info($"RTNSM: isExplicitlyEnabled={isExplicitlyEnabled}");
+                if (!isExplicitlyEnabled)
+                {
+                    _logger.Info("News ingestion is disabled, skipping timer setup");
+                    return;
+                }
+                
+                if (_aiTemplates == null)
+                {
+                    _aiTemplates = new AIModuleTemplates(_apiRouter, _logger);
+                    _logger.Info($"RealtimeNewsStreamModule: _aiTemplates initialized to {(_aiTemplates != null ? "non-null" : "null")}");
+                }
+
+                // Verify AI handlers are available; fail fast if missing
+                var missing = new List<string>();
+                if (!_apiRouter.TryGetHandler("ai", "extract-concepts", out _)) missing.Add("extract-concepts");
+                if (!_apiRouter.TryGetHandler("ai", "score-analysis", out _)) missing.Add("score-analysis");
+                if (!_apiRouter.TryGetHandler("ai", "fractal-transform", out _)) missing.Add("fractal-transform");
+                if (missing.Count > 0)
+                {
+                    _logger.Error($"AI handlers missing: {string.Join(", ", missing)}. News analysis requires AI; ingestion will error until available.");
+                }
+
+                // Start timers and initial ingestion now that router is ready
+                var delayEnv = Environment.GetEnvironmentVariable("NEWS_INGESTION_START_DELAY_SEC");
+                int delaySeconds = 120;
+                if (!string.IsNullOrWhiteSpace(delayEnv) && int.TryParse(delayEnv, out var parsedDelay) && parsedDelay >= 0)
+                {
+                    delaySeconds = parsedDelay;
+                }
+
+                _ingestionTimer.Change(TimeSpan.FromSeconds(delaySeconds), TimeSpan.FromMinutes(_ingestionIntervalMinutes));
+                _cleanupTimer.Change(TimeSpan.FromHours(1), TimeSpan.FromHours(_cleanupIntervalHours));
+                
+                _logger.Info($"RealtimeNewsStreamModule: Timers started with delay {delaySeconds}s");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in RegisterApiHandlers: {ex.Message}", ex);
+                throw;
+            }
         }
 
         public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
@@ -381,24 +497,7 @@ namespace CodexBootstrap.Modules
             // HTTP endpoints are registered via ApiRoute attributes
         }
 
-        // Manual trigger to run ingestion immediately
-        [ApiRoute("POST", "/news/ingestion/run", "Run News Ingestion", "Manually trigger ingestion cycle across all sources", "codex.news.ingestion")]
-        public async Task<object> RunNewsIngestionNow()
-        {
-            try
-            {
-                var before = Registry.GetNodesByType(NEWS_ITEM_NODE_TYPE).Count();
-                await IngestNewsFromSources(null);
-                var after = Registry.GetNodesByType(NEWS_ITEM_NODE_TYPE).Count();
-                var added = Math.Max(0, after - before);
-                return new { success = true, added, total = after };
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Manual ingestion trigger failed: {ex.Message}", ex);
-                return new ErrorResponse($"Ingestion failed: {ex.Message}");
-            }
-        }
+        // Removed manual ingestion endpoint - news ingestion now runs automatically in background
 
         public void Unregister()
         {
@@ -651,7 +750,8 @@ namespace CodexBootstrap.Modules
                                 {
                                     ["sourceType"] = "RSS",
                                     ["sourceId"] = source.Id,
-                                    ["rssId"] = item.Id
+                                    ["rssId"] = item.Id,
+                                    ["sharedMetadataRef"] = "shared-metadata-news-source-types"
                                 }
                             };
                             
@@ -681,7 +781,12 @@ namespace CodexBootstrap.Modules
                                     Url = ri.Link ?? "",
                                     PublishedAt = ri.PublishDate ?? DateTimeOffset.UtcNow,
                                     Tags = ExtractTagsFromContent(((ri.Title ?? "") + " " + (ri.Description ?? ""))),
-                                    Metadata = new Dictionary<string, object> { ["sourceType"] = "RSS", ["sourceId"] = source.Id }
+                                    Metadata = new Dictionary<string, object> 
+                                    { 
+                                        ["sourceType"] = "RSS", 
+                                        ["sourceId"] = source.Id,
+                                        ["sharedMetadataRef"] = "shared-metadata-news-source-types"
+                                    }
                                 };
                                 await ProcessNewsItem(newsItem);
                             }
@@ -844,9 +949,24 @@ namespace CodexBootstrap.Modules
                     return;
                 }
 
-                // Store news item as node
+                // Step 1: Extract full content from URL
+                var extractedContent = await ExtractContentFromUrl(newsItem.Url);
+                var contentNode = await CreateContentNode(newsItem, extractedContent);
+
+                // Step 2: Generate summary from extracted content
+                var summary = await GenerateSummary(extractedContent);
+                var summaryNode = await CreateSummaryNode(newsItem, summary, contentNode.Id);
+
+                // Step 3: Extract concepts from summary
+                var concepts = await ExtractConceptsFromSummary(summary);
+                var conceptNodes = await CreateConceptNodes(newsItem, concepts, summaryNode.Id);
+
+                // Step 4: Create direct connections from news item to U-CORE axes
+                await CreateNewsToUCoreConnections(newsItem, concepts);
+
+                // Step 5: Store original news item as node with links to content
                 var newsNode = new Node(
-                    Id: $"news-item-{newsItem.Id}",
+                    Id: $"codex.news.item.{newsItem.Id}.{Guid.NewGuid():N}",
                     TypeId: NEWS_ITEM_NODE_TYPE,
                     State: ContentState.Ice,
                     Locale: "en-US",
@@ -864,12 +984,18 @@ namespace CodexBootstrap.Modules
                         ["title"] = newsItem.Title,
                         ["source"] = newsItem.Source,
                         ["publishedAt"] = newsItem.PublishedAt.UtcDateTime,
-                        ["url"] = newsItem.Url
+                        ["url"] = newsItem.Url,
+                        ["contentNodeId"] = contentNode.Id,
+                        ["summaryNodeId"] = summaryNode.Id,
+                        ["conceptNodeIds"] = conceptNodes.Select(c => c.Id).ToArray()
                     }
                 );
 
                 Registry.Upsert(newsNode);
                 _logger.Info($"Successfully stored news item as node: {newsNode.Id} - {newsItem.Title}");
+
+                // Step 6: Ensure node has path back to core identity
+                await EnsureNodePathToIdentity(newsNode.Id);
 
                 // Create fractal news item
                 var fractalNews = await CreateFractalNewsItem(newsItem);
@@ -878,7 +1004,7 @@ namespace CodexBootstrap.Modules
                 {
                     // Store fractal news as node
                     var fractalNode = new Node(
-                        Id: $"fractal-news-{fractalNews.Id}",
+                        Id: $"codex.news.fractal.{fractalNews.Id}.{Guid.NewGuid():N}",
                         TypeId: FRACTAL_NEWS_NODE_TYPE,
                         State: ContentState.Ice,
                         Locale: "en-US",
@@ -897,20 +1023,33 @@ namespace CodexBootstrap.Modules
                             ["headline"] = fractalNews.Headline,
                             ["abundanceScore"] = fractalNews.ResonanceData.AmplificationPotential,
                             ["resonanceScore"] = fractalNews.ResonanceData.ResonanceScore,
-                            ["processedAt"] = fractalNews.ProcessedAt
+                            ["processedAt"] = fractalNews.ProcessedAt,
+                            ["source"] = newsItem.Source,
+                            ["originalNewsTitle"] = newsItem.Title,
+                            ["originalNewsUrl"] = newsItem.Url
                         }
                     );
 
                     Registry.Upsert(fractalNode);
 
+                    // Create edge from original news to fractal news
+                    var newsNodeId = $"codex.news.item.{newsItem.Id}.{Guid.NewGuid():N}";
+                    var fractalNodeId = $"fractal-news-{fractalNews.Id}";
+                    Registry.Upsert(new Edge(newsNodeId, fractalNodeId, "analyzed-as", 1.0, new Dictionary<string, object>
+                    {
+                        ["source"] = newsItem.Source,
+                        ["analyzedAt"] = DateTimeOffset.UtcNow
+                    }));
+                    _logger.Info($"NEWS_LINK_CREATED from={newsNodeId} to={fractalNodeId} type=analyzed-as source={newsItem.Source}");
+
                     // Extract concepts and ensure ontology links
-                    var concepts = await ExtractConceptsForNews(newsItem, fractalNews);
-                    foreach (var concept in concepts)
+                    var fractalConcepts = await ExtractConceptsForNews(newsItem, fractalNews);
+                    foreach (var concept in fractalConcepts)
                     {
                         EnsureConceptAndTopology(concept, newsItem, fractalNews);
                     }
 
-                    _logger.Info($"Processed news item: {newsItem.Title} from {newsItem.Source} (concepts: {concepts.Count})");
+                    _logger.Info($"Processed news item: {newsItem.Title} from {newsItem.Source} (concepts: {fractalConcepts.Count})");
                 }
             }
             catch (Exception ex)
@@ -919,13 +1058,1247 @@ namespace CodexBootstrap.Modules
             }
         }
 
+        // Content Extraction Pipeline Methods
+        private async Task<string> ExtractContentFromUrl(string url)
+        {
+            try
+            {
+                _logger.Info($"Extracting content from URL: {url}");
+                
+                using var httpClient = new HttpClient();
+                httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("LivingCodex/1.0 (+https://livingcodex.org)");
+                httpClient.Timeout = TimeSpan.FromSeconds(30);
+                
+                var response = await httpClient.GetAsync(url);
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.Warn($"Failed to fetch content from {url}: {response.StatusCode}");
+                    return string.Empty;
+                }
+                
+                var html = await response.Content.ReadAsStringAsync();
+                return ExtractTextFromHtml(html);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error extracting content from {url}: {ex.Message}", ex);
+                return string.Empty;
+            }
+        }
+
+        private string ExtractTextFromHtml(string html)
+        {
+            try
+            {
+                var doc = new HtmlDocument();
+                doc.LoadHtml(html);
+                
+                // Remove script and style elements
+                doc.DocumentNode.Descendants()
+                    .Where(n => n.Name == "script" || n.Name == "style")
+                    .ToList()
+                    .ForEach(n => n.Remove());
+                
+                // Try to find main content areas
+                var contentSelectors = new[]
+                {
+                    "article", "main", ".content", ".post-content", ".entry-content",
+                    ".article-content", ".story-content", "[role='main']", ".article-body"
+                };
+                
+                foreach (var selector in contentSelectors)
+                {
+                    var contentNode = doc.DocumentNode.SelectSingleNode($"//{selector}");
+                    if (contentNode != null)
+                    {
+                        var text = contentNode.InnerText;
+                        if (!string.IsNullOrWhiteSpace(text) && text.Length > 100)
+                        {
+                            return CleanText(text);
+                        }
+                    }
+                }
+                
+                // Fallback to body content
+                var bodyNode = doc.DocumentNode.SelectSingleNode("//body");
+                if (bodyNode != null)
+                {
+                    return CleanText(bodyNode.InnerText);
+                }
+                
+                return CleanText(doc.DocumentNode.InnerText);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error parsing HTML: {ex.Message}", ex);
+                return string.Empty;
+            }
+        }
+
+        private string CleanText(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return string.Empty;
+                
+            // Remove extra whitespace and normalize
+            text = Regex.Replace(text, @"\s+", " ");
+            text = text.Trim();
+            
+            // Remove common noise patterns
+            var noisePatterns = new[]
+            {
+                @"Advertisement\s*",
+                @"Subscribe\s*",
+                @"Follow us\s*",
+                @"Share this\s*",
+                @"Read more\s*",
+                @"Continue reading\s*"
+            };
+            
+            foreach (var pattern in noisePatterns)
+            {
+                text = Regex.Replace(text, pattern, "", RegexOptions.IgnoreCase);
+            }
+            
+            return text;
+        }
+
+        private async Task<Node> CreateContentNode(NewsItem newsItem, string extractedContent)
+        {
+            var contentNode = new Node(
+                Id: $"codex.content.extracted.{newsItem.Id}.{Guid.NewGuid():N}",
+                TypeId: "codex.content.extracted",
+                State: ContentState.Ice,
+                Locale: "en-US",
+                Title: $"Extracted Content: {newsItem.Title}",
+                Description: $"Full content extracted from {newsItem.Url}",
+                Content: new ContentRef(
+                    MediaType: "text/plain",
+                    InlineJson: extractedContent,
+                    InlineBytes: null,
+                    ExternalUri: null
+                ),
+                Meta: new Dictionary<string, object>
+                {
+                    ["originalNewsId"] = newsItem.Id,
+                    ["sourceUrl"] = newsItem.Url,
+                    ["extractedAt"] = DateTimeOffset.UtcNow,
+                    ["contentLength"] = extractedContent.Length,
+                    ["wordCount"] = extractedContent.Split(' ').Length
+                }
+            );
+            
+            Registry.Upsert(contentNode);
+            
+            // Create edge from news item to content
+            Registry.Upsert(new Edge(
+                $"news-item-{newsItem.Id}", 
+                contentNode.Id, 
+                "contains-content", 
+                1.0, 
+                new Dictionary<string, object>
+                {
+                    ["extractedAt"] = DateTimeOffset.UtcNow,
+                    ["contentLength"] = extractedContent.Length
+                }
+            ));
+            
+            return contentNode;
+        }
+
+        private async Task<string> GenerateSummary(string content)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(content))
+                    return string.Empty;
+                
+                // Use AI to generate summary if available
+                var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "llama3.1:8b";
+                var provider = Environment.GetEnvironmentVariable("NEWS_AI_PROVIDER") ?? "ollama";
+                
+                _logger.Info($"AI_PRECALL generate-summary provider={provider} model={model} chars={content.Length}");
+                // Use concept extraction as a proxy for summary generation
+                var result = await AITemplates.ExtractConceptsAsync(content, 3, model, provider);
+                
+                if (result != null && result.Concepts != null && result.Concepts.Any())
+                {
+                    var summary = $"Key concepts: {string.Join(", ", result.Concepts)}";
+                    _logger.Info($"AI summary generation successful (length: {summary.Length})");
+                    return summary;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"AI summary generation failed: {ex.Message}");
+            }
+            
+            // Fallback to simple extractive summary
+            return GenerateExtractiveSummary(content);
+        }
+
+        private string GenerateExtractiveSummary(string content)
+        {
+            var sentences = content.Split(new[] { '.', '!', '?' }, StringSplitOptions.RemoveEmptyEntries)
+                .Where(s => s.Trim().Length > 20)
+                .Take(3)
+                .ToArray();
+            
+            return string.Join(". ", sentences) + ".";
+        }
+
+        private async Task<Node> CreateSummaryNode(NewsItem newsItem, string summary, string contentNodeId)
+        {
+            var summaryNode = new Node(
+                Id: $"codex.content.summary.{newsItem.Id}.{Guid.NewGuid():N}",
+                TypeId: "codex.content.summary",
+                State: ContentState.Ice,
+                Locale: "en-US",
+                Title: $"Summary: {newsItem.Title}",
+                Description: $"AI-generated summary of {newsItem.Title}",
+                Content: new ContentRef(
+                    MediaType: "text/plain",
+                    InlineJson: summary,
+                    InlineBytes: null,
+                    ExternalUri: null
+                ),
+                Meta: new Dictionary<string, object>
+                {
+                    ["originalNewsId"] = newsItem.Id,
+                    ["contentNodeId"] = contentNodeId,
+                    ["generatedAt"] = DateTimeOffset.UtcNow,
+                    ["summaryLength"] = summary.Length,
+                    ["wordCount"] = summary.Split(' ').Length
+                }
+            );
+            
+            Registry.Upsert(summaryNode);
+            
+            // Create edges: content -> summary and news -> summary
+            Registry.Upsert(new Edge(
+                contentNodeId, 
+                summaryNode.Id, 
+                "summarized-as", 
+                1.0, 
+                new Dictionary<string, object>
+                {
+                    ["generatedAt"] = DateTimeOffset.UtcNow,
+                    ["summaryLength"] = summary.Length
+                }
+            ));
+            
+            Registry.Upsert(new Edge(
+                $"news-item-{newsItem.Id}", 
+                summaryNode.Id, 
+                "has-summary", 
+                1.0, 
+                new Dictionary<string, object>
+                {
+                    ["generatedAt"] = DateTimeOffset.UtcNow
+                }
+            ));
+            
+            return summaryNode;
+        }
+
+        private async Task<List<string>> ExtractConceptsFromSummary(string summary)
+        {
+            try
+            {
+                var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "llama3.1:8b";
+                var provider = Environment.GetEnvironmentVariable("NEWS_AI_PROVIDER") ?? "ollama";
+                
+                _logger.Info($"AI_PRECALL extract-concepts-from-summary provider={provider} model={model} chars={summary.Length}");
+                var result = await AITemplates.ExtractConceptsAsync(summary, 5, model, provider);
+                
+                if (result != null && result.Concepts != null)
+                {
+                    _logger.Info($"AI concept extraction successful (concepts: {result.Concepts.Count})");
+                    return result.Concepts.ToList();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"AI concept extraction failed: {ex.Message}");
+            }
+            
+            // Fallback to simple keyword extraction
+            return ExtractKeywordsFromText(summary);
+        }
+
+        private List<string> ExtractKeywordsFromText(string text)
+        {
+            var words = text.ToLowerInvariant()
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Where(w => w.Length > 3 && !IsStopWord(w))
+                .GroupBy(w => w)
+                .OrderByDescending(g => g.Count())
+                .Take(5)
+                .Select(g => g.Key)
+                .ToList();
+            
+            return words;
+        }
+
+        private bool IsStopWord(string word)
+        {
+            var stopWords = new HashSet<string>
+            {
+                "the", "and", "for", "are", "but", "not", "you", "all", "can", "had", "her", "was", "one", "our", "out", "day", "get", "has", "him", "his", "how", "its", "may", "new", "now", "old", "see", "two", "who", "boy", "did", "man", "men", "put", "say", "she", "too", "use"
+            };
+            return stopWords.Contains(word);
+        }
+
+        private async Task<List<Node>> CreateConceptNodes(NewsItem newsItem, List<string> concepts, string summaryNodeId)
+        {
+            var conceptNodes = new List<Node>();
+            
+            foreach (var concept in concepts)
+            {
+                var conceptNode = new Node(
+                    Id: $"codex.concept.extracted.{newsItem.Id}.{concept.ToLowerInvariant().Replace(" ", "_")}.{Guid.NewGuid():N}",
+                    TypeId: "codex.concept.extracted",
+                    State: ContentState.Ice,
+                    Locale: "en-US",
+                    Title: concept,
+                    Description: $"Concept extracted from {newsItem.Title}",
+                    Content: new ContentRef(
+                        MediaType: "text/plain",
+                        InlineJson: concept,
+                        InlineBytes: null,
+                        ExternalUri: null
+                    ),
+                    Meta: new Dictionary<string, object>
+                    {
+                        ["originalNewsId"] = newsItem.Id,
+                        ["summaryNodeId"] = summaryNodeId,
+                        ["extractedAt"] = DateTimeOffset.UtcNow,
+                        ["conceptType"] = "extracted"
+                    }
+                );
+                
+                Registry.Upsert(conceptNode);
+                conceptNodes.Add(conceptNode);
+                
+                // Create edges: summary -> concept and news -> concept
+                Registry.Upsert(new Edge(
+                    summaryNodeId, 
+                    conceptNode.Id, 
+                    "contains-concept", 
+                    1.0, 
+                    new Dictionary<string, object>
+                    {
+                        ["extractedAt"] = DateTimeOffset.UtcNow,
+                        ["concept"] = concept
+                    }
+                ));
+                
+                Registry.Upsert(new Edge(
+                    $"news-item-{newsItem.Id}", 
+                    conceptNode.Id, 
+                    "relates-to", 
+                    1.0, 
+                    new Dictionary<string, object>
+                    {
+                        ["extractedAt"] = DateTimeOffset.UtcNow,
+                        ["concept"] = concept
+                    }
+                ));
+
+                // Map concept to U-CORE axes and create bidirectional connections
+                await MapConceptToUCoreAxes(concept, conceptNode.Id, newsItem);
+            }
+            
+            return conceptNodes;
+        }
+
+        private async Task MapConceptToUCoreAxes(string concept, string conceptNodeId, NewsItem newsItem)
+        {
+            try
+            {
+                var conceptLower = concept.ToLowerInvariant();
+                var matchedAxes = new List<OntologyAxis>();
+                
+                // Step 1: Direct keyword matching
+                foreach (var axis in _ontologyAxes)
+                {
+                    if (axis.Keywords.Any(keyword => 
+                        conceptLower.Contains(keyword.ToLowerInvariant()) || 
+                        keyword.ToLowerInvariant().Contains(conceptLower)))
+                    {
+                        matchedAxes.Add(axis);
+                    }
+                }
+                
+                // Step 2: If no direct matches, try multi-hop traversal
+                if (!matchedAxes.Any())
+                {
+                    matchedAxes = await FindMultiHopMatches(concept, conceptNodeId);
+                }
+                
+                // Step 3: If still no matches, try AI-based semantic matching
+                if (!matchedAxes.Any())
+                {
+                    matchedAxes = await FindSemanticMatches(concept);
+                }
+                
+                // Create edges to matched U-CORE axes
+                foreach (var axis in matchedAxes)
+                {
+                    var axisNodeId = $"codex.ucore.axis.{axis.Name.ToLowerInvariant()}";
+                    
+                    // Create bidirectional edges: concept -> axis and axis -> concept
+                    Registry.Upsert(new Edge(
+                        conceptNodeId,
+                        axisNodeId,
+                        "maps-to-axis",
+                        1.0,
+                        new Dictionary<string, object>
+                        {
+                            ["concept"] = concept,
+                            ["axis"] = axis.Name,
+                            ["mappedAt"] = DateTimeOffset.UtcNow,
+                            ["mappingType"] = "semantic"
+                        }
+                    ));
+                    
+                    Registry.Upsert(new Edge(
+                        axisNodeId,
+                        conceptNodeId,
+                        "contains-concept",
+                        1.0,
+                        new Dictionary<string, object>
+                        {
+                            ["concept"] = concept,
+                            ["axis"] = axis.Name,
+                            ["mappedAt"] = DateTimeOffset.UtcNow,
+                            ["mappingType"] = "semantic"
+                        }
+                    ));
+                    
+                    _logger.Info($"Mapped concept '{concept}' to U-CORE axis '{axis.Name}'");
+                }
+                
+                // Step 4: If still no matches, create a general connection to a default axis
+                if (!matchedAxes.Any())
+                {
+                    var defaultAxisId = "codex.ucore.axis.abundance"; // Default to abundance
+                    Registry.Upsert(new Edge(
+                        conceptNodeId,
+                        defaultAxisId,
+                        "maps-to-axis",
+                        0.5, // Lower confidence for default mapping
+                        new Dictionary<string, object>
+                        {
+                            ["concept"] = concept,
+                            ["axis"] = "abundance",
+                            ["mappedAt"] = DateTimeOffset.UtcNow,
+                            ["mappingType"] = "default"
+                        }
+                    ));
+                    
+                    Registry.Upsert(new Edge(
+                        defaultAxisId,
+                        conceptNodeId,
+                        "contains-concept",
+                        0.5,
+                        new Dictionary<string, object>
+                        {
+                            ["concept"] = concept,
+                            ["axis"] = "abundance",
+                            ["mappedAt"] = DateTimeOffset.UtcNow,
+                            ["mappingType"] = "default"
+                        }
+                    ));
+                    
+                    _logger.Info($"Mapped concept '{concept}' to default U-CORE axis 'abundance'");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error mapping concept '{concept}' to U-CORE axes: {ex.Message}", ex);
+            }
+        }
+
+        private async Task<List<OntologyAxis>> FindMultiHopMatches(string concept, string conceptNodeId)
+        {
+            try
+            {
+                var matchedAxes = new List<OntologyAxis>();
+                var visitedConcepts = new HashSet<string>();
+                var conceptQueue = new Queue<(string concept, int hopCount, double confidence)>();
+                conceptQueue.Enqueue((concept, 0, 1.0));
+                visitedConcepts.Add(concept);
+                
+                // Multi-hop traversal (max 3 hops)
+                while (conceptQueue.Any() && conceptQueue.Peek().hopCount < 3)
+                {
+                    var (currentConcept, hopCount, currentConfidence) = conceptQueue.Dequeue();
+                    
+                    // Find related concepts using embedding-based similarity
+                    var relatedConcepts = await FindRelatedConceptsWithEmbeddings(currentConcept, hopCount, currentConfidence);
+                    
+                    foreach (var (relatedConcept, similarity) in relatedConcepts)
+                    {
+                        if (visitedConcepts.Contains(relatedConcept))
+                            continue;
+                            
+                        visitedConcepts.Add(relatedConcept);
+                        var newConfidence = currentConfidence * similarity;
+                        
+                        // Check if this related concept matches any U-CORE axis using embedding similarity
+                        var axisMatches = await FindAxisMatchesWithEmbeddings(relatedConcept, newConfidence);
+                        
+                        foreach (var (axis, axisSimilarity) in axisMatches)
+                        {
+                            if (!matchedAxes.Any(a => a.Name.Equals(axis.Name, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                matchedAxes.Add(axis);
+                                
+                                // Create intermediate concept node if it doesn't exist
+                                await CreateIntermediateConceptNode(relatedConcept, conceptNodeId, hopCount + 1, newConfidence * axisSimilarity);
+                            }
+                        }
+                        
+                        // Add to queue for further traversal if confidence is high enough
+                        if (newConfidence > 0.3) // Threshold for continuing traversal
+                        {
+                            conceptQueue.Enqueue((relatedConcept, hopCount + 1, newConfidence));
+                        }
+                    }
+                }
+                
+                return matchedAxes;
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"Multi-hop concept matching failed: {ex.Message}");
+                return new List<OntologyAxis>();
+            }
+        }
+
+        private async Task<List<(string concept, double similarity)>> FindRelatedConceptsWithEmbeddings(string concept, int currentHop, double currentConfidence)
+        {
+            try
+            {
+                var relatedConcepts = new List<(string concept, double similarity)>();
+                
+                // Get concept embedding
+                var conceptEmbedding = await GetConceptEmbedding(concept);
+                if (conceptEmbedding == null)
+                {
+                    // Fallback to simple text-based matching
+                    return await FindRelatedConceptsSimple(concept, currentHop);
+                }
+                
+                // Find existing concept nodes and compute similarity
+                var existingConceptNodes = Registry.GetNodesByType("codex.concept.extracted")
+                    .Where(n => n.Title != concept)
+                    .Take(20) // Increased limit for better coverage
+                    .ToList();
+                
+                foreach (var node in existingConceptNodes)
+                {
+                    var nodeEmbedding = await GetConceptEmbedding(node.Title);
+                    if (nodeEmbedding != null)
+                    {
+                        var similarity = ComputeCosineSimilarity(conceptEmbedding, nodeEmbedding);
+                        if (similarity > 0.3) // Threshold for semantic similarity
+                        {
+                            relatedConcepts.Add((node.Title, similarity));
+                        }
+                    }
+                }
+                
+                // Use AI to find semantically related concepts with similarity scores
+                if (relatedConcepts.Count < 5)
+                {
+                    var aiConcepts = await FindRelatedConceptsWithAI(concept, conceptEmbedding);
+                    relatedConcepts.AddRange(aiConcepts);
+                }
+                
+                return relatedConcepts
+                    .OrderByDescending(x => x.similarity)
+                    .Take(5)
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"Error finding related concepts with embeddings for '{concept}': {ex.Message}");
+                return await FindRelatedConceptsSimple(concept, currentHop);
+            }
+        }
+
+        private async Task<List<(string concept, double similarity)>> FindRelatedConceptsSimple(string concept, int currentHop)
+        {
+            try
+            {
+                var relatedConcepts = new List<(string concept, double similarity)>();
+                
+                // Find existing concept nodes that might be related
+                var existingConceptNodes = Registry.GetNodesByType("codex.concept.extracted")
+                    .Where(n => n.Title != concept && 
+                               (n.Title.ToLowerInvariant().Contains(concept.ToLowerInvariant()) ||
+                                concept.ToLowerInvariant().Contains(n.Title.ToLowerInvariant())))
+                    .Take(5) // Limit to prevent explosion
+                    .ToList();
+                
+                foreach (var node in existingConceptNodes)
+                {
+                    // Simple text similarity based on overlap
+                    var similarity = ComputeTextSimilarity(concept, node.Title);
+                    relatedConcepts.Add((node.Title, similarity));
+                }
+                
+                // Use AI to find semantically related concepts
+                if (relatedConcepts.Count < 3)
+                {
+                    var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "llama3.1:8b";
+                    var provider = Environment.GetEnvironmentVariable("NEWS_AI_PROVIDER") ?? "ollama";
+                    
+                    var prompt = $"Find 3 concepts that are semantically related to '{concept}'. " +
+                               $"Respond with just the concept names, separated by commas.";
+                    
+                    var result = await GenerateTextWithAI(prompt, model, provider);
+                    if (!string.IsNullOrWhiteSpace(result))
+                    {
+                        var aiConcepts = result.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(c => c.Trim())
+                            .Where(c => !string.IsNullOrWhiteSpace(c))
+                            .Take(3)
+                            .ToList();
+                        
+                        foreach (var aiConcept in aiConcepts)
+                        {
+                            var similarity = ComputeTextSimilarity(concept, aiConcept);
+                            relatedConcepts.Add((aiConcept, similarity));
+                        }
+                    }
+                }
+                
+                return relatedConcepts
+                    .OrderByDescending(x => x.similarity)
+                    .Take(5)
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"Error finding related concepts for '{concept}': {ex.Message}");
+                return new List<(string concept, double similarity)>();
+            }
+        }
+
+        private async Task<List<(OntologyAxis axis, double similarity)>> FindAxisMatchesWithEmbeddings(string concept, double confidence)
+        {
+            try
+            {
+                var matches = new List<(OntologyAxis axis, double similarity)>();
+                var conceptEmbedding = await GetConceptEmbedding(concept);
+                
+                if (conceptEmbedding == null)
+                {
+                    // Fallback to keyword matching
+                    return FindAxisMatchesSimple(concept);
+                }
+                
+                foreach (var axis in _ontologyAxes)
+                {
+                    // Get embedding for axis by combining its keywords
+                    var axisEmbedding = await GetAxisEmbedding(axis);
+                    if (axisEmbedding != null)
+                    {
+                        var similarity = ComputeCosineSimilarity(conceptEmbedding, axisEmbedding);
+                        if (similarity > 0.4) // Threshold for axis matching
+                        {
+                            matches.Add((axis, similarity * confidence));
+                        }
+                    }
+                }
+                
+                return matches.OrderByDescending(x => x.similarity).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"Error finding axis matches with embeddings for '{concept}': {ex.Message}");
+                return FindAxisMatchesSimple(concept);
+            }
+        }
+
+        private List<(OntologyAxis axis, double similarity)> FindAxisMatchesSimple(string concept)
+        {
+            var matches = new List<(OntologyAxis axis, double similarity)>();
+            var conceptLower = concept.ToLowerInvariant();
+            
+            foreach (var axis in _ontologyAxes)
+            {
+                var maxSimilarity = 0.0;
+                foreach (var keyword in axis.Keywords)
+                {
+                    var keywordLower = keyword.ToLowerInvariant();
+                    var similarity = ComputeTextSimilarity(conceptLower, keywordLower);
+                    maxSimilarity = Math.Max(maxSimilarity, similarity);
+                }
+                
+                if (maxSimilarity > 0.3)
+                {
+                    matches.Add((axis, maxSimilarity));
+                }
+            }
+            
+            return matches.OrderByDescending(x => x.similarity).ToList();
+        }
+
+        private async Task CreateIntermediateConceptNode(string concept, string originalConceptNodeId, int hopCount, double confidence = 0.8)
+        {
+            try
+            {
+                var intermediateNodeId = $"intermediate-concept-{concept.ToLowerInvariant().Replace(" ", "-")}-{hopCount}";
+                
+                // Check if intermediate node already exists
+                var existingNode = Registry.GetNode(intermediateNodeId);
+                if (existingNode != null)
+                    return;
+                
+                var intermediateNode = new Node(
+                    Id: intermediateNodeId,
+                    TypeId: "codex.concept.intermediate",
+                    State: ContentState.Ice,
+                    Locale: "en-US",
+                    Title: concept,
+                    Description: $"Intermediate concept (hop {hopCount}) related to original concept",
+                    Content: new ContentRef(
+                        MediaType: "text/plain",
+                        InlineJson: concept,
+                        InlineBytes: null,
+                        ExternalUri: null
+                    ),
+                    Meta: new Dictionary<string, object>
+                    {
+                        ["originalConceptNodeId"] = originalConceptNodeId,
+                        ["hopCount"] = hopCount,
+                        ["createdAt"] = DateTimeOffset.UtcNow,
+                        ["conceptType"] = "intermediate",
+                        ["confidence"] = confidence
+                    }
+                );
+                
+                Registry.Upsert(intermediateNode);
+                
+                // Create edge from original concept to intermediate concept
+                Registry.Upsert(new Edge(
+                    originalConceptNodeId,
+                    intermediateNodeId,
+                    "relates-to",
+                    confidence,
+                    new Dictionary<string, object>
+                    {
+                        ["hopCount"] = hopCount,
+                        ["createdAt"] = DateTimeOffset.UtcNow,
+                        ["relationshipType"] = "semantic",
+                        ["confidence"] = confidence
+                    }
+                ));
+                
+                // Create reverse edge
+                Registry.Upsert(new Edge(
+                    intermediateNodeId,
+                    originalConceptNodeId,
+                    "relates-to",
+                    confidence,
+                    new Dictionary<string, object>
+                    {
+                        ["hopCount"] = hopCount,
+                        ["createdAt"] = DateTimeOffset.UtcNow,
+                        ["relationshipType"] = "semantic",
+                        ["confidence"] = confidence
+                    }
+                ));
+                
+                _logger.Info($"Created intermediate concept node '{concept}' (hop {hopCount}, confidence: {confidence:F2})");
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"Error creating intermediate concept node '{concept}': {ex.Message}");
+            }
+        }
+
+        // Core embedding and similarity calculation methods
+        private async Task<double[]?> GetConceptEmbedding(string concept)
+        {
+            try
+            {
+                // Check if we have a cached embedding
+                var cacheKey = $"embedding-{concept.ToLowerInvariant()}";
+                var cachedNode = Registry.GetNode(cacheKey);
+                if (cachedNode?.Content?.InlineJson != null)
+                {
+                    var cachedEmbedding = JsonSerializer.Deserialize<double[]>(cachedNode.Content.InlineJson);
+                    if (cachedEmbedding != null)
+                    {
+                        return cachedEmbedding;
+                    }
+                }
+                
+                // Generate embedding using AI
+                var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "llama3.1:8b";
+                var provider = Environment.GetEnvironmentVariable("NEWS_AI_PROVIDER") ?? "ollama";
+                
+                var embedding = await GenerateConceptEmbedding(concept, model, provider);
+                if (embedding != null)
+                {
+                    // Cache the embedding
+                    var embeddingNode = new Node(
+                        Id: cacheKey,
+                        TypeId: "codex.embedding.concept",
+                        State: ContentState.Ice,
+                        Locale: "en-US",
+                        Title: $"Embedding: {concept}",
+                        Description: $"Vector embedding for concept '{concept}'",
+                        Content: new ContentRef(
+                            MediaType: "application/json",
+                            InlineJson: JsonSerializer.Serialize(embedding),
+                            InlineBytes: null,
+                            ExternalUri: null
+                        ),
+                        Meta: new Dictionary<string, object>
+                        {
+                            ["concept"] = concept,
+                            ["dimensions"] = embedding.Length,
+                            ["generatedAt"] = DateTimeOffset.UtcNow,
+                            ["model"] = model,
+                            ["provider"] = provider
+                        }
+                    );
+                    
+                    Registry.Upsert(embeddingNode);
+                    return embedding;
+                }
+                
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"Error getting concept embedding for '{concept}': {ex.Message}");
+                return null;
+            }
+        }
+
+        private async Task<double[]?> GetAxisEmbedding(OntologyAxis axis)
+        {
+            try
+            {
+                // Check if we have a cached embedding
+                var cacheKey = $"embedding-axis-{axis.Name.ToLowerInvariant()}";
+                var cachedNode = Registry.GetNode(cacheKey);
+                if (cachedNode?.Content?.InlineJson != null)
+                {
+                    var cachedEmbedding = JsonSerializer.Deserialize<double[]>(cachedNode.Content.InlineJson);
+                    if (cachedEmbedding != null)
+                    {
+                        return cachedEmbedding;
+                    }
+                }
+                
+                // Generate embedding by combining axis keywords
+                var axisText = $"{axis.Name}: {string.Join(", ", axis.Keywords)}";
+                var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "llama3.1:8b";
+                var provider = Environment.GetEnvironmentVariable("NEWS_AI_PROVIDER") ?? "ollama";
+                
+                var embedding = await GenerateConceptEmbedding(axisText, model, provider);
+                if (embedding != null)
+                {
+                    // Cache the embedding
+                    var embeddingNode = new Node(
+                        Id: cacheKey,
+                        TypeId: "codex.embedding.axis",
+                        State: ContentState.Ice,
+                        Locale: "en-US",
+                        Title: $"Embedding: {axis.Name}",
+                        Description: $"Vector embedding for U-CORE axis '{axis.Name}'",
+                        Content: new ContentRef(
+                            MediaType: "application/json",
+                            InlineJson: JsonSerializer.Serialize(embedding),
+                            InlineBytes: null,
+                            ExternalUri: null
+                        ),
+                        Meta: new Dictionary<string, object>
+                        {
+                            ["axis"] = axis.Name,
+                            ["keywords"] = axis.Keywords,
+                            ["dimensions"] = embedding.Length,
+                            ["generatedAt"] = DateTimeOffset.UtcNow,
+                            ["model"] = model,
+                            ["provider"] = provider
+                        }
+                    );
+                    
+                    Registry.Upsert(embeddingNode);
+                    return embedding;
+                }
+                
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"Error getting axis embedding for '{axis.Name}': {ex.Message}");
+                return null;
+            }
+        }
+
+        private async Task<double[]?> GenerateConceptEmbedding(string concept, string model, string provider)
+        {
+            try
+            {
+                // Use AI to generate a pseudo-embedding by extracting concepts and converting to numbers
+                var prompt = $"Convert the concept '{concept}' into a numerical representation. " +
+                           $"Respond with 10 numbers between 0 and 1, separated by commas, representing semantic features.";
+                
+                _logger.Info($"AI_PRECALL generate-embedding provider={provider} model={model} concept={concept}");
+                var result = await GenerateTextWithAI(prompt, model, provider);
+                
+                if (!string.IsNullOrWhiteSpace(result))
+                {
+                    var numbers = result.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(s => s.Trim())
+                        .Where(s => double.TryParse(s, out _))
+                        .Select(double.Parse)
+                        .ToArray();
+                    
+                    if (numbers.Length >= 5) // Minimum viable embedding size
+                    {
+                        // Pad or truncate to exactly 10 dimensions
+                        var embedding = new double[10];
+                        for (int i = 0; i < 10; i++)
+                        {
+                            embedding[i] = i < numbers.Length ? numbers[i] : 0.0;
+                        }
+                        
+                        // Normalize the embedding
+                        var magnitude = Math.Sqrt(embedding.Sum(x => x * x));
+                        if (magnitude > 0)
+                        {
+                            for (int i = 0; i < embedding.Length; i++)
+                            {
+                                embedding[i] /= magnitude;
+                            }
+                        }
+                        
+                        return embedding;
+                    }
+                }
+                
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"Error generating concept embedding: {ex.Message}");
+                return null;
+            }
+        }
+
+        private double ComputeCosineSimilarity(double[] embedding1, double[] embedding2)
+        {
+            try
+            {
+                if (embedding1.Length != embedding2.Length)
+                    return 0.0;
+                
+                var dotProduct = 0.0;
+                var magnitude1 = 0.0;
+                var magnitude2 = 0.0;
+                
+                for (int i = 0; i < embedding1.Length; i++)
+                {
+                    dotProduct += embedding1[i] * embedding2[i];
+                    magnitude1 += embedding1[i] * embedding1[i];
+                    magnitude2 += embedding2[i] * embedding2[i];
+                }
+                
+                magnitude1 = Math.Sqrt(magnitude1);
+                magnitude2 = Math.Sqrt(magnitude2);
+                
+                if (magnitude1 == 0 || magnitude2 == 0)
+                    return 0.0;
+                
+                return dotProduct / (magnitude1 * magnitude2);
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"Error computing cosine similarity: {ex.Message}");
+                return 0.0;
+            }
+        }
+
+        private double ComputeTextSimilarity(string text1, string text2)
+        {
+            try
+            {
+                var words1 = text1.ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries).ToHashSet();
+                var words2 = text2.ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries).ToHashSet();
+                
+                var intersection = words1.Intersect(words2).Count();
+                var union = words1.Union(words2).Count();
+                
+                if (union == 0)
+                    return 0.0;
+                
+                return (double)intersection / union; // Jaccard similarity
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"Error computing text similarity: {ex.Message}");
+                return 0.0;
+            }
+        }
+
+        private async Task<List<(string concept, double similarity)>> FindRelatedConceptsWithAI(string concept, double[]? conceptEmbedding)
+        {
+            try
+            {
+                var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "llama3.1:8b";
+                var provider = Environment.GetEnvironmentVariable("NEWS_AI_PROVIDER") ?? "ollama";
+                
+                var prompt = $"Find 5 concepts that are semantically related to '{concept}'. " +
+                           $"For each concept, provide a similarity score from 0.0 to 1.0. " +
+                           $"Format: concept1:score1, concept2:score2, etc.";
+                
+                var result = await GenerateTextWithAI(prompt, model, provider);
+                if (string.IsNullOrWhiteSpace(result))
+                    return new List<(string concept, double similarity)>();
+                
+                var concepts = new List<(string concept, double similarity)>();
+                var pairs = result.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                
+                foreach (var pair in pairs)
+                {
+                    var parts = pair.Split(':', StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length == 2 && double.TryParse(parts[1].Trim(), out var score))
+                    {
+                        concepts.Add((parts[0].Trim(), Math.Max(0.0, Math.Min(1.0, score))));
+                    }
+                }
+                
+                return concepts;
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"Error finding related concepts with AI: {ex.Message}");
+                return new List<(string concept, double similarity)>();
+            }
+        }
+
+        private async Task<List<OntologyAxis>> FindSemanticMatches(string concept)
+        {
+            try
+            {
+                var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "llama3.1:8b";
+                var provider = Environment.GetEnvironmentVariable("NEWS_AI_PROVIDER") ?? "ollama";
+                
+                var axisNames = _ontologyAxes.Select(a => a.Name).ToList();
+                var prompt = $"Given the concept '{concept}', which of these U-CORE ontology axes does it best relate to? " +
+                           $"Choose one or more: {string.Join(", ", axisNames)}. " +
+                           $"Respond with just the axis names, separated by commas if multiple.";
+                
+                _logger.Info($"AI_PRECALL find-semantic-matches provider={provider} model={model} concept={concept}");
+                var result = await GenerateTextWithAI(prompt, model, provider);
+                
+                if (!string.IsNullOrWhiteSpace(result))
+                {
+                    var matchedAxisNames = result.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(name => name.Trim())
+                        .Where(name => axisNames.Contains(name, StringComparer.OrdinalIgnoreCase))
+                        .ToList();
+                    
+                    return _ontologyAxes.Where(a => matchedAxisNames.Contains(a.Name, StringComparer.OrdinalIgnoreCase)).ToList();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"AI semantic matching failed for concept '{concept}': {ex.Message}");
+            }
+            
+            return new List<OntologyAxis>();
+        }
+
+        private async Task CreateNewsToUCoreConnections(NewsItem newsItem, List<string> concepts)
+        {
+            try
+            {
+                var newsNodeId = $"news-item-{newsItem.Id}";
+                var matchedAxes = new List<OntologyAxis>();
+                
+                // Find U-CORE axes that match any of the extracted concepts
+                foreach (var concept in concepts)
+                {
+                    var conceptLower = concept.ToLowerInvariant();
+                    foreach (var axis in _ontologyAxes)
+                    {
+                        if (axis.Keywords.Any(keyword => 
+                            conceptLower.Contains(keyword.ToLowerInvariant()) || 
+                            keyword.ToLowerInvariant().Contains(conceptLower)))
+                        {
+                            if (!matchedAxes.Any(a => a.Name.Equals(axis.Name, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                matchedAxes.Add(axis);
+                            }
+                        }
+                    }
+                }
+                
+                // If no direct matches, try AI-based semantic matching
+                if (!matchedAxes.Any())
+                {
+                    matchedAxes = await FindSemanticMatchesForNews(concepts);
+                }
+                
+                // Create bidirectional edges from news item to matched U-CORE axes
+                foreach (var axis in matchedAxes)
+                {
+                    var axisNodeId = $"codex.ucore.axis.{axis.Name.ToLowerInvariant()}.{Guid.NewGuid():N}";
+                    
+                    // News -> U-CORE axis
+                    Registry.Upsert(new Edge(
+                        newsNodeId,
+                        axisNodeId,
+                        "relates-to-axis",
+                        1.0,
+                        new Dictionary<string, object>
+                        {
+                            ["newsTitle"] = newsItem.Title,
+                            ["axis"] = axis.Name,
+                            ["connectedAt"] = DateTimeOffset.UtcNow,
+                            ["connectionType"] = "semantic"
+                        }
+                    ));
+                    
+                    // U-CORE axis -> News
+                    Registry.Upsert(new Edge(
+                        axisNodeId,
+                        newsNodeId,
+                        "contains-news",
+                        1.0,
+                        new Dictionary<string, object>
+                        {
+                            ["newsTitle"] = newsItem.Title,
+                            ["axis"] = axis.Name,
+                            ["connectedAt"] = DateTimeOffset.UtcNow,
+                            ["connectionType"] = "semantic"
+                        }
+                    ));
+                    
+                    _logger.Info($"Connected news '{newsItem.Title}' to U-CORE axis '{axis.Name}'");
+                }
+                
+                // If still no matches, create a general connection to abundance axis
+                if (!matchedAxes.Any())
+                {
+                    var defaultAxisId = "codex.ucore.axis.abundance";
+                    Registry.Upsert(new Edge(
+                        newsNodeId,
+                        defaultAxisId,
+                        "relates-to-axis",
+                        0.5,
+                        new Dictionary<string, object>
+                        {
+                            ["newsTitle"] = newsItem.Title,
+                            ["axis"] = "abundance",
+                            ["connectedAt"] = DateTimeOffset.UtcNow,
+                            ["connectionType"] = "default"
+                        }
+                    ));
+                    
+                    Registry.Upsert(new Edge(
+                        defaultAxisId,
+                        newsNodeId,
+                        "contains-news",
+                        0.5,
+                        new Dictionary<string, object>
+                        {
+                            ["newsTitle"] = newsItem.Title,
+                            ["axis"] = "abundance",
+                            ["connectedAt"] = DateTimeOffset.UtcNow,
+                            ["connectionType"] = "default"
+                        }
+                    ));
+                    
+                    _logger.Info($"Connected news '{newsItem.Title}' to default U-CORE axis 'abundance'");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error creating news to U-CORE connections: {ex.Message}", ex);
+            }
+        }
+
+        private async Task<List<OntologyAxis>> FindSemanticMatchesForNews(List<string> concepts)
+        {
+            try
+            {
+                var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "llama3.1:8b";
+                var provider = Environment.GetEnvironmentVariable("NEWS_AI_PROVIDER") ?? "ollama";
+                
+                var axisNames = _ontologyAxes.Select(a => a.Name).ToList();
+                var conceptsText = string.Join(", ", concepts);
+                var prompt = $"Given these concepts from a news article: {conceptsText}, " +
+                           $"which of these U-CORE ontology axes do they best relate to? " +
+                           $"Choose one or more: {string.Join(", ", axisNames)}. " +
+                           $"Respond with just the axis names, separated by commas if multiple.";
+                
+                _logger.Info($"AI_PRECALL find-semantic-matches-for-news provider={provider} model={model} concepts={conceptsText}");
+                var result = await GenerateTextWithAI(prompt, model, provider);
+                
+                if (!string.IsNullOrWhiteSpace(result))
+                {
+                    var matchedAxisNames = result.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(name => name.Trim())
+                        .Where(name => axisNames.Contains(name, StringComparer.OrdinalIgnoreCase))
+                        .ToList();
+                    
+                    return _ontologyAxes.Where(a => matchedAxisNames.Contains(a.Name, StringComparer.OrdinalIgnoreCase)).ToList();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"AI semantic matching failed for news concepts: {ex.Message}");
+            }
+            
+            return new List<OntologyAxis>();
+        }
+
+        private async Task<string> GenerateTextWithAI(string prompt, string model, string provider)
+        {
+            try
+            {
+                // Use concept extraction as a proxy for text generation
+                var result = await AITemplates.ExtractConceptsAsync(prompt, 5, model, provider);
+                if (result != null && result.Concepts != null && result.Concepts.Any())
+                {
+                    return string.Join(", ", result.Concepts);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"AI text generation failed: {ex.Message}");
+            }
+            
+            return string.Empty;
+        }
+
         private async Task<FractalNewsItem?> CreateFractalNewsItem(NewsItem newsItem)
         {
             try
             {
                 // Use AI-backed dynamic analysis
                 var conceptAnalysis = await PerformAIConceptExtraction(newsItem);
+                
+                // Small delay to avoid rate limiting
+                await Task.Delay(100);
+                
                 var scoringAnalysis = await PerformAIScoringAnalysis(conceptAnalysis, newsItem);
+                
+                // Small delay to avoid rate limiting
+                await Task.Delay(100);
+                
                 var fractalTransformation = await PerformAIFractalTransformation(newsItem, conceptAnalysis, scoringAnalysis);
 
                 return new FractalNewsItem
@@ -939,7 +2312,13 @@ namespace CodexBootstrap.Modules
                     AmplificationFactors = fractalTransformation.AmplificationFactors.Select(kvp => $"{kvp.Key}: {kvp.Value}").ToList(),
                     ResonanceData = new ResonanceData(),
                     ProcessedAt = DateTimeOffset.UtcNow,
-                    Metadata = fractalTransformation.Metadata
+                    Metadata = new Dictionary<string, object>(fractalTransformation.Metadata)
+                    {
+                        ["source"] = newsItem.Source,
+                        ["originalNewsTitle"] = newsItem.Title,
+                        ["originalNewsUrl"] = newsItem.Url,
+                        ["originalPublishedAt"] = newsItem.PublishedAt
+                    }
                 };
             }
             catch (Exception ex)
@@ -969,11 +2348,13 @@ namespace CodexBootstrap.Modules
                 var provider = Environment.GetEnvironmentVariable("NEWS_AI_PROVIDER"); // e.g., "ollama" or "openai"
                 var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL");       // e.g., "llama3.1:8b" or "gpt-4o-mini"
 
+                _logger.Info($"AI_PRECALL extract-concepts provider={provider ?? "auto"} model={model ?? "auto"} chars={content.Length}");
                 var result = await AITemplates.ExtractConceptsAsync(content, 5, model, provider);
                 
                 if (result != null)
                 {
-                    _logger.Info($"AI concept extraction successful for: {newsItem.Title} (confidence: {result.Confidence})");
+                    var conceptsList = result.Concepts != null ? string.Join(", ", result.Concepts) : "";
+                    _logger.Info($"AI concept extraction successful for: {newsItem.Title} (confidence: {result.Confidence}) concepts=[{conceptsList}]");
                     
                     var analysis = new ConceptAnalysis
                     {
@@ -993,7 +2374,7 @@ namespace CodexBootstrap.Modules
                         }
                     };
 
-                    SaveConceptAnalysisToCache(newsItem.Id, analysis);
+                    SaveConceptAnalysisToCache(newsItem.Id, analysis, provider, model);
                     return analysis;
                 }
                 else
@@ -1006,10 +2387,8 @@ namespace CodexBootstrap.Modules
                 _logger.Error($"Error in AI concept extraction for {newsItem.Title}: {ex.Message}", ex);
             }
 
-            // Deterministic heuristic extraction (no mock/sample)
-            var heuristic = await HeuristicConceptExtraction(newsItem);
-            SaveConceptAnalysisToCache(newsItem.Id, heuristic);
-            return heuristic;
+            // No fallback: require AI for concept extraction
+            throw new InvalidOperationException("AI concept extraction failed and fallback is disabled");
         }
 
         private ConceptAnalysis? TryLoadConceptAnalysisFromCache(string newsId)
@@ -1020,24 +2399,32 @@ namespace CodexBootstrap.Modules
             {
                 try
                 {
-                    return JsonSerializer.Deserialize<ConceptAnalysis>(node.Content.InlineJson);
+                    // Only treat as valid cache if marked as AI-derived and has provider/model
+                    var meta = node.Meta ?? new Dictionary<string, object>();
+                    var source = meta.ContainsKey("source") ? meta["source"]?.ToString() : null;
+                    var provider = meta.ContainsKey("provider") ? meta["provider"]?.ToString() : null;
+                    var model = meta.ContainsKey("model") ? meta["model"]?.ToString() : null;
+                    if (string.Equals(source, "ai", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(provider) && !string.IsNullOrWhiteSpace(model))
+                    {
+                        return JsonSerializer.Deserialize<ConceptAnalysis>(node.Content.InlineJson);
+                    }
                 }
                 catch { }
             }
             return null;
         }
 
-        private void SaveConceptAnalysisToCache(string newsId, ConceptAnalysis analysis)
+        private void SaveConceptAnalysisToCache(string newsId, ConceptAnalysis analysis, string? provider, string? model)
         {
             try
             {
                 var node = new Node(
-                    Id: $"concept-analysis-{newsId}",
+                    Id: $"codex.news.concept-analysis.{newsId}.{Guid.NewGuid():N}",
                     TypeId: "codex.news.concept-analysis",
                     State: ContentState.Ice,
                     Locale: "en-US",
                     Title: $"Concept analysis for {newsId}",
-                    Description: "Cached concept extraction result",
+                    Description: "Cached concept extraction result (AI)",
                     Content: new ContentRef(
                         MediaType: "application/json",
                         InlineJson: JsonSerializer.Serialize(analysis),
@@ -1047,7 +2434,10 @@ namespace CodexBootstrap.Modules
                     Meta: new Dictionary<string, object>
                     {
                         ["newsId"] = newsId,
-                        ["cachedAt"] = DateTimeOffset.UtcNow
+                        ["cachedAt"] = DateTimeOffset.UtcNow,
+                        ["source"] = "ai",
+                        ["provider"] = provider ?? string.Empty,
+                        ["model"] = model ?? string.Empty
                     }
                 );
                 Registry.Upsert(node);
@@ -1346,7 +2736,7 @@ namespace CodexBootstrap.Modules
 
                 // Store subscription as node
                 var subscriptionNode = new Node(
-                    Id: $"news-subscription-{subscription.Id}",
+                    Id: $"codex.news.subscription.{subscription.Id}.{Guid.NewGuid():N}",
                     TypeId: NEWS_SUBSCRIPTION_NODE_TYPE,
                     State: ContentState.Water,
                     Locale: "en-US",
@@ -1626,7 +3016,7 @@ namespace CodexBootstrap.Modules
                 // Update the source
                 source.Id = id; // Ensure ID matches
                 var updatedSourceNode = new Node(
-                    Id: $"news-source-{source.Id}",
+                    Id: $"codex.news.source.{source.Id}.{Guid.NewGuid():N}",
                     TypeId: NEWS_SOURCE_NODE_TYPE,
                     State: ContentState.Ice,
                     Locale: "en-US",
@@ -2252,6 +3642,9 @@ namespace CodexBootstrap.Modules
         private void EnsureConceptAndTopology(string concept, NewsItem newsItem, FractalNewsItem fractal)
         {
             var conceptNodeId = $"discovered-concept-{concept}";
+            var newsNodeId = $"news-item-{newsItem.Id}";
+            var fractalNewsNodeId = $"fractal-news-{fractal.Id}";
+            
             var existing = Registry.GetNode(conceptNodeId);
             if (existing == null)
             {
@@ -2262,19 +3655,45 @@ namespace CodexBootstrap.Modules
                     Locale: "en-US",
                     Title: concept,
                     Description: $"Concept discovered from news: {newsItem.Title}",
-                    Content: new ContentRef("application/json", JsonSerializer.Serialize(new { concept, newsId = newsItem.Id }), null, null),
-                    Meta: new Dictionary<string, object> { ["source"] = newsItem.Source, ["discoveredAt"] = DateTimeOffset.UtcNow }
+                    Content: new ContentRef("application/json", JsonSerializer.Serialize(new { concept, newsId = newsItem.Id, source = newsItem.Source }), null, null),
+                    Meta: new Dictionary<string, object> 
+                    { 
+                        ["source"] = newsItem.Source, 
+                        ["discoveredAt"] = DateTimeOffset.UtcNow,
+                        ["originalNewsId"] = newsItem.Id,
+                        ["originalNewsTitle"] = newsItem.Title
+                    }
                 );
                 Registry.Upsert(node);
+                _logger.Info($"CONCEPT_NODE_CREATED id={conceptNodeId} title='{concept}' source='{newsItem.Source}' newsId={newsItem.Id}");
             }
+
+            // Create edge from concept to original news item
+            Registry.Upsert(new Edge(conceptNodeId, newsNodeId, "discovered-from", 1.0, new Dictionary<string, object>
+            {
+                ["source"] = newsItem.Source,
+                ["discoveredAt"] = DateTimeOffset.UtcNow
+            }));
+            _logger.Info($"CONCEPT_LINK_CREATED from={conceptNodeId} to={newsNodeId} type=discovered-from source={newsItem.Source}");
+
+            // Create edge from concept to fractal news
+            Registry.Upsert(new Edge(conceptNodeId, fractalNewsNodeId, "relates-to", 0.5, new Dictionary<string, object>
+            {
+                ["source"] = newsItem.Source,
+                ["discoveredAt"] = DateTimeOffset.UtcNow
+            }));
+            _logger.Info($"CONCEPT_LINK_CREATED from={conceptNodeId} to={fractalNewsNodeId} type=relates-to source={newsItem.Source}");
 
             var ucoreTarget = MapConceptToUCore(concept);
             if (ucoreTarget != null)
             {
-                Registry.Upsert(new Edge(conceptNodeId, ucoreTarget, "is-a", 1.0, new Dictionary<string, object>()));
+                Registry.Upsert(new Edge(conceptNodeId, ucoreTarget, "is-a", 1.0, new Dictionary<string, object>
+                {
+                    ["source"] = newsItem.Source,
+                    ["discoveredAt"] = DateTimeOffset.UtcNow
+                }));
+                _logger.Info($"CONCEPT_LINK_CREATED from={conceptNodeId} to={ucoreTarget} type=is-a path=fractal source={newsItem.Source}");
             }
-
-            Registry.Upsert(new Edge(conceptNodeId, $"fractal-news-{fractal.Id}", "relates-to", 0.5, new Dictionary<string, object>()));
         }
 
         private string? MapConceptToUCore(string concept)
@@ -2289,6 +3708,91 @@ namespace CodexBootstrap.Modules
             if (c.Contains("technology")) return "u-core-concept-technology";
             if (c.Contains("science")) return "u-core-concept-science";
             return "u-core-concept-knowledge";
+        }
+
+        /// <summary>
+        /// Ensures a node has a path back to the core identity
+        /// </summary>
+        private async Task EnsureNodePathToIdentity(string nodeId)
+        {
+            try
+            {
+                // Check if node can already reach core identity
+                if (await CanReachNode(nodeId, "codex.core.identity.root"))
+                    return;
+
+                // Try to create a path through U-CORE root
+                if (await CanReachNode(nodeId, "u-core-ontology-root"))
+                {
+                    // Node can reach U-CORE root, which should reach core identity
+                    return;
+                }
+
+                // Create edge from node to U-CORE root
+                var nodeToUcoreEdge = NodeHelpers.CreateEdge(
+                    nodeId,
+                    "u-core-ontology-root",
+                    "belongs_to",
+                    1.0,
+                    new Dictionary<string, object>
+                    {
+                        ["relationship"] = "node-to-ontology",
+                        ["createdBy"] = "realtime-news-stream-module",
+                        ["autoCreated"] = true
+                    }
+                );
+                Registry.Upsert(nodeToUcoreEdge);
+                
+                _logger.Info($"Created edge from node {nodeId} to U-CORE root to ensure path to core identity");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error ensuring node path to identity for {nodeId}: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// Checks if a node can reach another node through the graph
+        /// </summary>
+        private async Task<bool> CanReachNode(string fromNodeId, string toNodeId)
+        {
+            var visited = new HashSet<string>();
+            var queue = new Queue<string>();
+            
+            queue.Enqueue(fromNodeId);
+            
+            while (queue.Count > 0)
+            {
+                var currentNodeId = queue.Dequeue();
+                
+                if (currentNodeId == toNodeId)
+                    return true;
+                    
+                if (visited.Contains(currentNodeId))
+                    continue;
+                    
+                visited.Add(currentNodeId);
+                
+                var edges = GetOutgoingEdges(currentNodeId);
+                foreach (var edge in edges)
+                {
+                    if (!visited.Contains(edge.ToId))
+                    {
+                        queue.Enqueue(edge.ToId);
+                    }
+                }
+            }
+            
+            return false;
+        }
+
+        /// <summary>
+        /// Gets all outgoing edges from a node
+        /// </summary>
+        private List<Edge> GetOutgoingEdges(string nodeId)
+        {
+            var allEdges = Registry.AllEdges().ToList();
+            return allEdges.Where(e => e.FromId == nodeId).ToList();
         }
     }
 
@@ -2413,3 +3917,4 @@ namespace CodexBootstrap.Modules
         }
     }
 }
+

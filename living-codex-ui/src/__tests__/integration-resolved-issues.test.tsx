@@ -8,8 +8,9 @@
  */
 
 import React from 'react'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { screen, fireEvent, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
+import { renderWithProviders } from './test-utils'
 
 // Mock the auth context
 const mockAuthContext = {
@@ -45,7 +46,7 @@ describe('Integration Tests - Resolved Issues', () => {
       mockAuthContext.login.mockResolvedValueOnce({ success: true })
       
       const { LoginForm } = await import('@/components/auth/LoginForm')
-      render(<LoginForm />)
+      renderWithProviders(<LoginForm />)
 
       // Fill in login form
       fireEvent.change(screen.getByPlaceholderText('Enter your username'), {
@@ -71,7 +72,7 @@ describe('Integration Tests - Resolved Issues', () => {
       mockAuthContext.register.mockResolvedValueOnce({ success: true })
       
       const { RegisterForm } = await import('@/components/auth/RegisterForm')
-      render(<RegisterForm />)
+      renderWithProviders(<RegisterForm />)
 
       // Fill in registration form
       fireEvent.change(screen.getByPlaceholderText('Choose a username'), {
@@ -80,7 +81,10 @@ describe('Integration Tests - Resolved Issues', () => {
       fireEvent.change(screen.getByPlaceholderText('Enter your email'), {
         target: { value: 'newuser@example.com' }
       })
-      fireEvent.change(screen.getByPlaceholderText('Create a password (min 6 characters)'), {
+      fireEvent.change(screen.getByPlaceholderText('Create a password (min 6 chars, 1 uppercase)'), {
+        target: { value: 'TestPass123' }
+      })
+      fireEvent.change(screen.getByPlaceholderText('Confirm your password'), {
         target: { value: 'TestPass123' }
       })
       // Note: Display Name field doesn't exist in current RegisterForm
@@ -103,7 +107,7 @@ describe('Integration Tests - Resolved Issues', () => {
       mockAuthContext.testConnection.mockResolvedValueOnce(true)
       
       const AuthPage = (await import('@/app/auth/page')).default
-      render(<AuthPage />)
+      renderWithProviders(<AuthPage />)
 
       // Find and click the connection test button
       const testButton = screen.getByText('Test')
@@ -144,15 +148,13 @@ describe('Integration Tests - Resolved Issues', () => {
       })
 
       const NewsPage = (await import('@/app/news/page')).default
-      render(<NewsPage />)
+      renderWithProviders(<NewsPage />)
 
       // Wait for news items to load
-      await waitFor(() => {
-        expect(screen.getByText('Vibe Coding Cleanup as a Service')).toBeInTheDocument()
-      })
+      expect(await screen.findByText('Vibe Coding Cleanup as a Service')).toBeInTheDocument()
 
       expect(screen.getByText('Representing Heterogeneous Data (2023)')).toBeInTheDocument()
-      expect(screen.getByText('Hacker News')).toBeInTheDocument()
+      expect(screen.getAllByText(/Hacker News/i).length).toBeGreaterThan(0)
     })
   })
 
@@ -199,7 +201,7 @@ describe('Integration Tests - Resolved Issues', () => {
       })
 
       const OntologyPage = (await import('@/app/ontology/page')).default
-      render(<OntologyPage />)
+      renderWithProviders(<OntologyPage />)
 
       // Wait for U-Core data to load
       await waitFor(() => {
@@ -207,7 +209,8 @@ describe('Integration Tests - Resolved Issues', () => {
       })
 
       // Should show consciousness axis
-      expect(screen.getByText('consciousness')).toBeInTheDocument()
+      const axes = await screen.findAllByText('consciousness')
+      expect(axes.length).toBeGreaterThan(0)
       expect(screen.getByText('awareness')).toBeInTheDocument()
     })
 
@@ -269,7 +272,7 @@ describe('Integration Tests - Resolved Issues', () => {
       })
 
       const DiscoverPage = (await import('@/app/discover/page')).default
-      render(<DiscoverPage />)
+      renderWithProviders(<DiscoverPage />)
 
       // Wait for discovery content to load
       await waitFor(() => {
@@ -306,14 +309,15 @@ describe('Integration Tests - Resolved Issues', () => {
       })
 
       const { FileBrowser } = await import('@/components/ui/FileBrowser')
-      render(<FileBrowser />)
+      renderWithProviders(<FileBrowser />)
 
-      // Wait for files to load
-      await waitFor(() => {
-        expect(screen.getByText('NodeHelpers.cs')).toBeInTheDocument()
-      })
+      const srcDirectory = await screen.findByText('src')
+      fireEvent.click(srcDirectory)
+      fireEvent.click(await screen.findByText('CodexBootstrap'))
+      fireEvent.click(await screen.findByText('Core'))
 
-      expect(screen.getByText('317 files')).toBeInTheDocument()
+      expect(await screen.findByText('NodeHelpers.cs')).toBeInTheDocument()
+      expect(screen.getByText('1 files')).toBeInTheDocument()
     })
   })
 

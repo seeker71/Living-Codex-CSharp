@@ -45,7 +45,7 @@ public sealed class HealthService
             // Use actual loaded module count from ModuleLoader instead of NodeRegistry count
             var moduleCount = _moduleLoader?.GetLoadedModules().Count ?? 
                              (_registry.GetNodesByType("module").Count() + 
-                              _registry.GetNodesByType("codex.module").Count());
+                              _registry.GetNodesByType("codex.meta/module").Count());
 
             return new HealthStatus(
                 Status: registrationMetrics.ModuleRegistrationSuccessRate >= 0.9 ? "healthy" : "degraded",

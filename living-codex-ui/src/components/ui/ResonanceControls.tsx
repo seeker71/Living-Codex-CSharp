@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useResonanceControls } from '@/lib/hooks';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 
 interface ResonanceControlsProps {
   onControlsChange?: (controls: Record<string, any>) => void;
@@ -43,12 +44,15 @@ export function ResonanceControls({ onControlsChange, className = '' }: Resonanc
   };
 
   return (
-    <div className={`bg-white rounded-lg border p-4 space-y-4 ${className}`}>
-      <h3 className="text-lg font-semibold text-gray-900">Resonance Controls</h3>
+    <Card className={className}>
+      <CardHeader className="pb-2">
+        <CardTitle>Resonance Controls</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
       
       {/* Axes Selection */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-secondary mb-2">
           U-CORE Axes
         </label>
         <div className="grid grid-cols-2 gap-2">
@@ -58,9 +62,9 @@ export function ResonanceControls({ onControlsChange, className = '' }: Resonanc
                 type="checkbox"
                 checked={values.axes.includes(axis)}
                 onChange={(e) => handleAxisChange(axis, e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="rounded border-slate-600 bg-slate-900 text-blue-500 focus:ring-blue-500"
               />
-              <span className="text-sm text-gray-700 capitalize">{axis}</span>
+              <span className="text-sm text-medium-contrast capitalize">{axis}</span>
             </label>
           ))}
         </div>
@@ -68,7 +72,7 @@ export function ResonanceControls({ onControlsChange, className = '' }: Resonanc
 
       {/* Joy Tuner */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-secondary mb-2">
           Joy Level: {Math.round(values.joy * 100)}%
         </label>
         <input
@@ -78,13 +82,13 @@ export function ResonanceControls({ onControlsChange, className = '' }: Resonanc
           step="0.1"
           value={values.joy}
           onChange={(e) => handleRangeChange('joy', parseFloat(e.target.value))}
-          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+          className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer"
         />
       </div>
 
       {/* Serendipity Dial */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-secondary mb-2">
           Serendipity: {Math.round(values.serendipity * 100)}%
         </label>
         <input
@@ -94,17 +98,18 @@ export function ResonanceControls({ onControlsChange, className = '' }: Resonanc
           step="0.1"
           value={values.serendipity}
           onChange={(e) => handleRangeChange('serendipity', parseFloat(e.target.value))}
-          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+          className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer"
         />
       </div>
 
       {/* Status Badge */}
       <div className="flex items-center space-x-2">
-        <span className="text-xs text-gray-500">Status:</span>
-        <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+        <span className="text-xs text-muted">Status:</span>
+        <span className="px-2 py-1 bg-emerald-500/10 text-emerald-300 text-xs rounded-full">
           {controls.status}
         </span>
       </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

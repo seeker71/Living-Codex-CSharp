@@ -65,11 +65,14 @@ public sealed class UserDiscoveryModule : ModuleBase
     {
         try
         {
+            var skip = request.Skip ?? 0;
+            var limit = request.Limit ?? 50;
+
             UserDiscoveryResult result = request switch
             {
-                { Interests: not null } => await DiscoverUsersByInterests(request.Interests, request.Limit ?? 50),
-                { Location: not null } => await DiscoverUsersByLocation(request.Location, request.RadiusKm ?? 50, request.Limit ?? 50),
-                { ConceptId: not null } => await DiscoverUsersByConcept(request.ConceptId, request.OntologyLevel, request.Limit ?? 50),
+                { Interests: not null } => await DiscoverUsersByInterests(request.Interests, skip, limit),
+                { Location: not null } => await DiscoverUsersByLocation(request.Location, request.RadiusKm ?? 50, skip, limit),
+                { ConceptId: not null } => await DiscoverUsersByConcept(request.ConceptId, request.OntologyLevel, skip, limit),
                 _ => new UserDiscoveryResult(new List<UserProfile>(), 0, "invalid")
             };
 
@@ -83,7 +86,7 @@ public sealed class UserDiscoveryModule : ModuleBase
     }
 
     // User Discovery by Interests (helper method)
-    public async Task<UserDiscoveryResult> DiscoverUsersByInterests(List<string> interests, int limit = 50)
+    public async Task<UserDiscoveryResult> DiscoverUsersByInterests(List<string> interests, int skip = 0, int limit = 50)
     {
         try
         {
@@ -91,7 +94,7 @@ public sealed class UserDiscoveryModule : ModuleBase
                 .Select(i => i.Trim().ToLowerInvariant())
                 .ToList();
 
-            var users = Registry.GetNodesByType("codex.user")
+            var query = Registry.GetNodesByType("codex.user")
                 .Where(u => u.Meta?.ContainsKey("interests") == true)
                 .Select(u => new UserProfile(
                     UserId: u.Id,
@@ -105,11 +108,12 @@ public sealed class UserDiscoveryModule : ModuleBase
                     Contributions: ParseStringList(u.Meta?.GetValueOrDefault("contributions")?.ToString()),
                     Metadata: u.Meta?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value) ?? new Dictionary<string, object>()
                 ))
-                .Where(u => u.Interests?.Any(i => interestList.Any(interest => i.Contains(interest, StringComparison.OrdinalIgnoreCase))) == true)
-                .Take(limit)
-                .ToList();
+                .Where(u => u.Interests?.Any(i => interestList.Any(interest => i.Contains(interest, StringComparison.OrdinalIgnoreCase))) == true);
 
-            return new UserDiscoveryResult(users, users.Count, "interests");
+            var total = query.Count();
+            var users = query.Skip(skip).Take(limit).ToList();
+
+            return new UserDiscoveryResult(users, total, "interests");
         }
         catch (Exception ex)
         {
@@ -119,7 +123,7 @@ public sealed class UserDiscoveryModule : ModuleBase
     }
 
     // User Discovery by Geo-location
-    public async Task<UserDiscoveryResult> DiscoverUsersByLocation(string location, double radiusKm = 50, int limit = 50)
+    public async Task<UserDiscoveryResult> DiscoverUsersByLocation(string location, double radiusKm = 50, int skip = 0, int limit = 50)
     {
         try
         {
@@ -131,7 +135,7 @@ public sealed class UserDiscoveryModule : ModuleBase
                     new Dictionary<string, object> { ["error"] = "Could not geocode location" });
             }
 
-            var users = Registry.GetNodesByType("codex.user")
+            var query = Registry.GetNodesByType("codex.user")
                 .Where(u => u.Meta?.ContainsKey("latitude") == true && u.Meta?.ContainsKey("longitude") == true)
                 .Select(u => new UserProfile(
                     UserId: u.Id,
@@ -145,12 +149,16 @@ public sealed class UserDiscoveryModule : ModuleBase
                     Contributions: ParseStringList(u.Meta?.GetValueOrDefault("contributions")?.ToString()),
                     Metadata: u.Meta?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value) ?? new Dictionary<string, object>()
                 ))
-                .Where(u => CalculateDistance(coordinates.Value.Latitude, coordinates.Value.Longitude, u.Latitude, u.Longitude) <= radiusKm)
+                .Where(u => CalculateDistance(coordinates.Value.Latitude, coordinates.Value.Longitude, u.Latitude, u.Longitude) <= radiusKm);
+
+            var total = query.Count();
+            var users = query
                 .OrderBy(u => CalculateDistance(coordinates.Value.Latitude, coordinates.Value.Longitude, u.Latitude, u.Longitude))
+                .Skip(skip)
                 .Take(limit)
                 .ToList();
 
-            return new UserDiscoveryResult(users, users.Count, "location", 
+            return new UserDiscoveryResult(users, total, "location", 
                 new Dictionary<string, object> 
                 { 
                     ["searchLocation"] = location,
@@ -166,11 +174,11 @@ public sealed class UserDiscoveryModule : ModuleBase
     }
 
     // User Discovery by Concept
-    public async Task<UserDiscoveryResult> DiscoverUsersByConcept(string conceptId, string? ontologyLevel, int limit = 50)
+    public async Task<UserDiscoveryResult> DiscoverUsersByConcept(string conceptId, string? ontologyLevel, int skip = 0, int limit = 50)
     {
         try
         {
-            var contributors = await FindConceptContributors(conceptId, ontologyLevel, limit);
+            var contributors = await FindConceptContributors(conceptId, ontologyLevel, int.MaxValue);
             var users = contributors.Contributors.Select(c => new UserProfile(
                 UserId: c.UserId,
                 DisplayName: c.DisplayName,
@@ -188,7 +196,10 @@ public sealed class UserDiscoveryModule : ModuleBase
                 }
             )).ToList();
 
-            return new UserDiscoveryResult(users, users.Count, "concept", 
+            var total = users.Count;
+            var paged = users.Skip(skip).Take(limit).ToList();
+
+            return new UserDiscoveryResult(paged, total, "concept", 
                 new Dictionary<string, object> 
                 { 
                     ["conceptId"] = conceptId,
@@ -512,7 +523,8 @@ public record UserDiscoveryRequest(
     double? RadiusKm = null,
     string? ConceptId = null,
     string? OntologyLevel = null,
-    int? Limit = 50
+    int? Limit = 50,
+    int? Skip = 0
 );
 
 [MetaNode(Id = "codex.user-discovery.profile", Name = "User Profile", Description = "User profile information")]

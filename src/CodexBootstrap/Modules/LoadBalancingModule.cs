@@ -57,34 +57,15 @@ public class LoadBalancingModule : ModuleBase
     /// </summary>
     private void RegisterLoadBalancingNodes(INodeRegistry registry)
     {
-        // Register Load Balancing module node
-        var loadBalancingNode = new Node(
-            Id: "codex.load-balancing",
-            TypeId: "codex.module",
-            State: ContentState.Ice,
-            Locale: "en",
-            Title: "Load Balancing and Performance Optimization Module",
-            Description: "Advanced load balancing, performance monitoring, and auto-scaling for distributed services",
-            Content: new ContentRef(
-                MediaType: "application/json",
-                InlineJson: JsonSerializer.Serialize(new
-                {
-                    version = "1.0.0",
-                    capabilities = new[] { "load-balancing", "performance-monitoring", "auto-scaling", "resource-optimization", "health-monitoring" },
-                    endpoints = new[] { "balance-load", "get-metrics", "get-recommendations", "scale-service", "optimize-performance" },
-                    integration = "performance-optimization"
-                }),
-                InlineBytes: null,
-                ExternalUri: null
-            ),
-            Meta: new Dictionary<string, object>
-            {
-                ["name"] = "Load Balancing and Performance Optimization Module",
-                ["version"] = "1.0.0",
-                ["type"] = "load-balancing",
-                ["parentModule"] = "codex.load-balancing",
-                ["capabilities"] = new[] { "load-balancing", "performance-monitoring", "auto-scaling", "resource-optimization" }
-            }
+        // Register Load Balancing module node using CreateModuleNode
+        var loadBalancingNode = CreateModuleNode(
+            moduleId: "codex.load-balancing",
+            name: "Load Balancing and Performance Optimization Module",
+            version: "1.0.0",
+            description: "Advanced load balancing, performance monitoring, and auto-scaling for distributed services",
+            tags: new[] { "load-balancing", "performance", "monitoring", "auto-scaling" },
+            capabilities: new[] { "load-balancing", "performance-monitoring", "auto-scaling", "resource-optimization", "health-monitoring" },
+            spec: "codex.spec.load-balancing"
         );
         registry.Upsert(loadBalancingNode);
 
@@ -115,7 +96,7 @@ public class LoadBalancingModule : ModuleBase
         foreach (var route in routes)
         {
             var routeNode = new Node(
-                Id: $"load-balancing.route.{route.name}",
+                Id: $"codex.load-balancing.route.{route.name}.{Guid.NewGuid():N}",
                 TypeId: "codex.meta/route",
                 State: ContentState.Ice,
                 Locale: "en",
@@ -169,7 +150,7 @@ public class LoadBalancingModule : ModuleBase
         foreach (var dto in dtos)
         {
             var dtoNode = new Node(
-                Id: $"load-balancing.dto.{dto.name}",
+                Id: $"codex.load-balancing.dto.{dto.name}.{Guid.NewGuid():N}",
                 TypeId: "codex.meta/type",
                 State: ContentState.Ice,
                 Locale: "en",

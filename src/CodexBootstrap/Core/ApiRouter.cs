@@ -20,7 +20,7 @@ public class ApiRouter : IApiRouter
     {
         var key = $"{moduleId}:{api}";
         _handlers[key] = handler;
-        _logger.Debug($"ApiRouter: Registered handler for {key}");
+        _logger.Info($"ApiRouter: Registered handler for {key}");
     }
 
     public bool TryGetHandler(string moduleId, string api, out Func<JsonElement?, Task<object>> handler)
@@ -29,7 +29,7 @@ public class ApiRouter : IApiRouter
         var result = _handlers.TryGetValue(key, out handler!);
         if (!result)
         {
-            _logger.Debug($"ApiRouter: No handler found for {key}");
+            _logger.Warn($"ApiRouter: No handler found for {key}. Registered keys: {string.Join(", ", _handlers.Keys)}");
         }
         return result;
     }

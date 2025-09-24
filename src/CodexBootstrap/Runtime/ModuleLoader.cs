@@ -174,23 +174,33 @@ public sealed class ModuleLoader
     
     /// <summary>
     /// Create a module instance with required dependencies
-    /// All modules must have constructor(INodeRegistry, ICodexLogger, HttpClient)
+    /// All modules must have constructor(INodeRegistry, ICodexLogger, HttpClient) or (INodeRegistry, ICodexLogger, HttpClient, CancellationTokenSource)
     /// </summary>
     private IModule? CreateModule(Type moduleType)
     {
         try
         {
-            // Single constructor pattern: (INodeRegistry, ICodexLogger, HttpClient)
+            var logger = _serviceProvider.GetRequiredService<ICodexLogger>();
+            var httpClient = _serviceProvider.GetService<HttpClient>() ?? new HttpClient();
+            var shutdownCts = _serviceProvider.GetService<CancellationTokenSource>();
+            
+            // Try constructor with CancellationTokenSource first
+            var constructorWithShutdown = moduleType.GetConstructor(new[] { typeof(INodeRegistry), typeof(ICodexLogger), typeof(HttpClient), typeof(CancellationTokenSource) });
+            if (constructorWithShutdown != null)
+            {
+                _logger.Info($"Creating module {moduleType.Name} with shutdown cancellation token");
+                return (IModule)constructorWithShutdown.Invoke(new object[] { _registry, logger, httpClient, shutdownCts! });
+            }
+            
+            // Fallback to constructor without CancellationTokenSource
             var constructor = moduleType.GetConstructor(new[] { typeof(INodeRegistry), typeof(ICodexLogger), typeof(HttpClient) });
             if (constructor != null)
             {
-                var logger = _serviceProvider.GetRequiredService<ICodexLogger>();
-                var httpClient = _serviceProvider.GetService<HttpClient>() ?? new HttpClient();
                 _logger.Info($"Creating module {moduleType.Name} with NodeRegistry instance: {_registry.GetHashCode()}");
                 return (IModule)constructor.Invoke(new object[] { _registry, logger, httpClient });
             }
             
-            _logger.Error($"No suitable constructor found for module {moduleType.Name}. Expected: (INodeRegistry, ICodexLogger, HttpClient)");
+            _logger.Error($"No suitable constructor found for module {moduleType.Name}. Expected: (INodeRegistry, ICodexLogger, HttpClient) or (INodeRegistry, ICodexLogger, HttpClient, CancellationTokenSource)");
             return null;
         }
         catch (Exception ex)
@@ -241,7 +251,9 @@ public sealed class ModuleLoader
             // Register API handlers
             try
             {
+                _logger.Info($"ModuleLoader: About to call RegisterApiHandlers for module {module.GetType().Name}");
                 module.RegisterApiHandlers(_router, _registry);
+                _logger.Info($"ModuleLoader: RegisterApiHandlers call completed for module {module.GetType().Name}");
                 _logger.Info($"Successfully registered API handlers for module {module.GetType().Name}");
             }
             catch (Exception ex)

@@ -26,6 +26,7 @@ public static class CodexBootstrapHost
         ConfigureCoreServices(builder);
         ConfigureHttp(builder);
         ConfigureAdapters(builder);
+        ConfigureShutdownServices(builder);
     }
 
     public static string ConfigureApp(WebApplication app)
@@ -33,7 +34,30 @@ public static class CodexBootstrapHost
         InitializePersistence(app);
         var hostingUrl = ConfigureMiddleware(app);
         ConfigureEndpoints(app);
+        ConfigureShutdownHandling(app);
         return hostingUrl;
+    }
+
+    private static void ConfigureShutdownServices(WebApplicationBuilder builder)
+    {
+        // Create a global cancellation token source for graceful shutdown
+        var shutdownCts = new CancellationTokenSource();
+        
+        // Add the cancellation token source to the service container
+        builder.Services.AddSingleton<CancellationTokenSource>(shutdownCts);
+    }
+
+    private static void ConfigureShutdownHandling(WebApplication app)
+    {
+        // Get the shutdown cancellation token source from the service container
+        var shutdownCts = app.Services.GetRequiredService<CancellationTokenSource>();
+        
+        // Register shutdown handler
+        app.Lifetime.ApplicationStopping.Register(() =>
+        {
+            shutdownCts.Cancel();
+            Console.WriteLine("Application is shutting down - canceling outstanding AI operations...");
+        });
     }
 
     private static void ConfigureServer(WebApplicationBuilder builder, string[] args)
@@ -154,7 +178,7 @@ public static class CodexBootstrapHost
         {
             var iceStorage = sp.GetRequiredService<IIceStorageBackend>();
             var waterStorage = sp.GetRequiredService<IWaterStorageBackend>();
-            var logger = sp.GetRequiredService<ICodexLogger>();
+            var logger = new Log4NetLogger(typeof(NodeRegistry));
             return new NodeRegistry(iceStorage, waterStorage, logger);
         });
 
@@ -406,11 +430,17 @@ public static class CodexBootstrapHost
             });
         });
 
-        app.UseCors();
+        app.UseCors(builder => builder
+            .AllowAnyOrigin()
+            .AllowAnyMethod()
+            .AllowAnyHeader());
         app.UseAuthentication();
         app.UseAuthorization();
 
-        if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName == "Testing")
+        // Enable Swagger UI in all environments unless explicitly disabled
+        var swaggerEnabledEnv = Environment.GetEnvironmentVariable("SWAGGER_ENABLED");
+        var swaggerEnabled = string.IsNullOrEmpty(swaggerEnabledEnv) || !string.Equals(swaggerEnabledEnv, "false", StringComparison.OrdinalIgnoreCase);
+        if (swaggerEnabled)
         {
             app.UseSwagger();
             app.UseSwaggerUI(c =>
@@ -448,7 +478,15 @@ public static class CodexBootstrapHost
         registry.InitializeAsync().GetAwaiter().GetResult();
         InitializeMetaNodeSystem(registry);
         // Ensure U-CORE is seeded synchronously without fire-and-forget to avoid warnings
-        UCoreInitializer.SeedIfMissing(registry, logger);
+        try
+        {
+            UCoreInitializer.SeedIfMissing(registry, logger).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            logger.Error($"Failed to seed U-CORE: {ex.Message}", ex);
+            throw;
+        }
 
         moduleLoader.LoadBuiltInModules();
         var moduleDirectory = configuration.GetValue<string>("ModuleDirectory") ??
@@ -460,7 +498,9 @@ public static class CodexBootstrapHost
         LogModuleSummary(logger, moduleLoader.GetLoadedModules());
 
         moduleLoader.RegisterHttpEndpoints(app, registry, coreApi);
-        app.MapMethods("/{*path}", new[] { "OPTIONS" }, () => Results.Ok());
+
+        // Ensure every encountered typeId has a corresponding meta-node (types-as-nodes invariant)
+        MetaNodeSystem.EnsureTypeMetaNodes(registry, logger);
 
         app.MapGet("/nodes", () => coreApi.GetNodes());
         app.MapGet("/nodes/{id}", (string id) =>

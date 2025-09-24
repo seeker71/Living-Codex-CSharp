@@ -56,23 +56,6 @@
     "Metadata": {}
   },
   {
-    "Id": "arstechnica",
-    "Name": "Ars Technica",
-    "Type": "rss",
-    "Url": "https://feeds.arstechnica.com/arstechnica/index/",
-    "Categories": [
-      "technology"
-    ],
-    "OntologyLevels": [
-      "L0-L2"
-    ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 25,
-    "Priority": 1,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
     "Id": "techcrunch",
     "Name": "TechCrunch",
     "Type": "rss",
@@ -103,19 +86,6 @@
     "OntologyLevels": [
       "L0-L2"
     ],
-    "IsActive": true,
-    "UpdateIntervalMinutes": 30,
-    "Priority": 1,
-    "LastIngested": null,
-    "Metadata": {}
-  },
-  {
-    "Id": "hackernews",
-    "Name": "Hacker News",
-    "Type": "api",
-    "Url": "https://hacker-news.firebaseio.com/v0/topstories.json",
-    "Categories": [],
-    "OntologyLevels": [],
     "IsActive": true,
     "UpdateIntervalMinutes": 30,
     "Priority": 1,
@@ -202,7 +172,7 @@
     "Id": "scientificamerican",
     "Name": "Scientific American",
     "Type": "rss",
-    "Url": "http://rss.sciam.com/ScientificAmerican-Global",
+    "Url": "https://rss.sciam.com/ScientificAmerican-Global",
     "Categories": [
       "science",
       "research",

@@ -98,26 +98,72 @@ public sealed class IdentityManagementModule : ModuleBase
     {
         try
         {
-            if (!_identityProfiles.ContainsKey(userId))
+            // Get the user node from the registry (created by IdentityModule)
+            var userNode = _registry.GetNode(userId);
+            if (userNode == null)
             {
                 return new ErrorResponse("Identity not found");
             }
 
-            var identity = _identityProfiles[userId];
-            var updatedIdentity = identity with
+            // Update the user node with new information
+            var updatedMeta = new Dictionary<string, object>(userNode.Meta);
+            
+            if (request.DisplayName != null)
             {
-                DisplayName = request.DisplayName ?? identity.DisplayName,
-                Email = request.Email ?? identity.Email,
-                UpdatedAt = DateTimeOffset.UtcNow,
-                Status = request.Status ?? identity.Status,
-                Metadata = request.Metadata ?? identity.Metadata
+                updatedMeta["displayName"] = request.DisplayName;
+            }
+            
+            if (request.Email != null)
+            {
+                updatedMeta["email"] = request.Email;
+            }
+            
+            if (request.Status != null)
+            {
+                updatedMeta["status"] = request.Status;
+            }
+            
+            if (request.Metadata != null)
+            {
+                // Merge metadata
+                foreach (var kvp in request.Metadata)
+                {
+                    updatedMeta[kvp.Key] = kvp.Value;
+                }
+            }
+
+            // Update last modified
+            updatedMeta["lastModified"] = DateTimeOffset.UtcNow;
+
+            // Create updated node
+            var updatedNode = userNode with
+            {
+                Meta = updatedMeta
             };
 
-            _identityProfiles[userId] = updatedIdentity;
+            // Save to registry
+            _registry.Upsert(updatedNode);
+
+            // Also update in-memory cache if it exists
+            if (_identityProfiles.ContainsKey(userId))
+            {
+                var identity = _identityProfiles[userId];
+                var updatedIdentity = identity with
+                {
+                    DisplayName = request.DisplayName ?? identity.DisplayName,
+                    Email = request.Email ?? identity.Email,
+                    UpdatedAt = DateTimeOffset.UtcNow,
+                    Status = request.Status ?? identity.Status,
+                    Metadata = request.Metadata != null ? 
+                        new Dictionary<string, object>(identity.Metadata.Concat(request.Metadata)) : 
+                        identity.Metadata
+                };
+                _identityProfiles[userId] = updatedIdentity;
+            }
 
             _logger.Info($"Updated identity profile for user {userId}");
 
-            return new { success = true, identity = updatedIdentity };
+            return new { success = true, message = "Identity updated successfully" };
         }
         catch (Exception ex)
         {

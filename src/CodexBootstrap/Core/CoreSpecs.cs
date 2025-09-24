@@ -39,6 +39,7 @@ public static class CoreSpecs
                 new FieldSpec("fromId", "string", true, "Source node ID", TypeKind.Primitive),
                 new FieldSpec("toId", "string", true, "Target node ID", TypeKind.Primitive),
                 new FieldSpec("role", "string", true, "Relationship role", TypeKind.Primitive),
+                new FieldSpec("roleId", "string", false, "Relationship type node id (codex.relationship.core)", TypeKind.Primitive),
                 new FieldSpec("weight", "number", false, "Relationship weight", TypeKind.Primitive),
                 new FieldSpec("meta", "object", false, "Edge metadata", TypeKind.Object)
             }, TypeKind.Object)

@@ -49,16 +49,7 @@ namespace CodexBootstrap.Modules
             );
         }
 
-        public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
-        {
-            _apiRouter = router;
-            _logger.Info("VisualValidationModule API router registered for internal calls");
-        }
-
-        public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
-        {
-            // This method is now handled by attribute-based discovery
-        }
+        // No overrides for RegisterApiHandlers/RegisterHttpEndpoints to ensure base wiring runs.
 
         /// <summary>
         /// Render UI component to image and store as node
@@ -85,7 +76,7 @@ namespace CodexBootstrap.Modules
                 
                 // Store rendered image as node
                 var imageNode = new Node(
-                    Id: $"rendered-image.{request.ComponentId}",
+                    Id: $"codex.ui.rendered-image.{request.ComponentId}.{Guid.NewGuid():N}",
                     TypeId: "codex.ui.rendered-image",
                     State: ContentState.Water,
                     Locale: "en",
@@ -267,7 +258,7 @@ Return your analysis as JSON with scores and detailed feedback.
 
                 // Store analysis as node
                 var analysisNode = new Node(
-                    Id: $"visual-analysis.{request.ImageNodeId}",
+                    Id: $"codex.ui.visual-analysis.{request.ImageNodeId}.{Guid.NewGuid():N}",
                     TypeId: "codex.ui.visual-analysis",
                     State: ContentState.Water,
                     Locale: "en",
@@ -354,7 +345,7 @@ Return your analysis as JSON with scores and detailed feedback.
 
                 // Store validation result
                 var validationNode = new Node(
-                    Id: $"validation.{request.ComponentId}",
+                    Id: $"codex.ui.validation-result.{request.ComponentId}.{Guid.NewGuid():N}",
                     TypeId: "codex.ui.validation-result",
                     State: ContentState.Water,
                     Locale: "en",
@@ -925,7 +916,7 @@ Rate each aspect from 0.0 to 1.0 and provide specific feedback."
                             }
                         }
                     },
-                    max_tokens = 1000,
+                    max_completion_tokens = 1000,
                     temperature = 0.3
                 };
 

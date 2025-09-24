@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { api } from '@/lib/api'
 
 interface UserProfile {
   userId: string
@@ -54,34 +55,40 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (user?.id) {
-      loadUserProfile()
-      loadBeliefSystem()
+      const loadAllData = async () => {
+        try {
+          await Promise.allSettled([
+            loadUserProfile(),
+            loadBeliefSystem()
+          ])
+        } finally {
+          setLoading(false)
+        }
+      }
+      loadAllData()
     }
   }, [user?.id])
 
   const loadUserProfile = async () => {
     try {
-      // Try to get user from the discovery endpoint first
-      const response = await fetch(`http://localhost:5002/users/discover`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ limit: 1 })
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        if (data.users && data.users.length > 0) {
-          const userProfile = data.users.find((u: any) => u.userId === user?.id) || data.users[0]
-          setProfile(userProfile)
-          
-          // Populate form fields
-          setDisplayName(userProfile.displayName || user?.username || '')
-          setEmail(userProfile.email || user?.email || '')
-          setLocation(userProfile.location || '')
-          setInterests(userProfile.interests || [])
+      if (!user?.id) return
+      // Use unified auth profile endpoint to ensure email and displayName are populated
+      const res = await api.get(`/auth/profile/${user.id}`)
+      if (res.success && (res.data as any)?.profile) {
+        const p = (res.data as any).profile
+        const normalized: UserProfile = {
+          userId: p.id || user.id,
+          displayName: p.displayName || user.username || '',
+          email: p.email || user.email || '',
+          location: '',
+          interests: [],
+          contributions: [],
         }
+        setProfile(normalized)
+        setDisplayName(normalized.displayName)
+        setEmail(normalized.email)
       } else {
-        // Fallback: create profile from current user data
+        // Fallback to stored user
         const fallbackProfile: UserProfile = {
           userId: user?.id || '',
           displayName: user?.username || '',
@@ -101,7 +108,7 @@ export default function ProfilePage() {
 
   const loadBeliefSystem = async () => {
     try {
-      const response = await fetch(`http://localhost:5002/concept/user-belief-system/${user?.id}`)
+      const response = await fetch(`http://localhost:5002/userconcept/belief-system/${user?.id}`)
       if (response.ok) {
         const data = await response.json()
         if (data.success && data.beliefSystemId) {
@@ -123,8 +130,6 @@ export default function ProfilePage() {
       }
     } catch (error) {
       console.error('Error loading belief system:', error)
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -143,18 +148,13 @@ export default function ProfilePage() {
         }
       }
 
-      const response = await fetch(`http://localhost:5002/identity/${user?.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(profileData)
-      })
+      const response = await api.put(`/identity/${user?.id}`, profileData)
 
-      if (response.ok) {
+      if (response.success) {
         setMessage({ type: 'success', text: 'Profile updated successfully!' })
         await loadUserProfile() // Reload to get updated data
       } else {
-        const error = await response.text()
-        setMessage({ type: 'error', text: `Failed to update profile: ${error}` })
+        setMessage({ type: 'error', text: `Failed to update profile: ${response.error}` })
       }
     } catch (error) {
       setMessage({ type: 'error', text: `Error updating profile: ${error}` })
@@ -182,18 +182,13 @@ export default function ProfilePage() {
         resonanceThreshold
       }
 
-      const response = await fetch(`http://localhost:5002/userconcept/belief-system/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(beliefData)
-      })
+      const response = await api.post(`/userconcept/belief-system/register`, beliefData)
 
-      if (response.ok) {
+      if (response.success) {
         setMessage({ type: 'success', text: 'Belief system updated successfully!' })
         await loadBeliefSystem() // Reload to get updated data
       } else {
-        const error = await response.text()
-        setMessage({ type: 'error', text: `Failed to update belief system: ${error}` })
+        setMessage({ type: 'error', text: `Failed to update belief system: ${response.error}` })
       }
     } catch (error) {
       setMessage({ type: 'error', text: `Error updating belief system: ${error}` })
@@ -249,8 +244,8 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-page text-foreground">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-3xl font-bold text-high-contrast mb-8">My Profile</h1>
 
@@ -573,7 +568,7 @@ export default function ProfilePage() {
             </div>
           )}
         </div>
-      </div>
+      </main>
     </div>
   )
 }

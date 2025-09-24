@@ -54,6 +54,11 @@ public interface INodeRegistry
     Task<IEnumerable<Node>> GetNodesByTypeAsync(string typeId);
 
     /// <summary>
+    /// Get nodes by type prefix (synchronous - returns only in-memory nodes)
+    /// </summary>
+    IEnumerable<Node> GetNodesByTypePrefix(string typeIdPrefix);
+
+    /// <summary>
     /// Get nodes by state
     /// </summary>
     IEnumerable<Node> GetNodesByState(ContentState state);

@@ -61,16 +61,7 @@ public sealed class BreathModule : ModuleBase
     }
 
 
-    public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
-    {
-        _apiRouter = router;
-        // This method is now handled by attribute-based discovery
-    }
-
-    public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
-    {
-        // This method is now handled by attribute-based discovery
-    }
+    // No overrides for RegisterApiHandlers/RegisterHttpEndpoints to ensure base wiring runs.
 
     [ApiRoute("POST", "/breath/expand/{id}", "breath-expand", "Expand a module specification", "codex.breath")]
     public async Task<object> ExpandModule([ApiParameter("id", "Module ID to expand", Required = true, Location = "path")] string id)

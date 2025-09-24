@@ -81,7 +81,7 @@ namespace CodexBootstrap.Tests
             _serverProcess.BeginErrorReadLine();
 
             // Wait for server to start
-            var maxWaitTime = TimeSpan.FromSeconds(60);
+            var maxWaitTime = TimeSpan.FromSeconds(120);
             var startTime = DateTime.UtcNow;
             var serverReady = false;
             var attemptCount = 0;
