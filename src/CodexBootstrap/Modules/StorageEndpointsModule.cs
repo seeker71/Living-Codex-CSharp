@@ -111,40 +111,8 @@ public sealed class StorageEndpointsModule : ModuleBase
             // Enforce at least one edge for every node upon creation
             try
             {
-                // 1) Identity self-edge (node references itself)
-                var identityEdge = NodeHelpers.CreateEdge(
-                    node.Id,
-                    node.Id,
-                    role: "identity",
-                    weight: 1.0,
-                    meta: new Dictionary<string, object> { ["relationship"] = "identity-self" }
-                );
-                _registry.Upsert(identityEdge);
-                if (_storageBackend != null)
-                {
-                    await _storageBackend.StoreEdgeAsync(identityEdge);
-                }
-
-                // 2) Instance-of edge to meta-type node (best-effort generic mapping)
-                string? metaTypeId = null;
-                if (!string.IsNullOrWhiteSpace(node.TypeId))
-                {
-                    if (node.TypeId.StartsWith("codex.meta/", StringComparison.OrdinalIgnoreCase))
-                    {
-                        // Meta-nodes are instances of the meta-node meta-type
-                        metaTypeId = "codex.meta/type/meta-node";
-                    }
-                    else
-                    {
-                        // Convert logical type (e.g., codex.news.item) to meta type id (codex.meta/type/news-item)
-                        var logical = node.TypeId.Trim();
-                        var typeName = logical.StartsWith("codex.", StringComparison.OrdinalIgnoreCase)
-                            ? logical.Substring("codex.".Length)
-                            : logical;
-                        typeName = typeName.Replace('.', '-').Replace('/', '-');
-                        metaTypeId = $"codex.meta/type/{typeName}";
-                    }
-                }
+                // 1) Instance-of edge to the node's declared typeId (types-as-nodes invariant)
+                string? metaTypeId = !string.IsNullOrWhiteSpace(node.TypeId) ? node.TypeId : null;
 
                 if (!string.IsNullOrWhiteSpace(metaTypeId))
                 {
@@ -163,7 +131,7 @@ public sealed class StorageEndpointsModule : ModuleBase
                     }
                 }
 
-                // 3) Derived content relationship if parentNodeId is provided
+                // 2) Derived content relationship if parentNodeId is provided
                 if (node.Meta != null && node.Meta.TryGetValue("parentNodeId", out var parentObj))
                 {
                     var parentId = parentObj?.ToString();
@@ -185,7 +153,7 @@ public sealed class StorageEndpointsModule : ModuleBase
                     }
                 }
 
-                // 4) Content type relationship if MediaType is available (best-effort)
+                // 3) Content type relationship if MediaType is available (best-effort)
                 var mediaType = node.Content?.MediaType;
                 if (!string.IsNullOrWhiteSpace(mediaType))
                 {
@@ -778,6 +746,51 @@ public sealed class StorageEndpointsModule : ModuleBase
         {
             _logger.Error($"Error listing edges: {ex.Message}", ex);
             return new ErrorResponse($"Failed to list edges: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("GET", "/storage-endpoints/edges/metadata", "GetEdgeMetadata", "Get unique edge roles and relationship types", "codex.storage-endpoints")]
+    public async Task<object> GetEdgeMetadataAsync()
+    {
+        try
+        {
+            var allEdges = _registry.AllEdges().ToList();
+            
+            // Get unique roles
+            var uniqueRoles = allEdges
+                .Select(e => e.Role)
+                .Where(role => !string.IsNullOrWhiteSpace(role))
+                .Distinct()
+                .OrderBy(role => role)
+                .ToList();
+
+            // Get unique relationship types from meta.relationship
+            var uniqueRelationshipTypes = allEdges
+                .Where(e => e.Meta != null && e.Meta.ContainsKey("relationship"))
+                .Select(e => e.Meta["relationship"])
+                .Where(rel => rel != null)
+                .Select(rel => rel.ToString())
+                .Where(rel => !string.IsNullOrWhiteSpace(rel))
+                .Distinct()
+                .OrderBy(rel => rel)
+                .ToList();
+
+            _logger.Debug($"Retrieved edge metadata: {uniqueRoles.Count} unique roles, {uniqueRelationshipTypes.Count} unique relationship types");
+            
+            return new { 
+                success = true, 
+                data = new {
+                    roles = uniqueRoles,
+                    relationshipTypes = uniqueRelationshipTypes,
+                    totalRoles = uniqueRoles.Count,
+                    totalRelationshipTypes = uniqueRelationshipTypes.Count
+                }
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error getting edge metadata: {ex.Message}", ex);
+            return new ErrorResponse($"Failed to get edge metadata: {ex.Message}");
         }
     }
 

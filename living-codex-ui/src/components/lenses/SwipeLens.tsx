@@ -9,13 +9,14 @@ interface SwipeLensProps {
   controls?: Record<string, any>;
   userId?: string;
   className?: string;
+  readOnly?: boolean;
 }
 
 const PAGE_SIZE = 12;
 
-export function SwipeLens({ controls = {}, userId, className = '' }: SwipeLensProps) {
-  const { user } = useAuth();
-  const effectiveUserId = userId || user?.id || 'demo-user';
+export function SwipeLens({ controls = {}, userId, className = '', readOnly = false }: SwipeLensProps) {
+  const { user, isAuthenticated } = useAuth();
+  const effectiveUserId = userId || user?.id;
   const trackInteraction = useTrackInteraction();
   const attune = useAttune();
   const amplify = useAmplify();
@@ -76,7 +77,7 @@ export function SwipeLens({ controls = {}, userId, className = '' }: SwipeLensPr
   };
 
   const handleAttune = async () => {
-    if (!currentConcept?.id) return;
+    if (!currentConcept?.id || !effectiveUserId) return;
     try {
       await attune.mutateAsync({ userId: effectiveUserId, conceptId: currentConcept.id });
       trackInteraction(currentConcept.id, 'swipe-attune', {
@@ -92,7 +93,7 @@ export function SwipeLens({ controls = {}, userId, className = '' }: SwipeLensPr
   };
 
   const handleAmplify = async () => {
-    if (!currentConcept?.id) return;
+    if (!currentConcept?.id || !effectiveUserId) return;
     try {
       await amplify.mutateAsync({
         userId: effectiveUserId,
@@ -128,6 +129,42 @@ export function SwipeLens({ controls = {}, userId, className = '' }: SwipeLensPr
       </p>
     </div>
   );
+
+  // Show read-only mode if not authenticated
+  if (readOnly || !isAuthenticated || !user) {
+    return (
+      <div className={`space-y-6 ${className}`}>
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center space-x-2">
+              <span>👆 Swipe Concepts</span>
+            </CardTitle>
+            <CardDescription>
+              Rapidly explore concepts tuned to your resonance. Attune to keep, amplify to boost, or skip to see the next match.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center py-8">
+            <div className="text-4xl mb-4">👁️</div>
+            <div className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+              {readOnly ? 'Read-only mode' : 'Sign in to swipe concepts'}
+            </div>
+            <div className="text-gray-600 dark:text-gray-300 mb-4">
+              {readOnly 
+                ? 'Browse concepts in read-only mode. Sign in to interact and personalize your experience.'
+                : 'Discover and interact with concepts that resonate with your interests'
+              }
+            </div>
+            <a
+              href="/login"
+              className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+            >
+              Sign In
+            </a>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className={`space-y-6 ${className}`}>

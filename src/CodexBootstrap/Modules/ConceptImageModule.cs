@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using CodexBootstrap.Core;
 using CodexBootstrap.Runtime;
@@ -469,46 +470,148 @@ public class ConceptImageModule : ModuleBase
             return customPrompt;
         }
 
-        var prompt = $"{concept.Description}";
+        // Start with an inspiring base prompt that captures the essence
+        var prompt = new StringBuilder();
         
-        if (concept.Style != "realistic")
-        {
-            prompt += $", {concept.Style} style";
-        }
+        // Core visual description with uplifting language
+        prompt.Append($"A breathtaking, inspiring visualization of {concept.Title}: ");
+        prompt.Append($"{concept.Description} ");
         
-        if (concept.Mood != "neutral")
-        {
-            prompt += $", {concept.Mood} mood";
-        }
+        // Add dynamic, joyful visual elements
+        prompt.Append("This magnificent scene radiates with vibrant energy, creative brilliance, and transformative power. ");
         
+        // Enhanced style and mood with uplifting descriptors
+        var styleDescriptor = GetInspiringStyleDescriptor(concept.Style);
+        var moodDescriptor = GetJoyfulMoodDescriptor(concept.Mood);
+        
+        prompt.Append($"{styleDescriptor} {moodDescriptor} ");
+        
+        // Rich color palette with inspiring descriptions
         if (concept.Colors.Any())
         {
-            prompt += $", colors: {string.Join(", ", concept.Colors)}";
+            var colorDescription = GetInspiringColorDescription(concept.Colors);
+            prompt.Append($"{colorDescription} ");
         }
         
+        // Dynamic visual elements with creative flair
         if (concept.Elements.Any())
         {
-            prompt += $", elements: {string.Join(", ", concept.Elements)}";
+            var elementDescription = GetCreativeElementDescription(concept.Elements);
+            prompt.Append($"{elementDescription} ");
         }
 
-        // Add quality and style modifiers based on concept type
-        switch (concept.ConceptType.ToLowerInvariant())
+        // Add concept-type specific uplifting enhancements
+        var typeEnhancement = GetInspiringTypeEnhancement(concept.ConceptType);
+        prompt.Append($"{typeEnhancement} ");
+
+        // Universal uplifting qualities for all images
+        prompt.Append("The entire composition pulses with life, movement, and infinite possibilities. ");
+        prompt.Append("Every detail speaks of growth, evolution, and the boundless potential of consciousness. ");
+        prompt.Append("The scene is alive with sparkles of light, flowing energy, and harmonious vibrations. ");
+        prompt.Append("High contrast, vibrant saturation, photorealistic yet transcendent, with a sense of wonder and infinite depth.");
+
+        return prompt.ToString();
+    }
+
+    private string GetInspiringStyleDescriptor(string style)
+    {
+        return style.ToLowerInvariant() switch
         {
-            case "spiritual":
-                prompt += ", ethereal, luminous, transcendent, divine light";
-                break;
-            case "scientific":
-                prompt += ", precise, detailed, technical, data visualization";
-                break;
-            case "abstract":
-                prompt += ", abstract, conceptual, symbolic, artistic";
-                break;
-            case "emotional":
-                prompt += ", expressive, emotional, heartfelt, moving";
-                break;
-        }
+            "mystical" => "In a mystical realm where reality bends with consciousness, rendered in",
+            "cosmic" => "Across the vast cosmic canvas of infinite space, painted in",
+            "ethereal" => "In an ethereal dimension where light and spirit merge, crafted in",
+            "futuristic" => "In a brilliant future where humanity has transcended limitations, designed in",
+            "artistic" => "As a masterpiece of creative expression that touches the soul, rendered in",
+            "abstract" => "Through the lens of pure creative consciousness, expressed in",
+            "realistic" => "With stunning photorealistic detail that captures the essence of",
+            _ => $"In a {style} aesthetic that elevates the spirit, rendered in"
+        };
+    }
 
-        return prompt;
+    private string GetJoyfulMoodDescriptor(string mood)
+    {
+        return mood.ToLowerInvariant() switch
+        {
+            "transcendent" => "a transcendent, awe-inspiring atmosphere that lifts consciousness to new heights",
+            "harmonious" => "a harmonious, peaceful energy that brings joy and balance to all who witness it",
+            "uplifting" => "an uplifting, inspiring mood that fills the heart with hope and possibility",
+            "mystical" => "a mystical, magical ambiance that opens doors to infinite wonder",
+            "energetic" => "a dynamic, energetic vibration that sparks creativity and action",
+            "serene" => "a serene, calming presence that brings inner peace and clarity",
+            "joyful" => "a joyful, celebratory spirit that radiates happiness and light",
+            "inspiring" => "an inspiring, motivational energy that awakens the potential within",
+            "neutral" => "a balanced, centered energy that grounds and elevates simultaneously",
+            _ => $"a {mood} atmosphere that enriches the soul and expands awareness"
+        };
+    }
+
+    private string GetInspiringColorDescription(List<string> colors)
+    {
+        if (colors.Count == 0) return "";
+        
+        var colorPhrases = colors.Select(color => 
+        {
+            var lowerColor = color.ToLowerInvariant();
+            return lowerColor switch
+            {
+                "golden" => "radiant golden light that symbolizes wisdom and enlightenment",
+                "gold" => "radiant golden light that symbolizes wisdom and enlightenment",
+                "purple" => "mystical purple energies that connect to higher consciousness",
+                "violet" => "mystical purple energies that connect to higher consciousness",
+                "blue" => "deep blue frequencies that calm and expand the mind",
+                "green" => "vibrant green healing energies that restore and balance",
+                "rainbow" => "spectacular rainbow spectrums that celebrate the full spectrum of life",
+                "silver" => "brilliant silver reflections that mirror the infinite",
+                "white" => "pure white light that represents divine consciousness",
+                "light" => "pure white light that represents divine consciousness",
+                "black" => "profound dark spaces that hold infinite potential",
+                "dark" => "profound dark spaces that hold infinite potential",
+                _ => $"beautiful {color} hues that enhance the visual harmony"
+            };
+        }).ToList();
+        
+        return $"Colors flow in magnificent harmony: {string.Join(", ", colorPhrases)}. ";
+    }
+
+    private string GetCreativeElementDescription(List<string> elements)
+    {
+        if (elements.Count == 0) return "";
+        
+        var elementPhrases = elements.Select(element =>
+        {
+            var lowerElement = element.ToLowerInvariant();
+            return lowerElement switch
+            {
+                var e when e.Contains("crystal") => "crystalline structures that amplify and focus energy",
+                var e when e.Contains("sound") => "visible sound waves creating geometric patterns of harmony",
+                var e when e.Contains("light") => "streams of pure light dancing through the composition",
+                var e when e.Contains("energy") => "flowing energy fields that pulse with life force",
+                var e when e.Contains("sacred") => "sacred symbols and patterns that connect to universal wisdom",
+                var e when e.Contains("geometry") => "sacred geometric forms that reveal the mathematical beauty of existence",
+                var e when e.Contains("spiral") => "spiraling forms that represent evolution and growth",
+                var e when e.Contains("star") || e.Contains("cosmic") => "stellar elements that connect to the cosmos",
+                _ => $"creative {element} elements that add depth and meaning"
+            };
+        }).ToList();
+        
+        return $"Visual elements include: {string.Join(", ", elementPhrases)}. ";
+    }
+
+    private string GetInspiringTypeEnhancement(string conceptType)
+    {
+        return conceptType.ToLowerInvariant() switch
+        {
+            "spiritual" => "The scene radiates with divine light, ethereal energies, and transcendent beauty that speaks to the soul's journey toward enlightenment.",
+            "scientific" => "Precision meets wonder as data becomes art, revealing the hidden beauty in the patterns that govern our universe.",
+            "healing" => "Healing energies flow visibly through the space, bringing restoration, balance, and the promise of wholeness.",
+            "consciousness" => "The very fabric of awareness becomes visible, showing how consciousness shapes reality through intention and love.",
+            "fundamental" => "Core principles of existence are made manifest, revealing the elegant simplicity underlying all complexity.",
+            "abstract" => "Pure creative expression flows freely, transcending form to touch the essence of what it means to create and be.",
+            "emotional" => "Emotions become living, breathing entities that dance through the space, teaching us about the heart's infinite capacity.",
+            "environmental" => "Nature's wisdom shines through every element, showing how all life is interconnected in a web of mutual support.",
+            "technological" => "Technology and spirit merge seamlessly, showing how innovation can serve the highest good of all beings.",
+            _ => "The concept comes alive with vibrant energy, showing how ideas can transform the world through conscious intention."
+        };
     }
 
     private async Task<List<string>> GenerateImagesAsync(ImageConfig config, string prompt, int numberOfImages)
@@ -533,16 +636,13 @@ public class ConceptImageModule : ModuleBase
                     images = await GenerateCustomImages(config, prompt, numberOfImages);
                     break;
                 default:
-                    // Fallback to placeholder for unknown providers
-                    images = await GeneratePlaceholderImages(prompt, numberOfImages);
-                    break;
+                    throw new NotSupportedException($"Image generation provider '{config.Provider}' is not supported. Only real AI providers are allowed.");
             }
         }
         catch (Exception ex)
         {
-            _logger.Warn($"Image generation failed for provider {config.Provider}: {ex.Message}");
-            // Fallback to placeholder images
-            images = await GeneratePlaceholderImages(prompt, numberOfImages);
+            _logger.Error($"Image generation failed for provider {config.Provider}: {ex.Message}");
+            throw new InvalidOperationException($"Real AI image generation failed: {ex.Message}", ex);
         }
 
         return images;
@@ -553,14 +653,65 @@ public class ConceptImageModule : ModuleBase
         // Check if API key is available
         if (string.IsNullOrEmpty(config.ApiKey) || config.ApiKey == "")
         {
-            _logger.Warn("OpenAI API key not configured, using placeholder");
-            return await GeneratePlaceholderImages(prompt, numberOfImages);
+            throw new InvalidOperationException("OpenAI API key not configured. Real AI image generation requires a valid API key.");
         }
 
-        // TODO: Implement real OpenAI DALL-E API call
-        // For now, return placeholder but with a note that it's configured
-        _logger.Info($"OpenAI DALL-E configured but not implemented yet for prompt: {prompt}");
-        return await GeneratePlaceholderImages(prompt, numberOfImages);
+        try
+        {
+            _logger.Info($"Generating {numberOfImages} images using OpenAI DALL-E 3 for prompt: {prompt.Substring(0, Math.Min(100, prompt.Length))}...");
+            
+            using var httpClient = new HttpClient();
+            httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {config.ApiKey}");
+            
+            var requestBody = new
+            {
+                model = config.Model,
+                prompt = prompt,
+                n = Math.Min(numberOfImages, config.MaxImages),
+                size = config.ImageSize,
+                quality = config.Quality,
+                style = config.Style
+            };
+            
+            var json = JsonSerializer.Serialize(requestBody);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            
+            var response = await httpClient.PostAsync($"{config.BaseUrl}/images/generations", content);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                throw new HttpRequestException($"OpenAI API request failed: {response.StatusCode} - {errorContent}");
+            }
+            
+            var responseContent = await response.Content.ReadAsStringAsync();
+            var responseData = JsonSerializer.Deserialize<JsonElement>(responseContent);
+            
+            var images = new List<string>();
+            if (responseData.TryGetProperty("data", out var dataArray))
+            {
+                foreach (var item in dataArray.EnumerateArray())
+                {
+                    if (item.TryGetProperty("url", out var urlElement))
+                    {
+                        images.Add(urlElement.GetString() ?? "");
+                    }
+                }
+            }
+            
+            if (images.Count == 0)
+            {
+                throw new InvalidOperationException("No images returned from OpenAI API");
+            }
+            
+            _logger.Info($"Successfully generated {images.Count} images using OpenAI DALL-E 3");
+            return images;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"OpenAI DALL-E image generation failed: {ex.Message}");
+            throw new InvalidOperationException($"Real AI image generation failed: {ex.Message}", ex);
+        }
     }
 
     private async Task<List<string>> GenerateStabilityAIImages(ImageConfig config, string prompt, int numberOfImages)
@@ -568,13 +719,11 @@ public class ConceptImageModule : ModuleBase
         // Check if API key is available
         if (string.IsNullOrEmpty(config.ApiKey) || config.ApiKey == "")
         {
-            _logger.Warn("Stability AI API key not configured, using placeholder");
-            return await GeneratePlaceholderImages(prompt, numberOfImages);
+            throw new InvalidOperationException("Stability AI API key not configured. Real AI image generation requires a valid API key.");
         }
 
         // TODO: Implement real Stability AI API call
-        _logger.Info($"Stability AI configured but not implemented yet for prompt: {prompt}");
-        return await GeneratePlaceholderImages(prompt, numberOfImages);
+        throw new NotSupportedException("Stability AI image generation is not yet implemented. Only OpenAI DALL-E is currently supported.");
     }
 
     private async Task<List<string>> GenerateLocalImages(ImageConfig config, string prompt, int numberOfImages)
@@ -631,10 +780,11 @@ public class ConceptImageModule : ModuleBase
         }
         catch (Exception ex)
         {
-            _logger.Warn($"Local image generation failed: {ex.Message}");
+            _logger.Error($"Local image generation failed: {ex.Message}");
+            throw new InvalidOperationException($"Local Stable Diffusion service failed: {ex.Message}", ex);
         }
 
-        return await GeneratePlaceholderImages(prompt, numberOfImages);
+        throw new InvalidOperationException("Local Stable Diffusion service is not available or failed to generate images.");
     }
 
     private async Task<List<string>> GenerateCustomImages(ImageConfig config, string prompt, int numberOfImages)
@@ -686,41 +836,13 @@ public class ConceptImageModule : ModuleBase
         }
         catch (Exception ex)
         {
-            _logger.Warn($"Custom image generation failed: {ex.Message}");
+            _logger.Error($"Custom image generation failed: {ex.Message}");
+            throw new InvalidOperationException($"Custom image generation service failed: {ex.Message}", ex);
         }
 
-        return await GeneratePlaceholderImages(prompt, numberOfImages);
+        throw new InvalidOperationException("Custom image generation service is not available or failed to generate images.");
     }
 
-    private async Task<List<string>> GeneratePlaceholderImages(string prompt, int numberOfImages)
-    {
-        // Generate sophisticated placeholder images with prompt-based styling
-        await Task.Delay(1000); // Simulate processing time
-        
-        var images = new List<string>();
-        for (int i = 0; i < numberOfImages; i++)
-        {
-            // Create a more sophisticated placeholder that reflects the prompt
-            var promptHash = prompt.GetHashCode();
-            var colors = new[] { "6366f1", "8b5cf6", "ec4899", "f59e0b", "10b981", "ef4444", "f97316", "84cc16" };
-            var colorIndex = Math.Abs(promptHash + i) % colors.Length;
-            var bgColor = colors[colorIndex];
-            
-            // Extract key words from prompt for display
-            var words = prompt.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                             .Where(w => w.Length > 3)
-                             .Take(2)
-                             .Select(w => w.Substring(0, Math.Min(2, w.Length)).ToUpper())
-                             .ToArray();
-            var displayText = words.Length > 0 ? string.Join("", words) : "AI";
-            
-            var placeholderUrl = $"https://via.placeholder.com/400x400/{bgColor}/ffffff?text={Uri.EscapeDataString(displayText)}";
-            images.Add(placeholderUrl);
-        }
-
-        _logger.Info($"Generated {images.Count} placeholder images for prompt: {prompt.Substring(0, Math.Min(50, prompt.Length))}...");
-        return images;
-    }
 
     private async Task<ImageConfigValidation> ValidateImageConfig(ImageConfig config)
     {

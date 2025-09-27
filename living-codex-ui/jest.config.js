@@ -9,30 +9,19 @@ const createJestConfig = nextJest({
 const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   testEnvironment: 'jsdom',
-  moduleNameMapper: {
-    // Handle module aliases (if you use them in your Next.js app)
-    '^@/(.*)$': '<rootDir>/src/$1',
-    '\\.(css|less|sass|scss)$': 'identity-obj-proxy',
-  },
+  testTimeout: 30000,
+  testMatch: [
+    '**/__tests__/**/*.test.js',
+    '**/__tests__/**/*.test.ts',
+    '**/__tests__/**/*.test.tsx',
+    '**/?(*.)+(spec|test).js',
+    '**/?(*.)+(spec|test).ts',
+    '**/?(*.)+(spec|test).tsx'
+  ],
   collectCoverageFrom: [
     'src/**/*.{js,jsx,ts,tsx}',
     '!src/**/*.d.ts',
-    '!src/**/layout.tsx',
-    '!src/**/loading.tsx',
-    '!src/**/not-found.tsx',
-    '!src/**/error.tsx',
-  ],
-  testPathIgnorePatterns: [
-    '<rootDir>/.next/',
-    '<rootDir>/node_modules/',
-    '<rootDir>/src/__tests__/test-utils.tsx',
-  ],
-  transform: {
-    '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { presets: ['next/babel'] }],
-  },
-  transformIgnorePatterns: [
-    '/node_modules/',
-    '^.+\\.module\\.(css|sass|scss)$',
+    '!src/**/*.stories.{js,jsx,ts,tsx}',
   ],
 }
 

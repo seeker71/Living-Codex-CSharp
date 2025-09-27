@@ -82,7 +82,12 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <CardTitle className="text-lg text-gray-900 dark:text-gray-100 mb-2">
-              {concept.name}
+              <button
+                onClick={() => window.open(`/node/${concept.id}`, '_blank')}
+                className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline text-left"
+              >
+                {concept.name}
+              </button>
             </CardTitle>
             <CardDescription className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
               {concept.description}
@@ -147,7 +152,7 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
             className="flex items-center space-x-1 px-3 py-1 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/40 transition-colors"
           >
             <Network className="w-4 h-4" />
-            <span>View</span>
+            <span>View Node</span>
           </button>
         </div>
         {concept.type && (

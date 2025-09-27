@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/Card';
 import { endpoints } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ResonanceData {
   success: boolean;
@@ -30,11 +31,11 @@ interface ContributorEnergy {
 }
 
 export default function ResonancePage() {
+  const { user, isAuthenticated } = useAuth();
   const [collectiveData, setCollectiveData] = useState<ResonanceData | null>(null);
   const [contributorData, setContributorData] = useState<ContributorEnergy | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [userId] = useState('demo-user'); // In real app, this would come from auth
 
   useEffect(() => {
     async function loadResonanceData() {
@@ -42,7 +43,7 @@ export default function ResonancePage() {
       setError(null);
 
       try {
-        // Load collective energy data
+        // Load collective energy data (always available)
         const collectiveResponse = await endpoints.getCollectiveEnergy();
         if (collectiveResponse.success) {
           setCollectiveData(collectiveResponse.data as ResonanceData);
@@ -50,13 +51,15 @@ export default function ResonancePage() {
           throw new Error(collectiveResponse.error || 'Failed to load collective energy');
         }
 
-        // Load contributor energy data
-        const contributorResponse = await endpoints.getContributorEnergy(userId);
-        if (contributorResponse.success) {
-          setContributorData(contributorResponse.data as ContributorEnergy);
-        } else {
-          console.warn('Failed to load contributor energy:', contributorResponse.error);
-          // Don't throw error for contributor data - it's optional
+        // Load contributor energy data only if user is authenticated
+        if (isAuthenticated && user?.id) {
+          const contributorResponse = await endpoints.getContributorEnergy(user.id);
+          if (contributorResponse.success) {
+            setContributorData(contributorResponse.data as ContributorEnergy);
+          } else {
+            console.warn('Failed to load contributor energy:', contributorResponse.error);
+            // Don't throw error for contributor data - it's optional
+          }
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
@@ -66,7 +69,7 @@ export default function ResonancePage() {
     }
 
     loadResonanceData();
-  }, [userId]);
+  }, [isAuthenticated, user?.id]);
 
   if (loading) {
     return (
@@ -175,7 +178,18 @@ export default function ResonancePage() {
               <CardTitle>✨ Your Resonance</CardTitle>
             </CardHeader>
             <CardContent>
-            {contributorData ? (
+            {!isAuthenticated || !user ? (
+              <div className="text-center text-gray-500 py-8">
+                <div className="text-4xl mb-4">🔐</div>
+                <div className="mb-4">Sign in to see your personal resonance</div>
+                <a
+                  href="/login"
+                  className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  Sign In
+                </a>
+              </div>
+            ) : contributorData ? (
               <div className="space-y-4">
                 <div className="text-center mb-6">
                   <div className="text-4xl font-bold text-indigo-600 mb-2">

@@ -229,24 +229,33 @@ public class SystemMetricsModule : ModuleBase
     {
         try
         {
+            // Get real module information from the registry
+            var moduleNodes = _registry.GetNodesByType("codex.module").ToList();
+            var totalModules = moduleNodes.Count;
+            var activeModules = moduleNodes.Count(n => n.Meta?.GetValueOrDefault("status")?.ToString() != "inactive");
+
+            var modules = moduleNodes.Select(moduleNode => new
+            {
+                name = moduleNode.Title ?? moduleNode.Id,
+                status = moduleNode.Meta?.GetValueOrDefault("status")?.ToString() ?? "active",
+                version = moduleNode.Meta?.GetValueOrDefault("version")?.ToString() ?? "unknown",
+                description = moduleNode.Description ?? "",
+                typeId = moduleNode.TypeId,
+                state = moduleNode.State.ToString(),
+                // These would be tracked in a real implementation
+                requests = 0,
+                avgResponseTime = 0.0,
+                errors = 0
+            }).ToArray();
+
             var moduleMetrics = new
             {
                 success = true,
                 message = "Module metrics retrieved successfully",
                 timestamp = DateTime.UtcNow,
-                totalModules = 20,
-                activeModules = 20,
-                modules = new[]
-                {
-                    new { name = "CoreModule", status = "active", requests = 1250, avgResponseTime = 12.5, errors = 0 },
-                    new { name = "FutureKnowledgeModule", status = "active", requests = 890, avgResponseTime = 1200.0, errors = 2 },
-                    new { name = "UserContributionsModule", status = "active", requests = 2100, avgResponseTime = 45.2, errors = 1 },
-                    new { name = "JoyModule", status = "active", requests = 650, avgResponseTime = 25.8, errors = 0 },
-                    new { name = "ServiceDiscoveryModule", status = "active", requests = 320, avgResponseTime = 8.5, errors = 0 },
-                    new { name = "EventStreamingModule", status = "active", requests = 1800, avgResponseTime = 15.3, errors = 0 },
-                    new { name = "LLMFutureKnowledgeModule", status = "active", requests = 450, avgResponseTime = 2500.0, errors = 3 },
-                    new { name = "RealtimeModule", status = "active", requests = 950, avgResponseTime = 18.7, errors = 0 }
-                }
+                totalModules = totalModules,
+                activeModules = activeModules,
+                modules = modules
             };
 
             return moduleMetrics;
@@ -272,7 +281,7 @@ public class SystemMetricsModule : ModuleBase
             
             _metrics["nodeCount"] = allNodes.Count();
             _metrics["edgeCount"] = allEdges.Count();
-            _metrics["moduleCount"] = 20; // This would be dynamic in a real implementation
+            _metrics["moduleCount"] = _registry.GetNodesByType("codex.module").Count();
 
             // Simulate other metrics
             _metrics["totalRequests"] = Random.Shared.Next(10000, 50000);

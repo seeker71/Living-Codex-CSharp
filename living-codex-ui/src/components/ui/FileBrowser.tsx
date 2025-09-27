@@ -287,6 +287,16 @@ export function FileBrowser({
               {node.fileNode?.contentRef?.hasInlineContent === false && (
                 <span className="text-xs text-blue-500">🔗</span>
               )}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.open(`/node/${encodeURIComponent(node.fileNode!.id)}`, '_blank');
+                }}
+                className="ml-2 text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                title="View node details"
+              >
+                View Node
+              </button>
             </>
           )}
         </div>

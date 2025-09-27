@@ -20,6 +20,18 @@ using System.Text.RegularExpressions;
 namespace CodexBootstrap.Modules
 {
     /// <summary>
+    /// U-Core Path represents a conceptual path from a source concept to U-Core concepts
+    /// </summary>
+    public class UCorePath
+    {
+        public string SourceConcept { get; set; } = "";
+        public string TargetConcept { get; set; } = "";
+        public List<string> ConceptIds { get; set; } = new();
+        public double PathStrength { get; set; } = 0.0;
+        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    }
+
+    /// <summary>
     /// Real-time fractal news streaming module that ingests external news sources
     /// and transforms them through fractal analysis aligned with belief systems
     /// </summary>
@@ -107,6 +119,67 @@ namespace CodexBootstrap.Modules
             {
                 _apiRouter = apiRouter;
                 _logger = logger;
+            }
+
+            public async Task<string?> GenerateSummaryAsync(
+                string content,
+                string? model = null,
+                string? provider = null)
+            {
+                try
+                {
+                    var request = new
+                    {
+                        Concept = new
+                        {
+                            Id = "",
+                            Name = "",
+                            Description = content,
+                            Domain = "News",
+                            Complexity = 0,
+                            Tags = new string[0]
+                        },
+                        Context = "news-summary",
+                        Style = "clear, informative, well-structured",
+                        Length = "medium",
+                        Model = model,
+                        Provider = provider
+                    };
+
+                    var requestJson = JsonSerializer.Serialize(request);
+                    var requestElement = JsonSerializer.Deserialize<JsonElement>(requestJson);
+
+                    if (_apiRouter.TryGetHandler("ai", "generate-summary", out var handler))
+                    {
+                        _logger.Info("AIModuleTemplates: Found generate-summary handler, calling it");
+                        var result = await handler(requestElement);
+                        _logger.Info($"AIModuleTemplates: generate-summary handler returned: {result != null}");
+                        if (result != null)
+                        {
+                            // Parse the result from the AI module
+                            var resultJson = JsonSerializer.Serialize(result);
+                            var resultElement = JsonSerializer.Deserialize<JsonElement>(resultJson);
+                            
+                            if (resultElement.TryGetProperty("success", out var success) && success.GetBoolean())
+                            {
+                                if (resultElement.TryGetProperty("data", out var data) && 
+                                    data.TryGetProperty("summary", out var summary))
+                                {
+                                    return summary.GetString();
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        _logger.Warn("AIModuleTemplates: generate-summary handler not found in router");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"Error calling AI module generate-summary: {ex.Message}", ex);
+                }
+                return null;
             }
 
             public async Task<ConceptExtractionResult?> ExtractConceptsAsync(
@@ -276,6 +349,56 @@ namespace CodexBootstrap.Modules
                 {
                     _logger.Error($"Error calling AI module fractal-transform: {ex.Message}", ex);
                 }
+                return null;
+            }
+
+            public async Task<string?> GenerateTextAsync(
+                string prompt,
+                string? model = null,
+                string? provider = null)
+            {
+                try
+                {
+                    var request = new
+                    {
+                        Prompt = prompt,
+                        Model = model,
+                        Provider = provider
+                    };
+
+                    var requestJson = JsonSerializer.Serialize(request);
+                    var requestElement = JsonSerializer.Deserialize<JsonElement>(requestJson);
+
+                    if (_apiRouter.TryGetHandler("ai", "generate-text", out var handler))
+                    {
+                        _logger.Info("AIModuleTemplates: Found generate-text handler, calling it");
+                        var result = await handler(requestElement);
+                        _logger.Info($"AIModuleTemplates: generate-text handler returned: {result != null}");
+                        if (result != null)
+                        {
+                            // Parse the result from the AI module
+                            var resultJson = JsonSerializer.Serialize(result);
+                            var resultElement = JsonSerializer.Deserialize<JsonElement>(resultJson);
+                            
+                            if (resultElement.TryGetProperty("success", out var success) && success.GetBoolean())
+                            {
+                                if (resultElement.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String)
+                                {
+                                    return text.GetString();
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        _logger.Warn("AIModuleTemplates: No generate-text handler found");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"AIModuleTemplates: Error in GenerateTextAsync: {ex.Message}", ex);
+                }
+                
                 return null;
             }
         }
@@ -740,12 +863,12 @@ namespace CodexBootstrap.Modules
                             var newsItem = new NewsItem
                             {
                                 Id = $"rss-{source.Id}-{stableId}",
-                                Title = item.Title?.Text ?? "",
-                                Content = item.Summary?.Text ?? "",
+                                Title = DecodeHtmlAndUrl(item.Title?.Text ?? ""),
+                                Content = DecodeHtmlAndUrl(item.Summary?.Text ?? ""),
                                 Source = source.Name,
                                 Url = item.Links.FirstOrDefault()?.Uri?.ToString() ?? "",
                                 PublishedAt = publish,
-                                Tags = ExtractTagsFromContent((item.Title?.Text ?? "") + " " + (item.Summary?.Text ?? "")),
+                                Tags = ExtractTagsFromContent(DecodeHtmlAndUrl(item.Title?.Text ?? "") + " " + DecodeHtmlAndUrl(item.Summary?.Text ?? "")),
                                 Metadata = new Dictionary<string, object>
                                 {
                                     ["sourceType"] = "RSS",
@@ -775,12 +898,12 @@ namespace CodexBootstrap.Modules
                                 var newsItem = new NewsItem
                                 {
                                     Id = $"rss-{source.Id}-{stableId}",
-                                    Title = ri.Title ?? "",
-                                    Content = ri.Description ?? "",
+                                    Title = DecodeHtmlAndUrl(ri.Title ?? ""),
+                                    Content = DecodeHtmlAndUrl(ri.Description ?? ""),
                                     Source = source.Name,
                                     Url = ri.Link ?? "",
                                     PublishedAt = ri.PublishDate ?? DateTimeOffset.UtcNow,
-                                    Tags = ExtractTagsFromContent(((ri.Title ?? "") + " " + (ri.Description ?? ""))),
+                                    Tags = ExtractTagsFromContent(DecodeHtmlAndUrl(ri.Title ?? "") + " " + DecodeHtmlAndUrl(ri.Description ?? "")),
                                     Metadata = new Dictionary<string, object> 
                                     { 
                                         ["sourceType"] = "RSS", 
@@ -892,12 +1015,12 @@ namespace CodexBootstrap.Modules
                             var newsItem = new NewsItem
                             {
                                 Id = $"hn-{storyId}",
-                                Title = story.Title,
-                                Content = story.Text ?? "",
+                                Title = DecodeHtmlAndUrl(story.Title),
+                                Content = DecodeHtmlAndUrl(story.Text ?? ""),
                                 Source = source.Name,
                                 Url = story.Url,
                                 PublishedAt = DateTimeOffset.FromUnixTimeSeconds(story.Time),
-                                Tags = ExtractTagsFromContent(story.Title + " " + (story.Text ?? "")),
+                                Tags = ExtractTagsFromContent(DecodeHtmlAndUrl(story.Title) + " " + DecodeHtmlAndUrl(story.Text ?? "")),
                                 Metadata = new Dictionary<string, object>
                                 {
                                     ["sourceType"] = "API",
@@ -949,26 +1072,33 @@ namespace CodexBootstrap.Modules
                     return;
                 }
 
+                // Precompute deterministic news node id for consistent child edges
+                var newsNodeId = $"codex.news.item.{newsItem.Id}.{Guid.NewGuid():N}";
+
                 // Step 1: Extract full content from URL
                 var extractedContent = await ExtractContentFromUrl(newsItem.Url);
-                var contentNode = await CreateContentNode(newsItem, extractedContent);
+                var contentNode = await CreateContentNode(newsItem, extractedContent, newsNodeId);
 
                 // Step 2: Generate summary from extracted content
                 var summary = await GenerateSummary(extractedContent);
-                var summaryNode = await CreateSummaryNode(newsItem, summary, contentNode.Id);
+                var summaryNode = await CreateSummaryNode(newsItem, summary, contentNode.Id, newsNodeId);
 
                 // Step 3: Extract concepts from summary
                 var concepts = await ExtractConceptsFromSummary(summary);
-                var conceptNodes = await CreateConceptNodes(newsItem, concepts, summaryNode.Id);
+                var conceptNodes = await CreateConceptNodes(newsItem, concepts, summaryNode.Id, newsNodeId);
 
-                // Step 4: Create direct connections from news item to U-CORE axes
-                await CreateNewsToUCoreConnections(newsItem, concepts);
+                // Step 4: For each concept, find path to U-Core and add missing concepts
+                var ucorePaths = await FindPathsToUCoreConcepts(concepts);
+                var allPathConcepts = await EnsureMissingConceptsInPaths(ucorePaths);
 
-                // Step 5: Store original news item as node with links to content
+                // Step 5: Create comprehensive edge network for navigation
+                await CreateComprehensiveEdgeNetwork(newsNodeId, newsItem, contentNode, summaryNode, conceptNodes, ucorePaths, allPathConcepts);
+
+                // Step 6: Store original news item as node with links to all pipeline stages
                 var newsNode = new Node(
-                    Id: $"codex.news.item.{newsItem.Id}.{Guid.NewGuid():N}",
+                    Id: newsNodeId,
                     TypeId: NEWS_ITEM_NODE_TYPE,
-                    State: ContentState.Ice,
+                    State: ContentState.Water,
                     Locale: "en-US",
                     Title: newsItem.Title,
                     Description: $"News item from {newsItem.Source}",
@@ -987,14 +1117,29 @@ namespace CodexBootstrap.Modules
                         ["url"] = newsItem.Url,
                         ["contentNodeId"] = contentNode.Id,
                         ["summaryNodeId"] = summaryNode.Id,
-                        ["conceptNodeIds"] = conceptNodes.Select(c => c.Id).ToArray()
+                        ["conceptNodeIds"] = conceptNodes.Select(c => c.Id).ToArray(),
+                        ["ucorePathIds"] = ucorePaths.SelectMany(p => p.ConceptIds).ToArray(),
+                        ["pipelineVersion"] = "2.0"
                     }
                 );
 
                 Registry.Upsert(newsNode);
+                // Ensure source node exists and link back to it
+                var sourceNodeId = await ResolveOrCreateSourceNode(newsItem);
+                Registry.Upsert(new Edge(
+                    newsNode.Id,
+                    sourceNodeId,
+                    "from_source",
+                    1.0,
+                    new Dictionary<string, object>
+                    {
+                        ["createdAt"] = DateTimeOffset.UtcNow,
+                        ["relationship"] = "news-from-source"
+                    }
+                ));
                 _logger.Info($"Successfully stored news item as node: {newsNode.Id} - {newsItem.Title}");
 
-                // Step 6: Ensure node has path back to core identity
+                // Step 7: Ensure node has path back to core identity
                 await EnsureNodePathToIdentity(newsNode.Id);
 
                 // Create fractal news item
@@ -1006,7 +1151,7 @@ namespace CodexBootstrap.Modules
                     var fractalNode = new Node(
                         Id: $"codex.news.fractal.{fractalNews.Id}.{Guid.NewGuid():N}",
                         TypeId: FRACTAL_NEWS_NODE_TYPE,
-                        State: ContentState.Ice,
+                        State: ContentState.Water,
                         Locale: "en-US",
                         Title: fractalNews.Headline,
                         Description: $"Fractal analysis of {newsItem.Title}",
@@ -1032,15 +1177,13 @@ namespace CodexBootstrap.Modules
 
                     Registry.Upsert(fractalNode);
 
-                    // Create edge from original news to fractal news
-                    var newsNodeId = $"codex.news.item.{newsItem.Id}.{Guid.NewGuid():N}";
-                    var fractalNodeId = $"fractal-news-{fractalNews.Id}";
-                    Registry.Upsert(new Edge(newsNodeId, fractalNodeId, "analyzed-as", 1.0, new Dictionary<string, object>
+                    // Create edge from original news to fractal news (using canonical newsNodeId)
+                    Registry.Upsert(new Edge(newsNodeId, fractalNode.Id, "analyzed-as", 1.0, new Dictionary<string, object>
                     {
                         ["source"] = newsItem.Source,
                         ["analyzedAt"] = DateTimeOffset.UtcNow
                     }));
-                    _logger.Info($"NEWS_LINK_CREATED from={newsNodeId} to={fractalNodeId} type=analyzed-as source={newsItem.Source}");
+                    _logger.Info($"NEWS_LINK_CREATED from={newsNodeId} to={fractalNode.Id} type=analyzed-as source={newsItem.Source}");
 
                     // Extract concepts and ensure ontology links
                     var fractalConcepts = await ExtractConceptsForNews(newsItem, fractalNews);
@@ -1055,6 +1198,705 @@ namespace CodexBootstrap.Modules
             catch (Exception ex)
             {
                 _logger.Error($"Error processing news item {newsItem.Title}: {ex.Message}", ex);
+            }
+        }
+
+        private async Task<string> ResolveOrCreateSourceNode(NewsItem newsItem)
+        {
+            try
+            {
+                var sourceKey = (newsItem.Source ?? "Unknown").Trim().ToLowerInvariant().Replace(" ", "-");
+                var sourceNodeId = $"news-source-{sourceKey}";
+                var existing = Registry.GetNode(sourceNodeId);
+                if (existing != null) return sourceNodeId;
+
+                var node = new Node(
+                    Id: sourceNodeId,
+                    TypeId: "codex.news.source",
+                    State: ContentState.Water,
+                    Locale: "en-US",
+                    Title: newsItem.Source ?? "Unknown",
+                    Description: $"News source for {newsItem.Source}",
+                    Content: NodeHelpers.CreateJsonContent(new { name = newsItem.Source, homepage = newsItem.Url }),
+                    Meta: new Dictionary<string, object> { ["name"] = newsItem.Source ?? "Unknown" }
+                );
+                Registry.Upsert(node);
+                return sourceNodeId;
+            }
+            catch
+            {
+                return "news-source-unknown";
+            }
+        }
+
+        private async Task<Node> CreateContentNode(NewsItem newsItem, string extractedContent, string newsNodeId)
+        {
+            var contentNode = new Node(
+                Id: $"codex.content.extracted.{newsItem.Id}.{Guid.NewGuid():N}",
+                TypeId: "codex.content.extracted",
+                State: ContentState.Water,
+                Locale: "en-US",
+                Title: $"Extracted Content: {newsItem.Title}",
+                Description: $"Full content extracted from {newsItem.Url}",
+                Content: new ContentRef(
+                    MediaType: "text/plain",
+                    InlineJson: extractedContent,
+                    InlineBytes: null,
+                    ExternalUri: null
+                ),
+                Meta: new Dictionary<string, object>
+                {
+                    ["originalNewsId"] = newsItem.Id,
+                    ["sourceUrl"] = newsItem.Url,
+                    ["extractedAt"] = DateTimeOffset.UtcNow,
+                    ["contentLength"] = extractedContent.Length,
+                    ["wordCount"] = extractedContent.Split(' ').Length
+                }
+            );
+            
+            Registry.Upsert(contentNode);
+            
+            // Create edge news -> content
+            Registry.Upsert(new Edge(
+                newsNodeId,
+                contentNode.Id,
+                "has_content",
+                1.0,
+                new Dictionary<string, object>
+                {
+                    ["extractedAt"] = DateTimeOffset.UtcNow,
+                    ["contentLength"] = extractedContent.Length,
+                    ["edgeType"] = "pipeline-stage"
+                }
+            ));
+
+            // Link content to source
+            var sourceNodeId = await ResolveOrCreateSourceNode(newsItem);
+            Registry.Upsert(new Edge(
+                contentNode.Id,
+                sourceNodeId,
+                "from_source",
+                0.9,
+                new Dictionary<string, object> { ["createdAt"] = DateTimeOffset.UtcNow }
+            ));
+            
+            return contentNode;
+        }
+
+        private async Task<Node> CreateSummaryNode(NewsItem newsItem, string summary, string contentNodeId, string newsNodeId)
+        {
+            var summaryNode = new Node(
+                Id: $"codex.content.summary.{newsItem.Id}.{Guid.NewGuid():N}",
+                TypeId: "codex.content.summary",
+                State: ContentState.Water,
+                Locale: "en-US",
+                Title: $"Summary: {newsItem.Title}",
+                Description: $"AI-generated summary of {newsItem.Title}",
+                Content: new ContentRef(
+                    MediaType: "text/plain",
+                    InlineJson: summary,
+                    InlineBytes: null,
+                    ExternalUri: null
+                ),
+                Meta: new Dictionary<string, object>
+                {
+                    ["originalNewsId"] = newsItem.Id,
+                    ["contentNodeId"] = contentNodeId,
+                    ["generatedAt"] = DateTimeOffset.UtcNow,
+                    ["summaryLength"] = summary.Length,
+                    ["wordCount"] = summary.Split(' ').Length
+                }
+            );
+            
+            Registry.Upsert(summaryNode);
+            
+            // content -> summary
+            Registry.Upsert(new Edge(
+                contentNodeId, 
+                summaryNode.Id, 
+                "summarized-as", 
+                1.0, 
+                new Dictionary<string, object>
+                {
+                    ["generatedAt"] = DateTimeOffset.UtcNow,
+                    ["summaryLength"] = summary.Length,
+                    ["edgeType"] = "pipeline-stage"
+                }
+            ));
+            
+            // news -> summary
+            Registry.Upsert(new Edge(
+                newsNodeId, 
+                summaryNode.Id, 
+                "has-summary", 
+                1.0, 
+                new Dictionary<string, object>
+                {
+                    ["generatedAt"] = DateTimeOffset.UtcNow,
+                    ["edgeType"] = "pipeline-stage"
+                }
+            ));
+
+            // Link summary to source
+            var sourceNodeId = await ResolveOrCreateSourceNode(newsItem);
+            Registry.Upsert(new Edge(
+                summaryNode.Id,
+                sourceNodeId,
+                "from_source",
+                0.8,
+                new Dictionary<string, object> { ["createdAt"] = DateTimeOffset.UtcNow }
+            ));
+            
+            return summaryNode;
+        }
+
+        private async Task<List<Node>> CreateConceptNodes(NewsItem newsItem, List<string> concepts, string summaryNodeId, string newsNodeId)
+        {
+            var conceptNodes = new List<Node>();
+            
+            foreach (var concept in concepts)
+            {
+                // Expand single-word concepts into more specific multi-word phrases using simple heuristics
+                var enrichedConcept = concept.Trim();
+                if (enrichedConcept.Split(' ').Length == 1 && !string.IsNullOrWhiteSpace(newsItem.Title))
+                {
+                    enrichedConcept = $"{enrichedConcept} in {newsItem.Title}";
+                }
+
+                var conceptNode = new Node(
+                    Id: $"codex.concept.extracted.{newsItem.Id}.{concept.ToLowerInvariant().Replace(" ", "_")}.{Guid.NewGuid():N}",
+                    TypeId: "codex.concept.extracted",
+                    State: ContentState.Water,
+                    Locale: "en-US",
+                    Title: enrichedConcept,
+                    Description: $"Concept extracted from {newsItem.Title}",
+                    Content: new ContentRef(
+                        MediaType: "text/plain",
+                        InlineJson: enrichedConcept,
+                        InlineBytes: null,
+                        ExternalUri: null
+                    ),
+                    Meta: new Dictionary<string, object>
+                    {
+                        ["originalNewsId"] = newsItem.Id,
+                        ["summaryNodeId"] = summaryNodeId,
+                        ["extractedAt"] = DateTimeOffset.UtcNow,
+                        ["conceptType"] = "extracted",
+                        ["source"] = newsItem.Source
+                    }
+                );
+                
+                Registry.Upsert(conceptNode);
+                conceptNodes.Add(conceptNode);
+                
+                // Create edges: summary -> concept and news -> concept
+                Registry.Upsert(new Edge(
+                    summaryNodeId, 
+                    conceptNode.Id, 
+                    "contains-concept", 
+                    1.0, 
+                    new Dictionary<string, object>
+                    {
+                        ["extractedAt"] = DateTimeOffset.UtcNow,
+                        ["concept"] = enrichedConcept,
+                        ["edgeType"] = "pipeline-stage"
+                    }
+                ));
+                
+                Registry.Upsert(new Edge(
+                    newsNodeId, 
+                    conceptNode.Id, 
+                    "relates-to", 
+                    1.0, 
+                    new Dictionary<string, object>
+                    {
+                        ["extractedAt"] = DateTimeOffset.UtcNow,
+                        ["concept"] = enrichedConcept
+                    }
+                ));
+
+                // Link concept to source
+                var sourceNodeId = await ResolveOrCreateSourceNode(newsItem);
+                Registry.Upsert(new Edge(
+                    conceptNode.Id,
+                    sourceNodeId,
+                    "from_source",
+                    0.7,
+                    new Dictionary<string, object> { ["createdAt"] = DateTimeOffset.UtcNow }
+                ));
+            }
+            
+            return conceptNodes;
+        }
+
+        private async Task CreateComprehensiveEdgeNetwork(
+            string newsNodeId,
+            NewsItem newsItem, 
+            Node contentNode, 
+            Node summaryNode, 
+            List<Node> conceptNodes, 
+            List<UCorePath> ucorePaths, 
+            List<Node> allPathConcepts)
+        {
+            try
+            {
+                _logger.Info($"Creating comprehensive edge network for news item: {newsItem.Title}");
+                
+                // 1. News -> Content (already created in CreateContentNode)
+                
+                // 2. Content -> Summary (already created in CreateSummaryNode)
+                
+                // 3. Summary -> Concepts (already created in CreateConceptNodes)
+                
+                // 4. Concepts -> U-Core Paths (only via explicit path, no shortcuts)
+                foreach (var path in ucorePaths)
+                {
+                    for (int i = 0; i < path.ConceptIds.Count - 1; i++)
+                    {
+                        var sourceConcept = path.ConceptIds[i];
+                        var targetConcept = path.ConceptIds[i + 1];
+                        
+                        var sourceNode = allPathConcepts.FirstOrDefault(n => 
+                            n.Meta?.GetValueOrDefault("conceptId")?.ToString() == sourceConcept);
+                        var targetNode = allPathConcepts.FirstOrDefault(n => 
+                            n.Meta?.GetValueOrDefault("conceptId")?.ToString() == targetConcept);
+                        
+                        if (sourceNode != null && targetNode != null)
+                        {
+                            Registry.Upsert(new Edge(
+                                sourceNode.Id,
+                                targetNode.Id,
+                                "is_a",
+                                path.PathStrength,
+                                new Dictionary<string, object>
+                                {
+                                    ["pathId"] = path.SourceConcept + "-to-" + path.TargetConcept,
+                                    ["pathPosition"] = i,
+                                    ["source"] = newsItem.Source,
+                                    ["createdAt"] = DateTimeOffset.UtcNow,
+                                    ["edgeType"] = "ucore-path"
+                                }
+                            ));
+                            // Reverse edge for navigation
+                            Registry.Upsert(new Edge(
+                                targetNode.Id,
+                                sourceNode.Id,
+                                "has_child",
+                                path.PathStrength,
+                                new Dictionary<string, object>
+                                {
+                                    ["pathId"] = path.SourceConcept + "-to-" + path.TargetConcept,
+                                    ["pathPosition"] = i,
+                                    ["source"] = newsItem.Source,
+                                    ["createdAt"] = DateTimeOffset.UtcNow,
+                                    ["edgeType"] = "ucore-path"
+                                }
+                            ));
+                        }
+                    }
+                }
+                
+                _logger.Info($"Created comprehensive edge network with {ucorePaths.Count} U-Core paths");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error creating comprehensive edge network: {ex.Message}", ex);
+            }
+        }
+
+        // Enhanced News Processing Pipeline Methods
+        
+        /// <summary>
+        /// Find paths from extracted concepts to U-Core concepts
+        /// </summary>
+        private async Task<List<UCorePath>> FindPathsToUCoreConcepts(List<string> concepts)
+        {
+            var paths = new List<UCorePath>();
+            
+            try
+            {
+                _logger.Info($"Finding U-Core paths for {concepts.Count} concepts");
+                
+                foreach (var concept in concepts)
+                {
+                    var path = await FindPathToUCoreConcept(concept);
+                    if (path != null)
+                    {
+                        paths.Add(path);
+                        _logger.Info($"Found U-Core path for '{concept}': {path.ConceptIds.Count} concepts");
+                    }
+                }
+                
+                return paths;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error finding U-Core paths: {ex.Message}", ex);
+                return paths;
+            }
+        }
+        
+        /// <summary>
+        /// Find a single path from a concept to U-Core concepts
+        /// </summary>
+        private async Task<UCorePath?> FindPathToUCoreConcept(string concept)
+        {
+            try
+            {
+                // Get U-Core ontology
+                var ontology = new UCoreOntology();
+                var coreConcepts = ontology.Concepts.Values.Where(c => c.Type == ConceptType.Core).ToList();
+                
+                // Use AI to find semantic relationships
+                var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "llama3.2:3b";
+                var provider = Environment.GetEnvironmentVariable("NEWS_AI_PROVIDER") ?? "ollama";
+                
+                var prompt = $"Find a conceptual path from '{concept}' to U-Core concepts. " +
+                           $"U-Core core concepts: {string.Join(", ", coreConcepts.Select(c => c.Name))}. " +
+                           $"Respond with a JSON array of concept names that form a logical path, " +
+                           $"starting with '{concept}' and ending with a U-Core core concept. " +
+                           $"Include intermediate concepts that logically connect them.";
+                
+                _logger.Info($"AI_PRECALL find-ucore-path provider={provider} model={model} concept={concept}");
+                
+                var response = await _aiTemplates?.GenerateTextAsync(prompt, model, provider);
+                if (response != null && !string.IsNullOrWhiteSpace(response))
+                {
+                    // Parse AI response to extract concept path
+                    var pathConcepts = ParseConceptPathFromAI(response, concept, coreConcepts);
+                    if (pathConcepts.Count > 1)
+                    {
+                        return new UCorePath
+                        {
+                            SourceConcept = concept,
+                            TargetConcept = pathConcepts.Last(),
+                            ConceptIds = pathConcepts,
+                            PathStrength = CalculatePathStrength(pathConcepts),
+                            CreatedAt = DateTimeOffset.UtcNow
+                        };
+                    }
+                }
+                
+                // Fallback: direct connection to closest U-Core concept
+                var closestCore = FindClosestUCoreConcept(concept, coreConcepts);
+                if (closestCore != null)
+                {
+                    return new UCorePath
+                    {
+                        SourceConcept = concept,
+                        TargetConcept = closestCore.Name,
+                        ConceptIds = new List<string> { concept, closestCore.Name },
+                        PathStrength = 0.5, // Lower strength for fallback
+                        CreatedAt = DateTimeOffset.UtcNow
+                    };
+                }
+                
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"Error finding U-Core path for '{concept}': {ex.Message}");
+                return null;
+            }
+        }
+        
+        /// <summary>
+        /// Ensure all concepts in paths exist as nodes, creating missing ones
+        /// </summary>
+        private async Task<List<Node>> EnsureMissingConceptsInPaths(List<UCorePath> paths)
+        {
+            var createdNodes = new List<Node>();
+            
+            try
+            {
+                _logger.Info($"Ensuring {paths.Count} U-Core paths have all required concepts");
+                
+                foreach (var path in paths)
+                {
+                    foreach (var conceptId in path.ConceptIds)
+                    {
+                        // Check if concept node already exists
+                        var existingNode = Registry.GetNodesByType("codex.concept")
+                            .FirstOrDefault(n => n.Meta?.GetValueOrDefault("conceptId")?.ToString() == conceptId);
+                        
+                        if (existingNode == null)
+                        {
+                            // Create missing concept node
+                            var conceptNode = await CreateConceptNode(conceptId, path);
+                            if (conceptNode != null)
+                            {
+                                Registry.Upsert(conceptNode);
+                                createdNodes.Add(conceptNode);
+                                _logger.Info($"Created missing concept node: {conceptId}");
+                            }
+                        }
+                        else
+                        {
+                            createdNodes.Add(existingNode);
+                        }
+                    }
+                }
+                
+                return createdNodes;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error ensuring missing concepts: {ex.Message}", ex);
+                return createdNodes;
+            }
+        }
+        
+        /// <summary>
+        /// Create comprehensive edge network connecting all pipeline stages
+        /// </summary>
+        private async Task CreateComprehensiveEdgeNetwork(
+            NewsItem newsItem, 
+            Node contentNode, 
+            Node summaryNode, 
+            List<Node> conceptNodes, 
+            List<UCorePath> ucorePaths, 
+            List<Node> allPathConcepts)
+        {
+            try
+            {
+                _logger.Info($"Creating comprehensive edge network for news item: {newsItem.Title}");
+                
+                var newsNodeId = $"codex.news.item.{newsItem.Id}";
+                
+                // 1. News -> Content
+                Registry.Upsert(new Edge(
+                    newsNodeId,
+                    contentNode.Id,
+                    "has-content",
+                    1.0,
+                    new Dictionary<string, object>
+                    {
+                        ["source"] = newsItem.Source,
+                        ["createdAt"] = DateTimeOffset.UtcNow,
+                        ["edgeType"] = "pipeline-stage"
+                    }
+                ));
+                
+                // 2. Content -> Summary
+                Registry.Upsert(new Edge(
+                    contentNode.Id,
+                    summaryNode.Id,
+                    "summarized-as",
+                    1.0,
+                    new Dictionary<string, object>
+                    {
+                        ["source"] = newsItem.Source,
+                        ["createdAt"] = DateTimeOffset.UtcNow,
+                        ["edgeType"] = "pipeline-stage"
+                    }
+                ));
+                
+                // 3. Summary -> Concepts
+                foreach (var conceptNode in conceptNodes)
+                {
+                    Registry.Upsert(new Edge(
+                        summaryNode.Id,
+                        conceptNode.Id,
+                        "contains-concept",
+                        1.0,
+                        new Dictionary<string, object>
+                        {
+                            ["source"] = newsItem.Source,
+                            ["createdAt"] = DateTimeOffset.UtcNow,
+                            ["edgeType"] = "pipeline-stage"
+                        }
+                    ));
+                }
+                
+                // 4. Concepts -> U-Core Paths
+                foreach (var path in ucorePaths)
+                {
+                    for (int i = 0; i < path.ConceptIds.Count - 1; i++)
+                    {
+                        var sourceConcept = path.ConceptIds[i];
+                        var targetConcept = path.ConceptIds[i + 1];
+                        
+                        var sourceNode = allPathConcepts.FirstOrDefault(n => 
+                            n.Meta?.GetValueOrDefault("conceptId")?.ToString() == sourceConcept);
+                        var targetNode = allPathConcepts.FirstOrDefault(n => 
+                            n.Meta?.GetValueOrDefault("conceptId")?.ToString() == targetConcept);
+                        
+                        if (sourceNode != null && targetNode != null)
+                        {
+                            Registry.Upsert(new Edge(
+                                sourceNode.Id,
+                                targetNode.Id,
+                                "leads-to",
+                                path.PathStrength,
+                                new Dictionary<string, object>
+                                {
+                                    ["pathId"] = path.SourceConcept + "-to-" + path.TargetConcept,
+                                    ["pathPosition"] = i,
+                                    ["source"] = newsItem.Source,
+                                    ["createdAt"] = DateTimeOffset.UtcNow,
+                                    ["edgeType"] = "ucore-path"
+                                }
+                            ));
+                        }
+                    }
+                }
+                
+                // 5. News -> U-Core Paths (direct connections)
+                foreach (var path in ucorePaths)
+                {
+                    var firstConceptNode = allPathConcepts.FirstOrDefault(n => 
+                        n.Meta?.GetValueOrDefault("conceptId")?.ToString() == path.ConceptIds.First());
+                    var lastConceptNode = allPathConcepts.FirstOrDefault(n => 
+                        n.Meta?.GetValueOrDefault("conceptId")?.ToString() == path.ConceptIds.Last());
+                    
+                    if (firstConceptNode != null)
+                    {
+                        Registry.Upsert(new Edge(
+                            newsNodeId,
+                            firstConceptNode.Id,
+                            "connects-to-ucore-via",
+                            path.PathStrength,
+                            new Dictionary<string, object>
+                            {
+                                ["pathId"] = path.SourceConcept + "-to-" + path.TargetConcept,
+                                ["source"] = newsItem.Source,
+                                ["createdAt"] = DateTimeOffset.UtcNow,
+                                ["edgeType"] = "news-to-ucore"
+                            }
+                        ));
+                    }
+                    
+                    if (lastConceptNode != null)
+                    {
+                        Registry.Upsert(new Edge(
+                            lastConceptNode.Id,
+                            newsNodeId,
+                            "connects-from-ucore",
+                            path.PathStrength,
+                            new Dictionary<string, object>
+                            {
+                                ["pathId"] = path.SourceConcept + "-to-" + path.TargetConcept,
+                                ["source"] = newsItem.Source,
+                                ["createdAt"] = DateTimeOffset.UtcNow,
+                                ["edgeType"] = "ucore-to-news"
+                            }
+                        ));
+                    }
+                }
+                
+                _logger.Info($"Created comprehensive edge network with {ucorePaths.Count} U-Core paths");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error creating comprehensive edge network: {ex.Message}", ex);
+            }
+        }
+        
+        // Helper methods for U-Core path finding
+        
+        private List<string> ParseConceptPathFromAI(string aiResponse, string sourceConcept, List<UCoreConcept> coreConcepts)
+        {
+            try
+            {
+                // Try to parse as JSON array
+                var jsonResponse = JsonSerializer.Deserialize<string[]>(aiResponse);
+                if (jsonResponse != null && jsonResponse.Length > 0)
+                {
+                    var path = new List<string> { sourceConcept };
+                    path.AddRange(jsonResponse.Where(c => !string.IsNullOrWhiteSpace(c)));
+                    return path;
+                }
+            }
+            catch
+            {
+                // Fallback: parse as comma-separated or line-separated
+                var concepts = aiResponse.Split(new[] { ',', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(c => c.Trim().Trim('"', '\''))
+                    .Where(c => !string.IsNullOrWhiteSpace(c))
+                    .ToList();
+                
+                if (concepts.Any())
+                {
+                    var path = new List<string> { sourceConcept };
+                    path.AddRange(concepts);
+                    return path;
+                }
+            }
+            
+            return new List<string> { sourceConcept };
+        }
+        
+        private double CalculatePathStrength(List<string> conceptPath)
+        {
+            // Calculate path strength based on length and concept quality
+            var baseStrength = 1.0;
+            var lengthPenalty = Math.Max(0, (conceptPath.Count - 2) * 0.1);
+            return Math.Max(0.1, baseStrength - lengthPenalty);
+        }
+        
+        private UCoreConcept? FindClosestUCoreConcept(string concept, List<UCoreConcept> coreConcepts)
+        {
+            // Simple keyword matching to find closest U-Core concept
+            var conceptLower = concept.ToLowerInvariant();
+            
+            foreach (var coreConcept in coreConcepts)
+            {
+                if (conceptLower.Contains(coreConcept.Name.ToLowerInvariant()) ||
+                    coreConcept.Name.ToLowerInvariant().Contains(conceptLower))
+                {
+                    return coreConcept;
+                }
+            }
+            
+            // Return the first core concept as fallback
+            return coreConcepts.FirstOrDefault();
+        }
+        
+        private async Task<Node?> CreateConceptNode(string conceptId, UCorePath path)
+        {
+            try
+            {
+                // Determine if this is a U-Core concept or intermediate concept
+                var isUCoreConcept = path.TargetConcept == conceptId;
+                var conceptType = isUCoreConcept ? "ucore.concept" : "codex.concept";
+                
+                var conceptNode = new Node(
+                    Id: $"codex.concept.{conceptId}.{Guid.NewGuid():N}",
+                    TypeId: conceptType,
+                    State: ContentState.Ice,
+                    Locale: "en",
+                    Title: conceptId,
+                    Description: isUCoreConcept ? 
+                        $"U-Core concept: {conceptId}" : 
+                        $"Intermediate concept: {conceptId}",
+                    Content: new ContentRef(
+                        MediaType: "application/json",
+                        InlineJson: JsonSerializer.Serialize(new
+                        {
+                            conceptId = conceptId,
+                            isUCoreConcept = isUCoreConcept,
+                            pathId = path.SourceConcept + "-to-" + path.TargetConcept,
+                            createdFrom = "news-pipeline"
+                        }),
+                        InlineBytes: null,
+                        ExternalUri: null
+                    ),
+                    Meta: new Dictionary<string, object>
+                    {
+                        ["conceptId"] = conceptId,
+                        ["isUCoreConcept"] = isUCoreConcept,
+                        ["pathId"] = path.SourceConcept + "-to-" + path.TargetConcept,
+                        ["createdAt"] = DateTimeOffset.UtcNow,
+                        ["createdFrom"] = "news-pipeline"
+                    }
+                );
+                
+                return conceptNode;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error creating concept node for '{conceptId}': {ex.Message}", ex);
+                return null;
             }
         }
 
@@ -1163,6 +2005,28 @@ namespace CodexBootstrap.Modules
             return text;
         }
 
+        private string DecodeHtmlAndUrl(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return string.Empty;
+
+            try
+            {
+                // First decode HTML entities
+                text = System.Net.WebUtility.HtmlDecode(text);
+                
+                // Then decode URL encoding
+                text = System.Web.HttpUtility.UrlDecode(text);
+                
+                return text;
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"Error decoding HTML/URL in text: {ex.Message}");
+                return text; // Return original text if decoding fails
+            }
+        }
+
         private async Task<Node> CreateContentNode(NewsItem newsItem, string extractedContent)
         {
             var contentNode = new Node(
@@ -1213,18 +2077,28 @@ namespace CodexBootstrap.Modules
                 if (string.IsNullOrWhiteSpace(content))
                     return string.Empty;
                 
-                // Use AI to generate summary if available
-                var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "llama3.1:8b";
+                // Use AI to generate formatted summary if available
+                var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "llama3.2:3b";
                 var provider = Environment.GetEnvironmentVariable("NEWS_AI_PROVIDER") ?? "ollama";
                 
                 _logger.Info($"AI_PRECALL generate-summary provider={provider} model={model} chars={content.Length}");
-                // Use concept extraction as a proxy for summary generation
+                
+                // Try the new formatted summary generation first
+                var formattedSummary = await AITemplates.GenerateSummaryAsync(content, model, provider);
+                
+                if (!string.IsNullOrWhiteSpace(formattedSummary))
+                {
+                    _logger.Info($"AI formatted summary generation successful (length: {formattedSummary.Length})");
+                    return formattedSummary;
+                }
+                
+                // Fallback to concept extraction for key concepts
                 var result = await AITemplates.ExtractConceptsAsync(content, 3, model, provider);
                 
                 if (result != null && result.Concepts != null && result.Concepts.Any())
                 {
                     var summary = $"Key concepts: {string.Join(", ", result.Concepts)}";
-                    _logger.Info($"AI summary generation successful (length: {summary.Length})");
+                    _logger.Info($"AI concept-based summary generation successful (length: {summary.Length})");
                     return summary;
                 }
             }
@@ -1233,7 +2107,7 @@ namespace CodexBootstrap.Modules
                 _logger.Warn($"AI summary generation failed: {ex.Message}");
             }
             
-            // Fallback to simple extractive summary
+            // Final fallback to simple extractive summary
             return GenerateExtractiveSummary(content);
         }
 
@@ -1305,7 +2179,7 @@ namespace CodexBootstrap.Modules
         {
             try
             {
-                var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "llama3.1:8b";
+                var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "llama3.2:3b";
                 var provider = Environment.GetEnvironmentVariable("NEWS_AI_PROVIDER") ?? "ollama";
                 
                 _logger.Info($"AI_PRECALL extract-concepts-from-summary provider={provider} model={model} chars={summary.Length}");
@@ -1653,7 +2527,7 @@ namespace CodexBootstrap.Modules
                 // Use AI to find semantically related concepts
                 if (relatedConcepts.Count < 3)
                 {
-                    var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "llama3.1:8b";
+                    var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "llama3.2:3b";
                     var provider = Environment.GetEnvironmentVariable("NEWS_AI_PROVIDER") ?? "ollama";
                     
                     var prompt = $"Find 3 concepts that are semantically related to '{concept}'. " +
@@ -1840,7 +2714,7 @@ namespace CodexBootstrap.Modules
                 }
                 
                 // Generate embedding using AI
-                var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "llama3.1:8b";
+                var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "llama3.2:3b";
                 var provider = Environment.GetEnvironmentVariable("NEWS_AI_PROVIDER") ?? "ollama";
                 
                 var embedding = await GenerateConceptEmbedding(concept, model, provider);
@@ -1901,7 +2775,7 @@ namespace CodexBootstrap.Modules
                 
                 // Generate embedding by combining axis keywords
                 var axisText = $"{axis.Name}: {string.Join(", ", axis.Keywords)}";
-                var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "llama3.1:8b";
+                var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "llama3.2:3b";
                 var provider = Environment.GetEnvironmentVariable("NEWS_AI_PROVIDER") ?? "ollama";
                 
                 var embedding = await GenerateConceptEmbedding(axisText, model, provider);
@@ -2055,7 +2929,7 @@ namespace CodexBootstrap.Modules
         {
             try
             {
-                var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "llama3.1:8b";
+                var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "llama3.2:3b";
                 var provider = Environment.GetEnvironmentVariable("NEWS_AI_PROVIDER") ?? "ollama";
                 
                 var prompt = $"Find 5 concepts that are semantically related to '{concept}'. " +
@@ -2091,7 +2965,7 @@ namespace CodexBootstrap.Modules
         {
             try
             {
-                var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "llama3.1:8b";
+                var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "llama3.2:3b";
                 var provider = Environment.GetEnvironmentVariable("NEWS_AI_PROVIDER") ?? "ollama";
                 
                 var axisNames = _ontologyAxes.Select(a => a.Name).ToList();
@@ -2234,7 +3108,7 @@ namespace CodexBootstrap.Modules
         {
             try
             {
-                var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "llama3.1:8b";
+                var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL") ?? "llama3.2:3b";
                 var provider = Environment.GetEnvironmentVariable("NEWS_AI_PROVIDER") ?? "ollama";
                 
                 var axisNames = _ontologyAxes.Select(a => a.Name).ToList();
@@ -2346,7 +3220,7 @@ namespace CodexBootstrap.Modules
                 var content = newsItem.Title + " " + newsItem.Content;
                 // Choose cheap model/provider via env vars
                 var provider = Environment.GetEnvironmentVariable("NEWS_AI_PROVIDER"); // e.g., "ollama" or "openai"
-                var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL");       // e.g., "llama3.1:8b" or "gpt-4o-mini"
+                var model = Environment.GetEnvironmentVariable("NEWS_AI_MODEL");       // e.g., "llama3.2:3b" or "gpt-4o-mini"
 
                 _logger.Info($"AI_PRECALL extract-concepts provider={provider ?? "auto"} model={model ?? "auto"} chars={content.Length}");
                 var result = await AITemplates.ExtractConceptsAsync(content, 5, model, provider);
@@ -2899,6 +3773,99 @@ namespace CodexBootstrap.Modules
                 {
                     Success = false,
                     Error = "Failed to ingest news item",
+                    Code = "Internal Server Error",
+                    Timestamp = DateTime.UtcNow
+                };
+            }
+        }
+
+        [Get("/news/concepts/{newsItemId}", "Get News Item Concepts", "Get extracted concepts for a specific news item", "realtime-news-stream")]
+        public async Task<object> GetNewsItemConceptsAsync([ApiParameter("newsItemId", "News item ID")] string newsItemId)
+        {
+            try
+            {
+                _logger.Info($"Getting concepts for news item: {newsItemId}");
+                
+                // Find the news item node
+                var newsNode = Registry.GetNodesByType(NEWS_ITEM_NODE_TYPE)
+                    .FirstOrDefault(n => n.Meta?.ContainsKey("newsId") == true && n.Meta["newsId"].ToString() == newsItemId);
+
+                if (newsNode == null)
+                {
+                    return new ErrorResponse
+                    {
+                        Success = false,
+                        Error = "News item not found",
+                        Code = "NOT_FOUND",
+                        Timestamp = DateTime.UtcNow
+                    };
+                }
+
+                // Get concept node IDs from the news item metadata
+                var conceptNodeIds = newsNode.Meta?.GetValueOrDefault("conceptNodeIds") as string[] ?? new string[0];
+                
+                if (conceptNodeIds.Length == 0)
+                {
+                    return new
+                    {
+                        success = true,
+                        newsItemId = newsItemId,
+                        concepts = new object[0],
+                        message = "No concepts found for this news item"
+                    };
+                }
+
+                // Fetch all concept nodes
+                var concepts = new List<object>();
+                foreach (var conceptNodeId in conceptNodeIds)
+                {
+                    var conceptNode = Registry.GetNode(conceptNodeId);
+                    if (conceptNode != null)
+                    {
+                        var concept = new
+                        {
+                            id = conceptNode.Id,
+                            name = conceptNode.Title ?? conceptNode.Meta?.GetValueOrDefault("concept")?.ToString() ?? "Unknown Concept",
+                            description = conceptNode.Description ?? conceptNode.Meta?.GetValueOrDefault("description")?.ToString(),
+                            weight = conceptNode.Meta?.GetValueOrDefault("weight") is double w ? w : 
+                                    conceptNode.Meta?.GetValueOrDefault("confidence") is double c ? c : 1.0,
+                            resonance = conceptNode.Meta?.GetValueOrDefault("resonance") is double r ? r : 
+                                      conceptNode.Meta?.GetValueOrDefault("resonanceScore") is double rs ? rs : 0.5,
+                            confidence = conceptNode.Meta?.GetValueOrDefault("confidence") is double conf ? conf : 
+                                       conceptNode.Meta?.GetValueOrDefault("score") is double score ? score : 0.8,
+                            extractedAt = conceptNode.Meta?.GetValueOrDefault("extractedAt") is DateTimeOffset et ? et : 
+                                        conceptNode.Meta?.GetValueOrDefault("createdAt") is DateTimeOffset ct ? ct : DateTimeOffset.UtcNow,
+                            conceptType = conceptNode.Meta?.GetValueOrDefault("conceptType")?.ToString() ?? conceptNode.TypeId,
+                            axes = conceptNode.Meta?.GetValueOrDefault("axes") is string[] axes ? axes : new string[0],
+                            meta = conceptNode.Meta ?? new Dictionary<string, object>()
+                        };
+                        concepts.Add(concept);
+                    }
+                }
+
+                // Sort by weight/confidence descending
+                concepts = concepts.OrderByDescending(c => 
+                {
+                    var weight = ((dynamic)c).weight;
+                    return weight is double w ? w : 0.0;
+                }).ToList();
+
+                return new
+                {
+                    success = true,
+                    newsItemId = newsItemId,
+                    newsTitle = newsNode.Title,
+                    concepts = concepts,
+                    count = concepts.Count
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error getting concepts for news item {newsItemId}: {ex.Message}", ex);
+                return new ErrorResponse
+                {
+                    Success = false,
+                    Error = "Failed to get concepts for news item",
                     Code = "Internal Server Error",
                     Timestamp = DateTime.UtcNow
                 };

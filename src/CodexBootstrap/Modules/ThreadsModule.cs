@@ -43,14 +43,121 @@ public sealed class ThreadsModule : ModuleBase
         _logger.Info("Threads HTTP endpoints registered");
     }
 
+    // GROUPS
+    [ApiRoute("GET", "/threads/groups", "ListThreadGroups", "List available thread groups", "codex.threads")]
+    public async Task<object> ListThreadGroupsAsync()
+    {
+        try
+        {
+            var groups = _registry.GetNodesByTypePrefix("codex.thread-group/")
+                .Select(g =>
+                {
+                    var groupId = g.Id;
+                    var threadCount = _registry.GetEdgesFrom(groupId).Count(e => e.Role == "has_thread");
+                    return new
+                    {
+                        id = groupId,
+                        name = g.Title ?? (g.Meta.TryGetValue("name", out var n) ? n?.ToString() : groupId),
+                        description = g.Description ?? (g.Meta.TryGetValue("description", out var d) ? d?.ToString() : string.Empty),
+                        color = g.Meta.TryGetValue("color", out var c) ? c?.ToString() : "#3B82F6",
+                        threadCount = threadCount,
+                        isDefault = g.Meta.TryGetValue("isDefault", out var isDef) && isDef is bool && (bool)isDef
+                    };
+                })
+                .ToList();
+
+            // Ensure there's always a default "General" group
+            if (!groups.Any(g => g.isDefault))
+            {
+                await EnsureDefaultGroupExists();
+                // Re-fetch groups after creating default
+                groups = _registry.GetNodesByTypePrefix("codex.thread-group/")
+                    .Select(g =>
+                    {
+                        var groupId = g.Id;
+                        var threadCount = _registry.GetEdgesFrom(groupId).Count(e => e.Role == "has_thread");
+                        return new
+                        {
+                            id = groupId,
+                            name = g.Title ?? (g.Meta.TryGetValue("name", out var n) ? n?.ToString() : groupId),
+                            description = g.Description ?? (g.Meta.TryGetValue("description", out var d) ? d?.ToString() : string.Empty),
+                            color = g.Meta.TryGetValue("color", out var c) ? c?.ToString() : "#3B82F6",
+                            threadCount = threadCount,
+                            isDefault = g.Meta.TryGetValue("isDefault", out var isDef) && isDef is bool && (bool)isDef
+                        };
+                    })
+                    .ToList();
+            }
+
+            return new { success = true, groups = groups };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error listing thread groups: {ex.Message}", ex);
+            return new ErrorResponse($"Failed to list thread groups: {ex.Message}");
+        }
+    }
+
+    [ApiRoute("POST", "/threads/groups/create", "CreateThreadGroup", "Create a new thread group", "codex.threads")]
+    public async Task<object> CreateThreadGroupAsync([ApiParameter("request", "Thread group creation request")] CreateThreadGroupRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.Name))
+            {
+                return new ErrorResponse("Name is required");
+            }
+
+            var groupId = $"thread-group-{Guid.NewGuid():N}";
+
+            var meta = new Dictionary<string, object>
+            {
+                ["moduleId"] = "codex.threads",
+                ["createdAt"] = DateTimeOffset.UtcNow,
+                ["updatedAt"] = DateTimeOffset.UtcNow,
+                ["name"] = request.Name,
+                ["description"] = request.Description ?? string.Empty,
+                ["color"] = string.IsNullOrWhiteSpace(request.Color) ? "#3B82F6" : request.Color!
+            };
+
+            var node = new Node(
+                Id: groupId,
+                TypeId: "codex.thread-group/root",
+                State: ContentState.Water,
+                Locale: "en",
+                Title: request.Name,
+                Description: request.Description,
+                Content: new ContentRef(MediaType: "application/json", InlineJson: JsonSerializer.Serialize(new { name = request.Name, description = request.Description }), InlineBytes: null, ExternalUri: null),
+                Meta: meta
+            );
+
+            _registry.Upsert(node);
+
+            return new { success = true, groupId = groupId };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error creating thread group: {ex.Message}", ex);
+            return new ErrorResponse($"Failed to create thread group: {ex.Message}");
+        }
+    }
+
     [ApiRoute("GET", "/threads/list", "ListThreads", "List recent discussion threads", "codex.threads")]
     public async Task<object> ListThreadsAsync()
     {
         try
         {
+            // Ensure default group exists
+            await EnsureDefaultGroupExists();
+
             var threadNodes = _registry.GetNodesByTypePrefix("codex.thread/")
+                .Where(n => n.TypeId == "codex.thread/root") // Only get root threads, not replies
                 .OrderByDescending(n =>
                 {
+                    if (n.Meta != null && n.Meta.TryGetValue("updatedAt", out var updatedObj) && updatedObj is DateTimeOffset udt)
+                    {
+                        return udt;
+                    }
                     if (n.Meta != null && n.Meta.TryGetValue("createdAt", out var createdObj) && createdObj is DateTimeOffset cdt)
                     {
                         return cdt;
@@ -70,10 +177,23 @@ public sealed class ThreadsModule : ModuleBase
                     .Select(e => _registry.GetNode(e.ToId))
                     .Where(n => n != null)
                     .Cast<Node>()
+                    .OrderBy(r => r.Meta.TryGetValue("createdAt", out var rc) ? rc : DateTimeOffset.MinValue)
                     .ToList();
+
+                // Find the primary group for this thread (first group it belongs to)
+                var groupEdges = _registry.GetEdgesTo(threadId)
+                    .Where(e => e.Role == "has_thread")
+                    .ToList();
+                var primaryGroupId = groupEdges.FirstOrDefault()?.FromId ?? "thread-group-general";
+                var allGroupIds = groupEdges.Select(e => e.FromId).ToArray();
 
                 var authorId = thread.Meta.TryGetValue("authorId", out var a) ? a?.ToString() : null;
                 var author = ResolveUser(authorId);
+
+                // Get last reply for preview
+                var lastReply = replies.LastOrDefault();
+                var lastActivity = lastReply?.Meta.TryGetValue("createdAt", out var lr) == true ? lr : 
+                    (thread.Meta.TryGetValue("updatedAt", out var tu) ? tu : thread.Meta.TryGetValue("createdAt", out var tc) ? tc : DateTimeOffset.UtcNow);
 
                 result.Add(new
                 {
@@ -83,6 +203,7 @@ public sealed class ThreadsModule : ModuleBase
                     author = author,
                     createdAt = thread.Meta.TryGetValue("createdAt", out var created) ? created : DateTimeOffset.UtcNow,
                     updatedAt = thread.Meta.TryGetValue("updatedAt", out var updated) ? updated : DateTimeOffset.UtcNow,
+                    lastActivity = lastActivity,
                     replies = replies.Select(r => new
                     {
                         id = r.Id,
@@ -96,7 +217,11 @@ public sealed class ThreadsModule : ModuleBase
                     axes = thread.Meta.TryGetValue("axes", out var axes) && axes is IEnumerable<object> list
                         ? list.Select(x => x.ToString() ?? "").Where(s => !string.IsNullOrWhiteSpace(s)).ToArray()
                         : Array.Empty<string>(),
-                    isResolved = thread.Meta.TryGetValue("isResolved", out var ir) && ir is bool rb && rb
+                    isResolved = thread.Meta.TryGetValue("isResolved", out var ir) && ir is bool rb && rb,
+                    primaryGroupId = primaryGroupId,
+                    groupIds = allGroupIds,
+                    replyCount = replies.Count,
+                    hasUnread = false // TODO: Implement unread tracking
                 });
             }
 
@@ -145,6 +270,39 @@ public sealed class ThreadsModule : ModuleBase
             );
 
             _registry.Upsert(node);
+
+            // Link to group if provided, otherwise link to default group
+            var groupId = request.GroupId;
+            if (string.IsNullOrWhiteSpace(groupId))
+            {
+                // Find or create default group
+                var defaultGroup = _registry.GetNodesByTypePrefix("codex.thread-group/")
+                    .FirstOrDefault(g => g.Meta.TryGetValue("isDefault", out var isDef) && isDef is bool && (bool)isDef);
+                
+                if (defaultGroup == null)
+                {
+                    await EnsureDefaultGroupExists();
+                    defaultGroup = _registry.GetNodesByTypePrefix("codex.thread-group/")
+                        .FirstOrDefault(g => g.Meta.TryGetValue("isDefault", out var isDef) && isDef is bool && (bool)isDef);
+                }
+                
+                groupId = defaultGroup?.Id;
+            }
+
+            if (!string.IsNullOrWhiteSpace(groupId) && _registry.GetNode(groupId) != null)
+            {
+                _registry.Upsert(new Edge(
+                    FromId: groupId,
+                    ToId: threadId,
+                    Role: "has_thread",
+                    Weight: 1.0,
+                    Meta: new Dictionary<string, object>()
+                ));
+            }
+            else
+            {
+                _logger.Warn($"Group {groupId} not found when creating thread {threadId}");
+            }
 
             return new { success = true, threadId = threadId };
         }
@@ -231,6 +389,40 @@ public sealed class ThreadsModule : ModuleBase
         return string.Empty;
     }
 
+    private async Task EnsureDefaultGroupExists()
+    {
+        var defaultGroupId = "thread-group-general";
+        var existingGroup = _registry.GetNode(defaultGroupId);
+        
+        if (existingGroup == null)
+        {
+            var meta = new Dictionary<string, object>
+            {
+                ["moduleId"] = "codex.threads",
+                ["createdAt"] = DateTimeOffset.UtcNow,
+                ["updatedAt"] = DateTimeOffset.UtcNow,
+                ["name"] = "General",
+                ["description"] = "General conversations and discussions",
+                ["color"] = "#3B82F6",
+                ["isDefault"] = true
+            };
+
+            var node = new Node(
+                Id: defaultGroupId,
+                TypeId: "codex.thread-group/root",
+                State: ContentState.Water,
+                Locale: "en",
+                Title: "General",
+                Description: "General conversations and discussions",
+                Content: new ContentRef(MediaType: "application/json", InlineJson: JsonSerializer.Serialize(new { name = "General", description = "General conversations and discussions" }), InlineBytes: null, ExternalUri: null),
+                Meta: meta
+            );
+
+            _registry.Upsert(node);
+            _logger.Info("Created default 'General' thread group");
+        }
+    }
+
     private object ResolveUser(string? userId)
     {
         if (string.IsNullOrWhiteSpace(userId))
@@ -256,7 +448,8 @@ public record CreateThreadRequest(
     string Title,
     string Content,
     string? AuthorId,
-    IEnumerable<string>? Axes
+    IEnumerable<string>? Axes,
+    string? GroupId
 );
 
 [RequestType("codex.threads.create-reply", "CreateReplyRequest", "Create reply request")]
@@ -264,4 +457,11 @@ public record CreateReplyRequest(
     string ThreadId,
     string Content,
     string? AuthorId
+);
+
+[RequestType("codex.threads.create-group", "CreateThreadGroupRequest", "Create thread group request")]
+public record CreateThreadGroupRequest(
+    string Name,
+    string? Description,
+    string? Color
 );

@@ -49,6 +49,7 @@ namespace CodexBootstrap.Modules;
     /// <summary>
     /// Link user to concept
     /// </summary>
+    [RequireAuth]
     [Post("/userconcept/link", "userconcept-link", "Link user to concept", "codex.userconcept")]
     [ApiResponse(200, "Success")]
     [ApiResponse(400, "Bad request")]
@@ -92,6 +93,7 @@ namespace CodexBootstrap.Modules;
     /// <summary>
     /// Unlink user from concept
     /// </summary>
+    [RequireAuth]
     [Post("/userconcept/unlink", "userconcept-unlink", "Unlink user from concept", "codex.userconcept")]
     [ApiResponse(200, "Success")]
     [ApiResponse(400, "Bad request")]
@@ -113,6 +115,7 @@ namespace CodexBootstrap.Modules;
     /// <summary>
     /// Get concepts for a user
     /// </summary>
+    [RequireAuth]
     [Get("/userconcept/user-concepts/{userId}", "userconcept-get-user-concepts", "Get concepts for a user", "codex.userconcept")]
     [ApiResponse(200, "Success")]
     [ApiResponse(404, "Not found")]

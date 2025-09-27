@@ -366,6 +366,7 @@ export const endpoints = {
     return api.get(`/storage-endpoints/edges${queryString ? `?${queryString}` : ''}`);
   },
   getEdge: (fromId: string, toId: string) => api.get(`/storage-endpoints/edges/${fromId}/${toId}`),
+  getEdgeMetadata: () => api.get('/storage-endpoints/edges/metadata'),
 };
 
 // Export logger for debugging

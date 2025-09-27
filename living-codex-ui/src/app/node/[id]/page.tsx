@@ -101,7 +101,7 @@ export default function NodeDetailPage() {
             const match = files.find(f => f.meta?.relativePath === path || f.meta?.fileName === path || f.title === path);
             if (match?.id) {
               resolvedNodeId = match.id;
-              nodeResponse = await fetch(buildApiUrl(`/storage-endpoints/nodes/${encodeURIComponent(resolvedNodeId)}`));
+              nodeResponse = await fetch(buildApiUrl(`/storage-endpoints/nodes/${encodeURIComponent(resolvedNodeId!)}`));
             }
           }
         } catch {
@@ -858,7 +858,7 @@ export default function NodeDetailPage() {
               )}
               
               {/* Meta-node navigation */}
-              {node.typeId.startsWith('codex.meta/') && (
+              {node.typeId && node.typeId.startsWith('codex.meta/') && (
                 <button
                   onClick={() => {
                     // Look for nodes that reference this meta-node

@@ -31,10 +31,16 @@ public static class CodexBootstrapHost
 
     public static string ConfigureApp(WebApplication app)
     {
+        var logger = app.Services.GetRequiredService<ICodexLogger>();
+        logger.Info("[Hosting] Starting ConfigureApp...");
         InitializePersistence(app);
+        logger.Info("[Hosting] Persistence initialized");
         var hostingUrl = ConfigureMiddleware(app);
+        logger.Info("[Hosting] Middleware configured");
         ConfigureEndpoints(app);
+        logger.Info("[Hosting] Endpoints configured");
         ConfigureShutdownHandling(app);
+        logger.Info("[Hosting] Shutdown handling configured");
         return hostingUrl;
     }
 
@@ -56,41 +62,17 @@ public static class CodexBootstrapHost
         app.Lifetime.ApplicationStopping.Register(() =>
         {
             shutdownCts.Cancel();
-            Console.WriteLine("Application is shutting down - canceling outstanding AI operations...");
+            var logger = app.Services.GetRequiredService<ICodexLogger>();
+            logger.Info("Application is shutting down - canceling outstanding AI operations...");
         });
     }
 
     private static void ConfigureServer(WebApplicationBuilder builder, string[] args)
     {
-        var urls = builder.Configuration["urls"] ?? "http://localhost:5001";
-        var baseUrl = urls.Split(';')[0];
-        var port = 5001;
-
-        try
-        {
-            if (!string.IsNullOrEmpty(baseUrl) && Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri))
-            {
-                port = uri.Port;
-            }
-            else
-            {
-                var portEnv = Environment.GetEnvironmentVariable("ASPNETCORE_URLS");
-                if (!string.IsNullOrEmpty(portEnv) && portEnv.Contains(':'))
-                {
-                    var portStr = portEnv.Split(':').LastOrDefault();
-                    if (int.TryParse(portStr, out var envPort))
-                    {
-                        port = envPort;
-                    }
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Warning: Could not parse URL '{baseUrl}', using default port 5001. Error: {ex.Message}");
-        }
-
-        builder.WebHost.ConfigureKestrel(options => options.ListenAnyIP(port));
+        // Let ASP.NET Core handle URL binding automatically
+        // Don't manually configure Kestrel as it conflicts with --urls parameter
+        var logger = new Log4NetLogger(typeof(CodexBootstrapHost));
+        logger.Info($"Server configuration: URLs will be handled by ASP.NET Core runtime");
 
         builder.Services.Configure<Microsoft.AspNetCore.HttpsPolicy.HttpsRedirectionOptions>(options =>
         {
@@ -128,7 +110,8 @@ public static class CodexBootstrapHost
             .Equals("true", StringComparison.OrdinalIgnoreCase);
         var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
 
-        Console.WriteLine($"[DEBUG] Environment: {environment}, PersistenceEnabled: {persistenceEnabled}");
+        var bootLogger = new Log4NetLogger(typeof(CodexBootstrapHost));
+        bootLogger.Info($"[DEBUG] Environment: {environment}, PersistenceEnabled: {persistenceEnabled}");
 
         builder.Services.AddSingleton(new NodeRegistryBootstrapOptions(persistenceEnabled, environment));
         builder.Services.AddSingleton<ICodexLogger>(_ => new Log4NetLogger(typeof(CodexBootstrapHost)));
@@ -139,7 +122,7 @@ public static class CodexBootstrapHost
             {
                 if (environment.Equals("Testing", StringComparison.OrdinalIgnoreCase))
                 {
-                    Console.WriteLine("[DEBUG] Using InMemoryIceStorageBackend for Testing environment");
+                    bootLogger.Info("[DEBUG] Using InMemoryIceStorageBackend for Testing environment");
                     return new InMemoryIceStorageBackend();
                 }
 
@@ -159,7 +142,7 @@ public static class CodexBootstrapHost
             {
                 if (environment.Equals("Testing", StringComparison.OrdinalIgnoreCase))
                 {
-                    Console.WriteLine("[DEBUG] Using InMemoryWaterStorageBackend for Testing environment");
+                    bootLogger.Info("[DEBUG] Using InMemoryWaterStorageBackend for Testing environment");
                     return new InMemoryWaterStorageBackend();
                 }
 
@@ -380,53 +363,36 @@ public static class CodexBootstrapHost
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Persistence initialization failed: {ex.Message}");
+            var logger = app.Services.GetRequiredService<ICodexLogger>();
+            logger.Warn($"Persistence initialization failed: {ex.Message}");
         }
     }
 
     private static string ConfigureMiddleware(WebApplication app)
     {
+        var logger = app.Services.GetRequiredService<ICodexLogger>();
         var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "development";
         var portConfig = new PortConfigurationService(environment);
-        var configuredPort = portConfig.GetPort("codex-bootstrap");
-        var correctBaseUrl = $"http://localhost:{configuredPort}";
-        GlobalConfiguration.Initialize(correctBaseUrl);
 
-        app.Use(async (context, next) =>
-        {
-            if (context.Request.Scheme == "https")
-            {
-                context.Request.Scheme = "http";
-            }
-            await next();
-        });
-
-        app.UseRequestLogging();
-
+        // Global exception handler
         app.UseExceptionHandler(errorApp =>
         {
             errorApp.Run(async context =>
             {
-                context.Response.StatusCode = 500;
                 context.Response.ContentType = "application/json";
-
-                var logger = context.RequestServices.GetRequiredService<ICodexLogger>();
                 var exception = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
+                logger.Error($"Unhandled exception: {exception?.Message}", exception);
 
-                if (exception != null)
+                context.Response.StatusCode = 500;
+                var response = new
                 {
-                    logger.Error($"Unhandled exception: {exception.Message}", exception);
+                    success = false,
+                    error = "Internal Server Error",
+                    message = app.Environment.IsDevelopment() ? exception?.Message : "An error occurred while processing your request",
+                    timestamp = DateTime.UtcNow
+                };
 
-                    var response = new
-                    {
-                        success = false,
-                        error = "An internal server error occurred",
-                        message = app.Environment.IsDevelopment() ? exception.Message : "An error occurred while processing your request",
-                        timestamp = DateTime.UtcNow
-                    };
-
-                    await context.Response.WriteAsync(JsonSerializer.Serialize(response));
-                }
+                await context.Response.WriteAsync(JsonSerializer.Serialize(response));
             });
         });
 
@@ -454,50 +420,72 @@ public static class CodexBootstrapHost
         try
         {
             portConfig.ValidateConfiguration();
-            Console.WriteLine(portConfig.GetConfigurationSummary());
+            logger.Info(portConfig.GetConfigurationSummary());
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Port configuration warning: {ex.Message}");
-            Console.WriteLine("Continuing with fallback configuration...");
+            logger.Warn($"Port configuration warning: {ex.Message}");
+            logger.Warn("Continuing with fallback configuration...");
         }
 
-        return correctBaseUrl;
+        // Initialize global base URL from service map
+        var baseUrl = portConfig.GetUrl("codex-bootstrap");
+        GlobalConfiguration.Initialize(baseUrl);
+        return baseUrl;
     }
 
     private static void ConfigureEndpoints(WebApplication app)
     {
-        var registry = app.Services.GetRequiredService<INodeRegistry>();
-        var router = app.Services.GetRequiredService<IApiRouter>();
-        var coreApi = app.Services.GetRequiredService<CoreApiService>();
-        var moduleLoader = app.Services.GetRequiredService<ModuleLoader>();
-        var healthService = app.Services.GetRequiredService<HealthService>();
         var logger = app.Services.GetRequiredService<ICodexLogger>();
+        logger.Info("[Hosting] Starting ConfigureEndpoints...");
+        var registry = app.Services.GetRequiredService<INodeRegistry>();
+        logger.Info("[Hosting] Got INodeRegistry service");
+        var router = app.Services.GetRequiredService<IApiRouter>();
+        logger.Info("[Hosting] Got IApiRouter service");
+        var coreApi = app.Services.GetRequiredService<CoreApiService>();
+        logger.Info("[Hosting] Got CoreApiService");
+        var moduleLoader = app.Services.GetRequiredService<ModuleLoader>();
+        logger.Info("[Hosting] Got ModuleLoader");
+        var healthService = app.Services.GetRequiredService<HealthService>();
         var configuration = app.Configuration;
 
+        logger.Info("[Hosting] About to initialize registry...");
         registry.InitializeAsync().GetAwaiter().GetResult();
+        logger.Info("[Hosting] Registry initialized");
         InitializeMetaNodeSystem(registry);
-        // Ensure U-CORE is seeded synchronously without fire-and-forget to avoid warnings
+        logger.Info("[Hosting] Meta node system initialized");
+        
+        // FOREGROUND: Perform U-CORE seeding synchronously to guarantee availability
         try
         {
+            logger.Info("[Hosting] Starting U-CORE seeding (synchronous)...");
+            var startTime = DateTime.UtcNow;
             UCoreInitializer.SeedIfMissing(registry, logger).GetAwaiter().GetResult();
+            logger.Info($"[Hosting] U-CORE seeding completed in {(DateTime.UtcNow - startTime).TotalMilliseconds}ms");
         }
         catch (Exception ex)
         {
-            logger.Error($"Failed to seed U-CORE: {ex.Message}", ex);
-            throw;
+            logger.Error($"U-CORE seeding failed: {ex.Message}", ex);
         }
 
+        logger.Info("[Hosting] About to load built-in modules...");
         moduleLoader.LoadBuiltInModules();
+        logger.Info("[Hosting] Built-in modules loaded");
         var moduleDirectory = configuration.GetValue<string>("ModuleDirectory") ??
                               Path.Combine(AppContext.BaseDirectory, "modules");
+        logger.Info("[Hosting] About to load external modules from: " + moduleDirectory);
         moduleLoader.LoadExternalModules(moduleDirectory);
+        logger.Info("[Hosting] External modules loaded");
+        logger.Info("[Hosting] About to generate meta nodes...");
         moduleLoader.GenerateMetaNodes();
+        logger.Info("[Hosting] Meta nodes generated");
         healthService.SetModuleLoader(moduleLoader);
 
         LogModuleSummary(logger, moduleLoader.GetLoadedModules());
 
+        logger.Info("[Hosting] About to register HTTP endpoints...");
         moduleLoader.RegisterHttpEndpoints(app, registry, coreApi);
+        logger.Info("[Hosting] HTTP endpoints registered");
 
         // Ensure every encountered typeId has a corresponding meta-node (types-as-nodes invariant)
         MetaNodeSystem.EnsureTypeMetaNodes(registry, logger);

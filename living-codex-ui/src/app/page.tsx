@@ -6,8 +6,10 @@ import { StreamLens } from '@/components/lenses/StreamLens';
 import { usePages, useLenses } from '@/lib/hooks';
 import { defaultAtoms } from '@/lib/atoms';
 import { bootstrapUI } from '@/lib/bootstrap';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function HomePage() {
+  const { user, isAuthenticated } = useAuth();
   const [controls, setControls] = useState({
     axes: ['resonance'],
     joy: 0.7,
@@ -80,12 +82,25 @@ export default function HomePage() {
                   </div>
                 ))}
               </div>
-            ) : (
+            ) : isAuthenticated && user ? (
               <StreamLens
                 lens={streamLens}
                 controls={controls}
-                userId="demo-user"
+                userId={user.id}
               />
+            ) : (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+                <div className="text-blue-800 font-medium mb-2">Sign in to see your personalized stream</div>
+                <div className="text-blue-600 text-sm mb-4">
+                  Connect with concepts and people that resonate with your interests
+                </div>
+                <a
+                  href="/login"
+                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Sign In
+                </a>
+              </div>
             )}
           </div>
         </div>

@@ -84,7 +84,7 @@ All meta-node TypeIds now follow the `codex.meta/` prefix convention:
 ### 🤖 AI Model Policy (Sept 2025)
 - **Primary Provider**: OpenAI (gpt-5-codex for code, gpt-5-mini for analysis)
 - **Secondary Provider**: Cursor Background Agent API (claude-3-5-sonnet-20241022)
-- **Fallback Provider**: Local Ollama (llama3.1:8b)
+- **Fallback Provider**: Local Ollama (llama3.2:3b)
 
 #### **Provider Configuration**
 **OpenAI:**

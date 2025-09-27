@@ -5,6 +5,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { endpoints } from '@/lib/api';
 import { useTrackInteraction } from '@/lib/hooks';
 import { buildApiUrl } from '@/lib/config';
+import { htmlEncode } from '@/lib/utils';
+import { NewsConceptsList } from '@/components/lenses/NewsConceptsList';
 
 interface NewsItem {
   id?: string;
@@ -46,7 +48,7 @@ export default function NewsPage() {
   const [totalCount, setTotalCount] = useState(0);
   const [pageSize] = useState(20);
   const [selectedNewsId, setSelectedNewsId] = useState<string | null>(null);
-  const [summaries, setSummaries] = useState<Record<string, string>>({});
+  const [summaries, setSummaries] = useState<Record<string, { text: string; status: string }>>({});
   const [summaryLoading, setSummaryLoading] = useState(false);
 
   const getNewsNodeId = (item: NewsItem): string | undefined => {
@@ -201,12 +203,18 @@ export default function NewsPage() {
         })
       });
 
-      // Track read interaction
-      trackInteraction(newsIdentifier, 'view', {
-        description: `User read: ${newsItem.title}`,
-        title: newsItem.title,
-        source: newsItem.source,
-      });
+      // Track read interaction - only if we have a valid node ID
+      if (nodeId) {
+        trackInteraction(nodeId, 'view', {
+          description: `User read: ${newsItem.title}`,
+          title: newsItem.title,
+          source: newsItem.source,
+          url: newsItem.url, // Include URL in metadata for reference
+        });
+      } else {
+        // If no node ID, don't track contribution to avoid URL-based contributions
+        console.warn('Cannot track contribution for news item without node ID:', newsItem.title);
+      }
     } catch (error) {
       console.error('Error marking news as read:', error);
     }
@@ -246,10 +254,31 @@ export default function NewsPage() {
       const resp = await fetch(buildApiUrl(`/news/summary/${encodeURIComponent(newsId)}`));
       if (resp.ok) {
         const data = await resp.json();
-        const text = data?.summary || data?.content || '';
-        setSummaries(prev => ({ ...prev, [newsId]: text }));
+        setSummaries(prev => ({ 
+          ...prev, 
+          [newsId]: { 
+            text: data?.summary || '', 
+            status: data?.status || 'error' 
+          } 
+        }));
+      } else {
+        setSummaries(prev => ({ 
+          ...prev, 
+          [newsId]: { 
+            text: '', 
+            status: 'error' 
+          } 
+        }));
       }
-    } catch {}
+    } catch (error) {
+      setSummaries(prev => ({ 
+        ...prev, 
+        [newsId]: { 
+          text: '', 
+          status: 'error' 
+        } 
+      }));
+    }
     setSummaryLoading(false);
   };
 
@@ -393,7 +422,7 @@ export default function NewsPage() {
                     newsItems.map((item, index) => {
                       const nodeId = getNewsNodeId(item);
                       const summaryKey = nodeId ?? item.url;
-                      const summaryText = summaries[summaryKey];
+                      const summaryData = summaries[summaryKey];
                       const isSelected = selectedNewsId === summaryKey;
 
                       return (
@@ -416,13 +445,13 @@ export default function NewsPage() {
                                 }}
                                 className="hover:text-blue-600 transition-colors text-left"
                                 title="Select to load summary"
-                              >
-                                {item.title}
-                              </button>
+                                dangerouslySetInnerHTML={{ __html: htmlEncode(item.title) }}
+                              />
                             </h3>
-                            <p className="text-gray-600 dark:text-gray-300 mb-3 line-clamp-2">
-                              {item.description}
-                            </p>
+                            <p 
+                              className="text-gray-600 dark:text-gray-300 mb-3 line-clamp-2"
+                              dangerouslySetInnerHTML={{ __html: htmlEncode(item.description) }}
+                            />
                             <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
                               <div className="flex items-center space-x-4">
                                 <span>📰 {item.source}</span>
@@ -450,12 +479,22 @@ export default function NewsPage() {
                         {isSelected && (
                           <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200">
                             {summaryLoading && <span>Loading summary...</span>}
-                            {!summaryLoading && (
-                              summaryText ? (
-                                <div>{summaryText}</div>
+                            {!summaryLoading && summaryData && (
+                              summaryData.status === 'available' ? (
+                                <div dangerouslySetInnerHTML={{ __html: htmlEncode(summaryData.text) }} />
+                              ) : summaryData.status === 'generating' ? (
+                                <div className="flex items-center space-x-2">
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                                  <span>Generating summary...</span>
+                                </div>
+                              ) : summaryData.status === 'none' ? (
+                                <div className="text-gray-500 italic">No summary available for this article.</div>
                               ) : (
-                                <div>No summary available.</div>
+                                <div className="text-red-500">Error loading summary. Please try again.</div>
                               )
+                            )}
+                            {!summaryLoading && !summaryData && (
+                              <div className="text-gray-500 italic">Click to load summary</div>
                             )}
                           </div>
                         )}
@@ -529,6 +568,19 @@ export default function NewsPage() {
 
           {/* Sidebar */}
           <div className="space-y-6">
+            {/* Extracted Concepts - Show when a news item is selected */}
+            {selectedNewsId && (
+              <NewsConceptsList
+                newsItemId={selectedNewsId}
+                newsTitle={newsItems.find(item => {
+                  const nodeId = getNewsNodeId(item);
+                  const summaryKey = nodeId ?? item.url;
+                  return summaryKey === selectedNewsId;
+                })?.title || 'Selected News Item'}
+                className="mb-6"
+              />
+            )}
+
             {/* Quick Stats (server-side totals) */}
             <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">📊 News Stats</h3>

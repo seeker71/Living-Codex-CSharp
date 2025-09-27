@@ -14,7 +14,6 @@ namespace CodexBootstrap.Core
             try
             {
                 logger.Info("=== UCoreInitializer.SeedIfMissing called ===");
-                Console.WriteLine("=== UCoreInitializer.SeedIfMissing called ===");
                 
                 // Stage 1: Seed ontology root if missing
                 await SeedOntologyRoot(registry, logger);
@@ -35,12 +34,10 @@ namespace CodexBootstrap.Core
                 await ValidateReferencedConcepts(registry, logger);
 
                 logger.Info("U-CORE ontology seeding completed successfully");
-                Console.WriteLine("U-CORE ontology seeding completed successfully");
             }
             catch (Exception ex)
             {
                 logger.Error($"Error during U-CORE seeding: {ex.Message}", ex);
-                Console.WriteLine($"Error during U-CORE seeding: {ex.Message}");
                 throw;
             }
         }
@@ -48,11 +45,9 @@ namespace CodexBootstrap.Core
         private static async Task SeedOntologyRoot(INodeRegistry registry, ICodexLogger logger)
         {
             logger.Info("Stage 1: Seeding ontology root");
-            Console.WriteLine("Stage 1: Seeding ontology root");
             
             var rootId = "u-core-ontology-root";
             var hasRoot = registry.GetNodesByType("codex.ontology/root").Any();
-            Console.WriteLine($"Root node exists: {hasRoot}");
             if (!hasRoot)
             {
                 var rootNode = new Node(
@@ -76,35 +71,26 @@ namespace CodexBootstrap.Core
                 );
                 registry.Upsert(rootNode);
                 logger.Info("Created U-CORE ontology root node");
-                Console.WriteLine("Created U-CORE ontology root node");
             }
         }
 
         private static async Task CreateImplicitEdges(INodeRegistry registry, ICodexLogger logger)
         {
             logger.Info("Stage 5: Creating implicit edges from concept properties");
-            Console.WriteLine("Stage 5: Creating implicit edges from concept properties");
             
             // Create edges derived from axes (dimensions, keywords, parent/child, type) and ensure missing nodes
-            Console.WriteLine("About to call EnsureAxisDerivedEdgesAndConcepts");
             EnsureAxisDerivedEdgesAndConcepts(registry, logger);
-            Console.WriteLine("EnsureAxisDerivedEdgesAndConcepts completed");
 
             // Create edges derived from concepts (parent/child hierarchy and axis membership)
-            Console.WriteLine("About to call EnsureConceptDerivedEdges");
             EnsureConceptDerivedEdges(registry, logger);
-            Console.WriteLine("EnsureConceptDerivedEdges completed");
 
             // Ensure baseline root → concept edges so every concept has at least one relationship
-            Console.WriteLine("About to call EnsureBaselineConceptEdges");
             EnsureBaselineConceptEdges(registry, logger);
-            Console.WriteLine("EnsureBaselineConceptEdges completed");
         }
 
         private static async Task ValidateReferencedConcepts(INodeRegistry registry, ICodexLogger logger)
         {
             logger.Info("Stage 6: Validating all referenced concepts exist");
-            Console.WriteLine("Stage 6: Validating all referenced concepts exist");
             
             // Get all concept nodes
             var conceptNodes = new List<Node>();
@@ -153,56 +139,50 @@ namespace CodexBootstrap.Core
             if (missingConcepts.Any())
             {
                 logger.Warn($"Found {missingConcepts.Count} missing referenced concepts:");
-                Console.WriteLine($"Found {missingConcepts.Count} missing referenced concepts:");
                 foreach (var missing in missingConcepts)
                 {
                     logger.Warn($"  - {missing}");
-                    Console.WriteLine($"  - {missing}");
                 }
             }
             else
             {
                 logger.Info("All referenced concepts exist");
-                Console.WriteLine("All referenced concepts exist");
             }
         }
 
         private static async Task LoadAxesFromConfig(INodeRegistry registry, ICodexLogger logger)
         {
-            Console.WriteLine("LoadAxesFromConfig called");
+            logger.Info("LoadAxesFromConfig called");
             var axisType = "codex.ontology.axis";
             var hasAxes = registry.GetNodesByType(axisType).Any();
-            Console.WriteLine($"Axes already exist: {hasAxes}");
             if (hasAxes)
             {
                 logger.Info("U-CORE axes already exist, skipping config loading");
-                Console.WriteLine("U-CORE axes already exist, skipping config loading");
                 return;
             }
 
             var configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config", "ontology", "core-axes.json");
-            Console.WriteLine($"Looking for config file at: {configPath}");
+            logger.Info($"Looking for config file at: {configPath}");
             if (!File.Exists(configPath))
             {
                 logger.Warn($"Core axes config file not found: {configPath}");
-                Console.WriteLine($"Config file not found: {configPath}");
                 return;
             }
 
-            Console.WriteLine("Config file found, reading...");
+            logger.Info("Config file found, reading...");
             try
             {
                 var json = await File.ReadAllTextAsync(configPath);
-                Console.WriteLine($"Config file read, size: {json.Length} characters");
+                logger.Info($"Config file read, size: {json.Length} characters");
                 var config = JsonSerializer.Deserialize<AxesConfig>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                Console.WriteLine($"Config deserialized, axes count: {config?.Axes?.Count ?? 0}");
+                logger.Info($"Config deserialized, axes count: {config?.Axes?.Count ?? 0}");
                 
                 if (config?.Axes != null)
                 {
-                    Console.WriteLine($"Processing {config.Axes.Count} axes...");
+                    logger.Info($"Processing {config.Axes.Count} axes...");
                     foreach (var axis in config.Axes)
                     {
-                        Console.WriteLine($"Processing axis: {axis.Id}");
+                        logger.Info($"Processing axis: {axis.Id}");
                         var axisNodeId = $"u-core-axis-{axis.Id}";
                         var axisNode = new Node(
                             Id: axisNodeId,
@@ -309,29 +289,25 @@ namespace CodexBootstrap.Core
                         }
                     }
                     logger.Info($"Loaded {config.Axes.Count} axes from config (edges upserted)");
-                    Console.WriteLine($"Loaded {config.Axes.Count} axes from config (edges upserted)");
                 }
             }
             catch (Exception ex)
             {
                 logger.Error($"Error loading axes config: {ex.Message}", ex);
-                Console.WriteLine($"Error loading axes config: {ex.Message}");
             }
-            Console.WriteLine("LoadAxesFromConfig completed");
         }
 
         private static async Task LoadConceptsFromConfig(INodeRegistry registry, ICodexLogger logger)
         {
-            Console.WriteLine("LoadConceptsFromConfig called");
-            var conceptType = "codex.ucore.base";
+            logger.Info("LoadConceptsFromConfig called");
+                    var conceptType = "codex.ucore.base";
             // Merge strategy: do not skip if some concepts exist; load/Upsert to ensure new/missing seeds are added
 
             var configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config", "ontology", "core-concepts.json");
-            Console.WriteLine($"Looking for concepts config file at: {configPath}");
+            logger.Info($"Looking for concepts config file at: {configPath}");
             if (!File.Exists(configPath))
             {
                 logger.Warn($"Core concepts config file not found: {configPath}");
-                Console.WriteLine($"Concepts config file not found: {configPath}");
                 return;
             }
 
@@ -339,27 +315,23 @@ namespace CodexBootstrap.Core
             {
                 var json = await File.ReadAllTextAsync(configPath);
                 logger.Info($"Loaded concepts config file, size: {json.Length} characters");
-                Console.WriteLine($"Loaded concepts config file, size: {json.Length} characters");
                 
                 var config = JsonSerializer.Deserialize<ConceptsConfig>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                Console.WriteLine($"Config deserialized, concepts count: {config?.Concepts?.Count ?? 0}");
+                logger.Info($"Config deserialized, concepts count: {config?.Concepts?.Count ?? 0}");
                 
                 if (config == null)
                 {
                     logger.Error("Failed to deserialize concepts config - config is null");
-                    Console.WriteLine("Failed to deserialize concepts config - config is null");
                     return;
                 }
                 
                 if (config.Concepts == null)
                 {
                     logger.Error("Failed to deserialize concepts config - Concepts list is null");
-                    Console.WriteLine("Failed to deserialize concepts config - Concepts list is null");
                     return;
                 }
                 
                 logger.Info($"Deserialized concepts config with {config.Concepts.Count} concepts");
-                Console.WriteLine($"Deserialized concepts config with {config.Concepts.Count} concepts");
                 
                 int upserts = 0;
                 foreach (var concept in config.Concepts)
@@ -394,45 +366,39 @@ namespace CodexBootstrap.Core
                     upserts++;
                 }
                 logger.Info($"Merged {upserts} core concepts from config");
-                Console.WriteLine($"Merged {upserts} core concepts from config");
             }
             catch (Exception ex)
             {
                 logger.Error($"Error loading concepts config: {ex.Message}", ex);
-                Console.WriteLine($"Error loading concepts config: {ex.Message}");
             }
-            Console.WriteLine("LoadConceptsFromConfig completed");
         }
 
         private static async Task LoadRelationshipsFromConfig(INodeRegistry registry, ICodexLogger logger)
         {
-            Console.WriteLine("LoadRelationshipsFromConfig called");
+            logger.Info("LoadRelationshipsFromConfig called");
             // Use the core relationship type to align with tests and ontology spec
             var relationshipType = "codex.relationship.core";
             var hasRelationships = registry.GetNodesByType(relationshipType).Any();
-            Console.WriteLine($"Relationships already exist: {hasRelationships}");
             if (hasRelationships)
             {
                 logger.Info("Core relationships already exist, skipping config loading");
-                Console.WriteLine("Core relationships already exist, skipping config loading");
                 return;
             }
 
             var configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config", "ontology", "core-relationships.json");
-            Console.WriteLine($"Looking for relationships config file at: {configPath}");
+            logger.Info($"Looking for relationships config file at: {configPath}");
             if (!File.Exists(configPath))
             {
                 logger.Warn($"Core relationships config file not found: {configPath}");
-                Console.WriteLine($"Relationships config file not found: {configPath}");
                 return;
             }
 
             try
             {
                 var json = await File.ReadAllTextAsync(configPath);
-                Console.WriteLine($"Loaded relationships config file, size: {json.Length} characters");
+                logger.Info($"Loaded relationships config file, size: {json.Length} characters");
                 var config = JsonSerializer.Deserialize<RelationshipsConfig>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                Console.WriteLine($"Config deserialized, relationships count: {config?.Relationships?.Count ?? 0}");
+                logger.Info($"Config deserialized, relationships count: {config?.Relationships?.Count ?? 0}");
                 
                 if (config?.Relationships != null)
                 {
@@ -468,15 +434,12 @@ namespace CodexBootstrap.Core
                         upserts++;
                     }
                     logger.Info($"Loaded {upserts} core relationships from config");
-                    Console.WriteLine($"Loaded {upserts} core relationships from config");
                 }
             }
             catch (Exception ex)
             {
                 logger.Error($"Error loading relationships config: {ex.Message}", ex);
-                Console.WriteLine($"Error loading relationships config: {ex.Message}");
             }
-            Console.WriteLine("LoadRelationshipsFromConfig completed");
         }
 
         private static void EnsureAxisDerivedEdgesAndConcepts(INodeRegistry registry, ICodexLogger logger)
@@ -520,12 +483,12 @@ namespace CodexBootstrap.Core
                     return new Node(
                         Id: fullId,
                         TypeId: typeId,
-                        State: ContentState.Ice,
+                        State: ContentState.Water,
                         Locale: "en-US",
                         Title: title,
                         Description: description,
                         Content: new ContentRef("application/json", JsonSerializer.Serialize(new { id = conceptId, name = title, description, typeId, level, keywords = keywords ?? Array.Empty<string>(), axes = axes ?? Array.Empty<string>() }), null, null),
-                        Meta: new Dictionary<string, object> { ["name"] = title, ["level"] = level }
+                        Meta: new Dictionary<string, object> { ["name"] = title, ["level"] = level, ["placeholder"] = true }
                     );
                 }
 
@@ -679,26 +642,9 @@ namespace CodexBootstrap.Core
                 conceptNodes = conceptNodes.Distinct().ToList();
                 
                 logger.Info($"EnsureConceptDerivedEdges: Found {conceptNodes.Count} concept nodes with type prefixes 'codex.ucore', 'codex.concept', and 'codex.meta'");
-                Console.WriteLine($"EnsureConceptDerivedEdges: Found {conceptNodes.Count} concept nodes with type prefixes 'codex.ucore', 'codex.concept', and 'codex.meta'");
-                
-                // Debug: List all concept type IDs
-                var typeIds = conceptNodes.Select(n => n.TypeId).Distinct().ToList();
-                Console.WriteLine($"Concept type IDs found: {string.Join(", ", typeIds)}");
-                
-                // Debug: Check if kw-matter is in the list
-                var kwMatterNode = conceptNodes.FirstOrDefault(n => n.Id == "u-core-concept-kw-matter");
-                if (kwMatterNode != null)
-                {
-                    Console.WriteLine($"Found kw-matter node with type: {kwMatterNode.TypeId}");
-                }
-                else
-                {
-                    Console.WriteLine("kw-matter node NOT found in concept nodes");
-                }
                 if (conceptNodes.Count == 0)
                 {
                     logger.Info("No concepts found to derive edges from");
-                    Console.WriteLine("No concepts found to derive edges from");
                     return;
                 }
 
@@ -736,13 +682,6 @@ namespace CodexBootstrap.Core
                         Meta: mergedMeta
                     );
                     registry.Upsert(edge);
-                    Console.WriteLine($"    Upserted edge: {fromId} -> {toId} ({role})");
-                    
-                    // Special debug for kw-matter node
-                    if (fromId == "u-core-concept-kw-matter" || toId == "u-core-concept-kw-matter")
-                    {
-                        Console.WriteLine($"    *** KW-MATTER EDGE: {fromId} -> {toId} ({role}) ***");
-                    }
                 }
 
                 // Helper to detect missing concepts without generating new nodes at runtime
@@ -760,7 +699,7 @@ namespace CodexBootstrap.Core
                     return new Node(
                         Id: fullId,
                         TypeId: "codex.concept",
-                        State: ContentState.Ice,
+                        State: ContentState.Water,
                         Locale: "en-US",
                         Title: title,
                         Description: $"Stub for missing concept '{shortId}'",
@@ -770,7 +709,7 @@ namespace CodexBootstrap.Core
                             InlineBytes: null,
                             ExternalUri: null
                         ),
-                        Meta: new Dictionary<string, object> { ["name"] = title, ["level"] = 3 }
+                        Meta: new Dictionary<string, object> { ["name"] = title, ["level"] = 3, ["placeholder"] = true }
                     );
                 }
 
@@ -780,26 +719,13 @@ namespace CodexBootstrap.Core
                     var shortId = conceptByShortId.First(kv => kv.Value.Id == conceptId).Key;
                     logger.Info($"Processing concept {conceptId} (short: {shortId})");
                     
-                    // Special debug for kw-matter
-                    if (conceptId == "u-core-concept-kw-matter")
-                    {
-                        Console.WriteLine($"    *** PROCESSING KW-MATTER CONCEPT ***");
-                        Console.WriteLine($"    Keywords: {string.Join(", ", GetStringArray(concept.Meta, "keywords"))}");
-                        Console.WriteLine($"    Axes: {string.Join(", ", GetStringArray(concept.Meta, "axes"))}");
-                        Console.WriteLine($"    Parent concepts: {string.Join(", ", GetStringArray(concept.Meta, "parentConcepts"))}");
-                        Console.WriteLine($"    Child concepts: {string.Join(", ", GetStringArray(concept.Meta, "childConcepts"))}");
-                    }
-
                     // Parent concepts → is_a edge from this to parent; and optional reverse has_child
                     var parents = GetStringArray(concept.Meta, "parentConcepts");
-                    logger.Info($"  Parent concepts: {string.Join(", ", parents)}");
                     foreach (var parentShort in parents)
                     {
                         var parentNode = conceptByShortId.TryGetValue(parentShort, out var p) ? p : EnsureConceptPlaceholder(parentShort);
                         conceptByShortId[parentShort] = parentNode; // cache
-                        logger.Info($"    Creating edge: {conceptId} -> {parentNode.Id} (is_a)");
                         UpsertEdge(conceptId, parentNode.Id, "is_a", 1.0, new Dictionary<string, object> { ["child"] = shortId, ["parent"] = parentShort });
-                        logger.Info($"    Creating edge: {parentNode.Id} -> {conceptId} (has_child)");
                         UpsertEdge(parentNode.Id, conceptId, "has_child", 0.95, new Dictionary<string, object> { ["parent"] = parentShort, ["child"] = shortId });
                     }
 
@@ -815,12 +741,10 @@ namespace CodexBootstrap.Core
 
                     // Axes membership → concept_on_axis (link to axis nodes)
                     var axes = GetStringArray(concept.Meta, "axes");
-                    logger.Info($"  Axes: {string.Join(", ", axes)}");
                     foreach (var axisShort in axes)
                     {
                         // Ensure axis node exists
                         var axisNode = registry.TryGet($"u-core-axis-{axisShort}", out var existingAxis) ? existingAxis : EnsureAxisNode(registry, axisShort, logger);
-                        logger.Info($"    Creating edge: {conceptId} -> {axisNode.Id} (concept_on_axis)");
                         UpsertEdge(conceptId, axisNode.Id, "concept_on_axis", 0.9, new Dictionary<string, object> { ["concept"] = shortId, ["axis"] = axisShort });
                     }
                 }

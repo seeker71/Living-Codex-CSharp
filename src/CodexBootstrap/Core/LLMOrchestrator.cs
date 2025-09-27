@@ -144,9 +144,17 @@ namespace CodexBootstrap.Core
                 json = json.Substring(1, json.Length - 2);
             }
 
-            // Remove extra whitespace and newlines
-            json = System.Text.RegularExpressions.Regex.Replace(json, @"\s+", " ");
-            json = json.Trim();
+            // Only remove extra whitespace/newlines if this looks like JSON (starts with { or [)
+            // This preserves newlines in text content while still sanitizing JSON
+            var trimmedJson = json.Trim();
+            if (trimmedJson.StartsWith("{") || trimmedJson.StartsWith("["))
+            {
+                // For JSON, remove extra whitespace and newlines between tokens
+                // But preserve newlines within string values by being more careful
+                json = System.Text.RegularExpressions.Regex.Replace(json, @"\s+", " ");
+                json = json.Trim();
+            }
+            // For non-JSON content (like summaries), preserve the original formatting
 
             return json;
         }

@@ -69,23 +69,50 @@ public sealed class FileAdapter : IContentAdapter
             if (!File.Exists(filePath))
                 return new { error = "File not found", path = filePath };
 
-            var content = await File.ReadAllTextAsync(filePath, cancellationToken);
             var mediaType = contentRef.MediaType ?? "text/plain";
+            var fileInfo = new FileInfo(filePath);
+            var lastModified = fileInfo.LastWriteTime;
 
-            return new
+            // Determine if this is a binary file based on media type or file extension
+            var isBinary = AdapterModule.IsBinaryFile(mediaType, filePath);
+            
+            if (isBinary)
             {
-                content,
-                mediaType,
-                path = filePath,
-                size = content.Length,
-                lastModified = File.GetLastWriteTime(filePath)
-            };
+                // For binary files, read as bytes and return as base64
+                var bytes = await File.ReadAllBytesAsync(filePath, cancellationToken);
+                var base64Content = Convert.ToBase64String(bytes);
+                
+                return new
+                {
+                    content = base64Content,
+                    mediaType,
+                    path = filePath,
+                    size = bytes.Length,
+                    lastModified,
+                    encoding = "base64"
+                };
+            }
+            else
+            {
+                // For text files, read as text
+                var content = await File.ReadAllTextAsync(filePath, cancellationToken);
+                
+                return new
+                {
+                    content,
+                    mediaType,
+                    path = filePath,
+                    size = content.Length,
+                    lastModified
+                };
+            }
         }
         catch (Exception ex)
         {
             return new { error = ex.Message, path = contentRef.ExternalUri?.LocalPath };
         }
     }
+
 }
 
 public sealed class HttpAdapter : IContentAdapter
@@ -308,6 +335,39 @@ public sealed class AdapterModule : ModuleBase
         return _adapters.Values;
     }
 
+    public static bool IsBinaryFile(string mediaType, string filePath)
+    {
+        // Check media type first
+        if (!string.IsNullOrEmpty(mediaType))
+        {
+            var binaryTypes = new[]
+            {
+                "image/", "video/", "audio/", "application/octet-stream",
+                "application/pdf", "application/zip", "application/x-",
+                "font/", "model/"
+            };
+            
+            if (binaryTypes.Any(type => mediaType.StartsWith(type, StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+        }
+
+        // Check file extension as fallback
+        var extension = Path.GetExtension(filePath).ToLowerInvariant();
+        var binaryExtensions = new[]
+        {
+            ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp", ".svg",
+            ".mp4", ".avi", ".mov", ".wmv", ".flv", ".webm",
+            ".mp3", ".wav", ".flac", ".aac", ".ogg",
+            ".pdf", ".zip", ".rar", ".7z", ".tar", ".gz",
+            ".exe", ".dll", ".so", ".dylib",
+            ".woff", ".woff2", ".ttf", ".otf", ".eot"
+        };
+
+        return binaryExtensions.Contains(extension);
+    }
+
     public override void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader)
     {
         // Adapter module exposes content hydration endpoint for external URIs
@@ -454,24 +514,7 @@ public sealed class AdapterModule : ModuleBase
             {
                 var scheme = contentRef.ExternalUri.Scheme.ToLowerInvariant();
 
-                // For file nodes, prefer the filesystem module's path for efficiency if available
-                if (scheme == "file")
-                {
-                    // If this is a file node, try to read the file directly from metadata path
-                    var absolutePath = node.Meta?.GetValueOrDefault("absolutePath")?.ToString();
-                    if (!string.IsNullOrEmpty(absolutePath) && File.Exists(absolutePath))
-                    {
-                        var text = await File.ReadAllTextAsync(absolutePath);
-                        return new
-                        {
-                            success = true,
-                            nodeId = node.Id,
-                            mediaType = contentRef.MediaType ?? "text/plain",
-                            content = text,
-                            source = "filesystem"
-                        };
-                    }
-                }
+                // Use adapters for all external content resolution, including files
 
                 var adapter = GetAdapter(scheme);
                 if (adapter == null)

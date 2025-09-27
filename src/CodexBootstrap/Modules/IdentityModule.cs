@@ -324,8 +324,12 @@ public sealed class IdentityModule : ModuleBase
     {
         try
         {
-            // Get user by username
-            var userNode = Registry.GetNode($"user.{request.Username}");
+            // Get user by username - search for users with matching username in meta
+            var userNodes = Registry.GetNodesByType("codex.user").ToList();
+            var userNode = userNodes.FirstOrDefault(u => 
+                u.Meta?.ContainsKey("username") == true && 
+                u.Meta["username"]?.ToString() == request.Username);
+            
             if (userNode == null)
             {
                 return new UserAuthResponse(false, null, "Invalid credentials");

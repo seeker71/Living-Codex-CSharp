@@ -216,7 +216,7 @@ public sealed class SharedMetadataModule : ModuleBase
                 {
                     models = new[]
                     {
-                        new { name = "llama3.1:8b", provider = "ollama", type = "llm", capabilities = new[] { "text-generation", "concept-extraction" } },
+                        new { name = "llama3.2:3b", provider = "ollama", type = "llm", capabilities = new[] { "text-generation", "concept-extraction" } },
                         new { name = "gpt-4", provider = "openai", type = "llm", capabilities = new[] { "text-generation", "concept-extraction", "analysis" } },
                         new { name = "claude-3", provider = "anthropic", type = "llm", capabilities = new[] { "text-generation", "analysis" } }
                     }
@@ -275,7 +275,7 @@ public sealed class SharedMetadataModule : ModuleBase
                 Data: new
                 {
                     newsIngestion = new { intervalMinutes = 15, cleanupIntervalHours = 24 },
-                    aiProcessing = new { defaultModel = "llama3.1:8b", defaultProvider = "ollama" },
+                    aiProcessing = new { defaultModel = "llama3.2:3b", defaultProvider = "ollama" },
                     contentExtraction = new { maxContentLength = 50000, minContentLength = 100 },
                     conceptExtraction = new { maxConceptsPerItem = 10, similarityThreshold = 0.3 }
                 }

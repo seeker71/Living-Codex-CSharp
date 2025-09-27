@@ -62,8 +62,15 @@ public class ConceptModule : ModuleBase
     {
         try
         {
-            // Get all concept nodes
-            var conceptNodes = _registry.GetNodesByType("codex.concept");
+            // Get all concept nodes - both extracted concepts and core concepts
+            var extractedConcepts = _registry.GetNodesByType("codex.concept.extracted");
+            var coreConcepts = _registry.GetNodesByType("codex.concept");
+            var conceptNodes = extractedConcepts.Concat(coreConcepts).ToList();
+            
+            // Debug: Log concept counts
+            var extractedCount = extractedConcepts.Count();
+            var coreCount = coreConcepts.Count();
+            _logger.Info("Found " + extractedCount + " extracted concepts and " + coreCount + " core concepts");
             
             var concepts = conceptNodes.Select(node => new
             {

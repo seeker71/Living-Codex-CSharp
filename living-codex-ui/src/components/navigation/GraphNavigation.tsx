@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { buildApiUrl } from '@/lib/config';
 
 interface GraphNavigationProps {
   currentNodeId: string;
@@ -34,7 +35,7 @@ export function GraphNavigation({ currentNodeId, onNavigate, className = '' }: G
     setLoading(true);
     try {
       // Load edges for this node
-      const edgesResponse = await fetch(`/api/storage-endpoints/edges?nodeId=${nodeId}`);
+      const edgesResponse = await fetch(buildApiUrl(`/storage-endpoints/edges?nodeId=${nodeId}`));
       if (edgesResponse.ok) {
         const edgesData = await edgesResponse.json();
         if (edgesData.edges) {
@@ -49,7 +50,7 @@ export function GraphNavigation({ currentNodeId, onNavigate, className = '' }: G
             
             try {
               // Load the related node
-              const nodeResponse = await fetch(`/api/storage-endpoints/nodes/${relatedNodeId}`);
+              const nodeResponse = await fetch(buildApiUrl(`/storage-endpoints/nodes/${relatedNodeId}`));
               if (nodeResponse.ok) {
                 const nodeData = await nodeResponse.json();
                 if (nodeData.node) {

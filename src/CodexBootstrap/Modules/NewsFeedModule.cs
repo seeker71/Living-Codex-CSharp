@@ -61,6 +61,7 @@ public sealed class NewsFeedModule : ModuleBase
     }
 
     // Get personalized news feed for user
+    [RequireAuth]
     [ApiRoute("GET", "/news/feed/{userId}", "Get User News Feed", "Get personalized news feed for a user based on their interests", "codex.news-feed")]
     public async Task<object> GetUserNewsFeed(
         [ApiParameter("userId", "User ID to get news feed for", Required = true, Location = "path")] string userId,
@@ -174,6 +175,115 @@ public sealed class NewsFeedModule : ModuleBase
         {
             _logger.Error($"Error getting news item {id}: {ex.Message}", ex);
             return new ErrorResponse($"Error getting news item: {ex.Message}");
+        }
+    }
+
+    // Get news item summary
+    [ApiRoute("GET", "/news/summary/{id}", "Get News Summary", "Get summary content for a news item", "codex.news-feed")]
+    public async Task<object> GetNewsSummary([ApiParameter("id", "News item ID", Required = true, Location = "path")] string id)
+    {
+        try
+        {
+            var node = Registry.GetNode(id);
+            if (node?.TypeId != "codex.news.item")
+            {
+                return new ErrorResponse("News item not found");
+            }
+
+            // First try to get summary from linked summary node
+            var summaryNodeId = node.Meta?.GetValueOrDefault("summaryNodeId")?.ToString();
+            if (!string.IsNullOrWhiteSpace(summaryNodeId))
+            {
+                var summaryNode = Registry.GetNode(summaryNodeId);
+                if (summaryNode?.TypeId == "codex.content.summary" && summaryNode.Content?.InlineJson != null)
+                {
+                    return new NewsSummaryResponse(id, summaryNode.Content.InlineJson, "available");
+                }
+            }
+
+            // Fallback to explicit summary field in metadata
+            var summary = node.Meta?.GetValueOrDefault("summary")?.ToString();
+            if (!string.IsNullOrWhiteSpace(summary))
+            {
+                return new NewsSummaryResponse(id, summary, "available");
+            }
+
+            // Check if summary is being generated
+            var isGenerating = node.Meta?.GetValueOrDefault("summaryGenerating")?.ToString() == "true";
+            if (isGenerating)
+            {
+                return new NewsSummaryResponse(id, "", "generating");
+            }
+            
+            // No summary available and not generating
+            return new NewsSummaryResponse(id, "", "none");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error getting news summary for {id}: {ex.Message}", ex);
+            return new ErrorResponse($"Error getting news summary: {ex.Message}");
+        }
+    }
+
+    // Get news item concepts
+    [ApiRoute("GET", "/news/concepts/{id}", "Get News Concepts", "Get extracted concepts for a news item", "codex.news-feed")]
+    public async Task<object> GetNewsConcepts([ApiParameter("id", "News item ID", Required = true, Location = "path")] string id)
+    {
+        try
+        {
+            var node = Registry.GetNode(id);
+            if (node?.TypeId != "codex.news.item")
+            {
+                return new ErrorResponse("News item not found");
+            }
+
+            var concepts = new List<object>();
+
+            // Get concept node IDs from metadata
+            var conceptNodeIds = node.Meta?.GetValueOrDefault("conceptNodeIds") as string[];
+            if (conceptNodeIds != null && conceptNodeIds.Length > 0)
+            {
+                foreach (var conceptNodeId in conceptNodeIds)
+                {
+                    var conceptNode = Registry.GetNode(conceptNodeId);
+                    if (conceptNode != null)
+                    {
+                        // Get edges to find relationship data
+                        var edges = Registry.GetEdges()
+                            .Where(e => e.FromId == id && e.ToId == conceptNodeId && e.Role == "relates-to")
+                            .ToList();
+
+                        var edge = edges.FirstOrDefault();
+                        var extractedAt = edge?.Meta?.GetValueOrDefault("extractedAt")?.ToString();
+                        var concept = edge?.Meta?.GetValueOrDefault("concept")?.ToString();
+
+                        concepts.Add(new
+                        {
+                            id = conceptNode.Id,
+                            name = conceptNode.Title ?? concept ?? "Unknown Concept",
+                            description = conceptNode.Description,
+                            weight = 1.0, // Default weight
+                            resonance = 0.5, // Default resonance
+                            confidence = 0.8, // Default confidence
+                            extractedAt = extractedAt,
+                            conceptType = conceptNode.TypeId,
+                            axes = new string[0], // Could be populated from U-Core mapping
+                            meta = conceptNode.Meta
+                        });
+                    }
+                }
+            }
+
+            return new
+            {
+                success = true,
+                concepts = concepts.OrderByDescending(c => ((dynamic)c).weight).ToList()
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error getting news concepts for {id}: {ex.Message}", ex);
+            return new ErrorResponse($"Error getting news concepts: {ex.Message}");
         }
     }
 
@@ -307,6 +417,7 @@ public sealed class NewsFeedModule : ModuleBase
     }
 
     // Get unread news for user
+    [RequireAuth]
     [ApiRoute("GET", "/news/unread/{userId}", "Get Unread News", "Get unread news items for user", "codex.news-feed")]
     public async Task<object> GetUnreadNews(
         [ApiParameter("userId", "User ID", Required = true, Location = "path")] string userId,
@@ -375,8 +486,26 @@ public sealed class NewsFeedModule : ModuleBase
             _logger.Info($"Found {newsNodes.Count} news nodes in registry");
             
             var totalCount = newsNodes.Count;
+            
+            // Robust publishedAt parsing (DateTime, DateTimeOffset, string ISO)
+            DateTime? GetPublishedAt(Node n)
+            {
+                try
+                {
+                    var raw = n.Meta?.GetValueOrDefault("publishedAt");
+                    if (raw is DateTime dt) return dt.ToUniversalTime();
+                    if (raw is DateTimeOffset dto) return dto.UtcDateTime;
+                    if (raw is string s && DateTime.TryParse(s, out var parsed))
+                    {
+                        return DateTime.SpecifyKind(parsed, DateTimeKind.Utc);
+                    }
+                }
+                catch { }
+                return null;
+            }
+            
             var items = newsNodes
-                .OrderByDescending(n => n.Meta?.GetValueOrDefault("publishedAt"))
+                .OrderByDescending(n => GetPublishedAt(n) ?? DateTime.MinValue)
                 .Skip(skip)
                 .Take(Math.Max(1, Math.Min(limit, 500)))
                 .Select(MapNodeToNewsFeedItem)
@@ -830,8 +959,29 @@ public sealed class NewsFeedModule : ModuleBase
             }
 
             var url = ResolveUrl(node);
-            var rawSource = node.Meta?.GetValueOrDefault("source")?.ToString();
-            var normalizedSource = NormalizeSource(rawSource, url);
+            
+            // Try to get source from serialized NewsItem content first
+            string? source = null;
+            if (node.Content?.InlineJson != null)
+            {
+                try
+                {
+                    var newsItem = JsonSerializer.Deserialize<NewsItem>(node.Content.InlineJson);
+                    source = newsItem?.Source;
+                }
+                catch (Exception ex)
+                {
+                    _logger.Debug($"Failed to deserialize NewsItem content: {ex.Message}");
+                }
+            }
+            
+            // Fallback to metadata
+            if (string.IsNullOrWhiteSpace(source))
+            {
+                source = node.Meta?.GetValueOrDefault("source")?.ToString();
+            }
+            
+            var normalizedSource = NormalizeSource(source, url);
             if (string.Equals(normalizedSource, "Unknown", StringComparison.OrdinalIgnoreCase))
             {
                 // Try alternate meta keys to derive a better source name
@@ -993,4 +1143,11 @@ public record NewsReadRequest(
 [MetaNode(Id = "codex.news-feed.news-item-response", Name = "News Item Response", Description = "Response containing a single news item")]
 public record NewsItemResponse(
     NewsFeedItem? Item
+);
+
+[MetaNode(Id = "codex.news-feed.news-summary-response", Name = "News Summary Response", Description = "Response containing news summary content")]
+public record NewsSummaryResponse(
+    string NewsId,
+    string Summary,
+    string Status = "available" // "available", "generating", "none", "error"
 );

@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import React, { Suspense } from 'react';
 import { Navigation } from '@/components/ui/Navigation';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, StatsCard, NodeCard, EdgeCard } from '@/components/ui/Card';
-import { useStorageStats, useNodes, useHealthStatus, useAdvancedNodeSearch, useNodeTypes, useAdvancedEdgeSearch } from '@/lib/hooks';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, StatsCard, NodeCard } from '@/components/ui/Card';
+import { EdgeCard } from '@/components/ui/EdgeCard';
+import { PaginationControls } from '@/components/ui/PaginationControls';
+import { useStorageStats, useNodes, useHealthStatus, useAdvancedNodeSearch, useNodeTypes, useAdvancedEdgeSearch, useEdgeMetadata } from '@/lib/hooks';
 import { endpoints } from '@/lib/api';
 import { buildApiUrl } from '@/lib/config';
 
@@ -67,7 +69,7 @@ function GraphPageInner() {
   const [nodeDetails, setNodeDetails] = useState<Node | null>(null);
   const [loading, setLoading] = useState(false);
   const [nodePage, setNodePage] = useState(1);
-  const [nodePageSize] = useState(50);
+  const [nodePageSize, setNodePageSize] = useState(25);
   const [directMatchNode, setDirectMatchNode] = useState<any | null>(null);
   
   // Edge browser state
@@ -75,12 +77,13 @@ function GraphPageInner() {
   const [selectedRelationshipType, setSelectedRelationshipType] = useState<string>('');
   const [edgeSearchQuery, setEdgeSearchQuery] = useState('');
   const [edgePage, setEdgePage] = useState(1);
-  const [edgePageSize] = useState(50);
+  const [edgePageSize, setEdgePageSize] = useState(25);
 
   // Use hooks for data fetching
   const { data: stats, isLoading: statsLoading } = useStorageStats();
   const { data: healthData } = useHealthStatus();
   const { data: nodeTypesData, isLoading: nodeTypesLoading } = useNodeTypes();
+  const { data: edgeMetadataData, isLoading: edgeMetadataLoading } = useEdgeMetadata();
   
   // Advanced node search with filtering
   const nodeSearchParams = {
@@ -111,17 +114,13 @@ function GraphPageInner() {
     (nodeTypesData.data as any)?.nodeTypes?.map((nt: any) => nt.typeId).sort() || [] :
     [];
 
-  const edgeRoles = ['defines', 'implements', 'contains', 'uses', 'extends', 'references', 'connects', 'provides'];
-  const relationshipTypes = [
-    'module-defines-record-type',
-    'module-implements-interface', 
-    'node-contains-property',
-    'api-uses-type',
-    'concept-extends-concept',
-    'node-references-node',
-    'service-provides-capability',
-    'user-interacts-with-concept'
-  ];
+  // Get edge roles and relationship types from server, fallback to empty arrays if loading or failed
+  const edgeRoles = edgeMetadataData?.success ? 
+    (edgeMetadataData.data as any)?.roles || [] :
+    [];
+  const relationshipTypes = edgeMetadataData?.success ? 
+    (edgeMetadataData.data as any)?.relationshipTypes || [] :
+    [];
 
   // Handle URL parameters for node selection
   useEffect(() => {
@@ -367,115 +366,127 @@ function GraphPageInner() {
             </div>
 
             {/* Node Results */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                  Node Results
-                </h3>
-                <span className="text-sm text-gray-500">
-                  {nodesLoading ? 'Loading...' : 
-                    `${(nodesData?.data as any)?.nodes?.length || 0} of ${(nodesData?.data as any)?.totalCount || 0} nodes`}
-                </span>
-              </div>
-
-              {nodesLoading ? (
-                <div className="space-y-3">
-                  {[...Array(5)].map((_, i) => (
-                    <div key={i} className="animate-pulse bg-gray-200 rounded-lg h-16"></div>
-                  ))}
-                </div>
-              ) : nodesData?.success && (nodesData.data as any)?.nodes ? (
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {directMatchNode && (
-                    <div className="border border-green-300 rounded-lg p-3 bg-green-50">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="text-sm text-green-700 font-semibold">Direct ID match</div>
-                          <div className="text-gray-900 font-medium">
-                            {directMatchNode.title || directMatchNode.id}
-                          </div>
-                          <div className="text-xs text-gray-600">{directMatchNode.typeId}</div>
-                        </div>
-                        <button
-                          onClick={() => window.open(`/node/${directMatchNode.id}`, '_blank')}
-                          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                        >
-                          View →
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  {(nodesData.data as any).nodes.map((node: any) => (
-                    <div
-                      key={node.id}
-                      className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <span className="text-xl">{getNodeTypeIcon(node.typeId)}</span>
-                        <div>
-                          <div className="font-medium text-gray-900">
-                            <button
-                              onClick={() => window.open(`/node/${encodeURIComponent(node.id)}`, '_blank')}
-                              className="hover:text-blue-600 hover:underline text-left"
-                            >
-                              {node.title || node.id}
-                            </button>
-                          </div>
-                          <div className="text-sm text-gray-600">{node.typeId}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStateColor(node.state)}`}>
-                          {node.state}
-                        </span>
-                        <button
-                          onClick={() => window.open(`/node/${encodeURIComponent(node.id)}`, '_blank')}
-                          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                        >
-                          View →
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center text-gray-500 py-8">
-                  <div className="text-4xl mb-4">🔍</div>
-                  <div>No nodes found</div>
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Node Results</CardTitle>
+                    <CardDescription className="mt-1">
+                      {nodesLoading ? 'Loading...' : 
+                        `${(nodesData?.data as any)?.nodes?.length || 0} of ${(nodesData?.data as any)?.totalCount || 0} nodes`}
+                    </CardDescription>
+                  </div>
                   <button
-                    onClick={() => setSelectedNodeType('')}
-                    className="mt-4 text-blue-600 hover:text-blue-700 text-sm font-medium"
+                    onClick={() => refetchNodes()}
+                    disabled={loading || nodesLoading}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm font-medium"
                   >
-                    Clear filters
+                    {loading || nodesLoading ? 'Loading...' : 'Refresh'}
                   </button>
                 </div>
-              )}
+              </CardHeader>
+              
+              <CardContent>
+                {/* Pagination at top */}
+                {nodesData?.success && (nodesData.data as any)?.totalCount > 0 && (
+                  <div className="mb-6">
+                    <PaginationControls
+                      currentPage={nodePage}
+                      pageSize={nodePageSize}
+                      totalCount={(nodesData.data as any)?.totalCount || 0}
+                      onPageChange={setNodePage}
+                      onPageSizeChange={setNodePageSize}
+                      showPageSizeSelector={true}
+                      pageSizeOptions={[10, 25, 50, 100, 200]}
+                    />
+                  </div>
+                )}
 
-              {/* Node Pagination */}
-              {nodesData?.success && (nodesData.data as any)?.totalCount > nodePageSize && (
-                <div className="mt-6 flex items-center justify-between">
-                  <div className="text-sm text-gray-500">
-                    Page {nodePage} of {Math.ceil(((nodesData.data as any)?.totalCount || 0) / nodePageSize)}
+                {nodesLoading ? (
+                  <div className="space-y-3">
+                    {[...Array(5)].map((_, i) => (
+                      <div key={i} className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-lg h-16"></div>
+                    ))}
                   </div>
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => setNodePage(Math.max(1, nodePage - 1))}
-                      disabled={nodePage <= 1 || nodesLoading}
-                      className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Previous
-                    </button>
-                    <button
-                      onClick={() => setNodePage(nodePage + 1)}
-                      disabled={nodePage >= Math.ceil(((nodesData.data as any)?.totalCount || 0) / nodePageSize) || nodesLoading}
-                      className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Next
-                    </button>
+                ) : nodesData?.success && (nodesData.data as any)?.nodes ? (
+                  <div className="space-y-3">
+                    {directMatchNode && (
+                      <div className="border border-green-300 rounded-lg p-3 bg-green-50 dark:bg-green-900/20">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-sm text-green-700 dark:text-green-300 font-semibold">Direct ID match</div>
+                            <div className="text-gray-900 dark:text-gray-100 font-medium">
+                              {directMatchNode.title || directMatchNode.id}
+                            </div>
+                            <div className="text-xs text-gray-600 dark:text-gray-400">{directMatchNode.typeId}</div>
+                          </div>
+                          <button
+                            onClick={() => window.open(`/node/${encodeURIComponent(directMatchNode.id)}`, '_blank')}
+                            className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium"
+                          >
+                            View →
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {(nodesData.data as any).nodes.map((node: any) => (
+                      <div
+                        key={node.id}
+                        className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <span className="text-xl">{getNodeTypeIcon(node.typeId)}</span>
+                          <div>
+                            <div className="font-medium text-gray-900 dark:text-gray-100">
+                              <button
+                                onClick={() => window.open(`/node/${encodeURIComponent(node.id)}`, '_blank')}
+                                className="hover:text-blue-600 hover:underline text-left"
+                              >
+                                {node.title || node.id}
+                              </button>
+                            </div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">{node.typeId}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStateColor(node.state)}`}>
+                            {node.state}
+                          </span>
+                          <button
+                            onClick={() => window.open(`/node/${encodeURIComponent(node.id)}`, '_blank')}
+                            className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium"
+                          >
+                            View →
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              )}
-            </div>
+                ) : (
+                  <div className="text-center text-gray-500 dark:text-gray-400 py-12">
+                    <div className="text-6xl mb-4">🔍</div>
+                    <div className="text-xl font-medium mb-2">No Nodes Found</div>
+                    <p className="text-sm mb-6 max-w-md mx-auto">
+                      {selectedNodeType || searchQuery
+                        ? 'No nodes match your current filters. Try adjusting the filters above or clear them to see all nodes.'
+                        : 'No nodes found in the system. Nodes will appear as content is created.'
+                      }
+                    </p>
+                    {(selectedNodeType || searchQuery) && (
+                      <button
+                        onClick={() => {
+                          setSelectedNodeType('');
+                          setSearchQuery('');
+                        }}
+                        className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+                      >
+                        Clear Filters
+                      </button>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         )}
 
@@ -483,177 +494,175 @@ function GraphPageInner() {
         {selectedView === 'edges' && (
           <div className="space-y-6">
             {/* Edge Filters */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">🔗 Edge Filters</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
-                  <select
-                    value={selectedEdgeRole}
-                    onChange={(e) => setSelectedEdgeRole(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">All Roles</option>
-                    {edgeRoles.map(role => (
-                      <option key={role} value={role}>{role}</option>
-                    ))}
-                  </select>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <span>🔗</span>
+                  Edge Explorer
+                </CardTitle>
+                <CardDescription>
+                  Browse and filter edge relationships in the knowledge graph
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                 <div>
+                   <label htmlFor="role-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                     Role Filter
+                   </label>
+                   <select
+                     id="role-filter"
+                     value={selectedEdgeRole}
+                     onChange={(e) => setSelectedEdgeRole(e.target.value)}
+                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                   >
+                     <option value="">All Roles</option>
+                     {edgeRoles.map((role: string) => (
+                       <option key={role} value={role}>{role}</option>
+                     ))}
+                   </select>
+                 </div>
+                  
+                 <div>
+                   <label htmlFor="relationship-type" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                     Relationship Type
+                   </label>
+                   <select
+                     id="relationship-type"
+                     value={selectedRelationshipType}
+                     onChange={(e) => setSelectedRelationshipType(e.target.value)}
+                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                   >
+                     <option value="">All Relationships</option>
+                     {relationshipTypes.map((type: string) => (
+                       <option key={type} value={type}>{type}</option>
+                     ))}
+                   </select>
+                 </div>
+                  
+                 <div>
+                   <label htmlFor="from-node-id" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                     From Node ID
+                   </label>
+                   <input
+                     id="from-node-id"
+                     type="text"
+                     placeholder="Search by source node ID..."
+                     value={edgeSearchQuery}
+                     onChange={(e) => setEdgeSearchQuery(e.target.value)}
+                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                   />
+                 </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Relationship Type</label>
-                  <select
-                    value={selectedRelationshipType}
-                    onChange={(e) => setSelectedRelationshipType(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">All Relationships</option>
-                    {relationshipTypes.map(type => (
-                      <option key={type} value={type}>{type}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Search From Node ID</label>
-                  <input
-                    type="text"
-                    placeholder="Search fromId (exact match)..."
-                    value={edgeSearchQuery}
-                    onChange={(e) => setEdgeSearchQuery(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-              </div>
-              {(selectedEdgeRole || selectedRelationshipType || edgeSearchQuery) && (
-                <div className="mt-4">
-                  <button
-                    onClick={() => {
-                      setSelectedEdgeRole('');
-                      setSelectedRelationshipType('');
-                      setEdgeSearchQuery('');
-                    }}
-                    className="text-sm text-blue-600 hover:text-blue-800"
-                  >
-                    Clear all filters
-                  </button>
-                </div>
-              )}
-            </div>
+                
+                {(selectedEdgeRole || selectedRelationshipType || edgeSearchQuery) && (
+                  <div className="mt-4 flex items-center justify-between">
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Active filters: {[selectedEdgeRole, selectedRelationshipType, edgeSearchQuery].filter(Boolean).join(', ')}
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedEdgeRole('');
+                        setSelectedRelationshipType('');
+                        setEdgeSearchQuery('');
+                      }}
+                      className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                    >
+                      Clear all filters
+                    </button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Edge Results */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                  📊 Edge Relationships
-                  <span className="ml-2 text-sm font-normal text-gray-500">
-                    ({edgesData?.success ? `${(edgesData.data as any)?.edges?.length || 0} of ${(edgesData.data as any)?.totalCount || 0} edges` : '0 edges'})
-                  </span>
-                </h2>
-                <button
-                  onClick={() => refetchEdges()}
-                  disabled={edgesLoading}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                >
-                  {edgesLoading ? 'Loading...' : 'Refresh'}
-                </button>
-              </div>
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <span>📊</span>
+                      Edge Relationships
+                    </CardTitle>
+                    <CardDescription className="mt-1">
+                      {edgesData?.success ? 
+                        `${(edgesData.data as any)?.edges?.length || 0} of ${(edgesData.data as any)?.totalCount || 0} edges` : 
+                        'Loading edges...'
+                      }
+                    </CardDescription>
+                  </div>
+                  <button
+                    onClick={() => refetchEdges()}
+                    disabled={edgesLoading}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm font-medium"
+                  >
+                    {edgesLoading ? 'Loading...' : 'Refresh'}
+                  </button>
+                </div>
+              </CardHeader>
               
-              {edgesLoading ? (
-                <div className="space-y-3">
-                  {[...Array(5)].map((_, i) => (
-                    <div key={i} className="animate-pulse bg-gray-200 rounded-lg h-16"></div>
-                  ))}
-                </div>
-              ) : edgesData?.success && (edgesData.data as any)?.edges?.length > 0 ? (
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {(edgesData.data as any).edges.map((edge: any, index: number) => (
-                    <div key={index} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2 mb-2">
-                            <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">{edge.role}</span>
-                            <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">
-                              Weight: {edge.weight}
-                            </span>
-                            {edge.meta?.relationship && (
-                              <span className="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded">
-                                {edge.meta.relationship}
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-sm text-gray-900 mb-1">
-                            <strong>From:</strong> 
-                            <button
-                              onClick={() => window.open(`/node/${encodeURIComponent(edge.fromId)}`, '_blank')}
-                              className="ml-1 text-blue-600 hover:text-blue-800 hover:underline"
-                            >
-                              {edge.fromId}
-                            </button>
-                          </div>
-                          <div className="text-sm text-gray-900">
-                            <strong>To:</strong> 
-                            <button
-                              onClick={() => window.open(`/node/${encodeURIComponent(edge.toId)}`, '_blank')}
-                              className="ml-1 text-blue-600 hover:text-blue-800 hover:underline"
-                            >
-                              {edge.toId}
-                            </button>
-                          </div>
-                          {edge.meta && Object.keys(edge.meta).length > 1 && (
-                            <div className="text-xs text-gray-500 mt-2">
-                              <strong>Metadata:</strong> {JSON.stringify(edge.meta, null, 2)}
-                            </div>
-                          )}
-                        </div>
-                        <div className="ml-4">
-                          <button
-                            onClick={() => window.open(`/edge/${encodeURIComponent(edge.fromId)}/${encodeURIComponent(edge.toId)}`, '_blank')}
-                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                          >
-                            View Edge →
-                          </button>
-                        </div>
+              <CardContent>
+                {/* Pagination at top */}
+                {edgesData?.success && (edgesData.data as any)?.totalCount > 0 && (
+                  <div className="mb-6">
+                    <PaginationControls
+                      currentPage={edgePage}
+                      pageSize={edgePageSize}
+                      totalCount={(edgesData.data as any)?.totalCount || 0}
+                      onPageChange={setEdgePage}
+                      onPageSizeChange={setEdgePageSize}
+                      showPageSizeSelector={true}
+                      pageSizeOptions={[10, 25, 50, 100, 200]}
+                    />
+                  </div>
+                )}
+                
+                {/* Edge List */}
+                {edgesLoading ? (
+                  <div className="space-y-3">
+                    {[...Array(5)].map((_, i) => (
+                      <div key={i} className="animate-pulse">
+                        <div className="bg-gray-200 dark:bg-gray-700 rounded-lg h-24"></div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center text-gray-500 py-8">
-                  <div className="text-4xl mb-4">🔗</div>
-                  <div className="text-lg font-medium mb-2">No Edges Found</div>
-                  <p className="text-sm mb-4">
-                    {selectedEdgeRole || selectedRelationshipType || edgeSearchQuery
-                      ? 'No edges match your current filters. Try adjusting the filters above.'
-                      : 'No edge relationships found in the system'
-                    }
-                  </p>
-                </div>
-              )}
-
-              {/* Edge Pagination */}
-              {edgesData?.success && (edgesData.data as any)?.totalCount > edgePageSize && (
-                <div className="mt-6 flex items-center justify-between">
-                  <div className="text-sm text-gray-500">
-                    Page {edgePage} of {Math.ceil(((edgesData.data as any)?.totalCount || 0) / edgePageSize)}
+                    ))}
                   </div>
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => setEdgePage(Math.max(1, edgePage - 1))}
-                      disabled={edgePage <= 1 || edgesLoading}
-                      className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Previous
-                    </button>
-                    <button
-                      onClick={() => setEdgePage(edgePage + 1)}
-                      disabled={edgePage >= Math.ceil(((edgesData.data as any)?.totalCount || 0) / edgePageSize) || edgesLoading}
-                      className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Next
-                    </button>
+                ) : edgesData?.success && (edgesData.data as any)?.edges?.length > 0 ? (
+                  <div className="space-y-3">
+                    {(edgesData.data as any).edges.map((edge: any, index: number) => (
+                      <EdgeCard
+                        key={`${edge.fromId}-${edge.toId}-${edge.role}-${index}`}
+                        edge={edge}
+                        onNodeClick={(nodeId) => window.open(`/node/${encodeURIComponent(nodeId)}`, '_blank')}
+                        onEdgeClick={(fromId, toId, role) => window.open(`/edge/${encodeURIComponent(fromId)}/${encodeURIComponent(toId)}`, '_blank')}
+                      />
+                    ))}
                   </div>
-                </div>
-              )}
-            </div>
+                ) : (
+                  <div className="text-center text-gray-500 dark:text-gray-400 py-12">
+                    <div className="text-6xl mb-4">🔗</div>
+                    <div className="text-xl font-medium mb-2">No Edges Found</div>
+                    <p className="text-sm mb-6 max-w-md mx-auto">
+                      {selectedEdgeRole || selectedRelationshipType || edgeSearchQuery
+                        ? 'No edges match your current filters. Try adjusting the filters above or clear them to see all edges.'
+                        : 'No edge relationships found in the system. Edges will appear as relationships are created between nodes.'
+                      }
+                    </p>
+                    {(selectedEdgeRole || selectedRelationshipType || edgeSearchQuery) && (
+                      <button
+                        onClick={() => {
+                          setSelectedEdgeRole('');
+                          setSelectedRelationshipType('');
+                          setEdgeSearchQuery('');
+                        }}
+                        className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+                      >
+                        Clear Filters
+                      </button>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         )}
 

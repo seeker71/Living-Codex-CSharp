@@ -18,6 +18,26 @@ namespace CodexBootstrap.Modules
     [RequestType("codex.ai.future-query-request", "AIFutureQueryRequest", "Request for future knowledge query")]
     public record AIFutureQueryRequest(string Query, string? Model = null, string? Provider = null);
     
+    [RequestType("codex.ai.summarize-concept", "AISummarizeConcept", "Concept data for summarization")]
+    public record AISummarizeConcept(
+        string Id,
+        string Name,
+        string Description,
+        string Domain = "General",
+        int Complexity = 0,
+        string[]? Tags = null
+    );
+    
+    [RequestType("codex.ai.summarize-request", "AISummarizeRequest", "Request for AI summarization")]
+    public record AISummarizeRequest(
+        AISummarizeConcept Concept,
+        string Context = "general",
+        string Style = "engaging, insightful, concise",
+        string Length = "medium",
+        string? Model = null,
+        string? Provider = null
+    );
+    
     [RequestType("codex.ai.scoring-analysis-request", "ScoringAnalysisRequest", "Request for scoring analysis")]
     public record ScoringAnalysisRequest(string Content, string? AnalysisType = null, string[]? Criteria = null, string? Model = null, string? Provider = null);
 
@@ -48,28 +68,28 @@ namespace CodexBootstrap.Modules
 
         // Mac M1 optimized configurations
         public static readonly LLMConfig MacM1_ConceptExtraction = CreateConfig(
-            "macm1-concept-extraction", "Mac M1 Concept Extraction", "ollama", "llama3.1:8b", 
+            "macm1-concept-extraction", "Mac M1 Concept Extraction", "ollama", "llama3.2:3b", 
             0.3f, 2048, 0.9f);
 
         public static readonly LLMConfig MacM1_FractalTransform = CreateConfig(
-            "macm1-fractal-transform", "Mac M1 Fractal Transform", "ollama", "llama3.1:8b", 
+            "macm1-fractal-transform", "Mac M1 Fractal Transform", "ollama", "llama3.2:3b", 
             0.7f, 4096, 0.95f);
 
         public static readonly LLMConfig MacM1_FutureQuery = CreateConfig(
-            "macm1-future-query", "Mac M1 Future Query", "ollama", "llama3.1:8b", 
+            "macm1-future-query", "Mac M1 Future Query", "ollama", "llama3.2:3b", 
             0.8f, 3072, 0.9f);
 
         // Ollama Turbo mode configurations
         public static readonly LLMConfig OllamaTurbo_ConceptExtraction = CreateConfig(
-            "ollama-turbo-concept-extraction", "Ollama Turbo Concept Extraction", "ollama", "llama3.1:8b-instruct-q4_0", 
+            "ollama-turbo-concept-extraction", "Ollama Turbo Concept Extraction", "ollama", "llama3.2:3b-instruct-q4_0", 
             0.2f, 1024, 0.8f);
 
         public static readonly LLMConfig OllamaTurbo_FractalTransform = CreateConfig(
-            "ollama-turbo-fractal-transform", "Ollama Turbo Fractal Transform", "ollama", "llama3.1:8b-instruct-q4_0", 
+            "ollama-turbo-fractal-transform", "Ollama Turbo Fractal Transform", "ollama", "llama3.2:3b-instruct-q4_0", 
             0.6f, 2048, 0.9f);
 
         public static readonly LLMConfig OllamaTurbo_FutureQuery = CreateConfig(
-            "ollama-turbo-future-query", "Ollama Turbo Future Query", "ollama", "llama3.1:8b-instruct-q4_0", 
+            "ollama-turbo-future-query", "Ollama Turbo Future Query", "ollama", "llama3.2:3b-instruct-q4_0", 
             0.7f, 1536, 0.85f);
 
         // OpenAI configurations
@@ -300,6 +320,12 @@ namespace CodexBootstrap.Modules
                 return await HandleUIPatternEvolutionAsync(request);
             });
             
+            router.Register("ai", "generate-summary", async (JsonElement? json) => 
+            {
+                var request = JsonSerializer.Deserialize<AISummarizeRequest>(json?.GetRawText() ?? "{}");
+                return await HandleSummaryGenerationAsync(request);
+            });
+            
             _logger.Info("AI module API handlers registered for internal communication");
         }
 
@@ -438,6 +464,30 @@ Response:",
                     },
                     DefaultLLMConfig: defaultLLMConfig,
                     Category: "future"
+                ),
+
+                new PromptTemplate(
+                    Id: "news-summary",
+                    Name: "News Summary Generation",
+                    Template: @"Create a well-structured summary of the following news content. Use proper formatting with line breaks and clear structure.
+
+Content: ""{content}""
+
+Requirements:
+- Write a concise but informative summary
+- Use clear paragraph breaks (double line breaks)
+- Highlight key points with proper formatting
+- Maintain readability and flow
+- Focus on the most important information
+- Keep it under 300 words
+
+Format your response with proper line breaks and structure. Do not use markdown formatting - use plain text with line breaks.",
+                    DefaultParameters: new Dictionary<string, object> 
+                    { 
+                        ["content"] = ""
+                    },
+                    DefaultLLMConfig: defaultLLMConfig,
+                    Category: "summary"
                 ),
 
                 new PromptTemplate(
@@ -641,6 +691,26 @@ IMPORTANT: Return ONLY a valid JSON object with the evolved template, no markdow
         [ApiRoute("POST", "/ai/extract-concepts", "ai-extract-concepts", "Extract concepts using configurable prompts", "ai-module")]
         public async Task<object> HandleConceptExtractionAsync([ApiParameter("request", "Concept extraction request", Required = true, Location = "body")] ConceptExtractionRequest request)
         {
+            // Check if AI calls are disabled during startup
+            var disableAI = Environment.GetEnvironmentVariable("DISABLE_AI");
+            if (string.Equals(disableAI, "true", StringComparison.OrdinalIgnoreCase))
+            {
+                var disabledConfig = LLMConfigurations.GetConfigForTask("concept-extraction", request.Provider, request.Model);
+                _logger.Warn($"AI_CALL extract-concepts DISABLED provider={disabledConfig.Provider} model={disabledConfig.Model} baseUrl={disabledConfig.BaseUrl} chars={request.Content.Length}");
+                return new
+                {
+                    success = true,
+                    message = "AI calls disabled during startup",
+                    data = new
+                    {
+                        concepts = new[] { "startup", "initialization", "system" },
+                        confidence = 0.8,
+                        model = "startup-mode"
+                    },
+                    timestamp = DateTimeOffset.UtcNow
+                };
+            }
+
             try
             {
                 if (request == null || string.IsNullOrEmpty(request.Content))
@@ -667,6 +737,27 @@ IMPORTANT: Return ONLY a valid JSON object with the evolved template, no markdow
         [ApiRoute("POST", "/ai/fractal-transform", "ai-fractal-transform", "Transform content using fractal patterns", "ai-module")]
         public async Task<object> HandleFractalTransformAsync([ApiParameter("request", "Fractal transform request", Required = true, Location = "body")] FractalTransformRequest request)
         {
+            // Check if AI calls are disabled during startup
+            var disableAI = Environment.GetEnvironmentVariable("DISABLE_AI");
+            if (string.Equals(disableAI, "true", StringComparison.OrdinalIgnoreCase))
+            {
+                var disabledConfig = LLMConfigurations.GetConfigForTask("fractal-transformation", request.Provider, request.Model);
+                _logger.Warn($"AI_CALL fractal-transform DISABLED provider={disabledConfig.Provider} model={disabledConfig.Model} baseUrl={disabledConfig.BaseUrl} chars={request.Content.Length}");
+                return new
+                {
+                    success = true,
+                    message = "AI calls disabled during startup",
+                    data = new
+                    {
+                        transformedContent = request.Content,
+                        fractalPattern = "startup-pattern",
+                        confidence = 0.8,
+                        model = "startup-mode"
+                    },
+                    timestamp = DateTimeOffset.UtcNow
+                };
+            }
+
             try
             {
                 if (request == null || string.IsNullOrEmpty(request.Content))
@@ -694,6 +785,27 @@ IMPORTANT: Return ONLY a valid JSON object with the evolved template, no markdow
         [ApiRoute("POST", "/ai/score-analysis", "ai-score-analysis", "Score and analyze content using AI", "ai-module")]
         public async Task<object> HandleScoringAnalysisAsync([ApiParameter("request", "Scoring analysis request", Required = true, Location = "body")] ScoringAnalysisRequest request)
         {
+            // Check if AI calls are disabled during startup
+            var disableAI = Environment.GetEnvironmentVariable("DISABLE_AI");
+            if (string.Equals(disableAI, "true", StringComparison.OrdinalIgnoreCase))
+            {
+                var disabledConfig = LLMConfigurations.GetConfigForTask("scoring-analysis", request.Provider, request.Model);
+                _logger.Warn($"AI_CALL score-analysis DISABLED provider={disabledConfig.Provider} model={disabledConfig.Model} baseUrl={disabledConfig.BaseUrl} chars={request.Content.Length}");
+                return new
+                {
+                    success = true,
+                    message = "AI calls disabled during startup",
+                    data = new
+                    {
+                        abundanceScore = 0.8,
+                        relevanceScore = 0.7,
+                        clarityScore = 0.9,
+                        model = "startup-mode"
+                    },
+                    timestamp = DateTimeOffset.UtcNow
+                };
+            }
+
             try
             {
                 if (request == null || string.IsNullOrEmpty(request.Content))
@@ -715,6 +827,72 @@ IMPORTANT: Return ONLY a valid JSON object with the evolved template, no markdow
             catch (Exception ex)
             {
                 _logger.Error($"Error in scoring analysis: {ex.Message}", ex);
+                return new { success = false, error = ex.Message };
+            }
+        }
+
+        [ApiRoute("POST", "/ai/summarize", "ai-summarize", "Generate AI summary for content", "ai-module")]
+        public async Task<object> HandleSummarizeAsync([ApiParameter("request", "Summarize request", Required = true, Location = "body")] AISummarizeRequest request)
+        {
+            try
+            {
+                if (request == null || request.Concept == null)
+                {
+                    return new { success = false, error = "Concept is required" };
+                }
+
+                var config = LLMConfigurations.GetConfigForTask("concept-extraction", request.Provider, request.Model);
+                _logger.Info($"AI_CALL summarize provider={config.Provider} model={config.Model} baseUrl={config.BaseUrl} conceptId={request.Concept.Id}");
+                
+                // Create a summary prompt based on the concept
+                var summaryPrompt = $@"Create an engaging, insightful, and concise summary for this concept:
+
+Name: {request.Concept.Name}
+Description: {request.Concept.Description}
+Domain: {request.Concept.Domain}
+Complexity: {request.Concept.Complexity}
+Tags: {string.Join(", ", request.Concept.Tags ?? new string[0])}
+
+Context: {request.Context}
+Style: {request.Style}
+Length: {request.Length}
+
+Requirements:
+- Make it engaging and insightful
+- Keep it concise but informative
+- Highlight the key value and potential
+- Use language that resonates with the target audience
+- Focus on practical applications and benefits
+
+Return only the summary text, no additional formatting or explanations.";
+
+                var result = await _llmOrchestrator.ExecuteAsync("concept-extraction", new Dictionary<string, object>
+                {
+                    ["content"] = summaryPrompt
+                }, config);
+
+                if (!result.Success)
+                {
+                    return new { success = false, error = result.Error };
+                }
+
+                return new
+                {
+                    success = true,
+                    summary = result.Content?.Trim() ?? request.Concept.Description,
+                    conceptId = request.Concept.Id,
+                    timestamp = DateTimeOffset.UtcNow,
+                    tracking = new
+                    {
+                        provider = result.Provider,
+                        model = result.Model,
+                        executionTimeMs = result.ExecutionTime.TotalMilliseconds
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in AI summarize: {ex.Message}", ex);
                 return new { success = false, error = ex.Message };
             }
         }
@@ -936,13 +1114,56 @@ IMPORTANT: Return ONLY a valid JSON object with the evolved template, no markdow
             }
         }
 
+        [ApiRoute("POST", "/ai/generate-summary", "ai-generate-summary", "Generate formatted summary with proper newlines", "ai-module")]
+        public async Task<object> HandleSummaryGenerationAsync([ApiParameter("request", "Summary generation request", Required = true, Location = "body")] AISummarizeRequest request)
+        {
+            try
+            {
+                if (request == null || string.IsNullOrEmpty(request.Concept.Description))
+                {
+                    return new { success = false, error = "Description is required for summary generation" };
+                }
+
+                var config = LLMConfigurations.GetConfigForTask("news-summary", request.Provider, request.Model);
+                var result = await _llmOrchestrator.ExecuteAsync("news-summary", new Dictionary<string, object>
+                {
+                    ["content"] = request.Concept.Description
+                }, config);
+
+                if (!result.Success)
+                {
+                    return new { success = false, error = result.Error };
+                }
+
+                // For summary generation, we want to return the raw text content with preserved newlines
+                // Don't use ParseStructuredResponse as it's designed for JSON, not formatted text
+                return new
+                {
+                    success = true,
+                    data = new
+                    {
+                        summary = result.Content,
+                        confidence = result.Confidence,
+                        model = result.Model,
+                        provider = result.Provider,
+                        executionTime = result.ExecutionTime.TotalMilliseconds
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in summary generation: {ex.Message}", ex);
+                return new { success = false, error = ex.Message };
+            }
+        }
+
         [ApiRoute("GET", "/ai/prompts", "ai-list-prompts", "List all available prompt templates", "ai-module")]
         public async Task<object> HandleListPromptsAsync(Dictionary<string, string> parameters)
         {
             try
             {
                 var allTemplates = new List<PromptTemplate>();
-                var categories = new[] { "analysis", "transformation", "future" };
+                var categories = new[] { "analysis", "transformation", "future", "summary" };
                 
                 foreach (var category in categories)
                 {

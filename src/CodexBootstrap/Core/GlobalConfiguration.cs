@@ -10,6 +10,7 @@ namespace CodexBootstrap.Core
         private static string _baseUrl = "http://localhost:5000";
         private static int _port = 5000;
         private static bool _isInitialized = false;
+        private static readonly ICodexLogger _logger = new Log4NetLogger(typeof(GlobalConfiguration));
 
         /// <summary>
         /// Gets the base URL for the API
@@ -61,12 +62,12 @@ namespace CodexBootstrap.Core
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Warning: Could not parse URL '{_baseUrl}', using default port 5001. Error: {ex.Message}");
+                _logger.Warn($"Warning: Could not parse URL '{_baseUrl}', using default port 5001. Error: {ex.Message}");
             }
             
             _isInitialized = true;
             
-            Console.WriteLine($"Global configuration initialized: BaseUrl={_baseUrl}, Port={_port}");
+            _logger.Info($"Global configuration initialized: BaseUrl={_baseUrl}, Port={_port}");
         }
 
         /// <summary>

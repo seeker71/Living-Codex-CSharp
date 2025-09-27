@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card } from '@/components/ui/Card';
+import { Card, CardContent } from '@/components/ui/Card';
+import { PaginationControls } from '@/components/ui/PaginationControls';
 import { buildApiUrl } from '@/lib/config';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTrackInteraction } from '@/lib/hooks';
@@ -10,6 +11,7 @@ interface GalleryItem {
   id: string;
   title: string;
   description: string;
+  summary?: string;
   imageUrl: string;
   thumbnailUrl: string;
   author: {
@@ -30,15 +32,18 @@ interface GalleryItem {
   energy?: number;
   imageLoading?: boolean;
   imageError?: string;
+  summaryLoading?: boolean;
+  summaryError?: string;
 }
 
 interface GalleryLensProps {
   controls?: Record<string, any>;
   userId?: string;
   className?: string;
+  readOnly?: boolean;
 }
 
-export function GalleryLens({ controls = {}, userId, className = '' }: GalleryLensProps) {
+export function GalleryLens({ controls = {}, userId, className = '', readOnly = false }: GalleryLensProps) {
   const { user } = useAuth();
   const trackInteraction = useTrackInteraction();
   
@@ -48,10 +53,46 @@ export function GalleryLens({ controls = {}, userId, className = '' }: GalleryLe
   const [selectedItem, setSelectedItem] = useState<GalleryItem | null>(null);
   const [filterBy, setFilterBy] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('resonance');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
 
   useEffect(() => {
+    console.log('Gallery: useEffect triggered, calling loadGalleryItems...');
     loadGalleryItems();
-  }, [controls]);
+  }, []); // Run on component mount
+
+  // Function to generate AI summary for a concept
+  const generateAISummary = async (concept: any): Promise<string> => {
+    try {
+      const summaryResponse = await fetch(buildApiUrl('/ai/summarize'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          concept: {
+            id: concept.id,
+            name: concept.name,
+            description: concept.description,
+            domain: concept.domain,
+            complexity: concept.complexity,
+            tags: concept.tags || []
+          },
+          context: 'concept-gallery',
+          style: 'engaging, insightful, concise',
+          length: 'medium'
+        })
+      });
+
+      if (!summaryResponse.ok) {
+        throw new Error(`Summary generation failed: ${summaryResponse.status}`);
+      }
+
+      const summaryData = await summaryResponse.json();
+      return summaryData.summary || summaryData.content || concept.description;
+    } catch (error) {
+      console.warn(`AI summary generation failed for ${concept.id}, using description:`, error);
+      return concept.description;
+    }
+  };
 
   // Function to generate AI image for a concept
   const generateAIImage = async (concept: any): Promise<string> => {
@@ -120,142 +161,105 @@ export function GalleryLens({ controls = {}, userId, className = '' }: GalleryLe
   };
 
   const loadGalleryItems = async () => {
+    console.log('Gallery: loadGalleryItems called');
     setLoading(true);
     try {
       console.log('Gallery: Starting to load concepts...');
       
       // Fetch concepts from the backend
-      const conceptsResponse = await fetch(buildApiUrl('/concepts/browse'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          axes: controls.axes || ['resonance'],
-          joy: controls.joy || 0.7,
-          serendipity: controls.serendipity || 0.5,
-          limit: 50
-        })
+      const conceptsResponse = await fetch(buildApiUrl('/concepts'), {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
       });
       
       console.log('Gallery: Concepts response status:', conceptsResponse.status);
 
       if (conceptsResponse.ok) {
         const conceptsData = await conceptsResponse.json();
-        const concepts = conceptsData.discoveredConcepts || conceptsData.concepts || conceptsData.data || [];
+        const concepts = conceptsData.concepts || conceptsData.data || [];
         
         console.log('Gallery: Found concepts:', concepts.length);
 
-        // For each concept, create a gallery item with AI-generated image
-        // Process concepts in batches to avoid overwhelming the API
-        const batchSize = 3;
-        const galleryItems = [];
+        // Create gallery items with real AI-generated images
+        const galleryItems = await Promise.allSettled(
+          concepts.map(async (concept: any) => {
+            const axes = concept.tags || [];
+            const domain = concept.domain || 'General';
+            const complexity = concept.complexity || 1;
+            
+            let imageUrl = '';
+            let imageError = '';
+            let aiGenerated = false;
+            let prompt = '';
+            
+            console.log(`Gallery: Generating AI image for concept "${concept.name}"...`);
+            
+            // Generate AI image using the concept image pipeline - NO FALLBACKS
+            imageUrl = await generateAIImage(concept);
+            aiGenerated = true;
+            prompt = `AI-generated image for "${concept.name}": ${concept.description}`;
+            
+            console.log(`Gallery: Successfully generated AI image for "${concept.name}"`);
+            
+            return {
+              id: concept.id,
+              title: concept.name || 'Untitled Concept',
+              description: concept.description || '',
+              summary: concept.description || '',
+              imageUrl: imageUrl,
+              thumbnailUrl: imageUrl,
+              author: {
+                id: 'system',
+                name: 'Living Codex',
+                avatar: `data:image/svg+xml;base64,${btoa(`
+                  <svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                      <linearGradient id="avatar-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+                      </linearGradient>
+                    </defs>
+                    <rect width="40" height="40" rx="20" fill="url(#avatar-grad)"/>
+                    <text x="20" y="25" text-anchor="middle" dy=".3em" 
+                          font-family="system-ui, sans-serif" font-size="16" font-weight="bold" 
+                          fill="white">LC</text>
+                  </svg>
+                `)}`
+              },
+              createdAt: concept.createdAt || new Date().toISOString(),
+              resonance: concept.resonance || 0.5,
+              axes: axes.length > 0 ? axes : ['concept'],
+              tags: [...axes, domain].filter(Boolean),
+              mediaType: 'image' as const,
+              dimensions: { width: 400, height: 400 },
+              aiGenerated: aiGenerated,
+              prompt: prompt,
+              domain: domain,
+              complexity: complexity,
+              energy: concept.energy || 0,
+              imageLoading: false,
+              imageError: imageError || undefined,
+              summaryLoading: false,
+              summaryError: undefined
+            };
+          })
+        );
         
-        for (let i = 0; i < concepts.length; i += batchSize) {
-          const batch = concepts.slice(i, i + batchSize);
-          const batchResults = await Promise.all(
-            batch.map(async (concept: any) => {
-            try {
-              // Create a rich description using concept metadata
-              const axes = concept.tags || [];
-              const domain = concept.domain || 'General';
-              const complexity = concept.complexity || 1;
-              
-              // Build contextual prompt for AI image generation
-              let contextualPrompt = `A visual representation of "${concept.name}": ${concept.description}`;
-              contextualPrompt += ` This concept is in the ${domain} domain with complexity level ${complexity}.`;
-              
-              if (axes.length > 0) {
-                contextualPrompt += ` This concept relates to: ${axes.join(', ')}.`;
-              }
-              
-              contextualPrompt += ` Create a modern, artistic, and inspiring visual that captures the essence and depth of this concept.`;
-
-              // Generate AI image with fallback to placeholder
-              let imageUrl;
-              try {
-                imageUrl = await generateAIImage({ ...concept, prompt: contextualPrompt });
-              } catch (aiError) {
-                console.warn(`AI generation failed for ${concept.id}, using placeholder:`, aiError);
-                // Create sophisticated placeholder with concept-specific styling
-                const colors = ['6366f1', '8b5cf6', 'ec4899', 'f59e0b', '10b981', 'ef4444', 'f97316', '84cc16'];
-                const colorIndex = concept.id.length % colors.length;
-                const bgColor = colors[colorIndex];
-                const conceptInitials = concept.name.split(' ').map((word: string) => word[0]).join('').toUpperCase().slice(0, 2);
-                imageUrl = `https://via.placeholder.com/400x400/${bgColor}/ffffff?text=${encodeURIComponent(conceptInitials)}`;
-              }
-
-              return {
-                id: concept.id,
-                title: concept.name || 'Untitled Concept',
-                description: concept.description || '',
-                imageUrl: imageUrl,
-                thumbnailUrl: imageUrl,
-                author: {
-                  id: 'system',
-                  name: 'Living Codex',
-                  avatar: 'https://via.placeholder.com/40x40/6366f1/ffffff?text=LC'
-                },
-                createdAt: concept.createdAt || new Date().toISOString(),
-                resonance: concept.resonance || 0.5,
-                axes: axes.length > 0 ? axes : ['concept'],
-                tags: [...axes, domain].filter(Boolean),
-                mediaType: 'image' as const,
-                dimensions: { width: 400, height: 400 },
-                aiGenerated: true,
-                prompt: contextualPrompt,
-                domain: domain,
-                complexity: complexity,
-                energy: concept.energy || 0,
-                imageLoading: false,
-                imageError: undefined
-              };
-            } catch (error) {
-              console.error(`Error processing concept ${concept.id}:`, error);
-              // Return item with placeholder image instead of failing completely
-              const colors = ['6366f1', '8b5cf6', 'ec4899', 'f59e0b', '10b981', 'ef4444', 'f97316', '84cc16'];
-              const colorIndex = concept.id.length % colors.length;
-              const bgColor = colors[colorIndex];
-              const conceptInitials = concept.name.split(' ').map((word: string) => word[0]).join('').toUpperCase().slice(0, 2);
-              const placeholderUrl = `https://via.placeholder.com/400x400/${bgColor}/ffffff?text=${encodeURIComponent(conceptInitials)}`;
-              
-              return {
-                id: concept.id,
-                title: concept.name || 'Untitled Concept',
-                description: concept.description || '',
-                imageUrl: placeholderUrl,
-                thumbnailUrl: placeholderUrl,
-                author: {
-                  id: 'system',
-                  name: 'Living Codex',
-                  avatar: 'https://via.placeholder.com/40x40/6366f1/ffffff?text=LC'
-                },
-                createdAt: concept.createdAt || new Date().toISOString(),
-                resonance: concept.resonance || 0.5,
-                axes: concept.tags || ['concept'],
-                tags: [...(concept.tags || []), concept.domain || 'General'].filter(Boolean),
-                mediaType: 'image' as const,
-                dimensions: { width: 400, height: 400 },
-                aiGenerated: false,
-                prompt: `A visual representation of "${concept.name}": ${concept.description}`,
-                domain: concept.domain || 'General',
-                complexity: concept.complexity || 1,
-                energy: concept.energy || 0,
-                imageLoading: false,
-                imageError: undefined
-              };
-            }
-            })
-          );
-          
-          galleryItems.push(...batchResults);
-          
-          // Add a small delay between batches to avoid overwhelming the API
-          if (i + batchSize < concepts.length) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          }
+        // Extract successful results and handle failures
+        const successfulItems = galleryItems
+          .filter((result): result is PromiseFulfilledResult<GalleryItem> => result.status === 'fulfilled')
+          .map(result => result.value);
+        
+        const failedItems = galleryItems
+          .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+          .map(result => result.reason);
+        
+        if (failedItems.length > 0) {
+          console.warn(`Gallery: ${failedItems.length} items failed to load:`, failedItems);
         }
 
-        console.log(`Gallery: Loaded ${galleryItems.length} concepts from ${concepts.length} total`);
-        setItems(galleryItems);
+        console.log(`Gallery: Loaded ${successfulItems.length} concepts from ${concepts.length} total`);
+        setItems(successfulItems);
       } else {
         const errorMessage = `Failed to fetch concepts: ${conceptsResponse.status} ${conceptsResponse.statusText}`;
         console.error(errorMessage);
@@ -283,6 +287,42 @@ export function GalleryLens({ controls = {}, userId, className = '' }: GalleryLe
     return `${Math.floor(diffInSeconds / 86400)}d ago`;
   };
 
+  const handleContribute = async (concept: GalleryItem) => {
+    try {
+      // Track the interaction
+      trackInteraction(concept.id, 'concept_contribute', { conceptName: concept.title });
+      
+      // Show contribution modal or redirect to contribution page
+      alert(`Contribute to "${concept.title}" - This would open a contribution interface where you can add your insights, resources, or improvements to this concept.`);
+    } catch (error) {
+      console.error('Error handling contribution:', error);
+    }
+  };
+
+  const handleInvest = async (concept: GalleryItem) => {
+    try {
+      // Track the interaction
+      trackInteraction(concept.id, 'concept_invest', { conceptName: concept.title });
+      
+      // Show investment modal or redirect to investment page
+      alert(`Invest in "${concept.title}" - This would open an investment interface where you can allocate resources, time, or energy to support this concept's development.`);
+    } catch (error) {
+      console.error('Error handling investment:', error);
+    }
+  };
+
+  const handleStartThread = async (concept: GalleryItem) => {
+    try {
+      // Track the interaction
+      trackInteraction(concept.id, 'concept_thread_start', { conceptName: concept.title });
+      
+      // Show thread modal or redirect to thread page
+      alert(`Start a discussion about "${concept.title}" - This would open a conversation interface with an AI bot that has this concept in mind, allowing you to explore ideas, ask questions, and connect with others who resonate with this concept.`);
+    } catch (error) {
+      console.error('Error starting thread:', error);
+    }
+  };
+
   // Filter and sort items
   const filteredItems = items
     .filter(item => {
@@ -303,6 +343,17 @@ export function GalleryLens({ controls = {}, userId, className = '' }: GalleryLe
           return 0;
       }
     });
+
+  // Paginate items
+  const totalCount = filteredItems.length;
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedItems = filteredItems.slice(startIndex, endIndex);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterBy, sortBy]);
 
   if (loading) {
     return (
@@ -345,7 +396,7 @@ export function GalleryLens({ controls = {}, userId, className = '' }: GalleryLe
           <div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Concept Gallery</h2>
             <p className="text-gray-600 dark:text-gray-400">
-              Visual expressions of concepts and ideas • {filteredItems.length} concepts
+              Visual expressions of concepts and ideas • {totalCount} concepts
             </p>
           </div>
         </div>
@@ -378,19 +429,36 @@ export function GalleryLens({ controls = {}, userId, className = '' }: GalleryLe
         </div>
       </div>
 
+      {/* Pagination at top */}
+      {totalCount > pageSize && (
+        <Card>
+          <CardContent className="p-4">
+            <PaginationControls
+              currentPage={currentPage}
+              pageSize={pageSize}
+              totalCount={totalCount}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+              showPageSizeSelector={true}
+              pageSizeOptions={[6, 12, 24, 48, 96]}
+            />
+          </CardContent>
+        </Card>
+      )}
+
       {/* Instagram-style Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-1">
-        {filteredItems.length === 0 ? (
-          <div className="col-span-full text-center py-12 text-gray-500">
-            <div className="text-6xl mb-4">🖼️</div>
-            <p>No concepts available yet.</p>
-            <p className="text-sm mt-2">Concepts will appear here as they are discovered!</p>
-            <div className="mt-4 text-xs text-gray-400">
-              Debug: Total items: {items.length}, Filtered: {filteredItems.length}
-            </div>
-          </div>
-        ) : (
-          filteredItems.map((item) => (
+            {paginatedItems.length === 0 ? (
+              <div className="col-span-full text-center py-12 text-red-500">
+                <div className="text-6xl mb-4">⚠️</div>
+                <p>No concepts available.</p>
+                <p className="text-sm mt-2">AI image generation is required for all concepts.</p>
+                <div className="mt-4 text-xs text-gray-400">
+                  Debug: Total items: {items.length}, Filtered: {totalCount}, Page: {currentPage}
+                </div>
+              </div>
+            ) : (
+          paginatedItems.map((item) => (
             <div
               key={item.id}
               className="relative group cursor-pointer bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300"
@@ -398,23 +466,19 @@ export function GalleryLens({ controls = {}, userId, className = '' }: GalleryLe
             >
               {/* Instagram-style square image */}
               <div className="aspect-square relative">
-                {item.imageError ? (
-                  <div className="w-full h-full bg-red-100 dark:bg-red-900 flex flex-col items-center justify-center p-4">
-                    <div className="text-red-500 text-2xl mb-2">⚠️</div>
-                    <div className="text-red-700 dark:text-red-300 text-xs text-center">
-                      <p className="font-semibold">Image Error</p>
-                      <p className="mt-1">{item.imageError}</p>
-                    </div>
-                  </div>
-                ) : item.imageUrl ? (
+                {item.imageUrl ? (
                   <img
                     src={item.imageUrl}
                     alt={item.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                 ) : (
-                  <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                    <div className="text-gray-500 text-2xl">📷</div>
+                  <div className="w-full h-full bg-red-100 dark:bg-red-900 flex flex-col items-center justify-center p-4">
+                    <div className="text-red-500 text-2xl mb-2">⚠️</div>
+                    <div className="text-red-700 dark:text-red-300 text-xs text-center">
+                      <p className="font-semibold">No Image Available</p>
+                      <p className="mt-1">AI image generation required</p>
+                    </div>
                   </div>
                 )}
                 
@@ -439,11 +503,30 @@ export function GalleryLens({ controls = {}, userId, className = '' }: GalleryLe
                 </div>
               </div>
 
-              {/* Always-visible caption */}
+              {/* Enhanced caption with more node information */}
               <div className="p-3 border-t border-gray-100 dark:border-gray-700">
-                <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate">{item.title}</h3>
-                <div className="flex items-center justify-between mt-1">
+                <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate mb-1">{item.title}</h3>
+                <p className="text-xs text-gray-600 dark:text-gray-300 line-clamp-2 mb-2">{item.description}</p>
+                <div className="flex items-center justify-between mb-2">
                   <span className="text-xs text-gray-500 dark:text-gray-400 truncate">{item.domain}</span>
+                  <span className="text-xs text-purple-600 dark:text-purple-400 font-medium">
+                    {Math.round(item.resonance * 100)}% resonance
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap gap-1">
+                    {item.axes.slice(0, 2).map((axis) => (
+                      <span
+                        key={axis}
+                        className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs px-2 py-0.5 rounded-full"
+                      >
+                        {axis}
+                      </span>
+                    ))}
+                    {item.axes.length > 2 && (
+                      <span className="text-xs text-gray-500 dark:text-gray-400">+{item.axes.length - 2}</span>
+                    )}
+                  </div>
                   {item.author?.name && (
                     <span className="text-xs text-gray-500 dark:text-gray-400 truncate">by {item.author.name}</span>
                   )}
@@ -461,23 +544,19 @@ export function GalleryLens({ controls = {}, userId, className = '' }: GalleryLe
             <div className="flex flex-col lg:flex-row">
               {/* Image Section */}
               <div className="flex-1 p-6">
-                {selectedItem.imageError ? (
-                  <div className="w-full h-96 bg-red-100 dark:bg-red-900 flex flex-col items-center justify-center rounded-lg">
-                    <div className="text-red-500 text-4xl mb-4">⚠️</div>
-                    <h3 className="text-lg font-semibold text-red-700 dark:text-red-300 mb-2">Image Generation Failed</h3>
-                    <p className="text-red-600 dark:text-red-400 text-sm text-center max-w-md">{selectedItem.imageError}</p>
-                  </div>
-                ) : selectedItem.imageUrl ? (
-                  <img
-                    src={selectedItem.imageUrl}
-                    alt={selectedItem.title}
-                    className="w-full h-auto rounded-lg"
-                  />
-                ) : (
-                  <div className="w-full h-96 bg-gray-200 dark:bg-gray-700 flex items-center justify-center rounded-lg">
-                    <div className="text-gray-500 text-4xl">📷</div>
-                  </div>
-                )}
+                    {selectedItem.imageUrl ? (
+                      <img
+                        src={selectedItem.imageUrl}
+                        alt={selectedItem.title}
+                        className="w-full h-auto rounded-lg"
+                      />
+                    ) : (
+                      <div className="w-full h-96 bg-red-100 dark:bg-red-900 flex flex-col items-center justify-center rounded-lg">
+                        <div className="text-red-500 text-4xl mb-4">⚠️</div>
+                        <h3 className="text-lg font-semibold text-red-700 dark:text-red-300 mb-2">No Image Available</h3>
+                        <p className="text-red-600 dark:text-red-400 text-sm text-center max-w-md">AI image generation required</p>
+                      </div>
+                    )}
               </div>
 
               {/* Details Section */}
@@ -496,10 +575,32 @@ export function GalleryLens({ controls = {}, userId, className = '' }: GalleryLe
 
                 <div className="space-y-4">
                   <div>
-                    <p className="text-gray-600 dark:text-gray-400 text-sm mb-2">
+                    <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Description</h4>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm mb-2 leading-relaxed">
                       {selectedItem.description}
                     </p>
                   </div>
+
+                  {selectedItem.aiGenerated && (
+                    <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 p-4 rounded-lg border border-purple-200 dark:border-purple-800">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <span className="text-purple-600 dark:text-purple-400">✨</span>
+                        <h4 className="text-sm font-medium text-purple-900 dark:text-purple-100">AI-Generated Image</h4>
+                      </div>
+                      <p className="text-purple-700 dark:text-purple-300 text-xs">
+                        This image was created using our enhanced AI prompt system with inspiring, creative, and joyful visualizations that capture the essence of this concept.
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedItem.summary && selectedItem.summary !== selectedItem.description && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">AI Summary</h4>
+                      <p className="text-gray-600 dark:text-gray-400 text-sm mb-2 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border-l-4 border-blue-500">
+                        {selectedItem.summary}
+                      </p>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
@@ -553,6 +654,38 @@ export function GalleryLens({ controls = {}, userId, className = '' }: GalleryLe
                   )}
 
                   <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                    {readOnly ? (
+                      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 mb-4">
+                        <div className="text-center text-amber-700 dark:text-amber-300 text-sm">
+                          <span className="inline-flex items-center space-x-2">
+                            <span>👁️</span>
+                            <span>Sign in to contribute, invest, or discuss this concept</span>
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex space-x-2 mb-4">
+                        <button
+                          onClick={() => handleContribute(selectedItem)}
+                          className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                        >
+                          💡 Contribute
+                        </button>
+                        <button
+                          onClick={() => handleInvest(selectedItem)}
+                          className="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+                        >
+                          💰 Invest
+                        </button>
+                        <button
+                          onClick={() => handleStartThread(selectedItem)}
+                          className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                        >
+                          💬 Discuss
+                        </button>
+                      </div>
+                    )}
+                    
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       Created {formatTimeAgo(selectedItem.createdAt)} • 
                       {selectedItem.aiGenerated ? ' AI Generated' : ' Placeholder'}

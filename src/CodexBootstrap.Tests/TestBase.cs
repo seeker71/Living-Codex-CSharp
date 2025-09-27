@@ -2,19 +2,18 @@ using System;
 using System.Net.Http;
 using CodexBootstrap.Core;
 using FluentAssertions;
-using Moq;
 using Xunit;
 
 namespace CodexBootstrap.Tests
 {
     public abstract class TestBase : IDisposable
     {
-        protected readonly Mock<CodexBootstrap.Core.ICodexLogger> MockLogger;
+        protected readonly ICodexLogger Logger;
         protected readonly HttpClient HttpClient;
 
         protected TestBase()
         {
-            MockLogger = new Mock<CodexBootstrap.Core.ICodexLogger>();
+            Logger = new Log4NetLogger(this.GetType());
             HttpClient = new HttpClient();
         }
 

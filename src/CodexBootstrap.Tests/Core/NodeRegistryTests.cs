@@ -6,24 +6,23 @@ using CodexBootstrap.Core;
 using CodexBootstrap.Core.Storage;
 using System.Reflection;
 using FluentAssertions;
-using Moq;
 using Xunit;
 
 namespace CodexBootstrap.Tests.Core
 {
     public class NodeRegistryTests
     {
-        private readonly Mock<CodexBootstrap.Core.ICodexLogger> _mockLogger;
+        private readonly ICodexLogger _logger;
         private readonly NodeRegistry _registry;
         private readonly InMemoryIceStorageBackend _iceStorage;
         private readonly InMemoryWaterStorageBackend _waterStorage;
 
         public NodeRegistryTests()
         {
-            _mockLogger = new Mock<CodexBootstrap.Core.ICodexLogger>();
+            _logger = new Log4NetLogger(typeof(NodeRegistryTests));
             _iceStorage = new InMemoryIceStorageBackend();
             _waterStorage = new InMemoryWaterStorageBackend();
-            _registry = new NodeRegistry(_iceStorage, _waterStorage, _mockLogger.Object);
+            _registry = new NodeRegistry(_iceStorage, _waterStorage, _logger);
             
             // Initialize the registry for testing
             _registry.InitializeAsync().Wait();
@@ -295,7 +294,7 @@ namespace CodexBootstrap.Tests.Core
             // Arrange
             var iceStorage = new InMemoryIceStorageBackend();
             var waterStorage = new InMemoryWaterStorageBackend();
-            var logger = new Mock<CodexBootstrap.Core.ICodexLogger>();
+            var logger = new Log4NetLogger(typeof(NodeRegistryTests));
 
             var iceNode = new Node(
                 Id: "hydrated-ice",
@@ -320,7 +319,7 @@ namespace CodexBootstrap.Tests.Core
             await iceStorage.StoreIceNodeAsync(iceNode);
             await waterStorage.StoreWaterNodeAsync(waterNode);
 
-            var registry = new NodeRegistry(iceStorage, waterStorage, logger.Object);
+            var registry = new NodeRegistry(iceStorage, waterStorage, logger);
 
             // Act
             await registry.InitializeAsync();

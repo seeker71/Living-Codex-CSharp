@@ -42,7 +42,8 @@ LoadDotEnvIfPresent();
 
 // Debug: Check if OPENAI_API_KEY was loaded
 var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-Console.WriteLine($"OPENAI_API_KEY loaded: {!string.IsNullOrEmpty(apiKey)}");
+var bootLogger = new CodexBootstrap.Core.Log4NetLogger(typeof(Program));
+bootLogger.Info($"OPENAI_API_KEY loaded: {!string.IsNullOrEmpty(apiKey)}");
 
 var builder = WebApplication.CreateBuilder(args);
 CodexBootstrapHost.ConfigureBuilder(builder, args);
@@ -50,7 +51,7 @@ CodexBootstrapHost.ConfigureBuilder(builder, args);
 var app = builder.Build();
 var hostingUrl = CodexBootstrapHost.ConfigureApp(app);
 
-Console.WriteLine($"Starting Living Codex on {hostingUrl}");
+bootLogger.Info($"Starting Living Codex on {hostingUrl}");
 
 // In Testing environment, respect ASPNETCORE_URLS/--urls provided by the test harness
 var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
@@ -60,59 +61,73 @@ if (string.Equals(env, "Testing", StringComparison.OrdinalIgnoreCase))
 }
 else
 {
+    // Fast startup: Initialize only essential services synchronously
     try
     {
-        // Startup reflection: generate app/meta nodes for loaded assemblies
         using var scope = app.Services.CreateScope();
         var services = scope.ServiceProvider;
 
-        try
-        {
-            var registry = services.GetService<CodexBootstrap.Core.INodeRegistry>();
-            CodexBootstrap.Core.ICodexLogger logger = services.GetService<CodexBootstrap.Core.ICodexLogger>()
-                ?? new CodexBootstrap.Core.Log4NetLogger(typeof(Program));
+        var registry = services.GetService<CodexBootstrap.Core.INodeRegistry>();
+        CodexBootstrap.Core.ICodexLogger logger = services.GetService<CodexBootstrap.Core.ICodexLogger>()
+            ?? new CodexBootstrap.Core.Log4NetLogger(typeof(Program));
 
-            if (registry != null)
+        if (registry != null)
+        {
+            // ESSENTIAL: Initialize core identity module synchronously (fast)
+            try
             {
-                // FIRST: Initialize core identity module to ensure core identity node exists
-                try
-                {
-                    var coreIdentity = new CodexBootstrap.Modules.CoreIdentityModule(registry, logger);
-                    coreIdentity.Register(registry);
-                    Console.WriteLine("[Startup] Core Identity Module initialized - core identity node ensured");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[Startup] Core Identity Module initialization failed: {ex.Message}");
-                }
-
-                // SECOND: Build reflection tree for current AppDomain assemblies
-                var reflection = new CodexBootstrap.Modules.ReflectionTreeModule(registry, logger);
-                var buildTask = reflection.BuildCompleteReflectionTreeAsync();
-                (buildTask as System.Threading.Tasks.Task<object>)?.GetAwaiter().GetResult();
-
-                // THIRD: Ensure edges across the graph (meta-node links, shared metadata, U-CORE)
-                try
-                {
-                    var edgeEnsurance = new CodexBootstrap.Modules.EdgeEnsuranceModule(registry, logger);
-                    var ensureTask = edgeEnsurance.EnsureAllEdgesAsync();
-                    (ensureTask as System.Threading.Tasks.Task<object>)?.GetAwaiter().GetResult();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[Startup] EdgeEnsurance failed: {ex.Message}");
-                }
+                var coreIdentity = new CodexBootstrap.Modules.CoreIdentityModule(registry, logger);
+                coreIdentity.Register(registry);
+                bootLogger.Info("[Startup] Core Identity Module initialized - core identity node ensured");
             }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Startup] Reflection graph initialization failed: {ex.Message}");
-        }
+            catch (Exception ex)
+            {
+                bootLogger.Warn($"[Startup] Core Identity Module initialization failed: {ex.Message}");
+            }
 
-        app.Run(hostingUrl);
+            // BACKGROUND: Start expensive initialization tasks asynchronously
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    bootLogger.Info("[Background] Starting expensive initialization tasks...");
+                    var startTime = DateTime.UtcNow;
+
+                    // Build reflection tree for current AppDomain assemblies
+                    var reflection = new CodexBootstrap.Modules.ReflectionTreeModule(registry, logger);
+                    var buildTask = reflection.BuildCompleteReflectionTreeAsync();
+                    await (buildTask as System.Threading.Tasks.Task<object>);
+                    bootLogger.Info($"[Background] Reflection tree built in {(DateTime.UtcNow - startTime).TotalMilliseconds}ms");
+
+                    // Ensure edges across the graph (meta-node links, shared metadata, U-CORE)
+                    try
+                    {
+                        var edgeEnsurance = new CodexBootstrap.Modules.EdgeEnsuranceModule(registry, logger);
+                        var ensureTask = edgeEnsurance.EnsureAllEdgesAsync();
+                        await (ensureTask as System.Threading.Tasks.Task<object>);
+                        bootLogger.Info($"[Background] Edge ensurance completed in {(DateTime.UtcNow - startTime).TotalMilliseconds}ms");
+                    }
+                    catch (Exception ex)
+                    {
+                        bootLogger.Warn($"[Background] EdgeEnsurance failed: {ex.Message}");
+                    }
+
+                    bootLogger.Info($"[Background] All initialization tasks completed in {(DateTime.UtcNow - startTime).TotalMilliseconds}ms");
+                }
+                catch (Exception ex)
+                {
+                    bootLogger.Error($"[Background] Background initialization failed: {ex.Message}");
+                    logger.Error($"Background initialization failed: {ex.Message}", ex);
+                }
+            });
+        }
     }
-    catch
+    catch (Exception ex)
     {
-        app.Run(hostingUrl);
+        bootLogger.Error($"[Startup] Essential initialization failed: {ex.Message}");
     }
+
+    bootLogger.Info("[Startup] About to start HTTP server...");
+    app.Run();
+    bootLogger.Info("[Startup] HTTP server started successfully!");
 }

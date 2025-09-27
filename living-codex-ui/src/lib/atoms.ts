@@ -71,7 +71,15 @@ export class AtomFetcher {
       const response = await fetch(`${this.baseUrl}/storage-endpoints/nodes?type=${type}`);
       if (!response.ok) throw new Error(`Failed to fetch ${type} atoms`);
       const data = await response.json();
-      return data.nodes || [];
+      const nodes = data.nodes || [];
+      
+      // If no nodes found, return empty array - the hooks will handle fallback to default atoms
+      if (nodes.length === 0) {
+        console.log(`No ${type} atoms found in backend, will use default atoms`);
+        return [];
+      }
+      
+      return nodes;
     } catch (error) {
       console.error(`Error fetching ${type} atoms:`, error);
       return [];

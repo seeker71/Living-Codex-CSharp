@@ -11,6 +11,7 @@ interface NearbyLensProps {
   controls?: Record<string, any>;
   userId?: string;
   className?: string;
+  readOnly?: boolean;
 }
 
 interface DiscoveredUser {
@@ -26,9 +27,9 @@ interface DiscoveredUser {
   contributions?: string[];
 }
 
-const PAGE_SIZE = 12;
+const DEFAULT_PAGE_SIZE = 12;
 
-export function NearbyLens({ controls = {}, userId, className = '' }: NearbyLensProps) {
+export function NearbyLens({ controls = {}, userId, className = '', readOnly = false }: NearbyLensProps) {
   const { user } = useAuth();
   const trackInteraction = useTrackInteraction();
 
@@ -36,6 +37,7 @@ export function NearbyLens({ controls = {}, userId, className = '' }: NearbyLens
   const [activeLocation, setActiveLocation] = useState('');
   const [radiusKm, setRadiusKm] = useState(50);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [users, setUsers] = useState<DiscoveredUser[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -55,11 +57,11 @@ export function NearbyLens({ controls = {}, userId, className = '' }: NearbyLens
     setError(null);
 
     try {
-      const skip = (requestedPage - 1) * PAGE_SIZE;
+      const skip = (requestedPage - 1) * pageSize;
       const payload: Record<string, any> = {
         location: activeLocation,
         radiusKm,
-        limit: PAGE_SIZE,
+        limit: pageSize,
         skip,
       };
 
@@ -99,7 +101,7 @@ export function NearbyLens({ controls = {}, userId, className = '' }: NearbyLens
     } finally {
       setLoading(false);
     }
-  }, [activeLocation, radiusKm, axes, user?.id, trackInteraction]);
+  }, [activeLocation, radiusKm, pageSize, axes, user?.id, trackInteraction]);
 
   useEffect(() => {
     setPage(1);
@@ -220,6 +222,24 @@ export function NearbyLens({ controls = {}, userId, className = '' }: NearbyLens
 
       {!loading && users.length > 0 && (
         <div className="space-y-4">
+          {/* Pagination at top */}
+          {totalCount > pageSize && (
+            <Card>
+              <CardContent className="p-4">
+                <PaginationControls
+                  currentPage={page}
+                  pageSize={pageSize}
+                  totalCount={totalCount}
+                  onPageChange={handlePageChange}
+                  onPageSizeChange={setPageSize}
+                  showPageSizeSelector={true}
+                  pageSizeOptions={[6, 12, 24, 48, 96]}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Users grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {users.map((item) => (
               <Card key={item.userId} className="h-full">
@@ -262,19 +282,6 @@ export function NearbyLens({ controls = {}, userId, className = '' }: NearbyLens
               </Card>
             ))}
           </div>
-
-          {totalCount > PAGE_SIZE && (
-            <Card>
-              <CardContent className="p-4">
-                <PaginationControls
-                  currentPage={page}
-                  pageSize={PAGE_SIZE}
-                  totalCount={totalCount}
-                  onPageChange={handlePageChange}
-                />
-              </CardContent>
-            </Card>
-          )}
         </div>
       )}
     </div>

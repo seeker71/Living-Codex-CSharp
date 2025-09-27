@@ -46,8 +46,8 @@ interface ThreadDetail extends ThreadSummary {
 }
 
 export function ChatsLens({ controls = {}, userId, className = '' }: ChatsLensProps) {
-  const { user } = useAuth();
-  const effectiveUserId = userId || user?.id || 'demo-user';
+  const { user, isAuthenticated } = useAuth();
+  const effectiveUserId = userId || user?.id;
   const trackInteraction = useTrackInteraction();
 
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
@@ -284,6 +284,37 @@ export function ChatsLens({ controls = {}, userId, className = '' }: ChatsLensPr
     if (!axes.length) return threads;
     return threads.filter(thread => thread.axes?.some(axis => axes.includes(axis)));
   }, [threads, axes]);
+
+  // Show sign-in prompt if no user is authenticated
+  if (!isAuthenticated || !user) {
+    return (
+      <div className={`space-y-6 ${className}`}>
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle className="text-2xl">💬 Chats</CardTitle>
+            <CardDescription>
+              Ongoing conversations tuned to your resonance.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center py-8">
+            <div className="text-4xl mb-4">🔐</div>
+            <div className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+              Sign in to join conversations
+            </div>
+            <div className="text-gray-600 dark:text-gray-300 mb-4">
+              Connect with others who share your resonance and participate in meaningful discussions
+            </div>
+            <a
+              href="/login"
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Sign In
+            </a>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className={`space-y-6 ${className}`}>

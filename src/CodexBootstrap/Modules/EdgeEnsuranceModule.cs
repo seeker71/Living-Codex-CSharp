@@ -296,16 +296,7 @@ public sealed class EdgeEnsuranceModule : ModuleBase
             foreach (var node in _registry.AllNodes())
             {
                 if (node.Id.StartsWith("u-core-")) continue; // skip U-CORE nodes themselves
-
-                var targetAxis = MatchAxis(node, axes) ?? defaultAxisId;
-                var edge = NodeHelpers.CreateEdge(node.Id, targetAxis, "maps_to_axis", 1.0, new Dictionary<string, object>
-                {
-                    ["relationship"] = "node-maps-to-ucore-axis",
-                    ["reason"] = "auto",
-                    ["createdAt"] = DateTimeOffset.UtcNow
-                });
-                _registry.Upsert(edge);
-                results.Add($"Connected {node.Id} -> {targetAxis}");
+                // Deprecated: do not auto-map generic nodes to axes. Respect explicit ontology only.
             }
 
             // Connect all meta-nodes
@@ -316,17 +307,7 @@ public sealed class EdgeEnsuranceModule : ModuleBase
                 .Concat(_registry.GetNodesByType("codex.meta/node"))
                 .ToList();
 
-            foreach (var meta in metaNodes)
-            {
-                var edge = NodeHelpers.CreateEdge(meta.Id, defaultConceptId, "maps_to_concept", 1.0, new Dictionary<string, object>
-                {
-                    ["relationship"] = "meta-node-maps-to-ucore-concept",
-                    ["reason"] = "default",
-                    ["createdAt"] = DateTimeOffset.UtcNow
-                });
-                _registry.Upsert(edge);
-                results.Add($"Connected meta {meta.Id} -> {defaultConceptId}");
-            }
+            // Deprecated: do not auto-map meta-nodes to a default concept.
 
             return new SuccessResponse($"Ensured U-CORE connections. Created/updated {results.Count} edges.", results);
         }
@@ -698,74 +679,14 @@ public sealed class EdgeEnsuranceModule : ModuleBase
     {
         try
         {
-            var results = new List<string>();
-
-            // Connect news nodes to their sources and related content
-            var newsNodes = _registry.GetNodesByType("codex.news.item")
-                .Concat(_registry.GetNodesByType("codex.news.fractal"))
-                .ToList();
-
-            foreach (var newsNode in newsNodes)
-            {
-                // Connect to news meta-type
-                var newsTypeEdge = NodeHelpers.CreateEdge(
-                    newsNode.Id,
-                    "codex.meta/type/news-item",
-                    "instance-of",
-                    1.0,
-                    new Dictionary<string, object> { ["relationship"] = "news-instance-of-type" }
-                );
-                _registry.Upsert(newsTypeEdge);
-                results.Add($"Connected news node {newsNode.Id} to news meta-type");
-
-                // Connect to source if specified
-                if (newsNode.Meta?.ContainsKey("source") == true)
-                {
-                    var source = newsNode.Meta["source"].ToString();
-                    if (!string.IsNullOrEmpty(source))
-                    {
-                        var sourceNodeId = $"news-source-{source.ToLowerInvariant()}";
-                        var sourceEdge = NodeHelpers.CreateEdge(
-                            newsNode.Id,
-                            sourceNodeId,
-                            "from_source",
-                            1.0,
-                            new Dictionary<string, object> 
-                            { 
-                                ["relationship"] = "news-from-source",
-                                ["source"] = source
-                            }
-                        );
-                        _registry.Upsert(sourceEdge);
-                        results.Add($"Connected news node {newsNode.Id} to source {source}");
-                    }
-                }
-
-                // Connect to extracted content if exists
-                if (newsNode.Meta?.ContainsKey("contentNodeId") == true)
-                {
-                    var contentNodeId = newsNode.Meta["contentNodeId"].ToString();
-                    if (!string.IsNullOrEmpty(contentNodeId))
-                    {
-                        var contentEdge = NodeHelpers.CreateEdge(
-                            newsNode.Id,
-                            contentNodeId,
-                            "has_content",
-                            1.0,
-                            new Dictionary<string, object> { ["relationship"] = "news-has-content" }
-                        );
-                        _registry.Upsert(contentEdge);
-                        results.Add($"Connected news node {newsNode.Id} to content {contentNodeId}");
-                    }
-                }
-            }
-
-            return new SuccessResponse($"Ensured news edges. Created/updated {results.Count} edges.", results);
+            // News-specific edge wiring is handled in RealtimeNewsStreamModule.
+            // This endpoint is intentionally a no-op to keep responsibilities aligned.
+            return new SuccessResponse("News edge wiring is handled by RealtimeNewsStreamModule. No action taken.", Array.Empty<string>());
         }
         catch (Exception ex)
         {
-            _logger.Error($"Error ensuring news edges: {ex.Message}", ex);
-            return new ErrorResponse($"Error ensuring news edges: {ex.Message}");
+            _logger.Error($"Error in ensure-news no-op: {ex.Message}", ex);
+            return new ErrorResponse($"Error in ensure-news: {ex.Message}");
         }
     }
 

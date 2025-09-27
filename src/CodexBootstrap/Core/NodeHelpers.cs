@@ -18,7 +18,7 @@ public static class NodeHelpers
         return new Node(
             Id: typeId,
             TypeId: "codex.meta/type",
-            State: ContentState.Ice,
+            State: ContentState.Water,
             Locale: "en",
             Title: name,
             Description: description,
@@ -62,7 +62,7 @@ public static class NodeHelpers
         return new Node(
             Id: apiId,
             TypeId: "codex.meta/api",
-            State: ContentState.Ice,
+            State: ContentState.Water,
             Locale: "en",
             Title: apiName,
             Description: description,
@@ -104,7 +104,7 @@ public static class NodeHelpers
         return new Node(
             Id: moduleId,
             TypeId: "codex.meta/module",
-            State: ContentState.Ice,
+            State: ContentState.Water,
             Locale: "en",
             Title: name,
             Description: description,
@@ -144,7 +144,7 @@ public static class NodeHelpers
         return new Node(
             Id: stateId,
             TypeId: "codex.meta/state",
-            State: ContentState.Ice,
+            State: ContentState.Water,
             Locale: "en",
             Title: name,
             Description: description,
@@ -179,7 +179,7 @@ public static class NodeHelpers
         return new Node(
             Id: responseId,
             TypeId: "codex.meta/response",
-            State: ContentState.Ice,
+            State: ContentState.Water,
             Locale: "en",
             Title: name,
             Description: description,

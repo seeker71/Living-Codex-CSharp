@@ -131,7 +131,7 @@ fi
 
 # Pull Ollama models
 print_status "Pulling Ollama models..."
-docker exec living-codex-ollama ollama pull llama3 || print_warning "Failed to pull llama3 model"
+docker exec living-codex-ollama ollama pull llama3.2:3b || print_warning "Failed to pull llama3.2:3b model"
 docker exec living-codex-ollama ollama pull gpt-oss:20b || print_warning "Failed to pull gpt-oss:20b model"
 
 # Display service URLs

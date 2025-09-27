@@ -64,17 +64,20 @@ public sealed class ModuleLoader
 
     public void LoadBuiltInModules()
     {
+        _logger.Info("[ModuleLoader] Starting LoadBuiltInModules...");
         // Load all built-in modules from the Modules namespace
         var moduleTypes = Assembly.GetExecutingAssembly()
             .GetTypes()
             .Where(t => typeof(IModule).IsAssignableFrom(t) && !t.IsAbstract && t.IsClass)
             .Where(t => t.Namespace?.StartsWith("CodexBootstrap.Modules") == true);
 
+        _logger.Info($"[ModuleLoader] Found {moduleTypes.Count()} module types to load");
         _logger.Info($"Found {moduleTypes.Count()} module types to load");
 
         // Debug: List all found module types
         foreach (var moduleType in moduleTypes)
         {
+            _logger.Info($"[ModuleLoader]   - {moduleType.Name} (Namespace: {moduleType.Namespace})");
             _logger.Info($"  - {moduleType.Name} (Namespace: {moduleType.Namespace})");
         }
 
@@ -82,15 +85,19 @@ public sealed class ModuleLoader
         {
             try
             {
+                _logger.Info($"[ModuleLoader] Attempting to load module: {moduleType.Name}");
                 _logger.Info($"Attempting to load module: {moduleType.Name}");
                 var module = CreateModule(moduleType);
                 if (module != null)
                 {
+                    _logger.Info($"[ModuleLoader] Successfully created module: {moduleType.Name}");
                     _logger.Info($"Successfully created module: {moduleType.Name}");
                     LoadModule(module);
+                    _logger.Info($"[ModuleLoader] Successfully loaded module: {moduleType.Name}");
                 }
                 else
                 {
+                    _logger.Warn($"[ModuleLoader] Failed to create module: {moduleType.Name} - returned null");
                     _logger.Warn($"Failed to create module: {moduleType.Name} - returned null");
                 }
             }
@@ -228,8 +235,10 @@ public sealed class ModuleLoader
             // Use enhanced module registration with spec tracking
             try
             {
+                _logger.Info($"[ModuleLoader] About to register module: {module.GetType().Name}");
                 // Register the module and its meta nodes with spec tracking
                 module.Register(_registry);
+                _logger.Info($"[ModuleLoader] Successfully registered module: {module.GetType().Name}");
                 _logger.Info($"Successfully registered module {module.GetType().Name} with enhanced registration");
             }
             catch (Exception ex)
@@ -262,8 +271,20 @@ public sealed class ModuleLoader
                 // Continue loading even if API handler registration fails
             }
             
-            // Register record types as meta nodes if the module supports it
-            RegisterModuleRecordTypes(module, moduleNode);
+            _ = Task.Run(() =>
+            {
+                Thread.Sleep(1000);
+                try
+                {
+                    _logger.Info($"[ModuleLoader] Queueing background record type registration for module: {module.GetType().Name}");
+                    RegisterModuleRecordTypes(module, moduleNode);
+                    _logger.Info($"[ModuleLoader] Background record type registration complete for module: {module.GetType().Name}");
+                }
+                catch (Exception ex)
+                {
+                    _logger.Warn($"Background record type registration failed for {module.GetType().Name}: {ex.Message}");
+                }
+            });
             
             // Track loaded modules
             _loadedModules.Add(module);
@@ -283,16 +304,20 @@ public sealed class ModuleLoader
     {
         try
         {
+            _logger.Info($"[ModuleLoader] RegisterModuleRecordTypes: Starting for {module.GetType().Name}");
             // Extract record types from the module's assembly
             var moduleType = module.GetType();
             var assembly = moduleType.Assembly;
+            _logger.Info($"[ModuleLoader] RegisterModuleRecordTypes: Got assembly for {module.GetType().Name}");
             
             // Find all record types in the same namespace as the module
+            _logger.Info($"[ModuleLoader] RegisterModuleRecordTypes: About to call assembly.GetTypes() for {module.GetType().Name}");
             var recordTypes = assembly.GetTypes()
                 .Where(t => t.IsClass && !t.IsAbstract && t.Namespace == moduleType.Namespace)
                 .Where(t => t.Name.EndsWith("Request") || t.Name.EndsWith("Response") || t.Name.EndsWith("Record") || t.Name.EndsWith("Data"))
                 .Select(t => t.Name)
                 .ToArray();
+            _logger.Info($"[ModuleLoader] RegisterModuleRecordTypes: Got {recordTypes.Length} record types for {module.GetType().Name}");
 
             if (recordTypes.Length > 0)
             {

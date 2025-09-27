@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import { ResonanceControls } from '@/components/ui/ResonanceControls';
 import { StreamLens } from '@/components/lenses/StreamLens';
-import { ThreadsLens } from '@/components/lenses/ThreadsLens';
+import { ConversationsLens } from '@/components/lenses/ThreadsLens';
 import { GalleryLens } from '@/components/lenses/GalleryLens';
 import { NearbyLens } from '@/components/lenses/NearbyLens';
 import { SwipeLens } from '@/components/lenses/SwipeLens';
@@ -14,7 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const lensTabs = [
   { id: 'lens.stream', name: 'Stream', icon: '📱' },
-  { id: 'lens.threads', name: 'Threads', icon: '🧵' },
+  { id: 'lens.threads', name: 'Conversations', icon: '💬' },
   { id: 'lens.gallery', name: 'Gallery', icon: '🖼️' },
   { id: 'lens.nearby', name: 'Nearby', icon: '📍' },
   { id: 'lens.swipe', name: 'Swipe', icon: '👆' },
@@ -30,8 +30,7 @@ export default function DiscoverPage() {
 
   const { isLoading: pagesLoading } = usePages();
   const { data: lenses, isLoading: lensesLoading } = useLenses();
-  const { user } = useAuth();
-  const userId = user?.id ?? 'demo-user';
+  const { user, isAuthenticated } = useAuth();
 
   const findLens = (lensId: string) =>
     lenses?.find(l => l.id === lensId) || defaultAtoms.lenses.find(l => l.id === lensId);
@@ -102,58 +101,85 @@ export default function DiscoverPage() {
                     ))}
                   </div>
                 ) : (
-                  (() => {
-                    switch (activeLens) {
-                      case 'lens.stream':
-                        return (
-                          <StreamLens
-                            lens={currentLens}
-                            controls={controls}
-                            userId={userId}
-                          />
-                        );
-                      case 'lens.threads':
-                        return (
-                          <ThreadsLens
-                            lens={currentLens}
-                            controls={controls}
-                            userId={userId}
-                          />
-                        );
-                      case 'lens.gallery':
-                        return (
-                          <GalleryLens
-                            controls={controls}
-                            userId={userId}
-                          />
-                        );
-                      case 'lens.nearby':
-                        return (
-                          <NearbyLens
-                            controls={controls}
-                            userId={userId}
-                          />
-                        );
-                      case 'lens.swipe':
-                        return (
-                          <SwipeLens
-                            controls={controls}
-                            userId={userId}
-                          />
-                        );
-                      default:
-                        return (
-                          <div className="bg-gray-50 dark:bg-gray-800 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-6 text-center">
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                              {currentLens.name || 'Lens Coming Soon'}
-                            </h3>
-                            <p className="text-sm text-gray-600 dark:text-gray-300">
-                              This experience is not wired up yet. Current status: {currentLens.status || 'Planned'}.
-                            </p>
-                          </div>
-                        );
-                    }
-                  })()
+                  <>
+                    {/* Read-only mode indicator */}
+                    {(!isAuthenticated || !user) && (
+                      <div className="mb-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-amber-600 dark:text-amber-400">👁️</span>
+                          <span className="text-sm text-amber-800 dark:text-amber-200 font-medium">
+                            Read-only mode
+                          </span>
+                          <span className="text-xs text-amber-700 dark:text-amber-300">
+                            Sign in to interact and personalize your experience
+                          </span>
+                          <a
+                            href="/login"
+                            className="ml-auto text-xs bg-amber-600 text-white px-3 py-1 rounded hover:bg-amber-700 transition-colors"
+                          >
+                            Sign In
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {(() => {
+                      switch (activeLens) {
+                        case 'lens.stream':
+                          return (
+                            <StreamLens
+                              lens={currentLens}
+                              controls={controls}
+                              userId={user?.id}
+                              readOnly={!isAuthenticated || !user}
+                            />
+                          );
+                        case 'lens.threads':
+                          return (
+                            <ConversationsLens
+                              controls={controls}
+                              userId={user?.id}
+                              readOnly={!isAuthenticated || !user}
+                            />
+                          );
+                        case 'lens.gallery':
+                          return (
+                            <GalleryLens
+                              controls={controls}
+                              userId={user?.id}
+                              readOnly={!isAuthenticated || !user}
+                            />
+                          );
+                        case 'lens.nearby':
+                          return (
+                            <NearbyLens
+                              controls={controls}
+                              userId={user?.id}
+                              readOnly={!isAuthenticated || !user}
+                            />
+                          );
+                        case 'lens.swipe':
+                          return (
+                            <SwipeLens
+                              controls={controls}
+                              userId={user?.id}
+                              readOnly={!isAuthenticated || !user}
+                            />
+                          );
+                        default:
+                          return (
+                            <div className="bg-gray-50 dark:bg-gray-800 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-6 text-center">
+                              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                                {currentLens.name || 'Lens Coming Soon'}
+                              </h3>
+                              <p className="text-sm text-gray-600 dark:text-gray-300">
+                                This experience is not wired up yet. Current status: {currentLens.status || 'Planned'}.
+                              </p>
+                            </div>
+                          );
+                      }
+                    })()}
+                  </>
                 )}
               </CardContent>
             </Card>

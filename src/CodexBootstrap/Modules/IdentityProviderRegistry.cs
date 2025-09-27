@@ -55,17 +55,26 @@ public class IdentityProviderRegistry
     /// </summary>
     private void RegisterDefaultProviders()
     {
-        // Register mock provider for testing
-        RegisterProvider("mock", new MockIdentityProvider(_logger));
-        
-        // Register OAuth providers (these would be configured based on environment)
-        RegisterProvider("google", new GoogleOAuthProvider(_logger));
-        RegisterProvider("microsoft", new MicrosoftOAuthProvider(_logger));
-        RegisterProvider("github", new GitHubOAuthProvider(_logger));
-        RegisterProvider("facebook", new FacebookOAuthProvider(_logger));
-        RegisterProvider("twitter", new TwitterOAuthProvider(_logger));
-        
-        _logger.Info($"Registered {_providers.Count} default identity providers");
+        // Move OAuth provider registration to background so it never blocks startup
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                _logger.Info("Starting background OAuth provider registration...");
+                RegisterProvider("google", new GoogleOAuthProvider(_logger));
+                RegisterProvider("microsoft", new MicrosoftOAuthProvider(_logger));
+                RegisterProvider("github", new GitHubOAuthProvider(_logger));
+                RegisterProvider("facebook", new FacebookOAuthProvider(_logger));
+                RegisterProvider("twitter", new TwitterOAuthProvider(_logger));
+                _logger.Info("Background OAuth provider registration completed");
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"Background OAuth provider registration failed: {ex.Message}");
+            }
+        });
+
+        _logger.Info($"Registered {_providers.Count} default identity providers (initial set)");
     }
 }
 

@@ -7,9 +7,13 @@ set -e  # Exit on any error
 
 echo "🚀 Starting Living Codex Server..."
 
+export DISABLE_AI="${DISABLE_AI:-true}"
+export NEWS_INGESTION_ENABLED="${NEWS_INGESTION_ENABLED:-false}"
+export USE_OLLAMA_ONLY="${USE_OLLAMA_ONLY:-false}"
+
 # Cheap AI defaults for news concept extraction (can be overridden)
 export NEWS_AI_PROVIDER="${NEWS_AI_PROVIDER:-ollama}"
-export NEWS_AI_MODEL="${NEWS_AI_MODEL:-llama3.1:8b}"
+export NEWS_AI_MODEL="${NEWS_AI_MODEL:-llama3.2:3b}"
 
 # Get the script directory and set up paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -92,9 +96,11 @@ check_port() {
 wait_for_server() {
     local server_pid=$1
     echo "⏳ Waiting for server to start (PID: $server_pid)..."
-    local max_attempts=5
+    local max_attempts=30  # Increased timeout for health checks
     local attempt=0
-    
+    local start_time=$(date +%s)
+
+    sleep 2  # Reduced initial wait
     while [ $attempt -lt $max_attempts ]; do
         # Check if the process is still running
         if ! kill -0 $server_pid 2>/dev/null; then
@@ -106,16 +112,23 @@ wait_for_server() {
         
         # Check if server is responding
         if curl -s "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
-            echo "✅ Server is ready!"
+            local end_time=$(date +%s)
+            local startup_time=$((end_time - start_time))
+            echo "✅ Server is ready! (startup time: ${startup_time}s)"
+            export DISABLE_AI=false
             return 0
         fi
         
         attempt=$((attempt + 1))
-        echo "Attempt $attempt/$max_attempts - waiting... (PID: $server_pid still running)"
+        local current_time=$(date +%s)
+        local elapsed=$((current_time - start_time))
+        echo "Attempt $attempt/$max_attempts - waiting... (PID: $server_pid still running, elapsed: ${elapsed}s)"
         sleep 1
     done
     
-    echo "❌ Server failed to start within 5 seconds"
+    local end_time=$(date +%s)
+    local total_time=$((end_time - start_time))
+    echo "❌ Server failed to start within ${total_time} seconds"
     echo "📋 Checking logs for startup issues..."
     tail -n 30 "$LOG_FILE" 2>/dev/null || echo "No logs available"
     return 1
@@ -261,12 +274,14 @@ analyze_startup_logs() {
 
 # Main execution
 main() {
+    local script_start_time=$(date +%s)
     echo "=========================================="
     echo "🌟 Living Codex Server Startup"
     echo "=========================================="
     echo "Port: $PORT"
     echo "Project: $PROJECT_DIR"
     echo "Logs: $LOG_FILE"
+    echo "Start Time: $(date)"
     echo "=========================================="
     
     # Stop any running server
@@ -347,8 +362,11 @@ main() {
         
         # Test the server
         if test_server; then
+            local script_end_time=$(date +%s)
+            local total_startup_time=$((script_end_time - script_start_time))
             echo ""
             echo "🎉 Living Codex Server is running!"
+            echo "⏱️  Total startup time: ${total_startup_time}s"
             echo "🌐 URL: http://127.0.0.1:$PORT"
             echo "📊 Health: http://127.0.0.1:$PORT/health"
             echo "🤖 AI Health: http://127.0.0.1:$PORT/ai/health"
@@ -369,6 +387,12 @@ main() {
             echo "🚀 Server is running in the background (PID: $SERVER_PID)."
             echo "   The script will now exit, leaving the server running."
             echo "   You can interact with the server immediately."
+            echo ""
+            echo "📋 Note: Background initialization tasks are still running:"
+            echo "   - U-CORE ontology seeding"
+            echo "   - Reflection tree building"
+            echo "   - Edge ensurance processing"
+            echo "   Check logs for progress: tail -f $LOG_FILE"
             echo ""
             
             # Server is running successfully in background - exit script

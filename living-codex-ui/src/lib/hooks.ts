@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { AtomFetcher, APIAdapter, UIPage, UILens, UIAction, UIControls } from './atoms';
+import { AtomFetcher, APIAdapter, UIPage, UILens, UIAction, UIControls, defaultAtoms } from './atoms';
 import { endpoints } from './api';
 import { useCallback, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,7 +11,23 @@ const apiAdapter = new APIAdapter();
 export function usePages() {
   return useQuery({
     queryKey: ['pages'],
-    queryFn: () => atomFetcher.fetchAtoms<UIPage>('codex.ui.page'),
+    queryFn: async () => {
+      console.log('usePages: Starting to fetch pages...');
+      try {
+        const backendPages = await atomFetcher.fetchAtoms<UIPage>('codex.ui.page');
+        console.log('usePages: Backend pages:', backendPages.length);
+        // If backend has no pages, use default atoms
+        if (backendPages.length === 0) {
+          console.log('usePages: Using default pages from atoms');
+          return defaultAtoms.pages;
+        }
+        return backendPages;
+      } catch (error) {
+        console.error('usePages: Error fetching pages:', error);
+        console.log('usePages: Falling back to default pages');
+        return defaultAtoms.pages;
+      }
+    },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
@@ -20,7 +36,23 @@ export function usePages() {
 export function useLenses() {
   return useQuery({
     queryKey: ['lenses'],
-    queryFn: () => atomFetcher.fetchAtoms<UILens>('codex.ui.lens'),
+    queryFn: async () => {
+      console.log('useLenses: Starting to fetch lenses...');
+      try {
+        const backendLenses = await atomFetcher.fetchAtoms<UILens>('codex.ui.lens');
+        console.log('useLenses: Backend lenses:', backendLenses.length);
+        // If backend has no lenses, use default atoms
+        if (backendLenses.length === 0) {
+          console.log('useLenses: Using default lenses from atoms');
+          return defaultAtoms.lenses;
+        }
+        return backendLenses;
+      } catch (error) {
+        console.error('useLenses: Error fetching lenses:', error);
+        console.log('useLenses: Falling back to default lenses');
+        return defaultAtoms.lenses;
+      }
+    },
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -289,6 +321,14 @@ export function useAdvancedEdgeSearch(searchParams: {
     queryKey: ['edges', 'search', searchParams],
     queryFn: () => endpoints.searchEdgesAdvanced(searchParams),
     staleTime: 30 * 1000, // 30 seconds for search results
+  });
+}
+
+export function useEdgeMetadata() {
+  return useQuery({
+    queryKey: ['edges', 'metadata'],
+    queryFn: () => endpoints.getEdgeMetadata(),
+    staleTime: 10 * 60 * 1000, // 10 minutes - edge metadata doesn't change often
   });
 }
 

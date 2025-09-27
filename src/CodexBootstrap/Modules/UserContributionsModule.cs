@@ -151,6 +151,7 @@ public sealed class UserContributionsModule : ModuleBase
         }
     }
 
+    [RequireAuth]
     [ApiRoute("GET", "/contributions/user/{userId}", "GetUserContributions", "Get contributions by user", "codex.user-contributions")]
     public async Task<object> GetUserContributionsAsync(string userId, [ApiParameter("query", "Query parameters")] ContributionQuery? query)
     {

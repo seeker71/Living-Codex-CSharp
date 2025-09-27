@@ -15,7 +15,7 @@ namespace CodexBootstrap.Core;
     Description = "Generic provider, model, and mode attributes for optimal LLM integration across all modules",
     Example = @"{
       ""provider"": ""Ollama"",
-      ""model"": ""llama3"",
+      ""model"": ""llama3.2:3b"",
       ""mode"": ""consciousness-expansion"",
       ""frequency"": 528,
       ""temperature"": 0.7,
@@ -43,7 +43,7 @@ public static class LLMConfigurationSystem
         {
             Provider = provider;
             Description = description;
-            SupportedModels = supportedModels ?? new[] { "llama2", "llama3", "mistral", "codellama" };
+            SupportedModels = supportedModels ?? new[] { "llama3.2:3b", "mistral", "codellama" };
             SupportedModes = supportedModes ?? new[] { "consciousness-expansion", "code-generation", "analysis", "creative" };
         }
     }
@@ -63,7 +63,7 @@ public static class LLMConfigurationSystem
         public string[] Frequencies { get; }
 
         public LLMModelAttribute(
-            string model = "llama3",
+            string model = "llama3.2:3b",
             string useCase = "general",
             string description = "LLM model configuration",
             double temperature = 0.7,
@@ -122,7 +122,7 @@ public static class LLMConfigurationSystem
         Example = @"{
           ""id"": ""consciousness-expansion-llama3"",
           ""provider"": ""Ollama"",
-          ""model"": ""llama3"",
+          ""model"": ""llama3.2:3b"",
           ""mode"": ""consciousness-expansion"",
           ""temperature"": 0.7,
           ""maxTokens"": 2000,
@@ -227,14 +227,14 @@ public static class LLMConfigurationSystem
         {
             return taskType.ToLower() switch
             {
-                "concept-extraction" => "llama3.1:8b", // Best for structured concept extraction
-                "consciousness-expansion" => "llama3.1:8b", // Good for spiritual content
-                "translation" => "llama3.1:8b", // Good multilingual support
+                "concept-extraction" => "llama3.2:3b", // Best for structured concept extraction
+                "consciousness-expansion" => "llama3.2:3b", // Good for spiritual content
+                "translation" => "llama3.2:3b", // Good multilingual support
                 "code-generation" => "codellama:latest", // Specialized for code
-                "reasoning" => "llama3.1:8b", // Good reasoning capabilities
-                "creative-writing" => "llama3.1:8b", // Good creativity
-                "analysis" => "llama3.1:8b", // Good analytical capabilities
-                _ => "llama3.1:8b" // Default fallback
+                "reasoning" => "llama3.2:3b", // Good reasoning capabilities
+                "creative-writing" => "llama3.2:3b", // Good creativity
+                "analysis" => "llama3.2:3b", // Good analytical capabilities
+                _ => "llama3.2:3b" // Default fallback
             };
         }
     }
@@ -268,7 +268,7 @@ public static class LLMConfigurationSystem
         public static readonly LLMConfiguration ConceptExtractionLlama3 = new(
             Id: "concept-extraction-llama3-8b",
             Provider: "Ollama",
-            Model: "llama3.1:8b",
+            Model: "llama3.2:3b",
             Mode: "concept-extraction",
             Temperature: 0.3,
             MaxTokens: 1500,
@@ -371,7 +371,7 @@ public static class LLMConfigurationSystem
         public static readonly LLMConfiguration DefaultLlama3 = new(
             Id: "default-llama3-8b",
             Provider: "Ollama",
-            Model: "llama3.1:8b",
+            Model: "llama3.2:3b",
             Mode: "default",
             Temperature: 0.7,
             MaxTokens: 2048,

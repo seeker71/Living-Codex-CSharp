@@ -12,13 +12,14 @@ interface StreamLensProps {
   controls?: Record<string, any>;
   userId?: string;
   className?: string;
+  readOnly?: boolean;
 }
 
-export function StreamLens({ lens, controls = {}, userId, className = '' }: StreamLensProps) {
+export function StreamLens({ lens, controls = {}, userId, className = '', readOnly = false }: StreamLensProps) {
   const [items, setItems] = useState<any[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const pageSize = 12;
+  const [pageSize, setPageSize] = useState<number>(12);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -126,15 +127,7 @@ export function StreamLens({ lens, controls = {}, userId, className = '' }: Stre
 
   return (
     <div className={`space-y-4 ${className}`}>
-      {items.map((item) => (
-        <ConceptStreamCard
-          key={item.id}
-          concept={item}
-          userId={userId}
-          onAction={handleAction}
-        />
-      ))}
-
+      {/* Pagination at top */}
       {totalCount > pageSize && (
         <Card>
           <CardContent className="p-4">
@@ -143,10 +136,23 @@ export function StreamLens({ lens, controls = {}, userId, className = '' }: Stre
               pageSize={pageSize}
               totalCount={totalCount}
               onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+              showPageSizeSelector={true}
+              pageSizeOptions={[6, 12, 24, 48, 96]}
             />
           </CardContent>
         </Card>
       )}
+
+      {/* Items */}
+      {items.map((item) => (
+        <ConceptStreamCard
+          key={item.id}
+          concept={item}
+          userId={userId}
+          onAction={handleAction}
+        />
+      ))}
     </div>
   );
 }

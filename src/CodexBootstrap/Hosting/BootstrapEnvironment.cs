@@ -8,6 +8,8 @@ namespace CodexBootstrap.Hosting;
 /// </summary>
 public static class BootstrapEnvironment
 {
+    private static readonly ILog _logger = LogManager.GetLogger(typeof(BootstrapEnvironment));
+
     public static void Initialize()
     {
         LoadDotEnv();
@@ -22,7 +24,7 @@ public static class BootstrapEnvironment
             var envFile = Path.Combine(cwd, "../../.env");
             if (!File.Exists(envFile))
             {
-                Console.WriteLine($".env file not found at: {envFile}");
+                _logger.Warn($".env file not found at: {envFile}");
                 return;
             }
 
@@ -39,12 +41,11 @@ public static class BootstrapEnvironment
                     Environment.SetEnvironmentVariable(parts[0].Trim(), parts[1].Trim());
                 }
             }
-
-            Console.WriteLine($".env file loaded from: {envFile}");
+            _logger.Info($".env file loaded from: {envFile}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading .env file: {ex.Message}");
+            _logger.Error($"Error loading .env file: {ex.Message}", ex);
         }
     }
 
@@ -56,17 +57,17 @@ public static class BootstrapEnvironment
             if (configFile.Exists)
             {
                 XmlConfigurator.Configure(configFile);
-                Console.WriteLine($"Log4net configured with config file: {configFile.FullName}");
+                _logger.Info($"Log4net configured with config file: {configFile.FullName}");
             }
             else
             {
-                Console.WriteLine($"Log4net config file not found at: {configFile.FullName}");
+                _logger.Warn($"Log4net config file not found at: {configFile.FullName}");
                 BasicConfigurator.Configure();
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to configure log4net: {ex.Message}");
+            _logger.Error($"Failed to configure log4net: {ex.Message}", ex);
         }
     }
 }

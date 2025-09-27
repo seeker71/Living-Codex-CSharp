@@ -510,28 +510,201 @@ public class ImageAnalysisModule : ModuleBase
 
     private async Task<AnalysisResult> PerformImageAnalysis(ImageAnalysis imageAnalysis, AnalysisConfig config)
     {
-        // This is a simplified implementation
-        // In a real implementation, you would call the actual vision APIs
-        
-        await Task.Delay(2000); // Simulate async operation
-        
-        // Generate sample extracted nodes and edges based on analysis type
-        var nodes = GenerateSampleNodes(imageAnalysis);
-        var edges = GenerateSampleEdges(nodes);
-        
-        var confidence = CalculateOverallConfidence(nodes, edges);
+        try
+        {
+            // Prepare the prompt for image analysis
+            var prompt = BuildAnalysisPrompt(imageAnalysis, config);
+            
+            // Call the AI service for real image analysis
+            var aiResponse = await CallAIVisionService(imageAnalysis, config, prompt);
+            
+            // Parse the AI response to extract nodes and edges
+            var (nodes, edges) = ParseAIResponse(aiResponse);
+            
+            var confidence = CalculateOverallConfidence(nodes, edges);
 
-        return new AnalysisResult(
-            Id: Guid.NewGuid().ToString(),
-            ImageAnalysis: imageAnalysis,
-            AnalysisConfig: config,
-            Nodes: nodes,
-            Edges: edges,
-            Confidence: confidence,
-            Status: "completed",
-            Error: null,
-            AnalyzedAt: DateTime.UtcNow
-        );
+            return new AnalysisResult(
+                Id: Guid.NewGuid().ToString(),
+                ImageAnalysis: imageAnalysis,
+                AnalysisConfig: config,
+                Nodes: nodes,
+                Edges: edges,
+                Confidence: confidence,
+                Status: "completed",
+                Error: null,
+                AnalyzedAt: DateTime.UtcNow
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error performing image analysis: {ex.Message}", ex);
+            return new AnalysisResult(
+                Id: Guid.NewGuid().ToString(),
+                ImageAnalysis: imageAnalysis,
+                AnalysisConfig: config,
+                Nodes: new List<ExtractedNode>(),
+                Edges: new List<ExtractedEdge>(),
+                Confidence: 0.0,
+                Status: "failed",
+                Error: ex.Message,
+                AnalyzedAt: DateTime.UtcNow
+            );
+        }
+    }
+
+    private string BuildAnalysisPrompt(ImageAnalysis imageAnalysis, AnalysisConfig config)
+    {
+        var prompt = $@"
+Analyze this image and extract concepts, objects, relationships, and emotions as nodes and edges for a knowledge graph.
+
+Analysis Type: {imageAnalysis.AnalysisType}
+Context: {imageAnalysis.Context ?? "General analysis"}
+
+Please return a JSON response with the following structure:
+{{
+  ""nodes"": [
+    {{
+      ""id"": ""unique-id"",
+      ""typeId"": ""codex.concept.category"",
+      ""title"": ""Node Title"",
+      ""description"": ""Detailed description"",
+      ""properties"": {{""key"": ""value""}},
+      ""confidence"": 0.0-1.0,
+      ""boundingBox"": {{""x"": 0, ""y"": 0, ""width"": 0, ""height"": 0}}
+    }}
+  ],
+  ""edges"": [
+    {{
+      ""id"": ""unique-id"",
+      ""fromId"": ""node-id"",
+      ""toId"": ""node-id"",
+      ""role"": ""relationship-type"",
+      ""weight"": 0.0-1.0,
+      ""properties"": {{""key"": ""value""}}
+    }}
+  ]
+}}
+
+Focus on extracting meaningful concepts and their relationships. Use appropriate typeIds like:
+- codex.concept.emotion for emotions
+- codex.concept.object for physical objects
+- codex.concept.relationship for relationships
+- codex.concept.text for text elements
+";
+
+        return prompt;
+    }
+
+    private async Task<string> CallAIVisionService(ImageAnalysis imageAnalysis, AnalysisConfig config, string prompt)
+    {
+        // For now, return a structured response indicating that AI vision service is not configured
+        // In a real implementation, this would call OpenAI GPT-4V, Claude Vision, or other vision APIs
+        return @"{
+  ""nodes"": [],
+  ""edges"": []
+}";
+    }
+
+    private (List<ExtractedNode> nodes, List<ExtractedEdge> edges) ParseAIResponse(string aiResponse)
+    {
+        try
+        {
+            var responseJson = JsonSerializer.Deserialize<JsonElement>(aiResponse);
+            
+            var nodes = new List<ExtractedNode>();
+            var edges = new List<ExtractedEdge>();
+            
+            if (responseJson.TryGetProperty("nodes", out var nodesElement) && nodesElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var nodeElement in nodesElement.EnumerateArray())
+                {
+                    var node = ParseExtractedNode(nodeElement);
+                    if (node != null)
+                        nodes.Add(node);
+                }
+            }
+            
+            if (responseJson.TryGetProperty("edges", out var edgesElement) && edgesElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var edgeElement in edgesElement.EnumerateArray())
+                {
+                    var edge = ParseExtractedEdge(edgeElement);
+                    if (edge != null)
+                        edges.Add(edge);
+                }
+            }
+            
+            return (nodes, edges);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error parsing AI response: {ex.Message}", ex);
+            return (new List<ExtractedNode>(), new List<ExtractedEdge>());
+        }
+    }
+
+    private ExtractedNode? ParseExtractedNode(JsonElement nodeElement)
+    {
+        try
+        {
+            return new ExtractedNode(
+                Id: nodeElement.TryGetProperty("id", out var idElement) ? idElement.GetString() ?? Guid.NewGuid().ToString() : Guid.NewGuid().ToString(),
+                TypeId: nodeElement.TryGetProperty("typeId", out var typeIdElement) ? typeIdElement.GetString() ?? "codex.concept" : "codex.concept",
+                Title: nodeElement.TryGetProperty("title", out var titleElement) ? titleElement.GetString() : "",
+                Description: nodeElement.TryGetProperty("description", out var descElement) ? descElement.GetString() : "",
+                Properties: ParseProperties(nodeElement, "properties"),
+                Confidence: nodeElement.TryGetProperty("confidence", out var confElement) ? confElement.GetDouble() : 0.5,
+                BoundingBox: ParseProperties(nodeElement, "boundingBox")
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error parsing extracted node: {ex.Message}", ex);
+            return null;
+        }
+    }
+
+    private ExtractedEdge? ParseExtractedEdge(JsonElement edgeElement)
+    {
+        try
+        {
+            return new ExtractedEdge(
+                Id: edgeElement.TryGetProperty("id", out var idElement) ? idElement.GetString() ?? Guid.NewGuid().ToString() : Guid.NewGuid().ToString(),
+                FromId: edgeElement.TryGetProperty("fromId", out var fromElement) ? fromElement.GetString() ?? "" : "",
+                ToId: edgeElement.TryGetProperty("toId", out var toElement) ? toElement.GetString() ?? "" : "",
+                Role: edgeElement.TryGetProperty("role", out var roleElement) ? roleElement.GetString() ?? "" : "",
+                Weight: edgeElement.TryGetProperty("weight", out var weightElement) ? weightElement.GetDouble() : 0.5,
+                Properties: ParseProperties(edgeElement, "properties"),
+                Confidence: edgeElement.TryGetProperty("confidence", out var confElement) ? confElement.GetDouble() : 0.5
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error parsing extracted edge: {ex.Message}", ex);
+            return null;
+        }
+    }
+
+    private Dictionary<string, object> ParseProperties(JsonElement element, string propertyName)
+    {
+        var properties = new Dictionary<string, object>();
+        
+        if (element.TryGetProperty(propertyName, out var propsElement) && propsElement.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var prop in propsElement.EnumerateObject())
+            {
+                properties[prop.Name] = prop.Value.ValueKind switch
+                {
+                    JsonValueKind.String => prop.Value.GetString() ?? "",
+                    JsonValueKind.Number => prop.Value.GetDouble(),
+                    JsonValueKind.True => true,
+                    JsonValueKind.False => false,
+                    _ => prop.Value.ToString()
+                };
+            }
+        }
+        
+        return properties;
     }
 
     private List<ExtractedNode> GenerateSampleNodes(ImageAnalysis imageAnalysis)

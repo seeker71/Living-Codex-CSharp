@@ -301,17 +301,7 @@ public class NodeRegistry : INodeRegistry
 
     private void EnforceEdgesForNewNode(Node node)
     {
-        // 1) Identity self-edge
-        var identityEdge = NodeHelpers.CreateEdge(
-            node.Id,
-            node.Id,
-            role: "identity",
-            weight: 1.0,
-            meta: new Dictionary<string, object> { ["relationship"] = "identity-self" }
-        );
-        Upsert(identityEdge);
-
-        // 2) Instance-of edge to the node's declared typeId (so meta nodes aggregate instances)
+        // 1) Instance-of edge to the node's declared typeId (types-as-nodes invariant)
         var metaTypeId = node.TypeId;
         if (!string.IsNullOrWhiteSpace(metaTypeId))
         {
@@ -326,7 +316,7 @@ public class NodeRegistry : INodeRegistry
             Upsert(instanceEdge);
         }
 
-        // 3) Derived relationship from parentNodeId -> node
+        // 2) Derived relationship from parentNodeId -> node
         if (node.Meta != null && node.Meta.TryGetValue("parentNodeId", out var parentObj))
         {
             var parentId = parentObj?.ToString();
@@ -344,7 +334,7 @@ public class NodeRegistry : INodeRegistry
             }
         }
 
-        // 4) Content type relationship node -> contentType
+        // 3) Content type relationship node -> contentType
         var mediaType = node.Content?.MediaType;
         if (!string.IsNullOrWhiteSpace(mediaType))
         {
