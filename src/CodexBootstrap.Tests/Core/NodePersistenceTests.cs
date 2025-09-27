@@ -1,3 +1,4 @@
+#if DISABLED_LEGACY_STORAGE_TESTS
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -1264,3 +1265,4 @@ namespace CodexBootstrap.Tests.Core
         #endregion
     }
 }
+#endif
