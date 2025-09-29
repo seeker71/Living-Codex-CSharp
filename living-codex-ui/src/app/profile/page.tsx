@@ -227,9 +227,10 @@ export default function ProfilePage() {
 
   const loadBeliefSystem = async () => {
     try {
-      const response = await fetch(`http://localhost:5002/userconcept/belief-system/${user?.id}`)
-      if (response.ok) {
-        const data = await response.json()
+      if (!user?.id) return
+      const response = await api.get(`/userconcept/belief-system/${user.id}`)
+      if (response.success && (response.data as any)) {
+        const data: any = response.data
         if (data.success && data.beliefSystemId) {
           setBeliefSystem({
             userId: data.userId,
@@ -267,17 +268,18 @@ export default function ProfilePage() {
     setMessage(null)
     
     try {
+      if (!user?.id) return
       const profileData = {
         displayName,
         email,
-        metadata: {
-          location,
-          interests: interests.join(','),
-          contributions: profile?.contributions?.join(',') || ''
-        }
+        bio,
+        location,
+        interests,
+        avatarUrl: profile?.avatarUrl || '',
+        coverImageUrl: profile?.coverImageUrl || ''
       }
 
-      const response = await api.put(`/identity/${user?.id}`, profileData)
+      const response = await api.put(`/auth/profile/${user.id}`, profileData)
 
       if (response.success) {
         setMessage({ type: 'success', text: 'Profile updated successfully!' })
@@ -297,8 +299,9 @@ export default function ProfilePage() {
     setMessage(null)
     
     try {
+      if (!user?.id) return
       const beliefData = {
-        userId: user?.id,
+        userId: user.id,
         framework,
         principles,
         values,
