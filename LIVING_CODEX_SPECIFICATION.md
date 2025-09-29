@@ -228,6 +228,11 @@ Note: The authoritative readiness view is maintained in the Status Ledger above 
 
 ### ⚠️ Implementation Limitations (Current State)
 - **~~Node Lifecycle & Edges~~**: ✅ **RESOLVED** - Enhanced edge persistence system now stores edges in the more fluid backend when endpoints are in different states (Gas > Water > Ice). Edges can only link from inside out, not outside in.
+  - ✅ Node Connection Model Phase A complete (2025-09-29):
+    - No self-identity edges
+    - `instance-of` always to distinct type node (self-typing only allowed for `codex.meta/type` anchor)
+    - All runtime placeholders use Water state with `meta.placeholder=true`
+    - Removed shortcut edges from arbitrary nodes to U-CORE root
 - **Simulation-heavy Modules**: `FutureKnowledgeModule`, `IntelligentCachingModule`, and several AI helpers return synthetic data through `Simulate*` methods; they are placeholders for production inference pipelines.
 - **Abundance System**: `UserContributionsModule` operates entirely in-memory; Ethereum/Web3 calls are stubbed and no on-chain state exists today.
 - **News Ingestion**: `RealtimeNewsStreamModule` needs external API keys. Without them, `NewsFeedModule` responds from cached samples rather than live sources.

@@ -5,8 +5,15 @@
 - Enforcement surfaces primarily at storage endpoints (`/storage-endpoints/nodes*`, `/storage-endpoints/edges*`) and in the registry.
 
 ### Integration Status
-- Enforcement is Partial: items under “Gaps in Current Implementation” reflect current deviations.
-- Priorities: remove self-identity edge auto-creation; ensure `instance-of` typing; move placeholders and reflection artifacts to Water.
+- Phase A — Behavior changes: COMPLETE (2025-09-29)
+  - Self-identity edge auto-creation removed (no self-edges allowed)
+  - `instance-of` creation enforced to distinct type nodes (self-typing forbidden except meta anchor)
+  - Placeholders and reflection artifacts created as Water with `meta.placeholder=true`
+  - Shortcut topology from arbitrary nodes directly to U‑CORE root removed
+- Phase B — Cleanup/backfill: IN PROGRESS (planning)
+  - One-shot cleanup of legacy self-identity edges in historical data
+  - Backfill missing `instance-of` where only identity existed
+  - Backfill `subtype-of` for type hierarchies where applicable
 - Treat related routes as PartiallyTested until backfill/cleanup steps are validated.
 
 ### Goals
@@ -76,12 +83,14 @@
    - Any runtime placeholder nodes MUST be Water and clearly marked.
 
 ### Gaps in Current Implementation
-- Self-identity edges are auto-created on every node insert.
-  - Node registry enforcement
-  - Storage endpoints enforcement
-- Meta/type nodes created via helpers default to Ice.
-- Global U‑CORE mapping shortcuts exist (`maps_to_axis`, default concept mapping), bypassing topology.
-- Placeholder/ensured nodes often use Ice.
+The following items have been resolved by Phase A (2025-09-29):
+- Self-identity edges auto-creation removed across registry and storage endpoints
+- Placeholder/ensured nodes now Water with `meta.placeholder=true`
+- Shortcut edges from arbitrary nodes to U‑CORE root removed
+
+Remaining:
+- Meta/type node defaults audited; ensure authored atoms only are Ice
+- Historical data cleanup/backfill (Phase B)
 
 ### Migration Plan (Minimal, Reversible Deltas)
 Phase A — Behavior changes
