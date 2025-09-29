@@ -23,7 +23,8 @@ public class SqliteWaterStorageBackend : IWaterStorageBackend
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             WriteIndented = true,
-            Converters = { new JsonStringEnumConverter() }
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
         };
     }
 

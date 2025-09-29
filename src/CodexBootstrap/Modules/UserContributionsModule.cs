@@ -74,12 +74,12 @@ public sealed class UserContributionsModule : ModuleBase
         {
             if (string.IsNullOrEmpty(request.UserId))
             {
-                return new ErrorResponse("User ID is required");
+                return new ErrorResponse("User ID is required", ErrorCodes.VALIDATION_ERROR, new { field = "userId", message = "User ID is required" });
             }
 
             if (string.IsNullOrEmpty(request.EntityId))
             {
-                return new ErrorResponse("Entity ID is required");
+                return new ErrorResponse("Entity ID is required", ErrorCodes.VALIDATION_ERROR, new { field = "entityId", message = "Entity ID is required" });
             }
 
             // Check for duplicate contributions within the last 60 seconds
@@ -135,11 +135,11 @@ public sealed class UserContributionsModule : ModuleBase
             // Record contribution event (synchronous)
             RecordContributionEvent(contribution);
 
-            // Record abundance event (synchronous)
-            RecordAbundanceEventAsync(contribution);
+            // Record abundance event (asynchronous)
+            await RecordAbundanceEventAsync(contribution);
 
-            // Calculate and assign rewards (synchronous)
-            CalculateAndAssignRewardsAsync(contribution);
+            // Calculate and assign rewards (asynchronous)
+            await CalculateAndAssignRewardsAsync(contribution);
 
             _logger.Info($"Contribution recorded: {contribution.Id} by user {request.UserId}");
             return new { success = true, contributionId = contribution.Id };
@@ -151,58 +151,34 @@ public sealed class UserContributionsModule : ModuleBase
         }
     }
 
-    [RequireAuth]
     [ApiRoute("GET", "/contributions/user/{userId}", "GetUserContributions", "Get contributions by user", "codex.user-contributions")]
-    public async Task<object> GetUserContributionsAsync(string userId, [ApiParameter("query", "Query parameters")] ContributionQuery? query)
+    public async Task<object> GetUserContributionsAsync(
+        string userId, 
+        [ApiParameter("take", "Number of items to return", Required = false, Location = "query")] int? take = null,
+        [ApiParameter("skip", "Number of items to skip", Required = false, Location = "query")] int? skip = null,
+        [ApiParameter("sortDescending", "Sort in descending order", Required = false, Location = "query")] bool? sortDescending = null)
     {
         try
         {
             if (string.IsNullOrEmpty(userId))
             {
-                return new ErrorResponse("User ID is required");
+                return new ErrorResponse("User ID is required", ErrorCodes.VALIDATION_ERROR, new { field = "userId", message = "User ID is required" });
             }
 
-            query ??= new ContributionQuery();
             var contributions = _contributions.Values
                 .Where(c => c.UserId == userId)
                 .AsEnumerable();
 
-            // Apply filters
-            if (query.ContributionTypes?.Any() == true)
-            {
-                contributions = contributions.Where(c => query.ContributionTypes.Contains(c.ContributionType));
-            }
-
-            if (query.EntityTypes?.Any() == true)
-            {
-                contributions = contributions.Where(c => query.EntityTypes.Contains(c.EntityType));
-            }
-
-            if (query.Status?.Any() == true)
-            {
-                contributions = contributions.Where(c => query.Status.Contains(c.Status));
-            }
-
-            if (query.Since.HasValue)
-            {
-                contributions = contributions.Where(c => c.Timestamp >= query.Since.Value);
-            }
-
-            if (query.Until.HasValue)
-            {
-                contributions = contributions.Where(c => c.Timestamp <= query.Until.Value);
-            }
-
             // Apply sorting
-            contributions = query.SortDescending ? 
+            contributions = (sortDescending ?? true) ? 
                 contributions.OrderByDescending(c => c.Timestamp) : 
                 contributions.OrderBy(c => c.Timestamp);
 
             // Apply pagination
             var totalCount = contributions.Count();
             var pagedContributions = contributions
-                .Skip(query.Skip ?? 0)
-                .Take(query.Take ?? 100)
+                .Skip(skip ?? 0)
+                .Take(take ?? 100)
                 .ToList();
 
             _logger.Debug($"Retrieved {pagedContributions.Count} contributions for user {userId}");
@@ -210,8 +186,8 @@ public sealed class UserContributionsModule : ModuleBase
                 success = true, 
                 contributions = pagedContributions, 
                 totalCount = totalCount,
-                skip = query.Skip ?? 0,
-                take = query.Take ?? 100
+                skip = skip ?? 0,
+                take = take ?? 100
             };
         }
         catch (Exception ex)

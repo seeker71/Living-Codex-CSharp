@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, forwardRef } from 'react';
 import { cn } from '@/lib/utils';
 
 interface CardProps {
@@ -9,6 +9,12 @@ interface CardProps {
   hover?: boolean;
   clickable?: boolean;
   onClick?: () => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLDivElement>) => void;
+  tabIndex?: number;
+  role?: string;
+  'aria-expanded'?: boolean;
+  'aria-label'?: string;
+  ref?: React.Ref<HTMLDivElement>;
 }
 
 interface CardHeaderProps {
@@ -36,15 +42,21 @@ interface CardFooterProps {
   className?: string;
 }
 
-export function Card({ 
-  children, 
-  className = '', 
-  hover = false, 
-  clickable = false, 
-  onClick 
-}: CardProps) {
+export const Card = forwardRef<HTMLDivElement, CardProps>(({
+  children,
+  className = '',
+  hover = false,
+  clickable = false,
+  onClick,
+  onKeyDown,
+  tabIndex,
+  role,
+  'aria-expanded': ariaExpanded,
+  'aria-label': ariaLabel
+}, ref) => {
   return (
     <div
+      ref={ref}
       className={cn(
         'card-surface',
         hover && 'card-surface-hover',
@@ -53,11 +65,16 @@ export function Card({
         className
       )}
       onClick={onClick}
+      onKeyDown={onKeyDown}
+      tabIndex={tabIndex}
+      role={role}
+      aria-expanded={ariaExpanded}
+      aria-label={ariaLabel}
     >
       {children}
     </div>
   );
-}
+});
 
 export function CardHeader({ children, className = '' }: CardHeaderProps) {
   return (

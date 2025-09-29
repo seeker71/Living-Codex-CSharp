@@ -127,6 +127,23 @@ else
         bootLogger.Error($"[Startup] Essential initialization failed: {ex.Message}");
     }
 
+    // Mark startup as complete and AI as ready
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var startupState = scope.ServiceProvider.GetService<CodexBootstrap.Core.StartupStateService>();
+        if (startupState != null)
+        {
+            startupState.MarkStartupComplete();
+            startupState.MarkAIReady();
+            bootLogger.Info("[Startup] Startup state marked as complete, AI services ready");
+        }
+    }
+    catch (Exception ex)
+    {
+        bootLogger.Warn($"[Startup] Failed to mark startup complete: {ex.Message}");
+    }
+
     bootLogger.Info("[Startup] About to start HTTP server...");
     app.Run();
     bootLogger.Info("[Startup] HTTP server started successfully!");

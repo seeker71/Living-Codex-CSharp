@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using CodexBootstrap.Core;
+using CodexBootstrap.Core.Security;
 using CodexBootstrap.Runtime;
 
 namespace CodexBootstrap.Core
@@ -57,7 +58,7 @@ namespace CodexBootstrap.Core
 
                 // Step 2: Validate new module
                 var validationResult = await ValidateNewModuleAsync(newDllPath);
-                if (!validationResult.Success)
+                if (!validationResult.IsValid)
                 {
                     return new HotReloadResult(false, $"Validation failed: {validationResult.ErrorMessage}", null);
                 }
@@ -181,7 +182,7 @@ namespace CodexBootstrap.Core
                 foreach (var moduleType in moduleTypes)
                 {
                     var validation = await ValidateModuleTypeAsync(moduleType);
-                    if (!validation.Success)
+                    if (!validation.IsValid)
                     {
                         return validation;
                     }

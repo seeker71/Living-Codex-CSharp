@@ -100,7 +100,7 @@ public static class CodexBootstrapHost
             o.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
             o.SerializerOptions.WriteIndented = true;
             o.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
-            o.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+            o.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false));
         });
     }
 
@@ -115,6 +115,7 @@ public static class CodexBootstrapHost
 
         builder.Services.AddSingleton(new NodeRegistryBootstrapOptions(persistenceEnabled, environment));
         builder.Services.AddSingleton<ICodexLogger>(_ => new Log4NetLogger(typeof(CodexBootstrapHost)));
+        builder.Services.AddSingleton<StartupStateService>();
 
         if (persistenceEnabled)
         {

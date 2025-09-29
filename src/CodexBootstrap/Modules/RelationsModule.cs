@@ -102,14 +102,14 @@ public sealed class RelationsModule : ModuleBase
             {
                 if (args == null || !args.HasValue)
                 {
-                    return new ErrorResponse("Missing request body");
+                    return new ErrorResponse("Missing request body", ErrorCodes.VALIDATION_ERROR, new { field = "body", message = "Request body is required" });
                 }
 
                 var relationJson = args.Value.TryGetProperty("relation", out var relationElement) ? relationElement.GetRawText() : null;
 
                 if (string.IsNullOrEmpty(relationJson))
                 {
-                    return new ErrorResponse("Relation information is required");
+                    return new ErrorResponse("Relation information is required", ErrorCodes.VALIDATION_ERROR, new { field = "relation", message = "Relation information is required" });
                 }
 
                 var registration = await Task.Run(() => JsonSerializer.Deserialize<RelationRegistration>(relationJson, new JsonSerializerOptions
@@ -120,7 +120,7 @@ public sealed class RelationsModule : ModuleBase
 
                 if (registration == null)
                 {
-                    return new ErrorResponse("Invalid relation registration");
+                    return new ErrorResponse("Invalid relation registration", ErrorCodes.VALIDATION_ERROR, new { field = "relation", message = "Invalid relation registration" });
                 }
 
                 var relationId = $"relation-{Guid.NewGuid()}";
@@ -177,30 +177,31 @@ public sealed class RelationsModule : ModuleBase
             }
             catch (Exception ex)
             {
-                return new ErrorResponse($"Failed to register relation: {ex.Message}");
+                return new ErrorResponse($"Failed to register relation: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { error = ex.Message });
             }
         });
 
         router.Register("codex.relations", "validate", async args =>
         {
+            string? nodeId = null;
             try
             {
                 if (args == null || !args.HasValue)
                 {
-                    return new ErrorResponse("Missing request parameters");
+                    return new ErrorResponse("Missing request parameters", ErrorCodes.VALIDATION_ERROR, new { field = "args", message = "Request parameters are required" });
                 }
 
-                var nodeId = args.Value.TryGetProperty("id", out var idElement) ? idElement.GetString() : null;
+                nodeId = args.Value.TryGetProperty("id", out var idElement) ? idElement.GetString() : null;
 
                 if (string.IsNullOrEmpty(nodeId))
                 {
-                    return new ErrorResponse("Node ID is required");
+                    return new ErrorResponse("Node ID is required", ErrorCodes.VALIDATION_ERROR, new { field = "id", message = "Node ID is required" });
                 }
 
                 // Get the node to validate
                 if (!registry.TryGet(nodeId, out var node))
                 {
-                    return new ErrorResponse($"Node '{nodeId}' not found");
+                    return new ErrorResponse($"Node '{nodeId}' not found", ErrorCodes.NOT_FOUND, new { resource = "Node", id = nodeId });
                 }
 
                 // Perform validation
@@ -214,7 +215,7 @@ public sealed class RelationsModule : ModuleBase
             }
             catch (Exception ex)
             {
-                return new ErrorResponse($"Failed to validate node: {ex.Message}");
+                return new ErrorResponse($"Failed to validate node: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { nodeId, error = ex.Message });
             }
         });
     }

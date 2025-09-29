@@ -148,7 +148,7 @@ public class ConceptModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error browsing concepts: {ex.Message}", ex);
-            return new ErrorResponse($"Failed to browse concepts: {ex.Message}");
+            return new ErrorResponse($"Failed to browse concepts: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { error = ex.Message });
         }
     }
 

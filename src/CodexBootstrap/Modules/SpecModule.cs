@@ -621,6 +621,14 @@ public sealed class SpecModule : ModuleBase
 
             foreach (var moduleNode in moduleNodes)
             {
+                // Check if this module is actually loaded by checking if it has registered API routes
+                var hasApiRoutes = _registry.GetNodesByType("codex.meta/api")
+                    .Any(apiNode => apiNode.Meta?.GetValueOrDefault("moduleId")?.ToString() == moduleNode.Id);
+
+                // Also check if it has registered routes
+                var hasRoutes = _registry.GetNodesByType("codex.meta/route")
+                    .Any(routeNode => routeNode.Meta?.GetValueOrDefault("moduleId")?.ToString() == moduleNode.Id);
+
                 var moduleInfo = new ModuleInfo
                 {
                     Id = moduleNode.Id,
@@ -628,6 +636,7 @@ public sealed class SpecModule : ModuleBase
                     Version = moduleNode.Meta?.GetValueOrDefault("version")?.ToString() ?? "1.0.0",
                     Description = moduleNode.Description ?? "No description available",
                     State = moduleNode.State.ToString(),
+                    Status = (hasApiRoutes || hasRoutes) ? "loaded" : "registered", // Set status based on API/route registration
                     IsSpecDriven = moduleNode.Meta?.GetValueOrDefault("spec-driven")?.ToString() == "true",
                     IsHotReloadable = IsModuleHotReloadable(moduleNode),
                     IsStable = IsModuleStable(moduleNode),
@@ -636,7 +645,7 @@ public sealed class SpecModule : ModuleBase
                     Routes = await GetModuleRoutes(moduleNode.Id),
                     LastUpdated = moduleNode.Meta?.GetValueOrDefault("lastUpdated")?.ToString() ?? DateTime.UtcNow.ToString("O")
                 };
-                
+
                 modules.Add(moduleInfo);
             }
         }
@@ -935,6 +944,7 @@ public class ModuleInfo
     public string Version { get; set; } = "";
     public string Description { get; set; } = "";
     public string State { get; set; } = "";
+    public string Status { get; set; } = "registered"; // Add status field for frontend compatibility
     public bool IsSpecDriven { get; set; }
     public bool IsHotReloadable { get; set; }
     public bool IsStable { get; set; }

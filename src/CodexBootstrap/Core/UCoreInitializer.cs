@@ -27,10 +27,13 @@ namespace CodexBootstrap.Core
                 // Stage 4: Load all relationships
                 await LoadRelationshipsFromConfig(registry, logger);
                 
-                // Stage 5: Create implicit edges from concept properties
+                // Stage 5: Load all frequencies
+                await LoadFrequenciesFromConfig(registry, logger);
+                
+                // Stage 6: Create implicit edges from concept properties
                 await CreateImplicitEdges(registry, logger);
                 
-                // Stage 6: Validate all referenced concepts exist
+                // Stage 7: Validate all referenced concepts exist
                 await ValidateReferencedConcepts(registry, logger);
 
                 logger.Info("U-CORE ontology seeding completed successfully");
@@ -154,12 +157,8 @@ namespace CodexBootstrap.Core
         {
             logger.Info("LoadAxesFromConfig called");
             var axisType = "codex.ontology.axis";
-            var hasAxes = registry.GetNodesByType(axisType).Any();
-            if (hasAxes)
-            {
-                logger.Info("U-CORE axes already exist, skipping config loading");
-                return;
-            }
+            // Always load config axes to ensure we have the proper axes with dimensions and relationships
+            // Placeholder axes may exist, but we want to load the real ones from config
 
             var configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config", "ontology", "core-axes.json");
             logger.Info($"Looking for config file at: {configPath}");
@@ -300,7 +299,6 @@ namespace CodexBootstrap.Core
         private static async Task LoadConceptsFromConfig(INodeRegistry registry, ICodexLogger logger)
         {
             logger.Info("LoadConceptsFromConfig called");
-                    var conceptType = "codex.ucore.base";
             // Merge strategy: do not skip if some concepts exist; load/Upsert to ensure new/missing seeds are added
 
             var configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config", "ontology", "core-concepts.json");
@@ -377,7 +375,7 @@ namespace CodexBootstrap.Core
         {
             logger.Info("LoadRelationshipsFromConfig called");
             // Use the core relationship type to align with tests and ontology spec
-            var relationshipType = "codex.relationship.core";
+            var relationshipType = "codex.relationship";
             var hasRelationships = registry.GetNodesByType(relationshipType).Any();
             if (hasRelationships)
             {
@@ -439,6 +437,73 @@ namespace CodexBootstrap.Core
             catch (Exception ex)
             {
                 logger.Error($"Error loading relationships config: {ex.Message}", ex);
+            }
+        }
+
+        private static async Task LoadFrequenciesFromConfig(INodeRegistry registry, ICodexLogger logger)
+        {
+            logger.Info("LoadFrequenciesFromConfig called");
+            var frequencyType = "codex.frequency";
+            var hasFrequencies = registry.GetNodesByType(frequencyType).Any();
+            if (hasFrequencies)
+            {
+                logger.Info("Core frequencies already exist, skipping config loading");
+                return;
+            }
+
+            var configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config", "ontology", "core-frequencies.json");
+            logger.Info($"Looking for frequencies config file at: {configPath}");
+            if (!File.Exists(configPath))
+            {
+                logger.Warn($"Core frequencies config file not found: {configPath}");
+                return;
+            }
+
+            try
+            {
+                var json = await File.ReadAllTextAsync(configPath);
+                logger.Info($"Loaded frequencies config file, size: {json.Length} characters");
+                var config = JsonSerializer.Deserialize<FrequenciesConfig>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                logger.Info($"Config deserialized, frequencies count: {config?.Frequencies?.Count ?? 0}");
+                
+                if (config?.Frequencies != null)
+                {
+                    int upserts = 0;
+                    foreach (var frequency in config.Frequencies)
+                    {
+                        var node = new Node(
+                            Id: $"u-core-frequency-{frequency.Id}",
+                            TypeId: frequencyType,
+                            State: ContentState.Ice,
+                            Locale: "en-US",
+                            Title: frequency.Name,
+                            Description: frequency.Description,
+                            Content: new ContentRef(
+                                MediaType: "application/json",
+                                InlineJson: JsonSerializer.Serialize(frequency),
+                                InlineBytes: null,
+                                ExternalUri: null
+                            ),
+                            Meta: new Dictionary<string, object>
+                            {
+                                ["name"] = frequency.Name,
+                                ["frequency"] = frequency.Frequency,
+                                ["keywords"] = frequency.Keywords,
+                                ["level"] = frequency.Level,
+                                ["benefits"] = frequency.Benefits,
+                                ["chakra"] = frequency.Chakra,
+                                ["planetary"] = frequency.Planetary
+                            }
+                        );
+                        registry.Upsert(node);
+                        upserts++;
+                    }
+                    logger.Info($"Loaded {upserts} core frequencies from config");
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Error($"Error loading frequencies config: {ex.Message}", ex);
             }
         }
 
@@ -945,6 +1010,25 @@ namespace CodexBootstrap.Core
             public bool Transitive { get; set; }
             public bool Symmetric { get; set; }
             public bool Reflexive { get; set; }
+        }
+
+        private class FrequenciesConfig
+        {
+            public List<FrequencyConfig> Frequencies { get; set; } = new();
+        }
+
+        private class FrequencyConfig
+        {
+            public string Id { get; set; } = "";
+            public string Name { get; set; } = "";
+            public string Description { get; set; } = "";
+            public double Frequency { get; set; }
+            public string TypeId { get; set; } = "";
+            public int Level { get; set; }
+            public string[] Keywords { get; set; } = Array.Empty<string>();
+            public string[] Benefits { get; set; } = Array.Empty<string>();
+            public string Chakra { get; set; } = "";
+            public bool Planetary { get; set; }
         }
     }
 }

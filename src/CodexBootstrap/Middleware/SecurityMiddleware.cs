@@ -165,9 +165,9 @@ namespace CodexBootstrap.Middleware
         /// <summary>
         /// Validates input parameters in the request
         /// </summary>
-        private async Task<CodexBootstrap.Core.Security.ValidationResult> ValidateRequestInput(HttpContext context)
+        private async Task<CodexBootstrap.Core.Security.InputValidationResult> ValidateRequestInput(HttpContext context)
         {
-            var validationResults = new List<CodexBootstrap.Core.Security.ValidationResult>();
+            var validationResults = new List<CodexBootstrap.Core.Security.InputValidationResult>();
 
             // Validate query parameters
             foreach (var param in context.Request.Query)
@@ -215,8 +215,8 @@ namespace CodexBootstrap.Middleware
             }
 
             return validationResults.Any() 
-                ? CodexBootstrap.Core.Security.ValidationResult.Error(string.Join("; ", validationResults.Select(r => r.ErrorMessage)))
-                : CodexBootstrap.Core.Security.ValidationResult.Success;
+                ? CodexBootstrap.Core.Security.InputValidationResult.Error(string.Join("; ", validationResults.Select(r => r.ErrorMessage)))
+                : CodexBootstrap.Core.Security.InputValidationResult.Success;
         }
 
         /// <summary>

@@ -12,8 +12,13 @@ export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
+  errorCode?: string;
+  errorDetails?: any;
   timestamp?: string;
   duration?: number;
+  httpStatusCode?: number;
+  technicalMessage?: string;
+  userMessage?: string;
 }
 
 export interface ApiOptions {
@@ -124,32 +129,51 @@ export async function apiCall<T = unknown>(
       const duration = Date.now() - startTime;
       
       if (!response.ok) {
-        const errorText = await response.text();
-        const error = `HTTP ${response.status}: ${errorText}`;
-        
-        if (attempt === retries) {
-          ApiLogger.log(method, endpoint, duration, 'error', error);
-          return {
-            success: false,
-            error,
-            duration,
-            timestamp: new Date().toISOString(),
-          };
+        let errorText = '';
+        let errorData: any = null;
+
+        try {
+          errorText = await response.text();
+          // Try to parse as JSON for structured error responses
+          if (errorText.trim().startsWith('{')) {
+            errorData = JSON.parse(errorText);
+          }
+        } catch (parseError) {
+          // If parsing fails, use raw text
+          errorData = { error: errorText };
         }
-        
+
+        // Parse structured error response from backend
+        const errorMessage = errorData?.error || `HTTP ${response.status}: ${response.statusText}`;
+        const errorCode = errorData?.code || `HTTP_${response.status}`;
+        const technicalMessage = errorData?.technicalMessage || response.statusText;
+        const userMessage = errorData?.userMessage || errorMessage;
+
+        const structuredError = {
+          success: false,
+          error: errorMessage,
+          errorCode,
+          errorDetails: errorData?.details,
+          httpStatusCode: response.status,
+          technicalMessage,
+          userMessage,
+          duration,
+          timestamp: new Date().toISOString(),
+        };
+
+        if (attempt === retries) {
+          ApiLogger.log(method, endpoint, duration, 'error', errorMessage);
+          return structuredError;
+        }
+
         // Retry on server errors (5xx) but not client errors (4xx)
         if (response.status >= 500) {
-          console.warn(`🔄 Retry ${attempt}/${retries} for ${method} ${endpoint} - ${error}`);
+          console.warn(`🔄 Retry ${attempt}/${retries} for ${method} ${endpoint} - ${errorMessage}`);
           await delay(RETRY_DELAY * attempt);
           continue;
         } else {
-          ApiLogger.log(method, endpoint, duration, 'error', error);
-          return {
-            success: false,
-            error,
-            duration,
-            timestamp: new Date().toISOString(),
-          };
+          ApiLogger.log(method, endpoint, duration, 'error', errorMessage);
+          return structuredError;
         }
       }
 
@@ -188,6 +212,10 @@ export async function apiCall<T = unknown>(
         return {
           success: false,
           error: errorMessage,
+          errorCode: 'NETWORK_ERROR',
+          httpStatusCode: 0,
+          technicalMessage: errorMessage,
+          userMessage: 'Network connection failed. Please check your connection and try again.',
           duration,
           timestamp: new Date().toISOString(),
         };
@@ -368,6 +396,66 @@ export const endpoints = {
   getEdge: (fromId: string, toId: string) => api.get(`/storage-endpoints/edges/${fromId}/${toId}`),
   getEdgeMetadata: () => api.get('/storage-endpoints/edges/metadata'),
 };
+
+// Error handling utilities
+export class ApiErrorHandler {
+  static getUserMessage(errorResponse: ApiResponse): string {
+    if (errorResponse.userMessage) {
+      return errorResponse.userMessage;
+    }
+
+    if (errorResponse.errorCode) {
+      // Map common error codes to user-friendly messages
+      const codeMessages: Record<string, string> = {
+        'NOT_FOUND': 'The requested resource was not found.',
+        'VALIDATION_ERROR': 'Please check your input and try again.',
+        'AUTHENTICATION_REQUIRED': 'Please log in to access this feature.',
+        'AUTHORIZATION_DENIED': 'You don\'t have permission to perform this action.',
+        'RATE_LIMIT_EXCEEDED': 'Too many requests. Please wait a moment and try again.',
+        'SERVICE_UNAVAILABLE': 'The service is temporarily unavailable. Please try again later.',
+        'NETWORK_ERROR': 'Network connection failed. Please check your connection and try again.',
+      };
+
+      return codeMessages[errorResponse.errorCode] || errorResponse.error || 'An unexpected error occurred.';
+    }
+
+    return errorResponse.error || 'An unexpected error occurred.';
+  }
+
+  static getErrorSeverity(errorResponse: ApiResponse): 'low' | 'medium' | 'high' | 'critical' {
+    if (errorResponse.errorCode?.startsWith('NETWORK_')) {
+      return 'medium';
+    }
+
+    if (errorResponse.httpStatusCode) {
+      if (errorResponse.httpStatusCode >= 500) {
+        return 'high';
+      }
+      if (errorResponse.httpStatusCode >= 400) {
+        return 'medium';
+      }
+    }
+
+    return 'low';
+  }
+
+  static shouldRetry(errorResponse: ApiResponse): boolean {
+    // Retry on network errors and server errors (5xx)
+    return errorResponse.errorCode?.startsWith('NETWORK_') ||
+           errorResponse.httpStatusCode === 502 ||
+           errorResponse.httpStatusCode === 503 ||
+           errorResponse.httpStatusCode === 504;
+  }
+
+  static getRetryDelay(errorResponse: ApiResponse, attempt: number): number {
+    // Exponential backoff with jitter
+    const baseDelay = 1000; // 1 second
+    const maxDelay = 10000; // 10 seconds
+    const exponentialDelay = Math.min(baseDelay * Math.pow(2, attempt - 1), maxDelay);
+    const jitter = Math.random() * 500; // Add up to 500ms jitter
+    return exponentialDelay + jitter;
+  }
+}
 
 // Export logger for debugging
 export { ApiLogger };

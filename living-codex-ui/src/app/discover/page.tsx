@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import { ResonanceControls } from '@/components/ui/ResonanceControls';
 import { StreamLens } from '@/components/lenses/StreamLens';
-import { ConversationsLens } from '@/components/lenses/ThreadsLens';
+import ThreadsLens from '@/components/lenses/ThreadsLens';
 import { GalleryLens } from '@/components/lenses/GalleryLens';
 import { NearbyLens } from '@/components/lenses/NearbyLens';
 import { SwipeLens } from '@/components/lenses/SwipeLens';
@@ -136,7 +136,7 @@ export default function DiscoverPage() {
                           );
                         case 'lens.threads':
                           return (
-                            <ConversationsLens
+                            <ThreadsLens
                               controls={controls}
                               userId={user?.id}
                               readOnly={!isAuthenticated || !user}

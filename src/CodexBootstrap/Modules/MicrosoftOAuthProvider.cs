@@ -24,8 +24,8 @@ public class MicrosoftOAuthProvider : IIdentityProvider
         _redirectUri = Environment.GetEnvironmentVariable("MICROSOFT_REDIRECT_URI") ?? "http://localhost:5000/identity/callback/microsoft";
     }
 
-    public string ProviderName => "Microsoft";
-    public bool IsEnabled => !string.IsNullOrEmpty(_clientId) && !string.IsNullOrEmpty(_clientSecret);
+    public string ProviderName => "microsoft";
+    public bool IsEnabled => false; // Disabled by default
 
     public async Task<object> InitiateLogin(string? returnUrl = null)
     {

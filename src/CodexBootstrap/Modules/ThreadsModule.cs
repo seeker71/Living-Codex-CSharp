@@ -8,6 +8,28 @@ using CodexBootstrap.Runtime;
 namespace CodexBootstrap.Modules;
 
 /// <summary>
+/// Request models for Threads API
+/// </summary>
+public record CreateThreadRequest(
+    string Title,
+    string Content,
+    string AuthorId,
+    string[]? Axes = null,
+    string? GroupId = null
+);
+
+public record CreateReplyRequest(
+    string ThreadId,
+    string Content,
+    string AuthorId
+);
+
+public record AddReactionRequest(
+    string Emoji,
+    string AuthorId
+);
+
+/// <summary>
 /// Threads Module - discussion threads and replies as nodes/edges
 /// </summary>
 public sealed class ThreadsModule : ModuleBase
@@ -94,7 +116,7 @@ public sealed class ThreadsModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error listing thread groups: {ex.Message}", ex);
-            return new ErrorResponse($"Failed to list thread groups: {ex.Message}");
+            return new ErrorResponse($"Failed to list thread groups: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { error = ex.Message });
         }
     }
 
@@ -105,7 +127,7 @@ public sealed class ThreadsModule : ModuleBase
         {
             if (string.IsNullOrWhiteSpace(request.Name))
             {
-                return new ErrorResponse("Name is required");
+                return new ErrorResponse("Name is required", ErrorCodes.VALIDATION_ERROR, new { field = "name", message = "Name is required" });
             }
 
             var groupId = $"thread-group-{Guid.NewGuid():N}";
@@ -138,7 +160,7 @@ public sealed class ThreadsModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error creating thread group: {ex.Message}", ex);
-            return new ErrorResponse($"Failed to create thread group: {ex.Message}");
+            return new ErrorResponse($"Failed to create thread group: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { request, error = ex.Message });
         }
     }
 
@@ -221,7 +243,7 @@ public sealed class ThreadsModule : ModuleBase
                     primaryGroupId = primaryGroupId,
                     groupIds = allGroupIds,
                     replyCount = replies.Count,
-                    hasUnread = false // TODO: Implement unread tracking
+                    hasUnread = replies.Any(r => (r.Meta?.GetValueOrDefault("createdAt") as DateTimeOffset?) > (thread.Meta?.GetValueOrDefault("lastReadAt") as DateTimeOffset? ?? DateTimeOffset.MinValue))
                 });
             }
 
@@ -230,7 +252,7 @@ public sealed class ThreadsModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error listing threads: {ex.Message}", ex);
-            return new ErrorResponse($"Failed to list threads: {ex.Message}");
+            return new ErrorResponse($"Failed to list threads: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { error = ex.Message });
         }
     }
 
@@ -309,7 +331,7 @@ public sealed class ThreadsModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error creating thread: {ex.Message}", ex);
-            return new ErrorResponse($"Failed to create thread: {ex.Message}");
+            return new ErrorResponse($"Failed to create thread: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { request, error = ex.Message });
         }
     }
 
@@ -325,7 +347,7 @@ public sealed class ThreadsModule : ModuleBase
 
             if (_registry.GetNode(request.ThreadId) == null)
             {
-                return new ErrorResponse("Thread not found");
+                return new ErrorResponse("Thread not found", ErrorCodes.NOT_FOUND, new { resource = "Thread", id = request.ThreadId });
             }
 
             var replyId = $"reply-{Guid.NewGuid():N}";
@@ -335,7 +357,8 @@ public sealed class ThreadsModule : ModuleBase
                 ["moduleId"] = "codex.threads",
                 ["createdAt"] = DateTimeOffset.UtcNow,
                 ["resonance"] = 0.0,
-                ["isAccepted"] = false
+                ["isAccepted"] = false,
+                ["reactions"] = new Dictionary<string, List<string>>()
             };
 
             meta["authorId"] = request.AuthorId!;
@@ -365,7 +388,118 @@ public sealed class ThreadsModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error creating reply: {ex.Message}", ex);
-            return new ErrorResponse($"Failed to create reply: {ex.Message}");
+            return new ErrorResponse($"Failed to create reply: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { request, error = ex.Message });
+        }
+    }
+
+    [ApiRoute("POST", "/threads/{threadId}/reactions", "AddReaction", "Add an emoji reaction to a thread or reply", "codex.threads")]
+    public async Task<object> AddReactionAsync([ApiParameter("threadId", "Thread or reply ID")] string threadId, [ApiParameter("request", "Reaction request")] AddReactionRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.Emoji) || string.IsNullOrWhiteSpace(request.AuthorId))
+            {
+                return new ErrorResponse("Emoji and AuthorId are required", ErrorCodes.VALIDATION_ERROR, new { field = "emoji,authorId", message = "Emoji and AuthorId are required" });
+            }
+
+            var node = _registry.GetNode(threadId);
+            if (node == null)
+            {
+                return new ErrorResponse("Thread or reply not found", ErrorCodes.NOT_FOUND, new { resource = "Thread/Reply", threadId });
+            }
+
+            var reactions = node.Meta.TryGetValue("reactions", out var reactionsObj) && reactionsObj is Dictionary<string, object> dict
+                ? dict.ToDictionary(k => k.Key, v => ((IEnumerable<object>)v.Value).Select(x => x.ToString()).Where(s => s != null).Cast<string>().ToList())
+                : new Dictionary<string, List<string>>();
+
+            if (!reactions.ContainsKey(request.Emoji))
+            {
+                reactions[request.Emoji] = new List<string>();
+            }
+
+            if (!reactions[request.Emoji].Contains(request.AuthorId))
+            {
+                reactions[request.Emoji].Add(request.AuthorId);
+            }
+
+            var updatedMeta = new Dictionary<string, object>(node.Meta)
+            {
+                ["reactions"] = reactions,
+                ["updatedAt"] = DateTimeOffset.UtcNow
+            };
+
+            var updatedNode = new Node(
+                Id: node.Id,
+                TypeId: node.TypeId,
+                State: node.State,
+                Locale: node.Locale,
+                Title: node.Title,
+                Description: node.Description,
+                Content: node.Content,
+                Meta: updatedMeta
+            );
+
+            _registry.Upsert(updatedNode);
+
+            return new { success = true, reactions = reactions };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error adding reaction: {ex.Message}", ex);
+            return new ErrorResponse($"Failed to add reaction: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { request, error = ex.Message });
+        }
+    }
+
+    [ApiRoute("DELETE", "/threads/{threadId}/reactions/{emoji}", "RemoveReaction", "Remove an emoji reaction from a thread or reply", "codex.threads")]
+    public async Task<object> RemoveReactionAsync([ApiParameter("threadId", "Thread or reply ID")] string threadId, [ApiParameter("emoji", "Emoji to remove")] string emoji, [ApiParameter("authorId", "Author ID")] string authorId)
+    {
+        try
+        {
+            var node = _registry.GetNode(threadId);
+            if (node == null)
+            {
+                return new ErrorResponse("Thread or reply not found", ErrorCodes.NOT_FOUND, new { resource = "Thread/Reply", threadId });
+            }
+
+            var reactions = node.Meta.TryGetValue("reactions", out var reactionsObj) && reactionsObj is Dictionary<string, object> dict
+                ? dict.ToDictionary(k => k.Key, v => ((IEnumerable<object>)v.Value).Select(x => x.ToString()).Where(s => s != null).Cast<string>().ToList())
+                : new Dictionary<string, List<string>>();
+
+            if (reactions.ContainsKey(emoji) && reactions[emoji].Contains(authorId))
+            {
+                reactions[emoji].Remove(authorId);
+
+                if (reactions[emoji].Count == 0)
+                {
+                    reactions.Remove(emoji);
+                }
+            }
+
+            var updatedMeta = new Dictionary<string, object>(node.Meta)
+            {
+                ["reactions"] = reactions,
+                ["updatedAt"] = DateTimeOffset.UtcNow
+            };
+
+            var updatedNode = new Node(
+                Id: node.Id,
+                TypeId: node.TypeId,
+                State: node.State,
+                Locale: node.Locale,
+                Title: node.Title,
+                Description: node.Description,
+                Content: node.Content,
+                Meta: updatedMeta
+            );
+
+            _registry.Upsert(updatedNode);
+
+            return new { success = true, reactions = reactions };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error removing reaction: {ex.Message}", ex);
+            return new ErrorResponse($"Failed to remove reaction: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { threadId, emoji, authorId, error = ex.Message });
         }
     }
 
@@ -443,21 +577,6 @@ public sealed class ThreadsModule : ModuleBase
     }
 }
 
-[RequestType("codex.threads.create-thread", "CreateThreadRequest", "Create thread request")]
-public record CreateThreadRequest(
-    string Title,
-    string Content,
-    string? AuthorId,
-    IEnumerable<string>? Axes,
-    string? GroupId
-);
-
-[RequestType("codex.threads.create-reply", "CreateReplyRequest", "Create reply request")]
-public record CreateReplyRequest(
-    string ThreadId,
-    string Content,
-    string? AuthorId
-);
 
 [RequestType("codex.threads.create-group", "CreateThreadGroupRequest", "Create thread group request")]
 public record CreateThreadGroupRequest(

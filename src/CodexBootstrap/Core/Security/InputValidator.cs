@@ -32,19 +32,19 @@ namespace CodexBootstrap.Core.Security
         /// <summary>
         /// Validates a string input for basic security and format requirements
         /// </summary>
-        public ValidationResult ValidateString(string input, string fieldName, int maxLength = 1000, bool allowEmpty = false)
+        public InputValidationResult ValidateString(string input, string fieldName, int maxLength = 1000, bool allowEmpty = false)
         {
             if (string.IsNullOrEmpty(input))
             {
                 if (allowEmpty)
-                    return ValidationResult.Success;
+                    return InputValidationResult.Success;
                 
-                return new ValidationResult($"{fieldName} cannot be null or empty");
+                return new InputValidationResult($"{fieldName} cannot be null or empty");
             }
 
             if (input.Length > maxLength)
             {
-                return new ValidationResult($"{fieldName} exceeds maximum length of {maxLength} characters");
+                return new InputValidationResult($"{fieldName} exceeds maximum length of {maxLength} characters");
             }
 
             // Check for SQL injection patterns (but skip for legitimate API endpoints)
@@ -54,7 +54,7 @@ namespace CodexBootstrap.Core.Security
                 if (IsLegitimateApiEndpoint(input))
                 {
                     _logger.Info($"[DEBUG] PathSegment '{input}' is legitimate, skipping SQL injection check");
-                    return ValidationResult.Success;
+                    return InputValidationResult.Success;
                 }
                 else
                 {
@@ -65,17 +65,17 @@ namespace CodexBootstrap.Core.Security
             if (SqlInjectionPattern.IsMatch(input))
             {
                 _logger.Warn($"Potential SQL injection detected in {fieldName}: {input.Substring(0, Math.Min(50, input.Length))}...");
-                return new ValidationResult($"{fieldName} contains potentially malicious content");
+                return new InputValidationResult($"{fieldName} contains potentially malicious content");
             }
 
             // Check for XSS patterns
             if (XssPattern.IsMatch(input))
             {
                 _logger.Warn($"Potential XSS detected in {fieldName}: {input.Substring(0, Math.Min(50, input.Length))}...");
-                return new ValidationResult($"{fieldName} contains potentially malicious content");
+                return new InputValidationResult($"{fieldName} contains potentially malicious content");
             }
 
-            return ValidationResult.Success;
+            return InputValidationResult.Success;
         }
 
         /// <summary>
@@ -99,134 +99,134 @@ namespace CodexBootstrap.Core.Security
         /// <summary>
         /// Validates an email address
         /// </summary>
-        public ValidationResult ValidateEmail(string email, string fieldName = "Email")
+        public InputValidationResult ValidateEmail(string email, string fieldName = "Email")
         {
             if (string.IsNullOrEmpty(email))
             {
-                return new ValidationResult($"{fieldName} cannot be null or empty");
+                return new InputValidationResult($"{fieldName} cannot be null or empty");
             }
 
             if (email.Length > 254) // RFC 5321 limit
             {
-                return new ValidationResult($"{fieldName} exceeds maximum length of 254 characters");
+                return new InputValidationResult($"{fieldName} exceeds maximum length of 254 characters");
             }
 
             if (!EmailPattern.IsMatch(email))
             {
-                return new ValidationResult($"{fieldName} is not a valid email address");
+                return new InputValidationResult($"{fieldName} is not a valid email address");
             }
 
-            return ValidationResult.Success;
+            return InputValidationResult.Success;
         }
 
         /// <summary>
         /// Validates a node ID
         /// </summary>
-        public ValidationResult ValidateNodeId(string nodeId, string fieldName = "NodeId")
+        public InputValidationResult ValidateNodeId(string nodeId, string fieldName = "NodeId")
         {
             if (string.IsNullOrEmpty(nodeId))
             {
-                return new ValidationResult($"{fieldName} cannot be null or empty");
+                return new InputValidationResult($"{fieldName} cannot be null or empty");
             }
 
             if (nodeId.Length > 100)
             {
-                return new ValidationResult($"{fieldName} exceeds maximum length of 100 characters");
+                return new InputValidationResult($"{fieldName} exceeds maximum length of 100 characters");
             }
 
             if (!NodeIdPattern.IsMatch(nodeId))
             {
-                return new ValidationResult($"{fieldName} contains invalid characters. Only alphanumeric, hyphens, underscores, and dots are allowed");
+                return new InputValidationResult($"{fieldName} contains invalid characters. Only alphanumeric, hyphens, underscores, and dots are allowed");
             }
 
-            return ValidationResult.Success;
+            return InputValidationResult.Success;
         }
 
         /// <summary>
         /// Validates a numeric input
         /// </summary>
-        public ValidationResult ValidateNumber<T>(T value, string fieldName, T? minValue = null, T? maxValue = null) where T : struct, IComparable<T>
+        public InputValidationResult ValidateNumber<T>(T value, string fieldName, T? minValue = null, T? maxValue = null) where T : struct, IComparable<T>
         {
             if (minValue.HasValue && value.CompareTo(minValue.Value) < 0)
             {
-                return new ValidationResult($"{fieldName} must be greater than or equal to {minValue.Value}");
+                return new InputValidationResult($"{fieldName} must be greater than or equal to {minValue.Value}");
             }
 
             if (maxValue.HasValue && value.CompareTo(maxValue.Value) > 0)
             {
-                return new ValidationResult($"{fieldName} must be less than or equal to {maxValue.Value}");
+                return new InputValidationResult($"{fieldName} must be less than or equal to {maxValue.Value}");
             }
 
-            return ValidationResult.Success;
+            return InputValidationResult.Success;
         }
 
         /// <summary>
         /// Validates a collection input
         /// </summary>
-        public ValidationResult ValidateCollection<T>(IEnumerable<T> collection, string fieldName, int maxCount = 1000, bool allowEmpty = false)
+        public InputValidationResult ValidateCollection<T>(IEnumerable<T> collection, string fieldName, int maxCount = 1000, bool allowEmpty = false)
         {
             if (collection == null)
             {
-                return new ValidationResult($"{fieldName} cannot be null");
+                return new InputValidationResult($"{fieldName} cannot be null");
             }
 
             var items = collection.ToList();
             
             if (items.Count == 0 && !allowEmpty)
             {
-                return new ValidationResult($"{fieldName} cannot be empty");
+                return new InputValidationResult($"{fieldName} cannot be empty");
             }
 
             if (items.Count > maxCount)
             {
-                return new ValidationResult($"{fieldName} exceeds maximum count of {maxCount} items");
+                return new InputValidationResult($"{fieldName} exceeds maximum count of {maxCount} items");
             }
 
-            return ValidationResult.Success;
+            return InputValidationResult.Success;
         }
 
         /// <summary>
         /// Validates a JSON string
         /// </summary>
-        public ValidationResult ValidateJson(string json, string fieldName = "Json")
+        public InputValidationResult ValidateJson(string json, string fieldName = "Json")
         {
             if (string.IsNullOrEmpty(json))
             {
-                return new ValidationResult($"{fieldName} cannot be null or empty");
+                return new InputValidationResult($"{fieldName} cannot be null or empty");
             }
 
             try
             {
                 System.Text.Json.JsonDocument.Parse(json);
-                return ValidationResult.Success;
+                return InputValidationResult.Success;
             }
             catch (System.Text.Json.JsonException ex)
             {
-                return new ValidationResult($"{fieldName} is not valid JSON: {ex.Message}");
+                return new InputValidationResult($"{fieldName} is not valid JSON: {ex.Message}");
             }
         }
 
         /// <summary>
         /// Validates a URL
         /// </summary>
-        public ValidationResult ValidateUrl(string url, string fieldName = "Url")
+        public InputValidationResult ValidateUrl(string url, string fieldName = "Url")
         {
             if (string.IsNullOrEmpty(url))
             {
-                return new ValidationResult($"{fieldName} cannot be null or empty");
+                return new InputValidationResult($"{fieldName} cannot be null or empty");
             }
 
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
             {
-                return new ValidationResult($"{fieldName} is not a valid URL");
+                return new InputValidationResult($"{fieldName} is not a valid URL");
             }
 
             if (uri.Scheme != "http" && uri.Scheme != "https")
             {
-                return new ValidationResult($"{fieldName} must use HTTP or HTTPS protocol");
+                return new InputValidationResult($"{fieldName} must use HTTP or HTTPS protocol");
             }
 
-            return ValidationResult.Success;
+            return InputValidationResult.Success;
         }
 
         /// <summary>
@@ -261,43 +261,43 @@ namespace CodexBootstrap.Core.Security
         /// <summary>
         /// Validates multiple fields at once
         /// </summary>
-        public ValidationResult ValidateMultiple(params ValidationResult[] results)
+        public InputValidationResult ValidateMultiple(params InputValidationResult[] results)
         {
             var errors = results.Where(r => !r.IsValid).ToList();
             
             if (errors.Any())
             {
                 var errorMessages = string.Join("; ", errors.Select(e => e.ErrorMessage));
-                return new ValidationResult(errorMessages);
+                return new InputValidationResult(errorMessages);
             }
 
-            return ValidationResult.Success;
+            return InputValidationResult.Success;
         }
 
         /// <summary>
         /// Validates request rate limiting
         /// </summary>
-        public ValidationResult ValidateRateLimit(string clientId, int maxRequestsPerMinute = 60)
+        public InputValidationResult ValidateRateLimit(string clientId, int maxRequestsPerMinute = 60)
         {
             // This is a simplified implementation
             // In production, you'd use a proper rate limiting service like Redis
             // For now, we'll just return success
-            return ValidationResult.Success;
+            return InputValidationResult.Success;
         }
 
         /// <summary>
         /// Validates file upload
         /// </summary>
-        public ValidationResult ValidateFileUpload(string fileName, long fileSize, string[] allowedExtensions = null, long maxSizeBytes = 10 * 1024 * 1024) // 10MB default
+        public InputValidationResult ValidateFileUpload(string fileName, long fileSize, string[] allowedExtensions = null, long maxSizeBytes = 10 * 1024 * 1024) // 10MB default
         {
             if (string.IsNullOrEmpty(fileName))
             {
-                return new ValidationResult("File name cannot be null or empty");
+                return new InputValidationResult("File name cannot be null or empty");
             }
 
             if (fileSize > maxSizeBytes)
             {
-                return new ValidationResult($"File size exceeds maximum allowed size of {maxSizeBytes / (1024 * 1024)}MB");
+                return new InputValidationResult($"File size exceeds maximum allowed size of {maxSizeBytes / (1024 * 1024)}MB");
             }
 
             if (allowedExtensions != null && allowedExtensions.Length > 0)
@@ -305,17 +305,17 @@ namespace CodexBootstrap.Core.Security
                 var extension = System.IO.Path.GetExtension(fileName).ToLowerInvariant();
                 if (!allowedExtensions.Contains(extension))
                 {
-                    return new ValidationResult($"File type {extension} is not allowed. Allowed types: {string.Join(", ", allowedExtensions)}");
+                    return new InputValidationResult($"File type {extension} is not allowed. Allowed types: {string.Join(", ", allowedExtensions)}");
                 }
             }
 
             // Check for potentially dangerous file names
             if (fileName.Contains("..") || fileName.Contains("/") || fileName.Contains("\\"))
             {
-                return new ValidationResult("File name contains potentially dangerous characters");
+                return new InputValidationResult("File name contains potentially dangerous characters");
             }
 
-            return ValidationResult.Success;
+            return InputValidationResult.Success;
         }
     }
 
@@ -324,42 +324,42 @@ namespace CodexBootstrap.Core.Security
     /// </summary>
     public interface IInputValidator
     {
-        ValidationResult ValidateString(string input, string fieldName, int maxLength = 1000, bool allowEmpty = false);
-        ValidationResult ValidateEmail(string email, string fieldName = "Email");
-        ValidationResult ValidateNodeId(string nodeId, string fieldName = "NodeId");
-        ValidationResult ValidateNumber<T>(T value, string fieldName, T? minValue = null, T? maxValue = null) where T : struct, IComparable<T>;
-        ValidationResult ValidateCollection<T>(IEnumerable<T> collection, string fieldName, int maxCount = 1000, bool allowEmpty = false);
-        ValidationResult ValidateJson(string json, string fieldName = "Json");
-        ValidationResult ValidateUrl(string url, string fieldName = "Url");
+        InputValidationResult ValidateString(string input, string fieldName, int maxLength = 1000, bool allowEmpty = false);
+        InputValidationResult ValidateEmail(string email, string fieldName = "Email");
+        InputValidationResult ValidateNodeId(string nodeId, string fieldName = "NodeId");
+        InputValidationResult ValidateNumber<T>(T value, string fieldName, T? minValue = null, T? maxValue = null) where T : struct, IComparable<T>;
+        InputValidationResult ValidateCollection<T>(IEnumerable<T> collection, string fieldName, int maxCount = 1000, bool allowEmpty = false);
+        InputValidationResult ValidateJson(string json, string fieldName = "Json");
+        InputValidationResult ValidateUrl(string url, string fieldName = "Url");
         string SanitizeString(string input, bool preserveSpaces = true);
-        ValidationResult ValidateMultiple(params ValidationResult[] results);
-        ValidationResult ValidateRateLimit(string clientId, int maxRequestsPerMinute = 60);
-        ValidationResult ValidateFileUpload(string fileName, long fileSize, string[] allowedExtensions = null, long maxSizeBytes = 10 * 1024 * 1024);
+        InputValidationResult ValidateMultiple(params InputValidationResult[] results);
+        InputValidationResult ValidateRateLimit(string clientId, int maxRequestsPerMinute = 60);
+        InputValidationResult ValidateFileUpload(string fileName, long fileSize, string[] allowedExtensions = null, long maxSizeBytes = 10 * 1024 * 1024);
     }
 
     /// <summary>
     /// Represents the result of a validation operation
     /// </summary>
-    public class ValidationResult
+    public class InputValidationResult
     {
         public bool IsValid { get; }
         public string ErrorMessage { get; }
 
-        private ValidationResult(bool isValid, string errorMessage = null)
+        private InputValidationResult(bool isValid, string errorMessage = null)
         {
             IsValid = isValid;
             ErrorMessage = errorMessage;
         }
 
-        public ValidationResult(string errorMessage)
+        public InputValidationResult(string errorMessage)
         {
             IsValid = false;
             ErrorMessage = errorMessage;
         }
 
-        public static ValidationResult Success => new(true);
-        public static ValidationResult Error(string message) => new(false, message);
+        public static InputValidationResult Success => new(true);
+        public static InputValidationResult Error(string message) => new(false, message);
 
-        public static implicit operator bool(ValidationResult result) => result.IsValid;
+        public static implicit operator bool(InputValidationResult result) => result.IsValid;
     }
 }

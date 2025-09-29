@@ -245,18 +245,26 @@ namespace CodexBootstrap.Modules
     {
         private readonly LLMOrchestrator _llmOrchestrator;
         private readonly PromptTemplateRepository _promptRepo;
+        private readonly StartupStateService _startupState;
+        private readonly HttpClient _httpClient;
 
         public override string Name => "AI Module (Refactored)";
         public override string Description => "Streamlined AI functionality with configurable prompts and reusable patterns";
         public override string Version => "2.0.0";
 
-        public AIModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, CancellationTokenSource? shutdownCts = null) 
+        public AIModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient, CancellationTokenSource? shutdownCts = null, StartupStateService? startupState = null) 
             : base(registry, logger)
         {
+            // Store httpClient for use in other methods
+            _httpClient = httpClient;
+            
             // Initialize LLM infrastructure
             var llmClient = new LLMClient(httpClient, logger);
             _promptRepo = new PromptTemplateRepository(registry);
             _llmOrchestrator = new LLMOrchestrator(llmClient, _promptRepo, logger, shutdownCts);
+            
+            // Initialize startup state service
+            _startupState = startupState ?? new StartupStateService(logger);
             
             // Register default prompt templates
             RegisterPromptTemplates();
@@ -278,49 +286,49 @@ namespace CodexBootstrap.Modules
         public override void RegisterApiHandlers(IApiRouter router, INodeRegistry registry)
         {
             // Register AI handlers for internal module communication
-            router.Register("ai", "extract-concepts", async (JsonElement? json) => 
+            router.Register("ai-module", "extract-concepts", async (JsonElement? json) =>
             {
                 var request = JsonSerializer.Deserialize<ConceptExtractionRequest>(json?.GetRawText() ?? "{}");
                 return await HandleConceptExtractionAsync(request);
             });
-            
-            router.Register("ai", "score-analysis", async (JsonElement? json) => 
+
+            router.Register("ai-module", "score-analysis", async (JsonElement? json) =>
             {
                 var request = JsonSerializer.Deserialize<ScoringAnalysisRequest>(json?.GetRawText() ?? "{}");
                 return await HandleScoringAnalysisAsync(request);
             });
-            
-            router.Register("ai", "fractal-transform", async (JsonElement? json) => 
+
+            router.Register("ai-module", "fractal-transform", async (JsonElement? json) =>
             {
                 var request = JsonSerializer.Deserialize<FractalTransformRequest>(json?.GetRawText() ?? "{}");
                 return await HandleFractalTransformAsync(request);
             });
             
-            router.Register("ai", "generate-ui-page", async (JsonElement? json) => 
+            router.Register("ai-module", "generate-ui-page", async (JsonElement? json) =>
             {
                 var request = JsonSerializer.Deserialize<UIPageGenerationRequest>(json?.GetRawText() ?? "{}");
                 return await HandleUIPageGenerationAsync(request);
             });
-            
-            router.Register("ai", "generate-ui-component", async (JsonElement? json) => 
+
+            router.Register("ai-module", "generate-ui-component", async (JsonElement? json) =>
             {
                 var request = JsonSerializer.Deserialize<UIComponentGenerationRequest>(json?.GetRawText() ?? "{}");
                 return await HandleUIComponentGenerationAsync(request);
             });
-            
-            router.Register("ai", "analyze-ui-feedback", async (JsonElement? json) => 
+
+            router.Register("ai-module", "analyze-ui-feedback", async (JsonElement? json) =>
             {
                 var request = JsonSerializer.Deserialize<UIFeedbackAnalysisRequest>(json?.GetRawText() ?? "{}");
                 return await HandleUIFeedbackAnalysisAsync(request);
             });
-            
-            router.Register("ai", "evolve-ui-pattern", async (JsonElement? json) => 
+
+            router.Register("ai-module", "evolve-ui-pattern", async (JsonElement? json) =>
             {
                 var request = JsonSerializer.Deserialize<UIPatternEvolutionRequest>(json?.GetRawText() ?? "{}");
                 return await HandleUIPatternEvolutionAsync(request);
             });
-            
-            router.Register("ai", "generate-summary", async (JsonElement? json) => 
+
+            router.Register("ai-module", "generate-summary", async (JsonElement? json) => 
             {
                 var request = JsonSerializer.Deserialize<AISummarizeRequest>(json?.GetRawText() ?? "{}");
                 return await HandleSummaryGenerationAsync(request);
@@ -354,22 +362,48 @@ namespace CodexBootstrap.Modules
                 new PromptTemplate(
                     Id: "concept-extraction",
                     Name: "Concept Extraction",
-                    Template: @"Analyze the following text for consciousness-related concepts.
+                    Template: @"You are a JSON API. Extract domain concepts present in the input text. Use only concepts explicitly grounded in the text; do not invent.
 
-Text: ""{content}""
+Input Text: ""{content}""
 
-Focus on: consciousness, transformation, unity, love, wisdom, energy, healing, abundance, sacred patterns.
+Instructions:
+- Identify 3-8 salient concepts grounded in the text. If the text includes at least three distinct domain terms (nouns/noun phrases), you MUST return at least 3 items.
+- For each, provide a short description quoting or paraphrasing the source text.
+- Category must be one of: consciousness, transformation, unity, love, wisdom, energy, healing, abundance, sacred, fractal, science, technology.
+- Scores and confidence must be in [0.0, 1.0].
+- If no concepts are found, return an empty array [].
 
-IMPORTANT: Return ONLY a valid JSON array, no markdown, no explanations, no additional text. Start with [ and end with ].
+Few-shot examples (follow format exactly):
 
+Example 1 Input:
+""Quantum computing achieves new milestone in error correction enabling practical quantum advantage in materials science and cryptography.""
+Example 1 Output:
 [
-  {{
-    ""concept"": ""concept_name"",
-    ""score"": 0.0-1.0,
-    ""description"": ""brief description"",
-    ""category"": ""consciousness|transformation|unity|love|wisdom|energy|healing|abundance|sacred|fractal"",
-    ""confidence"": 0.0-1.0
-  }}
+  {""concept"":""quantum computing"",""score"":0.92,""description"":""milestone in error correction enabling practical quantum advantage"",""category"":""science"",""confidence"":0.9},
+  {""concept"":""error correction"",""score"":0.82,""description"":""new milestone improving stability for quantum advantage"",""category"":""science"",""confidence"":0.85},
+  {""concept"":""cryptography"",""score"":0.76,""description"":""impact on cryptography from practical quantum advantage"",""category"":""technology"",""confidence"":0.8}
+]
+
+Example 2 Input:
+""Love and compassion practices support healing and harmony leading to transformation and unity in communities.""
+Example 2 Output:
+[
+  {""concept"":""love"",""score"":0.86,""description"":""love practices support healing and harmony"",""category"":""love"",""confidence"":0.85},
+  {""concept"":""compassion"",""score"":0.83,""description"":""compassion practices support healing and harmony"",""category"":""love"",""confidence"":0.82},
+  {""concept"":""healing"",""score"":0.8,""description"":""healing and harmony leading to transformation"",""category"":""healing"",""confidence"":0.8},
+  {""concept"":""unity"",""score"":0.74,""description"":""unity in communities as an outcome"",""category"":""unity"",""confidence"":0.75}
+]
+
+Output:
+Return ONLY a valid JSON array with the following item schema. No markdown, no extra text.
+[
+  {
+    ""concept"": ""string"",
+    ""score"": 0.0,
+    ""description"": ""string"",
+    ""category"": ""consciousness|transformation|unity|love|wisdom|energy|healing|abundance|sacred|fractal|science|technology"",
+    ""confidence"": 0.0
+  }
 ]",
                     DefaultParameters: new Dictionary<string, object> { ["content"] = "" },
                     DefaultLLMConfig: defaultLLMConfig,
@@ -691,22 +725,17 @@ IMPORTANT: Return ONLY a valid JSON object with the evolved template, no markdow
         [ApiRoute("POST", "/ai/extract-concepts", "ai-extract-concepts", "Extract concepts using configurable prompts", "ai-module")]
         public async Task<object> HandleConceptExtractionAsync([ApiParameter("request", "Concept extraction request", Required = true, Location = "body")] ConceptExtractionRequest request)
         {
-            // Check if AI calls are disabled during startup
-            var disableAI = Environment.GetEnvironmentVariable("DISABLE_AI");
-            if (string.Equals(disableAI, "true", StringComparison.OrdinalIgnoreCase))
+            // Check if AI services are ready
+            if (!_startupState.IsAIReady)
             {
                 var disabledConfig = LLMConfigurations.GetConfigForTask("concept-extraction", request.Provider, request.Model);
-                _logger.Warn($"AI_CALL extract-concepts DISABLED provider={disabledConfig.Provider} model={disabledConfig.Model} baseUrl={disabledConfig.BaseUrl} chars={request.Content.Length}");
+                _logger.Warn($"AI_CALL extract-concepts NOT READY provider={disabledConfig.Provider} model={disabledConfig.Model} baseUrl={disabledConfig.BaseUrl} chars={request.Content.Length}");
                 return new
                 {
-                    success = true,
-                    message = "AI calls disabled during startup",
-                    data = new
-                    {
-                        concepts = new[] { "startup", "initialization", "system" },
-                        confidence = 0.8,
-                        model = "startup-mode"
-                    },
+                    success = false,
+                    error = "AI services not ready",
+                    message = "AI services are not yet ready. Please try again in a moment.",
+                    details = "The system is still initializing. AI services will be available shortly.",
                     timestamp = DateTimeOffset.UtcNow
                 };
             }
@@ -718,14 +747,20 @@ IMPORTANT: Return ONLY a valid JSON object with the evolved template, no markdow
                     return new { success = false, error = "Content is required" };
                 }
 
-                var config = LLMConfigurations.GetConfigForTask("concept-extraction", request.Provider, request.Model);
-                _logger.Info($"AI_CALL extract-concepts provider={config.Provider} model={config.Model} baseUrl={config.BaseUrl} chars={request.Content.Length}");
-                var result = await _llmOrchestrator.ExecuteAsync("concept-extraction", new Dictionary<string, object>
-                {
-                    ["content"] = request.Content
-                }, config);
+                // Use the new resonance-aligned concept extraction system
+                var resonanceRequest = new ResonanceAlignedExtractionRequest(
+                    Content: request.Content,
+                    UserId: "system", // Default user for basic extraction
+                    Model: request.Model,
+                    Provider: request.Provider
+                );
 
-                return _llmOrchestrator.ParseStructuredResponse<List<ConceptScore>>(result, "concept extraction");
+                // Forward to resonance-aligned extraction
+                var resonanceModule = new ResonanceAlignedConceptExtractionModule(_registry, _logger, _httpClient, _startupState);
+                var resonanceResponse = await resonanceModule.ExtractAndIntegrateConceptsAsync(resonanceRequest);
+
+                // Return the enhanced response
+                return resonanceResponse;
             }
             catch (Exception ex)
             {
@@ -734,26 +769,62 @@ IMPORTANT: Return ONLY a valid JSON object with the evolved template, no markdow
             }
         }
 
+        [ApiRoute("POST", "/ai/extract-concepts-resonance", "ai-extract-concepts-resonance", "Extract concepts aligned with user's resonance field", "ai-module")]
+        public async Task<object> HandleResonanceAlignedConceptExtractionAsync([ApiParameter("request", "Resonance-aligned extraction request", Required = true, Location = "body")] ResonanceAlignedExtractionRequest request)
+        {
+            // Check if AI services are ready
+            if (!_startupState.IsAIReady)
+            {
+                _logger.Warn($"AI_CALL extract-concepts-resonance NOT READY userId={request.UserId} chars={request.Content.Length}");
+                return new
+                {
+                    success = false,
+                    error = "AI services not ready",
+                    message = "AI services are not yet ready. Please try again in a moment.",
+                    details = "The system is still initializing. AI services will be available shortly.",
+                    timestamp = DateTimeOffset.UtcNow
+                };
+            }
+
+            try
+            {
+                if (request == null || string.IsNullOrEmpty(request.Content))
+                {
+                    return new ErrorResponse("Content is required", ErrorCodes.VALIDATION_ERROR, new { field = "content", message = "Content is required" });
+                }
+
+                if (string.IsNullOrEmpty(request.UserId))
+                {
+                    return new ErrorResponse("User ID is required", ErrorCodes.VALIDATION_ERROR, new { field = "userId", message = "User ID is required" });
+                }
+
+                // Use the resonance-aligned concept extraction system
+                var resonanceModule = new ResonanceAlignedConceptExtractionModule(_registry, _logger, _httpClient, _startupState);
+                var response = await resonanceModule.ExtractAndIntegrateConceptsAsync(request);
+
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in resonance-aligned concept extraction: {ex.Message}", ex);
+                return new ErrorResponse($"Error in concept extraction: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { error = ex.Message });
+            }
+        }
+
         [ApiRoute("POST", "/ai/fractal-transform", "ai-fractal-transform", "Transform content using fractal patterns", "ai-module")]
         public async Task<object> HandleFractalTransformAsync([ApiParameter("request", "Fractal transform request", Required = true, Location = "body")] FractalTransformRequest request)
         {
-            // Check if AI calls are disabled during startup
-            var disableAI = Environment.GetEnvironmentVariable("DISABLE_AI");
-            if (string.Equals(disableAI, "true", StringComparison.OrdinalIgnoreCase))
+            // Check if AI services are ready
+            if (!_startupState.IsAIReady)
             {
                 var disabledConfig = LLMConfigurations.GetConfigForTask("fractal-transformation", request.Provider, request.Model);
-                _logger.Warn($"AI_CALL fractal-transform DISABLED provider={disabledConfig.Provider} model={disabledConfig.Model} baseUrl={disabledConfig.BaseUrl} chars={request.Content.Length}");
+                _logger.Warn($"AI_CALL fractal-transform NOT READY provider={disabledConfig.Provider} model={disabledConfig.Model} baseUrl={disabledConfig.BaseUrl} chars={request.Content.Length}");
                 return new
                 {
-                    success = true,
-                    message = "AI calls disabled during startup",
-                    data = new
-                    {
-                        transformedContent = request.Content,
-                        fractalPattern = "startup-pattern",
-                        confidence = 0.8,
-                        model = "startup-mode"
-                    },
+                    success = false,
+                    error = "AI services not ready",
+                    message = "AI services are not yet ready. Please try again in a moment.",
+                    details = "The system is still initializing. AI services will be available shortly.",
                     timestamp = DateTimeOffset.UtcNow
                 };
             }
@@ -785,23 +856,17 @@ IMPORTANT: Return ONLY a valid JSON object with the evolved template, no markdow
         [ApiRoute("POST", "/ai/score-analysis", "ai-score-analysis", "Score and analyze content using AI", "ai-module")]
         public async Task<object> HandleScoringAnalysisAsync([ApiParameter("request", "Scoring analysis request", Required = true, Location = "body")] ScoringAnalysisRequest request)
         {
-            // Check if AI calls are disabled during startup
-            var disableAI = Environment.GetEnvironmentVariable("DISABLE_AI");
-            if (string.Equals(disableAI, "true", StringComparison.OrdinalIgnoreCase))
+            // Check if AI services are ready
+            if (!_startupState.IsAIReady)
             {
                 var disabledConfig = LLMConfigurations.GetConfigForTask("scoring-analysis", request.Provider, request.Model);
-                _logger.Warn($"AI_CALL score-analysis DISABLED provider={disabledConfig.Provider} model={disabledConfig.Model} baseUrl={disabledConfig.BaseUrl} chars={request.Content.Length}");
+                _logger.Warn($"AI_CALL score-analysis NOT READY provider={disabledConfig.Provider} model={disabledConfig.Model} baseUrl={disabledConfig.BaseUrl} chars={request.Content.Length}");
                 return new
                 {
-                    success = true,
-                    message = "AI calls disabled during startup",
-                    data = new
-                    {
-                        abundanceScore = 0.8,
-                        relevanceScore = 0.7,
-                        clarityScore = 0.9,
-                        model = "startup-mode"
-                    },
+                    success = false,
+                    error = "AI services not ready",
+                    message = "AI services are not yet ready. Please try again in a moment.",
+                    details = "The system is still initializing. AI services will be available shortly.",
                     timestamp = DateTimeOffset.UtcNow
                 };
             }

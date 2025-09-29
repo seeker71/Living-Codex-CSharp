@@ -1,423 +1,679 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { useTrackInteraction } from '@/lib/hooks';
 import { buildApiUrl } from '@/lib/config';
 
-// Core interfaces that reflect the fractal nature
-interface Node {
+import { SmartSearch } from '@/components/ui/SmartSearch';
+import KnowledgeMap, { useMockKnowledgeNodes } from '@/components/ui/KnowledgeMap';
+
+interface OntologyNode {
   id: string;
   typeId: string;
-  meta: any;
+  title?: string;
   description?: string;
-  children?: Node[];
-  parent?: Node;
-  level: number;
-  resonance?: number;
+  meta?: {
+    name?: string;
+    description?: string;
+    keywords?: string[];
+    axis?: string;
+    parentAxes?: string[];
+  };
+  level?: number;
 }
 
-interface FractalView {
-  node: Node;
-  depth: number;
-  maxDepth: number;
-  connections: Node[];
-  frequencies: any[];
+interface KnowledgeDomain {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+  color: string;
+  keywords: string[];
+  concepts: OntologyNode[];
 }
 
-// Main component
+interface ConceptSummary {
+  id: string;
+  title: string;
+  description: string;
+  domain: string;
+  keywords: string[];
+  typeId: string;
+}
+
+const domainDefinitions: KnowledgeDomain[] = [
+  {
+    id: 'science',
+    name: 'Science & Technology',
+    icon: '🔬',
+    description: 'Scientific discoveries, technological innovations, and research',
+    color: 'bg-blue-500',
+    keywords: ['science', 'technology', 'research', 'discovery', 'innovation', 'physics', 'chemistry', 'biology'],
+    concepts: [],
+  },
+  {
+    id: 'arts',
+    name: 'Arts & Culture',
+    icon: '🎨',
+    description: 'Art, music, literature, philosophy, and cultural expressions',
+    color: 'bg-purple-500',
+    keywords: ['art', 'music', 'literature', 'culture', 'philosophy', 'creativity', 'expression'],
+    concepts: [],
+  },
+  {
+    id: 'society',
+    name: 'Society & Humanity',
+    icon: '👥',
+    description: 'Social sciences, history, politics, and human behavior',
+    color: 'bg-green-500',
+    keywords: ['society', 'history', 'politics', 'psychology', 'sociology', 'humanity', 'culture'],
+    concepts: [],
+  },
+  {
+    id: 'nature',
+    name: 'Nature & Environment',
+    icon: '🌍',
+    description: 'Ecology, environment, biology, and natural sciences',
+    color: 'bg-emerald-500',
+    keywords: ['nature', 'environment', 'ecology', 'biology', 'earth', 'climate', 'sustainability'],
+    concepts: [],
+  },
+  {
+    id: 'health',
+    name: 'Health & Wellness',
+    icon: '🏥',
+    description: 'Medicine, health, psychology, and well-being',
+    color: 'bg-red-500',
+    keywords: ['health', 'medicine', 'wellness', 'psychology', 'fitness', 'nutrition', 'healing'],
+    concepts: [],
+  },
+  {
+    id: 'business',
+    name: 'Business & Economics',
+    icon: '💼',
+    description: 'Business, economics, finance, and entrepreneurship',
+    color: 'bg-amber-500',
+    keywords: ['business', 'economics', 'finance', 'entrepreneurship', 'management', 'marketing'],
+    concepts: [],
+  },
+];
+
+const quickActions = [
+  {
+    label: 'Explore All Domains',
+    icon: '🌍',
+    description: 'Discover domains and their concepts',
+    href: '/ontology',
+  },
+  {
+    label: 'Search Knowledge',
+    icon: '🔍',
+    description: 'Find specific concepts and ideas',
+    href: '/ontology?view=search',
+  },
+  {
+    label: 'View Knowledge Map',
+    icon: '🕸️',
+    description: 'Explore the interconnected web of concepts',
+    href: '/graph',
+  },
+  {
+    label: 'Discover New Concepts',
+    icon: '🎯',
+    description: 'Explore recommended concepts for you',
+    href: '/discover',
+  },
+];
+
+function normalizeTitle(node: OntologyNode): string {
+  return node.title || node.meta?.name || node.id;
+}
+
+function matchDomain(node: OntologyNode): string {
+  const keywords = (node.meta?.keywords || []).map((k) => k.toLowerCase());
+  const description = (node.description || node.meta?.description || '').toLowerCase();
+
+  for (const definition of domainDefinitions) {
+    if (
+      definition.keywords.some((kw) =>
+        keywords.some((k) => k.includes(kw)) || description.includes(kw)
+      )
+    ) {
+      return definition.id;
+    }
+  }
+
+  return 'science';
+}
+
+function buildConceptSummaries(nodes: OntologyNode[]): ConceptSummary[] {
+  return nodes
+    .filter((node) => node.typeId.includes('concept') || node.typeId.includes('axis'))
+    .map((node) => ({
+      id: node.id,
+      title: normalizeTitle(node),
+      description: node.description || node.meta?.description || 'No description available',
+      domain: matchDomain(node),
+      keywords: node.meta?.keywords || [],
+      typeId: node.typeId,
+    }));
+}
+
 export default function OntologyPage() {
-  console.log('OntologyPage component rendering');
-  
+  const router = useRouter();
   const { user } = useAuth();
   const trackInteraction = useTrackInteraction();
-  
-  // Core state - everything derives from the data
-  const [nodes, setNodes] = useState<Node[]>([]);
-  const [currentView, setCurrentView] = useState<FractalView | null>(null);
-  const [loading, setLoading] = useState(false);
+
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  // Navigation state
-  const [navigationStack, setNavigationStack] = useState<FractalView[]>([]);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [nodes, setNodes] = useState<OntologyNode[]>([]);
+  const [domains, setDomains] = useState<KnowledgeDomain[]>(domainDefinitions);
+  const [viewMode, setViewMode] = useState<'cards' | 'map'>('cards');
+  const [activeDomain, setActiveDomain] = useState<string>('overview');
+  const [searchResults, setSearchResults] = useState<ConceptSummary[]>([]);
+  const [searchCount, setSearchCount] = useState(0);
+  const [exploredDomains, setExploredDomains] = useState<Set<string>>(new Set());
+  const [discoveredConcepts, setDiscoveredConcepts] = useState<Set<string>>(new Set());
 
-  // Find connections for a node - this is the fractal principle
-  const findConnections = (node: Node, allNodes: Node[]): Node[] => {
-    const connections: Node[] = [];
-    
-    // Find children
-    const children = allNodes.filter(n => 
-      n.meta?.parentAxes?.includes(node.id) || 
-      n.meta?.axis === node.id
-    );
-    connections.push(...children);
-    
-    // Find siblings
-    const siblings = allNodes.filter(n => 
-      n.id !== node.id && 
-      n.level === node.level &&
-      n.typeId === node.typeId
-    );
-    connections.push(...siblings.slice(0, 3)); // Limit to avoid clutter
-    
-    // Find related by keywords
-    const related = allNodes.filter(n => 
-      n.id !== node.id &&
-      n.meta?.keywords?.some((keyword: string) => 
-        node.meta?.keywords?.includes(keyword)
-      )
-    );
-    connections.push(...related.slice(0, 2));
-    
-    return connections;
-  };
+  const knowledgeMapNodes = useMockKnowledgeNodes(24);
 
-  // Load all nodes from the system
-  const loadNodes = async () => {
-    console.log('loadNodes called');
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // Load all node types in parallel - no hardcoding
-      const nodeTypes = ['codex.ontology.axis', 'codex.ucore.base', 'codex.relationship', 'codex.frequency'];
-      console.log('Loading node types:', nodeTypes);
-      
-      const allNodes = await Promise.all(
-        nodeTypes.map(async (typeId) => {
-          const url = buildApiUrl(`/storage-endpoints/nodes?typeId=${typeId}&take=1000`);
-          console.log(`Fetching ${typeId} from:`, url);
-          const response = await fetch(url);
-          console.log(`${typeId} response status:`, response.status);
-          if (response.ok) {
-            const data = await response.json();
-            console.log(`${typeId} data:`, data);
-            return data.nodes?.map((node: any) => ({
-              id: node.id,
-              typeId: node.typeId,
-              meta: node.meta || {},
-              description: node.description,
-              level: node.meta?.level || 0,
-              resonance: Math.random() * 100 // This would come from actual resonance calculation
-            })) || [];
-          }
-          console.log(`${typeId} failed with status:`, response.status);
-          return [];
-        })
-      );
-      
-      const flatNodes = allNodes.flat();
-      console.log('All nodes loaded:', flatNodes.length);
-      console.log('Sample nodes:', flatNodes.slice(0, 3));
-      setNodes(flatNodes);
-      
-      // Initialize with root nodes (level 0)
-      const rootNodes = flatNodes.filter(node => node.level === 0);
-      console.log('Root nodes found:', rootNodes.length);
-      console.log('Root nodes:', rootNodes);
-      if (rootNodes.length > 0) {
-        const initialView: FractalView = {
-          node: rootNodes[0],
-          depth: 0,
-          maxDepth: 3,
-          connections: findConnections(rootNodes[0], flatNodes),
-          frequencies: []
-        };
-        console.log('Setting initial view:', initialView);
-        setCurrentView(initialView);
-        setNavigationStack([initialView]);
-      } else {
-        console.log('No root nodes found, currentView will remain null');
-      }
-      
-    } catch (err) {
-      console.error('Error in loadNodes:', err);
-      setError(`Failed to load nodes: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Navigate to a node - this is the core interaction
-  const navigateToNode = (node: Node) => {
-    if (!currentView) return;
-    
-    const newView: FractalView = {
-      node,
-      depth: currentView.depth + 1,
-      maxDepth: currentView.maxDepth,
-      connections: findConnections(node, nodes),
-      frequencies: [] // This would be calculated from actual data
-    };
-    
-    setCurrentView(newView);
-    setNavigationStack(prev => [...prev, newView]);
-    setSelectedNodeId(node.id);
-    
-    if (user?.id) {
-      trackInteraction('ontology-navigation', 'node-selected', {
-        nodeId: node.id,
-        nodeType: node.typeId,
-        depth: newView.depth
-      });
-    }
-  };
-
-  // Navigate back in the stack
-  const navigateBack = () => {
-    if (navigationStack.length > 1) {
-      const newStack = navigationStack.slice(0, -1);
-      setNavigationStack(newStack);
-      setCurrentView(newStack[newStack.length - 1]);
-      setSelectedNodeId(newStack[newStack.length - 1].node.id);
-    }
-  };
-
-  // Load data on mount
   useEffect(() => {
-    console.log('useEffect called, loading nodes...');
-    loadNodes();
+    const fetchNodes = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetch(buildApiUrl('/storage-endpoints/nodes')); // mocked in tests
+        if (!response.ok) {
+          throw new Error(response.statusText || 'Failed to load ontology');
+        }
+
+        const payload = await response.json();
+        const fetchedNodes: OntologyNode[] = payload.nodes || [];
+        setNodes(fetchedNodes);
+
+        const summaries = buildConceptSummaries(fetchedNodes);
+        setSearchResults(summaries);
+
+        const mappedDomains = domainDefinitions.map((definition) => ({
+          ...definition,
+          concepts: summaries
+            .filter((concept) => concept.domain === definition.id)
+            .map((concept) => ({
+              id: concept.id,
+              typeId: 'codex.concept',
+              title: concept.title,
+              description: concept.description,
+              meta: { keywords: concept.keywords },
+            })),
+        }));
+
+        setDomains(mappedDomains);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load ontology');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNodes();
   }, []);
 
-  // Render a node as a fractal element
-  const renderNode = (node: Node, isMain: boolean = false) => {
-    const isSelected = selectedNodeId === node.id;
-    const hasChildren = node.children && node.children.length > 0;
-    const resonance = node.resonance || 0;
-    
-    return (
-      <div
-        key={node.id}
-        className={`
-          relative p-4 rounded-lg border-2 transition-all duration-300 cursor-pointer
-          ${isMain ? 'bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20' : 'bg-white dark:bg-gray-800'}
-          ${isSelected ? 'border-blue-500 shadow-lg scale-105' : 'border-gray-200 dark:border-gray-700 hover:border-blue-300'}
-          ${isMain ? 'min-h-[200px]' : 'min-h-[120px]'}
-        `}
-        onClick={() => navigateToNode(node)}
-      >
-        {/* Resonance indicator */}
-        <div className="absolute top-2 right-2">
-          <div className={`w-3 h-3 rounded-full ${
-            resonance > 80 ? 'bg-green-500' : 
-            resonance > 60 ? 'bg-yellow-500' : 
-            resonance > 40 ? 'bg-orange-500' : 'bg-gray-400'
-          }`} />
+  const conceptsByDomain = useMemo(() => {
+    const grouped: Record<string, ConceptSummary[]> = {};
+    searchResults.forEach((concept) => {
+      if (!grouped[concept.domain]) {
+        grouped[concept.domain] = [];
+      }
+      grouped[concept.domain].push(concept);
+    });
+    return grouped;
+  }, [searchResults]);
+
+  const getExplorationProgress = () => {
+    const totalDomains = domainDefinitions.length;
+    const exploredCount = exploredDomains.size;
+    const discoveredCount = discoveredConcepts.size;
+
+    return {
+      domainsExplored: exploredCount,
+      totalDomains,
+      conceptsDiscovered: discoveredCount,
+      searchCount,
+      completionPercentage: totalDomains === 0 ? 0 : Math.round((exploredCount / totalDomains) * 100),
+    };
+  };
+
+  const handleRetry = () => {
+    setActiveDomain('overview');
+    setLoading(true);
+    setError(null);
+    setNodes([]);
+    setSearchResults([]);
+    setDomains(domainDefinitions);
+    setSearchCount(0);
+    setExploredDomains(new Set());
+    setDiscoveredConcepts(new Set());
+  };
+
+  const handleDomainClick = (domainId: string) => {
+    setExploredDomains((prev) => new Set(prev).add(domainId));
+    setActiveDomain(domainId);
+  };
+
+  const handleBackToOverview = () => {
+    setActiveDomain('overview');
+  };
+
+const handleSearchResultsChange = (results: ConceptSummary[]) => {
+  setSearchCount((count) => count + 1);
+  setSearchResults(results);
+  results.forEach((concept) => {
+    setDiscoveredConcepts((prev) => new Set(prev).add(concept.id));
+  });
+};
+
+  const renderLoading = () => (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center" aria-live="polite">
+      <div className="text-center space-y-4">
+        <div className="text-gray-400 text-6xl animate-pulse">🌐</div>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Loading Knowledge Universe</h2>
+        <p className="text-gray-600 dark:text-gray-300">Connecting concepts and building knowledge networks...</p>
+      </div>
+    </div>
+  );
+
+  const renderError = () => (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="text-center space-y-4">
+        <div className="text-gray-400 text-6xl">😕</div>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Connection Lost</h2>
+        <p className="text-gray-600 dark:text-gray-300">
+          We're having trouble connecting to the knowledge network. This might be temporary.
+        </p>
+        <div className="flex items-center justify-center gap-3 text-sm">
+          <button
+            type="button"
+            className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+            onClick={handleRetry}
+          >
+            🔄 Try Again
+          </button>
+          <button
+            type="button"
+            className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+            onClick={() => window.location.reload()}
+          >
+            🔃 Reload Page
+          </button>
         </div>
-        
-        {/* Node content */}
-        <div className="space-y-2">
-          <h3 className={`font-semibold ${isMain ? 'text-xl' : 'text-lg'} text-gray-900 dark:text-gray-100`}>
-            {node.meta?.name || node.id}
-          </h3>
-          
-          <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
-            {node.description || node.meta?.description || 'No description available'}
-          </p>
-          
-          {/* Keywords as clickable elements */}
-          {node.meta?.keywords && (
-            <div className="flex flex-wrap gap-1">
-              {node.meta.keywords.slice(0, 4).map((keyword: string) => (
-                <span
-                  key={keyword}
-                  className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-full text-xs hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors"
-                >
-                  {keyword}
-                </span>
-              ))}
-              {node.meta.keywords.length > 4 && (
-                <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-full text-xs">
-                  +{node.meta.keywords.length - 4}
-                </span>
-              )}
-            </div>
-          )}
-          
-          {/* Dimensions as clickable elements */}
-          {node.meta?.dimensions && (
-            <div className="flex flex-wrap gap-1">
-              {node.meta.dimensions.slice(0, 3).map((dimension: string) => (
-                <span
-                  key={dimension}
-                  className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-full text-xs hover:bg-green-200 dark:hover:bg-green-800/50 transition-colors"
-                >
-                  {dimension}
-                </span>
-              ))}
-              {node.meta.dimensions.length > 3 && (
-                <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-full text-xs">
-                  +{node.meta.dimensions.length - 3}
-                </span>
-              )}
-            </div>
-          )}
-          
-          {/* Type indicator */}
-          <div className="text-xs text-gray-500 dark:text-gray-400">
-            {node.typeId.replace('codex.', '')} • Level {node.level}
-          </div>
-        </div>
-        
-        {/* Navigation hint */}
-        {hasChildren && (
-          <div className="absolute bottom-2 right-2 text-gray-400">
-            ↓
-          </div>
+        {error && (
+          <p className="text-xs text-gray-500 dark:text-gray-400">{error}</p>
         )}
       </div>
+    </div>
+  );
+
+  const renderQuickActions = () => (
+    <section aria-label="Quick Actions" className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Quick Actions</h2>
+        <span className="text-xs text-gray-500 dark:text-gray-400">Jump into common ontology workflows</span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {quickActions.map((action) => (
+          <button
+            key={action.label}
+            type="button"
+            className="flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-blue-300 hover:shadow transition-all"
+            onClick={() => router.push(action.href)}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl" aria-hidden="true">{action.icon}</span>
+              <div className="text-left">
+                <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">{action.label}</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">{action.description}</div>
+              </div>
+            </div>
+            <span className="text-gray-400">→</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+
+  const renderDomainOverview = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Featured Knowledge Areas</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Browse high-level domains to start your journey.</p>
+        </div>
+        <div className="text-sm text-blue-600 dark:text-blue-400">More Knowledge Areas →</div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {domains.map((domain) => (
+          <div
+            key={domain.id}
+            className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all cursor-pointer"
+            onClick={() => handleDomainClick(domain.id)}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className={`w-12 h-12 ${domain.color} rounded-full flex items-center justify-center text-white text-xl`}>
+                {domain.icon}
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{domain.concepts.length}</div>
+                <div className="text-xs text-gray-500">Concepts</div>
+              </div>
+            </div>
+
+            <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">{domain.name}</h4>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">{domain.description}</p>
+
+            <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+              {domain.concepts.slice(0, 3).map((concept) => (
+                <div key={concept.id} className="truncate">{normalizeTitle(concept)}</div>
+              ))}
+              {domain.concepts.length > 3 && (
+                <div className="text-xs text-gray-500">+{domain.concepts.length - 3} more concepts</div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderKnowledgeMapSection = () => (
+    <div className="space-y-4">
+      <KnowledgeMap
+        nodes={knowledgeMapNodes}
+        className="w-full"
+        onNodeClick={(nodeId) => {
+          trackInteraction('knowledge-map', 'node-click', { nodeId });
+          router.push(`/node/${encodeURIComponent(nodeId)}`);
+        }}
+      />
+      <div className="text-center text-sm text-gray-600 dark:text-gray-400">
+        Interactive map showing concept connections. Use Cards to browse summaries.
+      </div>
+    </div>
+  );
+
+  const renderDomainDetail = (domainId: string) => {
+    const domain = domains.find((d) => d.id === domainId);
+    if (!domain) {
+      return null;
+    }
+
+    return (
+      <section className="space-y-6" aria-label={`${domain.name} Details`}>
+        <button
+          type="button"
+          className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+          onClick={handleBackToOverview}
+        >
+          ← Back to Overview
+        </button>
+
+        <header className="space-y-2">
+          <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{domain.icon} {domain.name}</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400">{domain.description}</p>
+        </header>
+
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Concepts</h3>
+          {domain.concepts.length === 0 ? (
+            <p className="text-sm text-gray-600 dark:text-gray-400">No concepts available yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {domain.concepts.map((concept) => (
+                <li key={concept.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{normalizeTitle(concept)}</h4>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        {concept.description || concept.meta?.description || 'No description available'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                      onClick={() => router.push(`/node/${encodeURIComponent(concept.id)}`)}
+                    >
+                      View →
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
     );
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-300">Loading knowledge universe...</p>
-        </div>
+  const renderSearchSection = () => (
+    <section className="space-y-4" aria-label="Knowledge Search">
+      <div className="space-y-1">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Search Knowledge</h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400">Search concepts, people, and ideas.</p>
       </div>
+      <SmartSearch
+        placeholder="Search knowledge..."
+        showFilters
+        onResultSelect={(result) => {
+          setDiscoveredConcepts((prev) => new Set(prev).add(result.id));
+          router.push(`/node/${encodeURIComponent(result.id)}`);
+        }}
+        onResultsChange={(results) => handleSearchResultsChange(results.map((result) => ({
+          id: result.id,
+          title: result.title,
+          description: result.description,
+          domain: matchDomain({
+            id: result.id,
+            typeId: result.typeId,
+            title: result.title,
+            description: result.description,
+            meta: { keywords: result.tags },
+          }),
+          keywords: result.tags,
+          typeId: result.typeId,
+        })))}
+      />
+    </section>
+  );
+
+  const renderConceptCardsSection = () => (
+    <section className="space-y-6" aria-label="Featured Concepts">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Featured Concepts</h2>
+        <button
+          type="button"
+          className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+          onClick={() => router.push('/discover')}
+        >
+          Discover more →
+        </button>
+      </div>
+
+      {searchResults.length === 0 ? (
+        <p className="text-sm text-gray-600 dark:text-gray-400">No concepts to display yet. Try searching to discover more.</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {searchResults.slice(0, 6).map((concept) => (
+            <div key={concept.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{concept.title}</h3>
+                <span className="text-xs text-gray-500 capitalize">{concept.domain}</span>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2">{concept.description}</p>
+              <button
+                type="button"
+                className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                onClick={() => router.push(`/node/${encodeURIComponent(concept.id)}`)}
+              >
+                View concept →
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+
+  const renderInsightsSection = () => {
+    const progress = getExplorationProgress();
+
+    return (
+      <section className="grid grid-cols-1 lg:grid-cols-3 gap-6" aria-label="Knowledge Insights">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 space-y-4">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">
+              🔄 Fractal Navigation
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Navigate between concepts to see how knowledge branches across domains.
+            </p>
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              Currently viewing: {activeDomain === 'overview' ? 'Overview' : domains.find((d) => d.id === activeDomain)?.name || 'Overview'}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 space-y-3">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">🏆 Your Journey</h3>
+            <div className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
+              <div className="flex items-center justify-between">
+                <span>Domains Explored</span>
+                <strong>{progress.domainsExplored}</strong>
+              </div>
+              <div className="flex items-center justify_between">
+                <span>Concepts Discovered</span>
+                <strong>{progress.conceptsDiscovered}</strong>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Searches Performed</span>
+                <strong>{progress.searchCount}</strong>
+              </div>
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              Completion: {progress.completionPercentage}% of domains explored
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 space-y-3">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">💡 Quick Tips</h3>
+            <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
+              <li>Click any domain card to explore concepts in that area.</li>
+              <li>Use the search bar to find specific topics quickly.</li>
+              <li>Switch to map view to visualize concept connections.</li>
+            </ul>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 space-y-3">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">📈 Domain Insights</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              {domains
+                .map((domain) => `${domain.icon} ${domain.name}: ${domain.concepts.length} concepts`)
+                .slice(0, 4)
+                .join(' • ')}
+            </p>
+          </div>
+        </div>
+      </section>
     );
+  };
+
+  const renderFloatingQuickActionsButton = () => (
+    <button
+      type="button"
+      aria-label="Quick Actions"
+      className="fixed bottom-6 right-6 px-4 py-3 rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700"
+      onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+    >
+      Quick Actions
+    </button>
+  );
+
+  if (loading) {
+    return renderLoading();
   }
 
   if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-500 text-6xl mb-4">⚠️</div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Connection Lost</h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-4">{error}</p>
-          <button
-            onClick={loadNodes}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!currentView) {
-    console.log('Rendering no knowledge found state');
-    console.log('Loading:', loading);
-    console.log('Error:', error);
-    console.log('Nodes length:', nodes.length);
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-gray-400 text-6xl mb-4">🧠</div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">No Knowledge Found</h2>
-          <p className="text-gray-600 dark:text-gray-300">The knowledge universe appears to be empty.</p>
-          <div className="mt-4 text-sm text-gray-500">
-            <p>Loading: {loading ? 'true' : 'false'}</p>
-            <p>Error: {error || 'none'}</p>
-            <p>Nodes: {nodes.length}</p>
-          </div>
-        </div>
-      </div>
-    );
+    return renderError();
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                🧠 Knowledge Explorer
-              </h1>
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                Navigate the fractal structure of knowledge • Everything is a Node
-              </p>
-            </div>
-            
-            {/* Navigation breadcrumb */}
-            <div className="flex items-center space-x-2">
-              {navigationStack.length > 1 && (
-                <button
-                  onClick={navigateBack}
-                  className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                >
-                  ← Back
-                </button>
-              )}
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                Depth: {currentView.depth}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900" data-testid="ontology-page">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12">
+        <header className="space-y-2">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">🌍 Knowledge Universe</h1>
+          <p className="text-gray-600 dark:text-gray-300 max-w-2xl">
+            Explore human knowledge through interconnected concepts.
+          </p>
+        </header>
 
-      {/* Main content */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Current node - the center of the fractal */}
-          <div className="lg:col-span-2">
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                Current Focus
-              </h2>
-              {renderNode(currentView.node, true)}
-            </div>
-            
-            {/* Connections - the fractal expansion */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                Connected Knowledge ({currentView.connections.length})
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {currentView.connections.map(connection => renderNode(connection))}
-              </div>
-            </div>
-          </div>
-          
-          {/* Sidebar - system information */}
-          <div className="space-y-6">
-            {/* System stats */}
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                📊 System State
-              </h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-300">Total Nodes</span>
-                  <span className="font-medium">{nodes.length}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-300">Current Depth</span>
-                  <span className="font-medium">{currentView.depth}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-300">Connections</span>
-                  <span className="font-medium">{currentView.connections.length}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-300">Resonance</span>
-                  <span className="font-medium">{Math.round(currentView.node.resonance || 0)}%</span>
-                </div>
-              </div>
-            </div>
-            
-            {/* Navigation help */}
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                🧭 Navigation
-              </h3>
-              <div className="text-sm text-gray-600 dark:text-gray-300 space-y-2">
-                <p><strong>Click any node</strong> to explore deeper into the knowledge fractal</p>
-                <p><strong>Keywords & dimensions</strong> are clickable and show connections</p>
-                <p><strong>Resonance indicators</strong> show the strength of connections</p>
-                <p><strong>Everything is a Node</strong> - every element can be explored further</p>
-              </div>
+        {renderQuickActions()}
+
+        <section className="space-y-4" aria-label="Featured Knowledge Areas Toggle">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Featured Knowledge Areas</h2>
+            <div className="inline-flex rounded-lg border border-gray-200 dark:border-gray-700">
+              <button
+                type="button"
+                className={`px-3 py-1 text-sm font-medium ${viewMode === 'cards' ? 'bg-gray-900 text-white' : 'text-gray-600 dark:text-gray-300'}`}
+                onClick={() => setViewMode('cards')}
+              >
+                📋 Cards
+              </button>
+              <button
+                type="button"
+                className={`px-3 py-1 text-sm font-medium ${viewMode === 'map' ? 'bg-gray-900 text-white' : 'text-gray-600 dark:text-gray-300'}`}
+                onClick={() => setViewMode('map')}
+              >
+                🕸️ Map
+              </button>
             </div>
           </div>
-        </div>
-      </div>
+
+          {viewMode === 'cards' ? renderDomainOverview() : renderKnowledgeMapSection()}
+        </section>
+
+        <section className="space-y-4" aria-label="Domain Filter">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">
+            Filter by Domain
+          </h3>
+          <select
+            className="w-full sm:w-64 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+            value={activeDomain}
+            onChange={(event) => handleDomainClick(event.target.value)}
+          >
+            <option value="overview">All Domains</option>
+            {domains.map((domain) => (
+              <option key={domain.id} value={domain.id}>
+                {domain.name}
+              </option>
+            ))}
+          </select>
+        </section>
+
+        {activeDomain !== 'overview' && renderDomainDetail(activeDomain)}
+
+        {renderSearchSection()}
+
+        {renderConceptCardsSection()}
+
+        {renderInsightsSection()}
+      </main>
+
+      {renderFloatingQuickActionsButton()}
     </div>
   );
 }

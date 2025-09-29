@@ -1,11 +1,8 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
-import { PaginationControls } from '@/components/ui/PaginationControls';
-import { buildApiUrl } from '@/lib/config';
-import { useAuth } from '@/contexts/AuthContext';
-import { useTrackInteraction } from '@/lib/hooks';
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { MapPin, Users, Clock, MessageCircle, Heart, ExternalLink } from 'lucide-react';
 
 interface NearbyLensProps {
   controls?: Record<string, any>;
@@ -14,274 +11,273 @@ interface NearbyLensProps {
   readOnly?: boolean;
 }
 
-interface DiscoveredUser {
-  userId: string;
-  displayName: string;
-  email?: string;
-  avatarUrl?: string;
-  location?: string;
-  latitude?: number;
-  longitude?: number;
-  interests?: string[];
-  resonanceScore?: number;
-  contributions?: string[];
+interface NearbyUser {
+  id: string;
+  name: string;
+  avatar?: string;
+  location: string;
+  distance: string;
+  lastSeen: string;
+  interests: string[];
+  isOnline: boolean;
+  mutualConnections: number;
 }
 
-const DEFAULT_PAGE_SIZE = 12;
-
 export function NearbyLens({ controls = {}, userId, className = '', readOnly = false }: NearbyLensProps) {
-  const { user } = useAuth();
-  const trackInteraction = useTrackInteraction();
-
-  const [locationInput, setLocationInput] = useState('');
-  const [activeLocation, setActiveLocation] = useState('');
-  const [radiusKm, setRadiusKm] = useState(50);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
-  const [users, setUsers] = useState<DiscoveredUser[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [nearbyUsers, setNearbyUsers] = useState<NearbyUser[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const hasSearchCriteria = activeLocation.trim().length > 0;
-  const axes = Array.isArray(controls.axes) && controls.axes.length > 0 ? controls.axes : undefined;
-
-  const fetchNearbyUsers = useCallback(async (requestedPage: number) => {
-    if (!activeLocation) {
-      setUsers([]);
-      setTotalCount(0);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const skip = (requestedPage - 1) * pageSize;
-      const payload: Record<string, any> = {
-        location: activeLocation,
-        radiusKm,
-        limit: pageSize,
-        skip,
-      };
-
-      if (axes) {
-        payload.interests = axes;
-      }
-
-      const response = await fetch(buildApiUrl('/users/discover'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-      const discovered = Array.isArray(data.users) ? data.users : [];
-      setUsers(discovered);
-      setTotalCount(typeof data.totalCount === 'number' ? data.totalCount : discovered.length);
-
-      if (user?.id) {
-        trackInteraction('lens.nearby', 'search', {
-          description: 'Nearby lens search executed',
-          location: activeLocation,
-          radiusKm,
-          interestAxes: axes,
-          resultCount: discovered.length,
-        });
-      }
-    } catch (err) {
-      console.error('NearbyLens error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load nearby users');
-      setUsers([]);
-      setTotalCount(0);
-    } finally {
-      setLoading(false);
-    }
-  }, [activeLocation, radiusKm, pageSize, axes, user?.id, trackInteraction]);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
-    setPage(1);
-    if (hasSearchCriteria) {
-      fetchNearbyUsers(1);
-    }
-  }, [activeLocation, radiusKm, fetchNearbyUsers, hasSearchCriteria]);
+    const fetchNearbyUsers = async () => {
+      setLoading(true);
+      setError(null);
 
-  const handleSearch = () => {
-    const trimmed = locationInput.trim();
-    if (!trimmed) {
-      setActiveLocation('');
-      setUsers([]);
-      setTotalCount(0);
-      return;
-    }
-    setActiveLocation(trimmed);
+      try {
+        // Get user's location
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              setUserLocation({
+                lat: position.coords.latitude,
+                lng: position.coords.longitude
+              });
+            },
+            (error) => {
+              console.warn('Geolocation not available:', error);
+              // Use mock location for demo
+              setUserLocation({ lat: 40.7128, lng: -74.0060 }); // NYC
+            }
+          );
+        } else {
+          // Mock location for demo
+          setUserLocation({ lat: 40.7128, lng: -74.0060 }); // NYC
+        }
+
+        // Fetch nearby users from API
+        try {
+          const response = await fetch('http://localhost:5002/users/discover', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              location: userLocation ? { lat: userLocation.lat, lng: userLocation.lng } : null,
+              radiusKm: 50,
+              limit: 20
+            })
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.users) {
+              const nearbyUsers: NearbyUser[] = data.users.map((user: any) => ({
+                id: user.id,
+                name: user.displayName || user.name || 'Unknown User',
+                location: user.location || 'Unknown Location',
+                distance: user.distance ? `${user.distance} km` : 'Unknown',
+                lastSeen: user.lastSeen || 'Unknown',
+                interests: user.interests || [],
+                isOnline: user.isOnline || false,
+                mutualConnections: user.mutualConnections || 0
+              }));
+              setNearbyUsers(nearbyUsers);
+            } else {
+              throw new Error('No nearby users found from API');
+            }
+          } else {
+            throw new Error(`Nearby Users API Error: HTTP ${response.status} - ${response.statusText}`);
+          }
+        } catch (error) {
+          console.error('Error fetching nearby users:', error);
+          setNearbyUsers([]);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load nearby users');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNearbyUsers();
+  }, [controls]);
+
+  const handleConnect = (userId: string) => {
+    if (readOnly || !userId) return;
+
+    // Mock connection logic
+    console.log('Connecting with user:', userId);
   };
 
-  const handlePageChange = (nextPage: number) => {
-    setPage(nextPage);
-    fetchNearbyUsers(nextPage);
+  const getInterestColor = (interest: string) => {
+    const colors: Record<string, string> = {
+      'AI': 'bg-blue-100 text-blue-800',
+      'Machine Learning': 'bg-green-100 text-green-800',
+      'Art': 'bg-purple-100 text-purple-800',
+      'Quantum Computing': 'bg-indigo-100 text-indigo-800',
+      'Physics': 'bg-cyan-100 text-cyan-800',
+      'Philosophy': 'bg-orange-100 text-orange-800',
+      'Sustainability': 'bg-emerald-100 text-emerald-800',
+      'Climate Science': 'bg-teal-100 text-teal-800',
+      'Innovation': 'bg-pink-100 text-pink-800',
+      'Blockchain': 'bg-yellow-100 text-yellow-800',
+      'Cryptocurrency': 'bg-amber-100 text-amber-800',
+      'Economics': 'bg-rose-100 text-rose-800',
+    };
+    return colors[interest] || 'bg-gray-100 text-gray-800';
   };
+
+  if (loading) {
+    return (
+      <div className={`space-y-4 ${className}`}>
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="animate-pulse">
+            <div className="bg-gray-200 rounded-lg h-32" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={`bg-red-50 border border-red-200 rounded-lg p-4 ${className}`}>
+        <div className="text-red-800 font-medium">Error loading nearby users</div>
+        <div className="text-red-600 text-sm mt-1">{error}</div>
+      </div>
+    );
+  }
 
   return (
     <div className={`space-y-6 ${className}`}>
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="flex items-center space-x-2">
-            <span>📍 Nearby Explorers</span>
-          </CardTitle>
-          <CardDescription>
-            Discover people within {radiusKm} km who align with your resonance axes{axes ? ` (${axes.join(', ')})` : ''}.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-secondary mb-2">
-                Location
-              </label>
-              <div className="flex space-x-2">
-                <input
-                  type="text"
-                  value={locationInput}
-                  onChange={(event) => setLocationInput(event.target.value)}
-                  placeholder="City, region, or landmark"
-                  className="flex-1 input-standard"
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      handleSearch();
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={handleSearch}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  Search
-                </button>
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-secondary mb-2">
-                Radius: {radiusKm} km
-              </label>
-              <input
-                type="range"
-                min={5}
-                max={500}
-                step={5}
-                value={radiusKm}
-                onChange={(event) => setRadiusKm(Number(event.target.value))}
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-muted mt-1">
-                <span>Local</span>
-                <span>Global</span>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="text-center mb-8">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+          People Nearby
+        </h2>
+        <p className="text-gray-600 dark:text-gray-300">
+          Discover and connect with people in your area who share your interests
+        </p>
+      </div>
 
-      {loading && (
-        <div className="space-y-4">
-          {[...Array(3)].map((_, index) => (
-            <div key={index} className="animate-pulse">
-              <div className="bg-gray-200 dark:bg-gray-700 rounded-lg h-24" />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {!loading && error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-          <div className="text-red-800 dark:text-red-200 font-medium">Unable to load nearby explorers.</div>
-          <div className="text-sm text-red-700 dark:text-red-300 mt-1">{error}</div>
-        </div>
-      )}
-
-      {!loading && !error && !hasSearchCriteria && (
-        <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 text-center">
-          <p className="text-sm text-gray-600 dark:text-gray-300">
-            Enter a location to find resonant collaborators nearby.
+      {!userLocation && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 text-center">
+          <MapPin className="w-8 h-8 text-amber-600 dark:text-amber-400 mx-auto mb-2" />
+          <p className="text-amber-800 dark:text-amber-200 font-medium">
+            Location access needed
+          </p>
+          <p className="text-amber-700 dark:text-amber-300 text-sm mt-1">
+            Enable location services to see people nearby and find local connections
           </p>
         </div>
       )}
 
-      {!loading && !error && hasSearchCriteria && users.length === 0 && (
-        <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 text-center">
-          <p className="text-sm text-gray-600 dark:text-gray-300">
-            No nearby explorers found. Try widening your radius or adjusting resonance axes.
-          </p>
-        </div>
-      )}
+      <div className="space-y-4">
+        {nearbyUsers.map((user) => (
+          <Card key={user.id} className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
+            <CardContent className="p-6">
+              <div className="flex items-start space-x-4">
+                {/* Avatar */}
+                <div className="relative flex-shrink-0">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold text-lg">
+                    {user.avatar ? (
+                      <img
+                        src={user.avatar}
+                        alt={user.name}
+                        className="w-full h-full rounded-full object-cover"
+                      />
+                    ) : (
+                      user.name.charAt(0).toUpperCase()
+                    )}
+                  </div>
+                  {user.isOnline && (
+                    <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"></div>
+                  )}
+                </div>
 
-      {!loading && users.length > 0 && (
-        <div className="space-y-4">
-          {/* Pagination at top */}
-          {totalCount > pageSize && (
-            <Card>
-              <CardContent className="p-4">
-                <PaginationControls
-                  currentPage={page}
-                  pageSize={pageSize}
-                  totalCount={totalCount}
-                  onPageChange={handlePageChange}
-                  onPageSizeChange={setPageSize}
-                  showPageSizeSelector={true}
-                  pageSizeOptions={[6, 12, 24, 48, 96]}
-                />
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Users grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {users.map((item) => (
-              <Card key={item.userId} className="h-full">
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                        {item.displayName || item.userId}
-                      </h3>
-                      {item.location && (
-                        <p className="text-sm text-gray-600 dark:text-gray-300">{item.location}</p>
-                      )}
+                {/* User Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                      {user.name}
+                    </h3>
+                    <div className="flex items-center space-x-1 text-xs text-gray-500 dark:text-gray-400">
+                      <MapPin className="w-3 h-3" />
+                      <span>{user.distance}</span>
                     </div>
-                    {typeof item.resonanceScore === 'number' && (
-                      <span className="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-200">
-                        Resonance {Math.round(item.resonanceScore * 100)}%
+                  </div>
+
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                    {user.location}
+                  </p>
+
+                  <div className="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400 mb-3">
+                    <div className="flex items-center space-x-1">
+                      <Clock className="w-3 h-3" />
+                      <span>{user.lastSeen}</span>
+                    </div>
+                    {user.mutualConnections > 0 && (
+                      <div className="flex items-center space-x-1">
+                        <Users className="w-3 h-3" />
+                        <span>{user.mutualConnections} mutual</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Interests */}
+                  <div className="flex flex-wrap gap-1 mb-4">
+                    {user.interests.slice(0, 4).map((interest) => (
+                      <span
+                        key={interest}
+                        className={`px-2 py-1 text-xs rounded-full ${getInterestColor(interest)}`}
+                      >
+                        {interest}
+                      </span>
+                    ))}
+                    {user.interests.length > 4 && (
+                      <span className="px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs rounded-full">
+                        +{user.interests.length - 4}
                       </span>
                     )}
                   </div>
 
-                  {item.interests && item.interests.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {item.interests.slice(0, 6).map((interest) => (
-                        <span
-                          key={interest}
-                          className="px-2 py-1 text-xs rounded-full bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200"
-                        >
-                          {interest}
-                        </span>
-                      ))}
+                  {/* Actions */}
+                  {!readOnly && userId && (
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => handleConnect(user.id)}
+                        className="flex items-center space-x-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        <Heart className="w-4 h-4" />
+                        <span>Connect</span>
+                      </button>
+                      <button className="flex items-center space-x-1 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                        <MessageCircle className="w-4 h-4" />
+                        <span>Message</span>
+                      </button>
                     </div>
                   )}
+                </div>
 
-                  {item.contributions && item.contributions.length > 0 && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Contributions: {item.contributions.join(', ')}
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                {/* View Profile */}
+                <div className="flex-shrink-0">
+                  <button className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors">
+                    <ExternalLink className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {nearbyUsers.length === 0 && (
+        <div className="text-center py-12">
+          <MapPin className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+            No one nearby right now
+          </h3>
+          <p className="text-gray-600 dark:text-gray-300">
+            Check back later or expand your search radius to find more people.
+          </p>
         </div>
       )}
     </div>

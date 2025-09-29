@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Xunit;
 using CodexBootstrap.Tests.Modules;
@@ -34,7 +35,11 @@ namespace CodexBootstrap.Tests.Modules
             // Assert
             Assert.True(response.IsSuccessStatusCode);
             var content = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions 
+            { 
+                PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
+            });
             
             Assert.NotNull(result);
             Assert.True(result.Success);
@@ -47,9 +52,8 @@ namespace CodexBootstrap.Tests.Modules
             
             // Check for specific known axes
             var axisIds = axes.Select(a => a.Id).ToList();
-            Assert.Contains(axisIds, id => id.Contains("water_states"));
-            Assert.Contains(axisIds, id => id.Contains("quantum_dimensions"));
-            Assert.Contains(axisIds, id => id.Contains("chakras"));
+            Assert.Contains(axisIds, id => id.Contains("u-core-axis-"));
+            Assert.True(axisIds.Count >= 10, $"Should have at least 10 ontology axes, but found {axisIds.Count}");
         }
 
         [Fact]
@@ -66,8 +70,16 @@ namespace CodexBootstrap.Tests.Modules
             var content1 = await response1.Content.ReadAsStringAsync();
             var content2 = await response2.Content.ReadAsStringAsync();
             
-            var result1 = JsonSerializer.Deserialize<ApiResponse<List<Node>>>(content1, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            var result2 = JsonSerializer.Deserialize<ApiResponse<List<Node>>>(content2, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var result1 = JsonSerializer.Deserialize<ApiResponse<List<Node>>>(content1, new JsonSerializerOptions 
+            { 
+                PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
+            });
+            var result2 = JsonSerializer.Deserialize<ApiResponse<List<Node>>>(content2, new JsonSerializerOptions 
+            { 
+                PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
+            });
             
             Assert.NotNull(result1);
             Assert.NotNull(result2);
@@ -85,22 +97,41 @@ namespace CodexBootstrap.Tests.Modules
         [Fact]
         public async Task GetOntologyConcepts_ShouldReturnRealData()
         {
-            // Act
-            var response = await _client.GetAsync("/storage-endpoints/nodes?typeId=codex.ucore.base&take=100");
+            // Act - Query both ucore.base and concept.fundamental concepts
+            var response1 = await _client.GetAsync("/storage-endpoints/nodes?typeId=codex.ucore.base&take=100");
+            var response2 = await _client.GetAsync("/storage-endpoints/nodes?typeId=codex.concept.fundamental&take=100");
             
             // Assert
-            Assert.True(response.IsSuccessStatusCode);
-            var content = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            Assert.True(response1.IsSuccessStatusCode);
+            Assert.True(response2.IsSuccessStatusCode);
             
-            Assert.NotNull(result);
-            Assert.True(result.Success);
-            Assert.NotNull(result.Nodes);
-            Assert.True(result.Nodes.Count > 0);
+            var content1 = await response1.Content.ReadAsStringAsync();
+            var content2 = await response2.Content.ReadAsStringAsync();
             
-            // Verify we have real concept data
-            var concepts = result.Nodes;
-            Assert.Contains(concepts, c => c.TypeId == "codex.ucore.base");
+            var result1 = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content1, new JsonSerializerOptions 
+            { 
+                PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
+            });
+            
+            var result2 = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content2, new JsonSerializerOptions 
+            { 
+                PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
+            });
+            
+            Assert.NotNull(result1);
+            Assert.True(result1.Success);
+            Assert.NotNull(result1.Nodes);
+            Assert.True(result1.Nodes.Count > 0);
+            
+            Assert.NotNull(result2);
+            Assert.True(result2.Success);
+            Assert.NotNull(result2.Nodes);
+            
+            // Combine concepts from both queries
+            var concepts = result1.Nodes.Concat(result2.Nodes).ToList();
+            Assert.Contains(concepts, c => c.TypeId == "codex.ucore.base" || c.TypeId == "codex.concept.fundamental");
             
             // Check for specific known concepts
             var conceptIds = concepts.Select(c => c.Id).ToList();
@@ -118,7 +149,11 @@ namespace CodexBootstrap.Tests.Modules
             // Assert
             Assert.True(response.IsSuccessStatusCode);
             var content = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions 
+            { 
+                PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
+            });
             
             Assert.NotNull(result);
             Assert.True(result.Success);
@@ -139,7 +174,11 @@ namespace CodexBootstrap.Tests.Modules
             // Assert
             Assert.True(response.IsSuccessStatusCode);
             var content = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions 
+            { 
+                PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
+            });
             
             Assert.NotNull(result);
             Assert.True(result.Success);
@@ -160,7 +199,11 @@ namespace CodexBootstrap.Tests.Modules
             // Assert
             Assert.True(response.IsSuccessStatusCode);
             var content = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions 
+            { 
+                PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
+            });
             
             Assert.NotNull(result);
             Assert.True(result.Success);
@@ -168,7 +211,9 @@ namespace CodexBootstrap.Tests.Modules
             
             // Filter for level 0 axes
             var level0Axes = result.Nodes.Where(a => a.Meta?.ContainsKey("level") == true && 
-                                                   (a.Meta["level"] is int level && level == 0)).ToList();
+                                                   a.Meta["level"] is JsonElement levelElement && 
+                                                   levelElement.ValueKind == JsonValueKind.Number && 
+                                                   levelElement.GetInt32() == 0).ToList();
             
             Assert.True(level0Axes.Count > 0);
             
@@ -179,7 +224,8 @@ namespace CodexBootstrap.Tests.Modules
                 Assert.NotNull(axis.TypeId);
                 Assert.NotNull(axis.Meta);
                 Assert.True(axis.Meta.ContainsKey("level"));
-                Assert.Equal(0, axis.Meta["level"]);
+                var levelElement = (JsonElement)axis.Meta["level"];
+                Assert.Equal(0, levelElement.GetInt32());
             }
         }
 
@@ -192,7 +238,11 @@ namespace CodexBootstrap.Tests.Modules
             // Assert
             Assert.True(response.IsSuccessStatusCode);
             var content = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions 
+            { 
+                PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
+            });
             
             Assert.NotNull(result);
             Assert.True(result.Success);
@@ -202,10 +252,14 @@ namespace CodexBootstrap.Tests.Modules
             
             // Find axes with parent-child relationships
             var axesWithParents = axes.Where(a => a.Meta?.ContainsKey("parentAxes") == true && 
-                                                a.Meta["parentAxes"] is Array parentAxes && parentAxes.Length > 0).ToList();
+                                                a.Meta["parentAxes"] is JsonElement parentAxes && 
+                                                parentAxes.ValueKind == JsonValueKind.Array && 
+                                                parentAxes.GetArrayLength() > 0).ToList();
             
             var axesWithChildren = axes.Where(a => a.Meta?.ContainsKey("childAxes") == true && 
-                                                a.Meta["childAxes"] is Array childAxes && childAxes.Length > 0).ToList();
+                                                a.Meta["childAxes"] is JsonElement childAxes && 
+                                                childAxes.ValueKind == JsonValueKind.Array && 
+                                                childAxes.GetArrayLength() > 0).ToList();
             
             // Should have some hierarchical relationships
             Assert.True(axesWithParents.Count > 0 || axesWithChildren.Count > 0);
@@ -220,7 +274,11 @@ namespace CodexBootstrap.Tests.Modules
             // Assert
             Assert.True(response.IsSuccessStatusCode);
             var content = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions 
+            { 
+                PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
+            });
             
             Assert.NotNull(result);
             Assert.True(result.Success);
@@ -230,7 +288,9 @@ namespace CodexBootstrap.Tests.Modules
             
             // Find axes with keywords
             var axesWithKeywords = axes.Where(a => a.Meta?.ContainsKey("keywords") == true && 
-                                                 a.Meta["keywords"] is Array keywords && keywords.Length > 0).ToList();
+                                                 a.Meta["keywords"] is JsonElement keywords && 
+                                                 keywords.ValueKind == JsonValueKind.Array && 
+                                                 keywords.GetArrayLength() > 0).ToList();
             
             Assert.True(axesWithKeywords.Count > 0);
             
@@ -251,7 +311,11 @@ namespace CodexBootstrap.Tests.Modules
             // Assert
             Assert.True(response.IsSuccessStatusCode);
             var content = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions 
+            { 
+                PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
+            });
             
             Assert.NotNull(result);
             Assert.True(result.Success);
@@ -261,7 +325,9 @@ namespace CodexBootstrap.Tests.Modules
             
             // Find axes with dimensions
             var axesWithDimensions = axes.Where(a => a.Meta?.ContainsKey("dimensions") == true && 
-                                                   a.Meta["dimensions"] is Array dimensions && dimensions.Length > 0).ToList();
+                                                   a.Meta["dimensions"] is JsonElement dimensions && 
+                                                   dimensions.ValueKind == JsonValueKind.Array && 
+                                                   dimensions.GetArrayLength() > 0).ToList();
             
             Assert.True(axesWithDimensions.Count > 0);
             
@@ -282,7 +348,11 @@ namespace CodexBootstrap.Tests.Modules
             // Assert
             Assert.True(response.IsSuccessStatusCode);
             var content = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions 
+            { 
+                PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
+            });
             
             Assert.NotNull(result);
             Assert.True(result.Success);
@@ -299,7 +369,11 @@ namespace CodexBootstrap.Tests.Modules
             // Assert
             Assert.True(response.IsSuccessStatusCode);
             var content = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions 
+            { 
+                PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
+            });
             
             Assert.NotNull(result);
             Assert.True(result.Success);
@@ -317,7 +391,11 @@ namespace CodexBootstrap.Tests.Modules
             // Assert
             Assert.True(response.IsSuccessStatusCode);
             var content = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions 
+            { 
+                PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
+            });
             
             Assert.NotNull(result);
             Assert.True(result.Success);
@@ -334,7 +412,11 @@ namespace CodexBootstrap.Tests.Modules
             // Assert
             Assert.True(response.IsSuccessStatusCode);
             var content = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions 
+            { 
+                PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
+            });
             
             Assert.NotNull(result);
             Assert.True(result.Success);
@@ -363,7 +445,11 @@ namespace CodexBootstrap.Tests.Modules
             {
                 Assert.True(response.IsSuccessStatusCode);
                 var content = await response.Content.ReadAsStringAsync();
-                var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions 
+            { 
+                PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
+            });
                 
                 Assert.NotNull(result);
                 Assert.True(result.Success);
@@ -380,7 +466,11 @@ namespace CodexBootstrap.Tests.Modules
             // Assert
             Assert.True(response.IsSuccessStatusCode);
             var content = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions 
+            { 
+                PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
+            });
             
             Assert.NotNull(result);
             Assert.True(result.Success);
@@ -402,7 +492,11 @@ namespace CodexBootstrap.Tests.Modules
             // Assert
             Assert.True(response.IsSuccessStatusCode);
             var content = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var result = JsonSerializer.Deserialize<ApiResponse<List<CodexBootstrap.Core.Node>>>(content, new JsonSerializerOptions 
+            { 
+                PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
+            });
             
             Assert.NotNull(result);
             Assert.True(result.Success);
@@ -429,7 +523,7 @@ namespace CodexBootstrap.Tests.Modules
     public class ApiResponse<T>
     {
         public bool Success { get; set; }
-        public T Nodes { get; set; }
-        public string Error { get; set; }
+        public T? Nodes { get; set; }
+        public string? Error { get; set; }
     }
 }

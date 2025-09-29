@@ -1,5 +1,13 @@
 # MULTI_SERVICE_ARCHITECTURE Specification
 
+## How to read this spec
+- This document is a target architecture. Defer to the main spec’s Status Ledger for present readiness and to Module Analysis for implementation gaps.
+- Use adapters over features: externalized comms (gateway/queue) must not leak into the core.
+
+## Integration Status
+- Current system is primarily single-service with adapter points; treat mesh features as Untested/ExternalInfo until concrete services are introduced.
+- Route-level readiness is tracked in the main spec (Appendix B) and service-specific modules.
+
 ## Overview
 This specification defines the multi-service architecture for the Living Codex concept exchange platform, enabling distributed concept processing and exchange across multiple services.
 

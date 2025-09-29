@@ -1,5 +1,13 @@
 # FRACTAL_CONCEPT_EXCHANGE Specification
 
+## How to read this spec
+- This defines a cross-node exchange protocol. Use it with the main spec’s Status Ledger and Appendix B for concrete endpoints.
+- Everything is a Node: protocol objects must round‑trip to nodes and edges.
+
+## Integration Status
+- The endpoints listed here are a contract baseline; treat them as Stub/Untested unless present in Appendix B and implemented in modules.
+- Real-time sync and multi-dimensional mapping are ExternalInfo until backed by running services.
+
 ## Overview
 This specification defines the fractal concept exchange system for the Living Codex platform, enabling multi-dimensional concept sharing and resonance across distributed nodes.
 

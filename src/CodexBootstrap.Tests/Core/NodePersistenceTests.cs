@@ -1,7 +1,4 @@
-#if DISABLED_LEGACY_STORAGE_TESTS
-using System;
-using System.Collections.Generic;
-using System.Linq;
+#if DISABLED_COMPLEX_STORAGE_TESTS
 using System.Threading.Tasks;
 using CodexBootstrap.Core;
 using CodexBootstrap.Core.Storage;
@@ -11,10 +8,12 @@ using Xunit;
 
 namespace CodexBootstrap.Tests.Core
 {
-    /// <summary>
-    /// Comprehensive tests for node state transitions, persistence, and cache behavior.
-    /// Validates the "Everything is a Node" principle with proper Ice/Water/Gas state management.
-    /// </summary>
+/// <summary>
+/// Comprehensive tests for node state transitions, persistence, and cache behavior.
+/// Validates the "Everything is a Node" principle with proper Ice/Water/Gas state management.
+/// These tests are currently disabled as they rely on internal storage backend APIs that have been removed.
+/// TODO: Rewrite these tests to use public storage-endpoints APIs instead of internal APIs.
+/// </summary>
     public class NodePersistenceTests
     {
         private readonly ICodexLogger _logger;
@@ -265,13 +264,13 @@ namespace CodexBootstrap.Tests.Core
             var waterNodes = await _waterStorage.GetAllWaterNodesAsync();
             var iceNodes = await _iceStorage.GetAllIceNodesAsync();
             
-            waterNodes.Should().Contain(n => n.Id == "test-water-node");
-            iceNodes.Should().NotContain(n => n.Id == "test-water-node");
+            Assert.True(waterNodes.Any(n => n.Id == "test-water-node"), "Node should be in Water storage");
+            Assert.False(iceNodes.Any(n => n.Id == "test-water-node"), "Node should not be in Ice storage");
 
             var storedNode = waterNodes.First(n => n.Id == "test-water-node");
-            storedNode.State.Should().Be(ContentState.Water);
-            storedNode.Title.Should().Be("Test Water Node");
-            storedNode.Content?.InlineJson.Should().Be("{\"data\": \"water-data\"}");
+            Assert.Equal(ContentState.Water, storedNode.State);
+            Assert.Equal("Test Water Node", storedNode.Title);
+            Assert.Equal("{\"data\": \"water-data\"}", storedNode.Content?.InlineJson);
         }
 
         [Fact]
@@ -346,13 +345,14 @@ namespace CodexBootstrap.Tests.Core
             await Task.Delay(100);
 
             // Assert 2: Should be in Water storage, removed from Ice
-            _waterStorage.GetAllWaterNodesAsync().Should().Contain(n => n.Id == "transition-node");
+            var waterNodes = await _waterStorage.GetAllWaterNodesAsync();
+            Assert.True(waterNodes.Any(n => n.Id == "transition-node"), "Node should be in Water storage");
             // Note: Ice storage might still contain the old version until cleanup
-            
-            var storedWaterNode = _waterStorage.GetAllWaterNodesAsync().First(n => n.Id == "transition-node");
-            storedWaterNode.State.Should().Be(ContentState.Water);
-            storedWaterNode.Content?.InlineJson.Should().Be("{\"data\": \"updated\"}");
-            storedWaterNode.Meta?["version"].Should().Be(2);
+
+            var storedWaterNode = waterNodes.First(n => n.Id == "transition-node");
+            Assert.Equal(ContentState.Water, storedWaterNode.State);
+            Assert.Equal("{\"data\": \"updated\"}", storedWaterNode.Content?.InlineJson);
+            Assert.Equal(2, storedWaterNode.Meta?["version"]);
         }
 
         [Fact]

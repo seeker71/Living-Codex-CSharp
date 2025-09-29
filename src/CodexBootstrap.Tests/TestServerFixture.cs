@@ -45,6 +45,10 @@ namespace CodexBootstrap.Tests
 
             // Disable realtime news ingestion during tests to reduce noise and speed up shutdown
             startInfo.EnvironmentVariables["NEWS_INGESTION_ENABLED"] = "false";
+            // Enable AI services during integration tests
+            startInfo.EnvironmentVariables["DISABLE_AI"] = "false";
+            startInfo.EnvironmentVariables["USE_OLLAMA_ONLY"] = "true";
+            startInfo.EnvironmentVariables["OLLAMA_HOST"] = "http://localhost:11434";
             // Ensure server binds to the expected port and runs with predictable environment
             startInfo.EnvironmentVariables["ASPNETCORE_URLS"] = $"http://localhost:{_port}";
             startInfo.EnvironmentVariables["ASPNETCORE_ENVIRONMENT"] = "Testing";

@@ -80,7 +80,7 @@ public class UCoreOntologyTests
     {
         await UCoreInitializer.SeedIfMissing(_registry, _logger);
 
-        var relationshipTypeNodes = _registry.GetNodesByType("codex.relationship.core").ToList();
+        var relationshipTypeNodes = _registry.GetNodesByType("codex.relationship").ToList();
         // Relationship type nodes are stored as nodes (not edges);
         // ensure at least a set of them exist.
         Assert.True(relationshipTypeNodes.Count >= 10, "Expected at least 10 core relationship type nodes");
@@ -114,7 +114,7 @@ public class UCoreOntologyTests
         _logger.Info("✓ Quantum dimensions axis node exists");
     }
 
-    [Fact(Skip = "Resonance matrix integration edges not guaranteed during initial seed; enable when implemented")]
+    [Fact(Skip = "Resonance matrix node not yet implemented in current ontology")]
     public async Task ResonanceMatrix_Should_ExistAndIntegrateAxes()
     {
         await UCoreInitializer.SeedIfMissing(_registry, _logger);

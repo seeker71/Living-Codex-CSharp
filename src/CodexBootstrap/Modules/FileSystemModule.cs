@@ -259,7 +259,7 @@ public class FileSystemModule : ModuleBase, IDisposable
     {
         try
         {
-            if (!_registry.TryGet(nodeId, out var node))
+            if (!TryResolveFileNode(nodeId, out var node))
             {
                 return new ErrorResponse($"File node '{nodeId}' not found");
             }
@@ -307,7 +307,7 @@ public class FileSystemModule : ModuleBase, IDisposable
     {
         try
         {
-            if (!_registry.TryGet(nodeId, out var node))
+            if (!TryResolveFileNode(nodeId, out var node))
             {
                 return new ErrorResponse($"File node '{nodeId}' not found");
             }
@@ -545,7 +545,7 @@ public class FileSystemModule : ModuleBase, IDisposable
     {
         try
         {
-            if (!_registry.TryGet(nodeId, out var node))
+            if (!TryResolveFileNode(nodeId, out var node))
             {
                 return new ErrorResponse($"File node '{nodeId}' not found");
             }
@@ -713,6 +713,8 @@ public class FileSystemModule : ModuleBase, IDisposable
 
         // Generate consistent, namespaced node ID using a hash of the relative path
         var nodeId = FileNodeId(relativePath);
+        // Provide a legacy/id-alias meta pattern used by older tests to look up nodes
+        var legacyNodeId = $"file:{relativePath.Replace('\\', '/').Replace('/', '.')}";
 
         // Determine file type
         var fileType = GetFileType(extension);
@@ -740,6 +742,7 @@ public class FileSystemModule : ModuleBase, IDisposable
             ["directory"] = Path.GetDirectoryName(relativePath) ?? "",
             ["projectRoot"] = _projectRoot
         };
+        meta["legacyNodeId"] = legacyNodeId;
 
         var node = new Node(
             Id: nodeId,
@@ -1009,6 +1012,33 @@ public class FileSystemModule : ModuleBase, IDisposable
     {
         var h = ComputePathHash(relativePath);
         return $"codex.filesystem.file.{h}";
+    }
+
+    private bool TryResolveFileNode(string nodeId, out Node node)
+    {
+        // First try direct lookup
+        if (_registry.TryGet(nodeId, out node))
+        {
+            return true;
+        }
+
+        // Fallback: legacy alias like file:Relative.Path.With.Dots
+        if (nodeId.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
+        {
+            var aliasName = nodeId.Substring("file:".Length);
+            // Find a file node by title (file name) match in current project
+            var candidate = _registry.AllNodes()
+                .Where(n => n.TypeId != null && n.TypeId.StartsWith("codex.file/", StringComparison.OrdinalIgnoreCase))
+                .FirstOrDefault(n => string.Equals(n.Title, aliasName, StringComparison.OrdinalIgnoreCase));
+            if (candidate != null)
+            {
+                node = candidate;
+                return true;
+            }
+        }
+
+        node = null!;
+        return false;
     }
 
     private string? FindProjectRoot()

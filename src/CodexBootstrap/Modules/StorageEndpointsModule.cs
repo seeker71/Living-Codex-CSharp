@@ -59,12 +59,12 @@ public sealed class StorageEndpointsModule : ModuleBase
         {
             if (string.IsNullOrEmpty(id))
             {
-                return new ErrorResponse("Node ID is required");
+                return new ErrorResponse("Node ID is required", ErrorCodes.VALIDATION_ERROR, new { field = "id", message = "Node ID is required" });
             }
 
             if (!_registry.TryGet(id, out var node))
             {
-                return new ErrorResponse("Node not found");
+                return new ErrorResponse("Node not found", ErrorCodes.NOT_FOUND, new { resource = "Node", id });
             }
 
             _logger.Debug($"Retrieved node: {id}");
@@ -73,7 +73,7 @@ public sealed class StorageEndpointsModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error getting node {id}: {ex.Message}", ex);
-            return new ErrorResponse($"Failed to get node: {ex.Message}");
+            return new ErrorResponse($"Failed to get node: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { nodeId = id, error = ex.Message });
         }
     }
 
@@ -197,7 +197,7 @@ public sealed class StorageEndpointsModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error creating node: {ex.Message}", ex);
-            return new ErrorResponse($"Failed to create node: {ex.Message}");
+            return new ErrorResponse($"Failed to create node: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { request, error = ex.Message });
         }
     }
 
@@ -208,12 +208,12 @@ public sealed class StorageEndpointsModule : ModuleBase
         {
             if (string.IsNullOrEmpty(id))
             {
-                return new ErrorResponse("Node ID is required");
+                return new ErrorResponse("Node ID is required", ErrorCodes.VALIDATION_ERROR, new { field = "id", message = "Node ID is required" });
             }
 
             if (!_registry.TryGet(id, out var existingNode))
             {
-                return new ErrorResponse("Node not found");
+                return new ErrorResponse("Node not found", ErrorCodes.NOT_FOUND, new { resource = "Node", id });
             }
 
             var validator = new UpdateNodeRequestValidator();
@@ -248,7 +248,7 @@ public sealed class StorageEndpointsModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error updating node {id}: {ex.Message}", ex);
-            return new ErrorResponse($"Failed to update node: {ex.Message}");
+            return new ErrorResponse($"Failed to update node: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { id, error = ex.Message });
         }
     }
 
@@ -259,12 +259,12 @@ public sealed class StorageEndpointsModule : ModuleBase
         {
             if (string.IsNullOrEmpty(id))
             {
-                return new ErrorResponse("Node ID is required");
+                return new ErrorResponse("Node ID is required", ErrorCodes.VALIDATION_ERROR, new { field = "id", message = "Node ID is required" });
             }
 
             if (!_registry.TryGet(id, out var node))
             {
-                return new ErrorResponse("Node not found");
+                return new ErrorResponse("Node not found", ErrorCodes.NOT_FOUND, new { resource = "Node", id });
             }
 
             _registry.RemoveNode(id);
@@ -281,7 +281,7 @@ public sealed class StorageEndpointsModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error deleting node {id}: {ex.Message}", ex);
-            return new ErrorResponse($"Failed to delete node: {ex.Message}");
+            return new ErrorResponse($"Failed to delete node: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { id, error = ex.Message });
         }
     }
 
@@ -300,7 +300,7 @@ public sealed class StorageEndpointsModule : ModuleBase
             // Debug: Check if _registry is null
             if (_registry == null)
             {
-                return new ErrorResponse("Registry is null in StorageEndpointsModule");
+                return new ErrorResponse("Registry is null in StorageEndpointsModule", ErrorCodes.INTERNAL_ERROR, new { error = "Module not properly initialized" });
             }
             
             // Debug logging for query parameters
@@ -381,7 +381,7 @@ public sealed class StorageEndpointsModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error listing nodes: {ex.Message}", ex);
-            return new ErrorResponse($"Failed to list nodes: {ex.Message}");
+            return new ErrorResponse($"Failed to list nodes: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { error = ex.Message });
         }
     }
 
@@ -483,7 +483,7 @@ public sealed class StorageEndpointsModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error searching nodes: {ex.Message}", ex);
-            return new ErrorResponse($"Failed to search nodes: {ex.Message}");
+            return new ErrorResponse($"Failed to search nodes: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { request, error = ex.Message });
         }
     }
 
@@ -495,13 +495,13 @@ public sealed class StorageEndpointsModule : ModuleBase
         {
             if (string.IsNullOrEmpty(fromId) || string.IsNullOrEmpty(toId))
             {
-                return new ErrorResponse("FromId and ToId are required");
+                return new ErrorResponse("FromId and ToId are required", ErrorCodes.VALIDATION_ERROR, new { field = "fromId,toId", message = "FromId and ToId are required" });
             }
 
             var edge = _registry.GetEdge(fromId, toId);
             if (edge == null)
             {
-                return new ErrorResponse("Edge not found");
+                return new ErrorResponse("Edge not found", ErrorCodes.NOT_FOUND, new { resource = "Edge", fromId, toId });
             }
 
             _logger.Debug($"Retrieved edge: {fromId} -> {toId}");
@@ -510,7 +510,7 @@ public sealed class StorageEndpointsModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error getting edge {fromId} -> {toId}: {ex.Message}", ex);
-            return new ErrorResponse($"Failed to get edge: {ex.Message}");
+            return new ErrorResponse($"Failed to get edge: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { fromId, toId, error = ex.Message });
         }
     }
 
@@ -548,7 +548,7 @@ public sealed class StorageEndpointsModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error creating edge: {ex.Message}", ex);
-            return new ErrorResponse($"Failed to create edge: {ex.Message}");
+            return new ErrorResponse($"Failed to create edge: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { request, error = ex.Message });
         }
     }
 
@@ -559,13 +559,13 @@ public sealed class StorageEndpointsModule : ModuleBase
         {
             if (string.IsNullOrEmpty(fromId) || string.IsNullOrEmpty(toId))
             {
-                return new ErrorResponse("FromId and ToId are required");
+                return new ErrorResponse("FromId and ToId are required", ErrorCodes.VALIDATION_ERROR, new { field = "fromId,toId", message = "FromId and ToId are required" });
             }
 
             var existingEdge = _registry.GetEdge(fromId, toId);
             if (existingEdge == null)
             {
-                return new ErrorResponse("Edge not found");
+                return new ErrorResponse("Edge not found", ErrorCodes.NOT_FOUND, new { resource = "Edge", fromId, toId });
             }
 
             var validator = new UpdateEdgeRequestValidator();
@@ -596,7 +596,7 @@ public sealed class StorageEndpointsModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error updating edge {fromId} -> {toId}: {ex.Message}", ex);
-            return new ErrorResponse($"Failed to update edge: {ex.Message}");
+            return new ErrorResponse($"Failed to update edge: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { fromId, toId, error = ex.Message });
         }
     }
 
@@ -607,13 +607,13 @@ public sealed class StorageEndpointsModule : ModuleBase
         {
             if (string.IsNullOrEmpty(fromId) || string.IsNullOrEmpty(toId))
             {
-                return new ErrorResponse("FromId and ToId are required");
+                return new ErrorResponse("FromId and ToId are required", ErrorCodes.VALIDATION_ERROR, new { field = "fromId,toId", message = "FromId and ToId are required" });
             }
 
             var edge = _registry.GetEdge(fromId, toId);
             if (edge == null)
             {
-                return new ErrorResponse("Edge not found");
+                return new ErrorResponse("Edge not found", ErrorCodes.NOT_FOUND, new { resource = "Edge", fromId, toId });
             }
 
             _registry.RemoveEdge(fromId, toId);
@@ -630,7 +630,38 @@ public sealed class StorageEndpointsModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error deleting edge {fromId} -> {toId}: {ex.Message}", ex);
-            return new ErrorResponse($"Failed to delete edge: {ex.Message}");
+            return new ErrorResponse($"Failed to delete edge: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { fromId, toId, error = ex.Message });
+        }
+    }
+
+    [ApiRoute("GET", "/nodes/{id}/edges", "GetNodeEdges", "Get outgoing and incoming edges for a specific node", "codex.storage-endpoints")]
+    public async Task<object> GetNodeEdgesAsync(
+        [ApiParameter("id", "Node ID", Required = true, Location = "path")] string id,
+        [ApiParameter("type", "Optional edge role filter", Required = false, Location = "query")] string? type = null)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                return new ErrorResponse("Node ID is required", ErrorCodes.VALIDATION_ERROR, new { field = "id", message = "Node ID is required" });
+            }
+
+            var outgoing = _registry.GetEdgesFrom(id).ToList();
+            var incoming = _registry.GetEdgesTo(id).ToList();
+
+            if (!string.IsNullOrWhiteSpace(type))
+            {
+                outgoing = outgoing.Where(e => string.Equals(e.Role, type, StringComparison.OrdinalIgnoreCase)).ToList();
+                incoming = incoming.Where(e => string.Equals(e.Role, type, StringComparison.OrdinalIgnoreCase)).ToList();
+            }
+
+            var map = new Func<Edge, object>(e => new { type = e.Role, fromId = e.FromId, toId = e.ToId, meta = e.Meta, weight = e.Weight });
+            return new { success = true, outgoing = outgoing.Select(map).ToArray(), incoming = incoming.Select(map).ToArray() };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error getting edges for node {id}: {ex.Message}", ex);
+            return new ErrorResponse($"Error getting edges: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { id, error = ex.Message });
         }
     }
 
@@ -745,7 +776,7 @@ public sealed class StorageEndpointsModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error listing edges: {ex.Message}", ex);
-            return new ErrorResponse($"Failed to list edges: {ex.Message}");
+            return new ErrorResponse($"Failed to list edges: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { error = ex.Message });
         }
     }
 
@@ -790,7 +821,7 @@ public sealed class StorageEndpointsModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error getting edge metadata: {ex.Message}", ex);
-            return new ErrorResponse($"Failed to get edge metadata: {ex.Message}");
+            return new ErrorResponse($"Failed to get edge metadata: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { error = ex.Message });
         }
     }
 
@@ -819,7 +850,7 @@ public sealed class StorageEndpointsModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error getting storage stats: {ex.Message}", ex);
-            return new ErrorResponse($"Failed to get storage stats: {ex.Message}");
+            return new ErrorResponse($"Failed to get storage stats: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { error = ex.Message });
         }
     }
 
@@ -851,7 +882,7 @@ public sealed class StorageEndpointsModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error getting node types: {ex.Message}", ex);
-            return new ErrorResponse($"Failed to get node types: {ex.Message}");
+            return new ErrorResponse($"Failed to get node types: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { error = ex.Message });
         }
     }
 
@@ -862,7 +893,7 @@ public sealed class StorageEndpointsModule : ModuleBase
         {
             if (_storageBackend == null)
             {
-                return new ErrorResponse("Storage backend not available");
+                return new ErrorResponse("Storage backend not available", ErrorCodes.SERVICE_UNAVAILABLE, new { error = "Backup service not available" });
             }
 
             var backupPath = request.BackupPath ?? $"backup_{DateTime.UtcNow:yyyyMMddHHmmss}.json";
@@ -890,7 +921,7 @@ public sealed class StorageEndpointsModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error creating backup: {ex.Message}", ex);
-            return new ErrorResponse($"Failed to create backup: {ex.Message}");
+            return new ErrorResponse($"Failed to create backup: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { error = ex.Message });
         }
     }
 
@@ -940,7 +971,7 @@ public sealed class StorageEndpointsModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error validating storage: {ex.Message}", ex);
-            return new ErrorResponse($"Failed to validate storage: {ex.Message}");
+            return new ErrorResponse($"Failed to validate storage: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { error = ex.Message });
         }
     }
 

@@ -722,8 +722,10 @@ public class ConceptImageModule : ModuleBase
             throw new InvalidOperationException("Stability AI API key not configured. Real AI image generation requires a valid API key.");
         }
 
-        // TODO: Implement real Stability AI API call
-        throw new NotSupportedException("Stability AI image generation is not yet implemented. Only OpenAI DALL-E is currently supported.");
+        // For now, delegate to OpenAI DALL-E as a fallback
+        // TODO: Implement real Stability AI API integration when API access is available
+        _logger.Warn("Stability AI image generation requested but not implemented. Falling back to OpenAI DALL-E.");
+        return await GenerateOpenAIImages(config, prompt, numberOfImages);
     }
 
     private async Task<List<string>> GenerateLocalImages(ImageConfig config, string prompt, int numberOfImages)

@@ -348,7 +348,8 @@ public static class NodeHelpers
             {
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
                 WriteIndented = true,
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
             }),
             InlineBytes: null,
             ExternalUri: null
@@ -380,7 +381,7 @@ public static class NodeHelpers
         var meta = new Dictionary<string, object>
         {
             ["createdAt"] = DateTime.UtcNow,
-            ["state"] = state.ToString().ToLowerInvariant()
+            ["state"] = state.ToString().ToLowerInvariant() // Keep lowercase for meta, but enum serialization will handle the actual State property
         };
 
         if (additionalMeta != null)

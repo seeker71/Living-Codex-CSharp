@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AtomFetcher, APIAdapter, UIPage, UILens, UIAction, UIControls, defaultAtoms } from './atoms';
-import { endpoints } from './api';
-import { useCallback, useRef } from 'react';
+import { endpoints, ApiResponse, ApiErrorHandler } from './api';
+import { useCallback, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 const atomFetcher = new AtomFetcher();
@@ -439,4 +439,48 @@ export function useTrackInteraction() {
       }
     });
   }, [recordContribution, user?.id]);
+}
+
+// Hook for handling API errors with user-friendly messages and retry logic
+export function useApiError() {
+  const [error, setError] = useState<ApiResponse | null>(null);
+
+  const handleError = useCallback((errorResponse: ApiResponse) => {
+    setError(errorResponse);
+  }, []);
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  const getUserMessage = useCallback(() => {
+    if (!error) return '';
+    return ApiErrorHandler.getUserMessage(error);
+  }, [error]);
+
+  const getSeverity = useCallback(() => {
+    if (!error) return 'low';
+    return ApiErrorHandler.getErrorSeverity(error);
+  }, [error]);
+
+  const shouldRetry = useCallback(() => {
+    if (!error) return false;
+    return ApiErrorHandler.shouldRetry(error);
+  }, [error]);
+
+  const getRetryDelay = useCallback((attempt: number) => {
+    if (!error) return 0;
+    return ApiErrorHandler.getRetryDelay(error, attempt);
+  }, [error]);
+
+  return {
+    error,
+    handleError,
+    clearError,
+    getUserMessage,
+    getSeverity,
+    shouldRetry,
+    getRetryDelay,
+    hasError: !!error,
+  };
 }

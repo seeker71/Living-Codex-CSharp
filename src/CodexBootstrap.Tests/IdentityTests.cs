@@ -1,6 +1,7 @@
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using FluentAssertions;
 using Xunit;
 using CodexBootstrap.Core;
@@ -32,7 +33,11 @@ namespace CodexBootstrap.Tests
                 var content = await response.Content.ReadAsStringAsync();
                 content.Should().NotBeNullOrEmpty();
                 
-                var providers = JsonSerializer.Deserialize<IdentityProvidersResponse>(content);
+                var providers = JsonSerializer.Deserialize<IdentityProvidersResponse>(content, new JsonSerializerOptions 
+                { 
+                    PropertyNameCaseInsensitive = true,
+                    Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
+                });
                 providers.Should().NotBeNull();
                 providers.providers.Should().NotBeEmpty();
                 
@@ -189,11 +194,16 @@ namespace CodexBootstrap.Tests
                 // Ensure user exists (unique)
                 var unique = DateTime.UtcNow.Ticks.ToString();
                 var username = $"testuser_{unique}";
-                var userId = $"user.{username}";
                 var userRequest = new UserCreateRequest(username, $"{username}@example.com", "Test User", "password123");
                 var createJson = JsonSerializer.Serialize(userRequest);
                 var createContent = new StringContent(createJson, Encoding.UTF8, "application/json");
-                await _httpClient.PostAsync("/identity/users", createContent);
+                var createResponse = await _httpClient.PostAsync("/identity/users", createContent);
+                
+                // Get the actual user ID from the creation response
+                var createResponseContent = await createResponse.Content.ReadAsStringAsync();
+                var createResult = JsonSerializer.Deserialize<Dictionary<string, object>>(createResponseContent);
+                var userId = (createResult["userId"] as JsonElement?)?.GetString();
+                userId.Should().NotBeNullOrEmpty();
 
                 // Act
                 var response = await _httpClient.GetAsync($"/identity/users/{userId}");

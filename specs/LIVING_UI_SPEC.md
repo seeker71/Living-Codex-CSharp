@@ -2,6 +2,16 @@
 
 _Last reviewed: 2025-09-24_
 
+## How to read this spec
+- This file mirrors the concrete Next.js implementation; defer to the main spec’s Status Ledger for readiness and to Appendix B for the full route catalog.
+- When backend is unavailable, UI falls back to atoms/empty states without mutating data; treat such views as non-authoritative.
+- Each page/lens associates to a `RouteStatus`; UI surfaces status badges where applicable.
+
+## RouteStatus Summary
+- Most routes depend on `http://localhost:5002`; without a running backend treat their status as Untested or PartiallyTested.
+- Lenses with creation flows (Threads, Gallery, Chats) require auth and real endpoints; avoid simulations.
+- Full per-route list is maintained in the main spec Appendix B and `/spec/routes/all`.
+
 ## 1. Purpose & Status
 - **Purpose**: Provide a spec-first, resonance-driven user interface for exploring the Living Codex concept graph, people network, news feed, and self-updating tooling.
 - **Status**: Functional prototype. All routes render and include loading/error handling, but most experiences depend on a backend at `http://localhost:5002`. When the backend is unavailable the UI falls back to seeded atoms or empty views rather than mutating data.

@@ -4,7 +4,7 @@ using CodexBootstrap.Runtime;
 namespace CodexBootstrap.Core;
 
 /// <summary>
-/// Helper functions for creating consistent API responses
+/// Helper functions for creating consistent API responses with standardized error codes
 /// </summary>
 public static class ResponseHelpers
 {
@@ -23,15 +23,21 @@ public static class ResponseHelpers
     }
 
     /// <summary>
-    /// Creates an error response
+    /// Creates an error response with standardized error code
     /// </summary>
     public static object CreateErrorResponse(string error, string? code = null, object? details = null)
     {
+        var errorCode = code ?? ErrorCodes.INTERNAL_ERROR;
+        var errorDetails = ErrorCodes.GetErrorDetails(errorCode);
+        
         return new
         {
             success = false,
             error = error,
-            code = code,
+            code = errorCode,
+            httpStatusCode = errorDetails.HttpStatusCode,
+            technicalMessage = errorDetails.TechnicalMessage,
+            userMessage = errorDetails.UserMessage,
             details = details,
             timestamp = DateTime.UtcNow
         };
@@ -42,7 +48,11 @@ public static class ResponseHelpers
     /// </summary>
     public static object CreateValidationErrorResponse(string field, string message)
     {
-        return CreateErrorResponse($"Validation failed for field '{field}': {message}", "VALIDATION_ERROR", new { field, message });
+        return CreateErrorResponse(
+            $"Validation failed for field '{field}': {message}", 
+            ErrorCodes.VALIDATION_ERROR, 
+            new { field, message }
+        );
     }
 
     /// <summary>
@@ -50,7 +60,129 @@ public static class ResponseHelpers
     /// </summary>
     public static object CreateNotFoundResponse(string resource, string id)
     {
-        return CreateErrorResponse($"{resource} with id '{id}' not found", "NOT_FOUND", new { resource, id });
+        return CreateErrorResponse(
+            $"{resource} with id '{id}' not found", 
+            ErrorCodes.NOT_FOUND, 
+            new { resource, id }
+        );
+    }
+
+    /// <summary>
+    /// Creates an authentication required error response
+    /// </summary>
+    public static object CreateAuthenticationRequiredResponse()
+    {
+        return CreateErrorResponse(
+            "Authentication is required to access this resource",
+            ErrorCodes.AUTHENTICATION_REQUIRED
+        );
+    }
+
+    /// <summary>
+    /// Creates an authorization denied error response
+    /// </summary>
+    public static object CreateAuthorizationDeniedResponse(string? reason = null)
+    {
+        return CreateErrorResponse(
+            reason ?? "You don't have permission to perform this action",
+            ErrorCodes.AUTHORIZATION_DENIED
+        );
+    }
+
+    /// <summary>
+    /// Creates a service unavailable error response
+    /// </summary>
+    public static object CreateServiceUnavailableResponse(string service, string? reason = null)
+    {
+        return CreateErrorResponse(
+            reason ?? $"{service} is temporarily unavailable",
+            ErrorCodes.SERVICE_UNAVAILABLE,
+            new { service }
+        );
+    }
+
+    /// <summary>
+    /// Creates a rate limit exceeded error response
+    /// </summary>
+    public static object CreateRateLimitExceededResponse(int retryAfterSeconds = 60)
+    {
+        return CreateErrorResponse(
+            "Rate limit exceeded. Please wait before trying again.",
+            ErrorCodes.RATE_LIMIT_EXCEEDED,
+            new { retryAfterSeconds }
+        );
+    }
+
+    /// <summary>
+    /// Creates a business rule violation error response
+    /// </summary>
+    public static object CreateBusinessRuleViolationResponse(string rule, string? details = null)
+    {
+        return CreateErrorResponse(
+            $"Business rule violation: {rule}",
+            ErrorCodes.BUSINESS_RULE_VIOLATION,
+            new { rule, details }
+        );
+    }
+
+    /// <summary>
+    /// Creates a resource conflict error response
+    /// </summary>
+    public static object CreateResourceConflictResponse(string resource, string? reason = null)
+    {
+        return CreateErrorResponse(
+            reason ?? $"Conflict with {resource}",
+            ErrorCodes.RESOURCE_CONFLICT,
+            new { resource }
+        );
+    }
+
+    /// <summary>
+    /// Creates a dependency not met error response
+    /// </summary>
+    public static object CreateDependencyNotMetResponse(string dependency, string? reason = null)
+    {
+        return CreateErrorResponse(
+            reason ?? $"Required dependency '{dependency}' is not met",
+            ErrorCodes.DEPENDENCY_NOT_MET,
+            new { dependency }
+        );
+    }
+
+    /// <summary>
+    /// Creates an external service error response
+    /// </summary>
+    public static object CreateExternalServiceErrorResponse(string service, string? reason = null)
+    {
+        return CreateErrorResponse(
+            reason ?? $"External service '{service}' is unavailable",
+            ErrorCodes.EXTERNAL_API_ERROR,
+            new { service }
+        );
+    }
+
+    /// <summary>
+    /// Creates an AI processing error response
+    /// </summary>
+    public static object CreateAIProcessingErrorResponse(string operation, string? reason = null)
+    {
+        return CreateErrorResponse(
+            reason ?? $"AI processing failed for operation '{operation}'",
+            ErrorCodes.AI_PROCESSING_ERROR,
+            new { operation }
+        );
+    }
+
+    /// <summary>
+    /// Creates a portal connection error response
+    /// </summary>
+    public static object CreatePortalConnectionErrorResponse(string portal, string? reason = null)
+    {
+        return CreateErrorResponse(
+            reason ?? $"Failed to connect to portal '{portal}'",
+            ErrorCodes.PORTAL_CONNECTION_ERROR,
+            new { portal }
+        );
     }
 
     /// <summary>

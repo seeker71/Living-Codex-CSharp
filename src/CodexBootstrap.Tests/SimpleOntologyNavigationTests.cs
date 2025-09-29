@@ -119,7 +119,7 @@ namespace CodexBootstrap.Tests
             await UCoreInitializer.SeedIfMissing(_registry, _logger);
 
             // Test axis navigation
-            var axisNodes = _registry.GetNodesByType("codex.axis.universal").ToList();
+            var axisNodes = _registry.GetNodesByType("codex.ontology.axis").ToList();
             _logger.Info($"Found {axisNodes.Count} universal axis nodes");
 
             foreach (var axisNode in axisNodes.Take(5)) // Test first 5 axes
@@ -153,7 +153,7 @@ namespace CodexBootstrap.Tests
             await UCoreInitializer.SeedIfMissing(_registry, _logger);
 
             // Test cross-domain navigation by looking for different types of concepts
-            var conceptTypes = new[] { "codex.ucore.base", "codex.axis.universal", "codex.concept.core" };
+            var conceptTypes = new[] { "codex.ucore.base", "codex.ontology.axis", "codex.concept.fundamental" };
             var crossDomainPaths = new List<string>();
 
             foreach (var typeId in conceptTypes)

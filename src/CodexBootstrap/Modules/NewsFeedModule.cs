@@ -1,6 +1,7 @@
 using System.Text.Json;
 using CodexBootstrap.Core;
 using CodexBootstrap.Runtime;
+using System.Collections.Generic;
 
 namespace CodexBootstrap.Modules;
 
@@ -74,7 +75,7 @@ public sealed class NewsFeedModule : ModuleBase
             // Validate userId parameter
             if (string.IsNullOrEmpty(userId))
             {
-                return new ErrorResponse("User ID is required");
+                return new ErrorResponse("User ID is required", ErrorCodes.VALIDATION_ERROR, new { field = "userId", message = "User ID is required" });
             }
 
             // Get user profile and interests
@@ -104,7 +105,7 @@ public sealed class NewsFeedModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error getting news feed for user {userId}: {ex.Message}", ex);
-            return new ErrorResponse($"Error getting news feed: {ex.Message}");
+            return new ErrorResponse($"Error getting news feed: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { userId, error = ex.Message });
         }
     }
 
@@ -129,7 +130,7 @@ public sealed class NewsFeedModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error searching news: {ex.Message}", ex);
-            return new ErrorResponse($"Error searching news: {ex.Message}");
+            return new ErrorResponse($"Error searching news: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { request, error = ex.Message });
         }
     }
 
@@ -147,7 +148,7 @@ public sealed class NewsFeedModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error getting trending topics: {ex.Message}", ex);
-            return new ErrorResponse($"Error getting trending topics: {ex.Message}");
+            return new ErrorResponse($"Error getting trending topics: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { error = ex.Message });
         }
     }
 
@@ -157,24 +158,55 @@ public sealed class NewsFeedModule : ModuleBase
     {
         try
         {
+            // Validate input
+            var validationResult = ValidationHelpers.ValidateRequired(id, "id");
+            if (validationResult != null)
+            {
+                return ValidationHelpers.CreateValidationErrorResponse(validationResult);
+            }
+
+            // First try to find by exact node ID
             var node = Registry.GetNode(id);
+
+            // If not found, try to find by original news ID in metadata
+            if (node == null)
+            {
+                var allNewsNodes = Registry.GetNodesByType("codex.news.item");
+                node = allNewsNodes.FirstOrDefault(n => n.Meta?.GetValueOrDefault("newsId")?.ToString() == id);
+            }
+
             if (node?.TypeId != "codex.news.item")
             {
-                return new ErrorResponse("News item not found");
+                return new ErrorResponse("News item not found", ErrorCodes.NOT_FOUND, new { resource = "News item", id });
             }
 
             var newsItem = MapNodeToNewsFeedItem(node);
             if (newsItem == null)
             {
-                return new ErrorResponse("Failed to parse news item");
+                return new ErrorResponse(
+                    "Failed to parse news item data",
+                    ErrorCodes.INTERNAL_ERROR,
+                    new { nodeId = id, error = "Invalid news item data format" }
+                );
             }
 
-            return new NewsItemResponse(newsItem);
+            return new NewsItemResponse(
+                newsItem,
+                node.Meta?.GetValueOrDefault("contentNodeId")?.ToString() ?? "",
+                node.Meta?.GetValueOrDefault("summaryNodeId")?.ToString() ?? "",
+                node.Meta?.GetValueOrDefault("conceptNodeIds") as string[] ?? Array.Empty<string>(),
+                node.Meta?.GetValueOrDefault("ucorePathIds") as string[] ?? Array.Empty<string>(),
+                node.Meta?.GetValueOrDefault("pipelineVersion")?.ToString() ?? "2.0"
+            );
         }
         catch (Exception ex)
         {
             _logger.Error($"Error getting news item {id}: {ex.Message}", ex);
-            return new ErrorResponse($"Error getting news item: {ex.Message}");
+            return ResponseHelpers.CreateErrorResponse(
+                "An error occurred while retrieving the news item",
+                ErrorCodes.INTERNAL_ERROR,
+                new { nodeId = id, error = ex.Message }
+            );
         }
     }
 
@@ -184,10 +216,19 @@ public sealed class NewsFeedModule : ModuleBase
     {
         try
         {
+            // First try to find by exact node ID
             var node = Registry.GetNode(id);
+
+            // If not found, try to find by original news ID in metadata
+            if (node == null)
+            {
+                var allNewsNodes = Registry.GetNodesByType("codex.news.item");
+                node = allNewsNodes.FirstOrDefault(n => n.Meta?.GetValueOrDefault("newsId")?.ToString() == id);
+            }
+
             if (node?.TypeId != "codex.news.item")
             {
-                return new ErrorResponse("News item not found");
+                return new ErrorResponse("News item not found", ErrorCodes.NOT_FOUND, new { resource = "News item", id });
             }
 
             // First try to get summary from linked summary node
@@ -221,7 +262,7 @@ public sealed class NewsFeedModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error getting news summary for {id}: {ex.Message}", ex);
-            return new ErrorResponse($"Error getting news summary: {ex.Message}");
+            return new ErrorResponse($"Error getting news summary: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { id, error = ex.Message });
         }
     }
 
@@ -231,10 +272,19 @@ public sealed class NewsFeedModule : ModuleBase
     {
         try
         {
+            // First try to find by exact node ID
             var node = Registry.GetNode(id);
+
+            // If not found, try to find by original news ID in metadata
+            if (node == null)
+            {
+                var allNewsNodes = Registry.GetNodesByType("codex.news.item");
+                node = allNewsNodes.FirstOrDefault(n => n.Meta?.GetValueOrDefault("newsId")?.ToString() == id);
+            }
+
             if (node?.TypeId != "codex.news.item")
             {
-                return new ErrorResponse("News item not found");
+                return new ErrorResponse("News item not found", ErrorCodes.NOT_FOUND, new { resource = "News item", id });
             }
 
             var concepts = new List<object>();
@@ -283,7 +333,7 @@ public sealed class NewsFeedModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error getting news concepts for {id}: {ex.Message}", ex);
-            return new ErrorResponse($"Error getting news concepts: {ex.Message}");
+            return new ErrorResponse($"Error getting news concepts: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { id, error = ex.Message });
         }
     }
 
@@ -298,7 +348,7 @@ public sealed class NewsFeedModule : ModuleBase
             var sourceNode = Registry.GetNode(id);
             if (sourceNode?.TypeId != "codex.news.item")
             {
-                return new ErrorResponse("Source news item not found");
+                return new ErrorResponse("Source news item not found", ErrorCodes.NOT_FOUND, new { resource = "News item", id });
             }
 
             // Get all nodes and filter by type
@@ -328,7 +378,7 @@ public sealed class NewsFeedModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error getting related news for {id}: {ex.Message}", ex);
-            return new ErrorResponse($"Error getting related news: {ex.Message}");
+            return new ErrorResponse($"Error getting related news: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { id, error = ex.Message });
         }
     }
 
@@ -361,7 +411,7 @@ public sealed class NewsFeedModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error marking news as read: {ex.Message}", ex);
-            return new ErrorResponse($"Error marking news as read: {ex.Message}");
+            return new ErrorResponse($"Error marking news as read: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { request, error = ex.Message });
         }
     }
 
@@ -412,7 +462,7 @@ public sealed class NewsFeedModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error getting read news for user {userId}: {ex.Message}", ex);
-            return new ErrorResponse($"Error getting read news: {ex.Message}");
+            return new ErrorResponse($"Error getting read news: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { userId, error = ex.Message });
         }
     }
 
@@ -462,7 +512,7 @@ public sealed class NewsFeedModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error getting unread news for user {userId}: {ex.Message}", ex);
-            return new ErrorResponse($"Error getting unread news: {ex.Message}");
+            return new ErrorResponse($"Error getting unread news: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { userId, error = ex.Message });
         }
     }
 
@@ -520,7 +570,7 @@ public sealed class NewsFeedModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error getting latest news: {ex.Message}", ex);
-            return new ErrorResponse($"Error getting latest news: {ex.Message}");
+            return new ErrorResponse($"Error getting latest news: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { error = ex.Message });
         }
     }
 
@@ -551,7 +601,7 @@ public sealed class NewsFeedModule : ModuleBase
         catch (Exception ex)
         {
             _logger.Error($"Error computing news stats: {ex.Message}", ex);
-            return new ErrorResponse($"Error computing news stats: {ex.Message}");
+            return new ErrorResponse($"Error computing news stats: {ex.Message}", ErrorCodes.INTERNAL_ERROR, new { error = ex.Message });
         }
     }
 
@@ -643,6 +693,46 @@ public sealed class NewsFeedModule : ModuleBase
         }
 
         return newsItems;
+    }
+
+    // Enhance news items with full content extraction if needed
+    private async Task<List<NewsFeedItem>> EnhanceNewsItemsWithContent(List<NewsFeedItem> items)
+    {
+        var enhancedItems = new List<NewsFeedItem>();
+
+        foreach (var item in items)
+        {
+            // If content is missing or very short, try to extract full content
+            if (string.IsNullOrEmpty(item.Content) || item.Content.Length < 200)
+            {
+                try
+                {
+                    var contentExtractionModule = new ContentExtractionModule(_registry, _logger, _httpClient);
+                    var extractionResult = await contentExtractionModule.ExtractContentFromUrl(item.Url, useHeadlessBrowser: false);
+
+                    if (extractionResult.Success && !string.IsNullOrEmpty(extractionResult.Content))
+                    {
+                        enhancedItems.Add(item with { Content = extractionResult.Content });
+                        _logger.Debug($"Enhanced content for article: {item.Title}");
+                    }
+                    else
+                    {
+                        enhancedItems.Add(item);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.Warn($"Failed to enhance content for {item.Title}: {ex.Message}");
+                    enhancedItems.Add(item);
+                }
+            }
+            else
+            {
+                enhancedItems.Add(item);
+            }
+        }
+
+        return enhancedItems;
     }
 
     // Get news from a specific source
@@ -1088,6 +1178,7 @@ public sealed class NewsFeedModule : ModuleBase
         
         return union > 0 ? (double)intersection / union : 0.0;
     }
+
 }
 
 // Response types for news feed
@@ -1142,7 +1233,12 @@ public record NewsReadRequest(
 
 [MetaNode(Id = "codex.news-feed.news-item-response", Name = "News Item Response", Description = "Response containing a single news item")]
 public record NewsItemResponse(
-    NewsFeedItem? Item
+    NewsFeedItem? Item,
+    string ContentNodeId = "",
+    string SummaryNodeId = "",
+    string[] ConceptNodeIds = null!,
+    string[] UcorePathIds = null!,
+    string PipelineVersion = "2.0"
 );
 
 [MetaNode(Id = "codex.news-feed.news-summary-response", Name = "News Summary Response", Description = "Response containing news summary content")]

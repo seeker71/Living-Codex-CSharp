@@ -1,5 +1,14 @@
 ## Node Connection Model: Identity, Typing, Ontology Paths, and State
 
+### How to read this spec
+- This is a policy and enforcement specification. For runtime readiness and deviations, see the main spec’s Status Ledger and `GAP_ANALYSIS.md`.
+- Enforcement surfaces primarily at storage endpoints (`/storage-endpoints/nodes*`, `/storage-endpoints/edges*`) and in the registry.
+
+### Integration Status
+- Enforcement is Partial: items under “Gaps in Current Implementation” reflect current deviations.
+- Priorities: remove self-identity edge auto-creation; ensure `instance-of` typing; move placeholders and reflection artifacts to Water.
+- Treat related routes as PartiallyTested until backfill/cleanup steps are validated.
+
 ### Goals
 - Remove non-essential self-identity edges; keep identity semantics via proper type and ontology links.
 - Make typing explicit with `instance-of` edges to type nodes (`codex.meta/type/*`).

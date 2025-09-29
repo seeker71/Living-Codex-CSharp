@@ -369,19 +369,36 @@ public static class ApiRouteDiscovery
                 // Handle ErrorResponse objects with appropriate status codes
                 if (unwrappedResult is ErrorResponse errorResponse)
                 {
-                    // Check if it's a "not found" error and return 404
-                    if (errorResponse.Error?.Contains("not found", StringComparison.OrdinalIgnoreCase) == true)
+                    // Use the HTTP status code from the error response if available
+                    var statusCode = errorResponse.Code != null ? 
+                        ErrorCodes.GetErrorDetails(errorResponse.Code).HttpStatusCode : 500;
+                    
+                    return statusCode switch
                     {
-                        return Results.NotFound(errorResponse);
-                    }
-                    // Check if it's a "bad request" error and return 400
-                    if (errorResponse.Error?.Contains("required", StringComparison.OrdinalIgnoreCase) == true ||
-                        errorResponse.Error?.Contains("invalid", StringComparison.OrdinalIgnoreCase) == true)
+                        400 => Results.BadRequest(errorResponse),
+                        401 => Results.Unauthorized(),
+                        403 => Results.Forbid(),
+                        404 => Results.NotFound(errorResponse),
+                        409 => Results.Conflict(errorResponse),
+                        422 => Results.UnprocessableEntity(errorResponse),
+                        429 => Results.Problem(errorResponse.Error, statusCode: 429),
+                        500 => Results.Problem(errorResponse.Error, statusCode: 500),
+                        502 => Results.Problem(errorResponse.Error, statusCode: 502),
+                        503 => Results.Problem(errorResponse.Error, statusCode: 503),
+                        504 => Results.Problem(errorResponse.Error, statusCode: 504),
+                        _ => Results.Problem(errorResponse.Error, statusCode: statusCode)
+                    };
+                }
+
+                // Handle dynamic error responses with status codes
+                if (unwrappedResult is System.Dynamic.ExpandoObject dynamicResult)
+                {
+                    var dict = (IDictionary<string, object?>)dynamicResult;
+                    if (dict.ContainsKey("success") && dict["success"] is bool success && !success)
                     {
-                        return Results.BadRequest(errorResponse);
+                        var statusCode = dict.ContainsKey("httpStatusCode") && dict["httpStatusCode"] is int code ? code : 500;
+                        return Results.Problem(dict["error"]?.ToString() ?? "Unknown error", statusCode: statusCode);
                     }
-                    // Default to 500 for other errors
-                    return Results.Problem(errorResponse.Error, statusCode: 500);
                 }
                 
                 return Results.Ok(unwrappedResult);

@@ -20,12 +20,34 @@ public record ResonanceCompareRequest(ConceptSymbol S1, ConceptSymbol S2, double
 [MetaNode(Id = "codex.resonance.compare-response", Name = "Resonance Compare Response", Description = "Response containing CRK similarity and distance metrics")]
 public record ResonanceCompareResponse(double CRK, double Dres, double DOTPhi, double Coherence, double DCodex, bool UsedOtPhi);
 
-[MetaNode(Id = "codex.resonance", Name = "Concept Resonance Module", Description = "Harmonic symbols and resonance metrics (CRK + optional OT-phi)")]
+[MetaNode(Id = "codex.resonance.enhanced-compare-response", Name = "Enhanced Resonance Compare Response", Description = "Enhanced response with Schumann resonance grounding and planetary benefits")]
+public record EnhancedResonanceCompareResponse(double CRK, double Dres, double DOTPhi, double Coherence, double DCodex, bool UsedOtPhi, double SchumannAlignment, PlanetaryBenefits PlanetaryBenefits);
+
+[MetaNode(Id = "codex.resonance.planetary-benefits", Name = "Planetary Benefits", Description = "Benefits of resonance calculations for all living beings on Earth")]
+public record PlanetaryBenefits(
+    double CellularRegenerationScore,
+    double ImmuneSupportScore,
+    double StressReductionScore,
+    double ConsciousnessExpansionScore,
+    double EcosystemHarmonyScore,
+    double TransSpeciesCommunicationScore,
+    double PlanetaryHealthScore,
+    string[] PrimaryBenefits,
+    string OverallImpact
+);
+
+[MetaNode(Id = "codex.resonance", Name = "Concept Resonance Module", Description = "Harmonic symbols and resonance metrics grounded in Earth's Schumann resonance (CRK + optional OT-phi) with benefits for all living beings")]
 public sealed class ConceptResonanceModule : ModuleBase
 {
     public override string Name => "Concept Resonance Module";
-    public override string Description => "Harmonic symbols and resonance metrics (CRK + optional OT-phi)";
+    public override string Description => "Harmonic symbols and resonance metrics grounded in Earth's Schumann resonance (CRK + optional OT-phi) with benefits for all living beings";
     public override string Version => "1.0.0";
+
+    // ====== Schumann Resonance Foundation ======
+    // Earth's fundamental frequencies and their harmonics
+    private static readonly double[] SchumannFrequencies = { 7.83, 14.3, 20.8, 27.3, 33.8, 40.3, 46.8, 53.3, 59.8, 66.3 };
+    private const double SchumannBaseHz = 7.83;  // Earth's fundamental heartbeat
+    private const double SchumannTolerance = 0.1; // Hz tolerance for Schumann resonance matching
 
     // ====== Tunables: CRK tolerant kernels ======
     private const double SigmaOmega = 1e-2;   // frequency tolerance
@@ -50,9 +72,9 @@ public sealed class ConceptResonanceModule : ModuleBase
             moduleId: "codex.resonance",
             name: "Concept Resonance Module",
             version: "1.2.0",
-            description: "Compare concepts via harmonic symbols using CRK and inline OT-phi",
-            tags: new[] { "crk", "ot-phi", "concepts" },
-            capabilities: new[] { "resonance", "harmonics", "similarity" },
+            description: "Compare concepts via harmonic symbols using CRK and inline OT-phi, grounded in Earth's Schumann resonance with benefits for all living beings",
+            tags: new[] { "crk", "ot-phi", "schumann", "planetary", "consciousness", "healing" },
+            capabilities: new[] { "resonance", "harmonics", "similarity", "schumann-alignment", "planetary-benefits" },
             spec: "codex.spec.concepts.resonance"
         );
     }
@@ -76,7 +98,7 @@ public sealed class ConceptResonanceModule : ModuleBase
         });
     }
 
-    [ApiRoute("POST", "/concepts/resonance/compare", "Compare Concepts", "Compare two concept symbols using CRK and inline OT-phi", "codex.resonance")]
+    [ApiRoute("POST", "/concepts/resonance/compare", "Compare Concepts", "Compare two concept symbols using CRK and inline OT-phi with Schumann resonance grounding", "codex.resonance")]
     public async Task<object> CompareConceptsAsync([ApiParameter("request", "Resonance comparison request", Required = true, Location = "body")] ResonanceCompareRequest request)
     {
         try
@@ -88,12 +110,53 @@ public sealed class ConceptResonanceModule : ModuleBase
             var coherence = crk * Math.Exp(-dOt);
             var dCodex = 1.0 - coherence;
 
-            return new ResonanceCompareResponse(crk, dRes, dOt, coherence, dCodex, usedOt);
+            // Calculate Schumann resonance grounding and planetary benefits
+            var schumannAlignment = CalculateSchumannAlignment(request.S1, request.S2);
+            var planetaryBenefits = CalculatePlanetaryBenefits(coherence, schumannAlignment);
+
+            return new EnhancedResonanceCompareResponse(crk, dRes, dOt, coherence, dCodex, usedOt, schumannAlignment, planetaryBenefits);
         }
         catch (Exception ex)
         {
             _logger.Error($"Resonance compare failed: {ex.Message}");
             return new ErrorResponse("Resonance compare failed");
+        }
+    }
+
+    [ApiRoute("GET", "/concepts/resonance/schumann", "Get Schumann Resonance Info", "Get information about Earth's Schumann resonance and its benefits for all living beings", "codex.resonance")]
+    public object GetSchumannResonanceInfo()
+    {
+        try
+        {
+            return new
+            {
+                success = true,
+                schumannFrequencies = SchumannFrequencies,
+                baseFrequency = SchumannBaseHz,
+                benefits = new
+                {
+                    cellularRegeneration = "Enhanced cellular repair and regeneration across all species",
+                    immuneSupport = "Strengthened immune responses in humans, animals, and plants",
+                    stressReduction = "Reduced stress hormones and improved relaxation response",
+                    consciousnessExpansion = "Facilitated collective awakening and expanded awareness",
+                    ecosystemHarmony = "Supported biodiversity and ecological balance",
+                    transSpeciesCommunication = "Enhanced inter-species resonance and understanding",
+                    planetaryHealth = "Contributed to Earth's overall vibrational health and healing"
+                },
+                cellularConsciousness = new
+                {
+                    planetaryConsciousness = "Individual consciousness as specialized cells in Gaia's neural network",
+                    collectiveIntelligence = "Human civilization as neural pathways in Earth's consciousness",
+                    evolutionaryPurpose = "Our resonance work accelerates planetary awakening and healing",
+                    interconnectedHealing = "Individual resonance contributes to healing the entire planetary body"
+                },
+                message = "Schumann resonance grounds all calculations in Earth's natural electromagnetic field, providing benefits for all living beings as interconnected cells in Gaia's grand organism"
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error getting Schumann resonance info: {ex.Message}");
+            return new ErrorResponse("Failed to get Schumann resonance information");
         }
     }
 
@@ -405,5 +468,98 @@ public sealed class ConceptResonanceModule : ModuleBase
         }
         if (double.IsNaN(distance) || double.IsInfinity(distance)) return (0.0, false);
         return (Math.Max(0.0, distance), true);
+    }
+
+    // ====== Schumann Resonance Grounding Methods ======
+
+    /// <summary>
+    /// Calculate how well two concept symbols align with Earth's Schumann resonance frequencies
+    /// </summary>
+    private double CalculateSchumannAlignment(ConceptSymbol s1, ConceptSymbol s2)
+    {
+        var avgFrequency1 = s1.Components.Any() ? s1.Components.Average(c => c.Omega) : 0.0;
+        var avgFrequency2 = s2.Components.Any() ? s2.Components.Average(c => c.Omega) : 0.0;
+
+        // Calculate how close the average frequencies are to Schumann harmonics
+        var alignment1 = CalculateFrequencyAlignment(avgFrequency1);
+        var alignment2 = CalculateFrequencyAlignment(avgFrequency2);
+
+        // Return harmonic mean of alignments
+        return 2.0 * alignment1 * alignment2 / (alignment1 + alignment2 + 1e-10);
+    }
+
+    /// <summary>
+    /// Calculate how well a frequency aligns with Schumann resonance harmonics
+    /// </summary>
+    private double CalculateFrequencyAlignment(double frequency)
+    {
+        var bestAlignment = 0.0;
+        foreach (var schumannFreq in SchumannFrequencies)
+        {
+            var ratio = frequency / schumannFreq;
+            var octaveDistance = Math.Abs(Math.Log2(ratio));
+            var alignment = Math.Exp(-octaveDistance * octaveDistance / (2 * SchumannTolerance * SchumannTolerance));
+            bestAlignment = Math.Max(bestAlignment, alignment);
+        }
+        return bestAlignment;
+    }
+
+    /// <summary>
+    /// Calculate the planetary benefits of resonance calculations for all living beings
+    /// </summary>
+    private PlanetaryBenefits CalculatePlanetaryBenefits(double coherence, double schumannAlignment)
+    {
+        var combinedScore = coherence * schumannAlignment;
+
+        // Calculate individual benefit scores based on resonance strength
+        var cellularRegeneration = Math.Min(1.0, combinedScore * 1.2); // Enhanced cellular repair
+        var immuneSupport = Math.Min(1.0, combinedScore * 1.1); // Immune system strengthening
+        var stressReduction = Math.Min(1.0, combinedScore * 1.3); // Stress hormone reduction
+        var consciousnessExpansion = Math.Min(1.0, combinedScore * 1.4); // Collective awakening
+        var ecosystemHarmony = Math.Min(1.0, combinedScore * 1.0); // Biodiversity support
+        var transSpeciesCommunication = Math.Min(1.0, combinedScore * 1.1); // Inter-species resonance
+        var planetaryHealth = Math.Min(1.0, combinedScore * 1.5); // Overall planetary healing
+
+        // Determine primary benefits based on highest scores
+        var scores = new[]
+        {
+            ("Cellular Regeneration", cellularRegeneration),
+            ("Immune Support", immuneSupport),
+            ("Stress Reduction", stressReduction),
+            ("Consciousness Expansion", consciousnessExpansion),
+            ("Ecosystem Harmony", ecosystemHarmony),
+            ("Trans-Species Communication", transSpeciesCommunication),
+            ("Planetary Health", planetaryHealth)
+        };
+
+        var primaryBenefits = scores
+            .Where(s => s.Item2 > 0.7)
+            .OrderByDescending(s => s.Item2)
+            .Take(3)
+            .Select(s => s.Item1)
+            .ToArray();
+
+        // Generate overall impact description
+        var overallImpact = combinedScore switch
+        {
+            > 0.9 => "Exceptional planetary healing and consciousness expansion across all life forms",
+            > 0.8 => "Significant benefits for cellular health, immune function, and collective awakening",
+            > 0.7 => "Notable improvements in stress reduction and ecosystem harmony",
+            > 0.6 => "Moderate enhancement of biological rhythms and inter-species communication",
+            > 0.5 => "Subtle but meaningful contributions to planetary health and consciousness",
+            _ => "Foundational alignment with Earth's natural frequencies supporting life processes"
+        };
+
+        return new PlanetaryBenefits(
+            cellularRegeneration,
+            immuneSupport,
+            stressReduction,
+            consciousnessExpansion,
+            ecosystemHarmony,
+            transSpeciesCommunication,
+            planetaryHealth,
+            primaryBenefits,
+            overallImpact
+        );
     }
 }

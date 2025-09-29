@@ -715,9 +715,34 @@ public class IntelligentCachingModule : ModuleBase
     // Utility methods
     private async Task<object> LoadConceptData(string conceptId)
     {
-        // Simulate loading concept data
-        await Task.Delay(10); // Simulate network delay
-        return new { id = conceptId, data = $"Concept data for {conceptId}", loadedAt = DateTime.UtcNow };
+        try
+        {
+            // Try to load real concept data from the registry
+            var conceptNode = _registry.GetNode(conceptId);
+            if (conceptNode != null)
+            {
+                return new
+                {
+                    id = conceptNode.Id,
+                    title = conceptNode.Title,
+                    description = conceptNode.Description,
+                    typeId = conceptNode.TypeId,
+                    state = conceptNode.State.ToString(),
+                    content = conceptNode.Content?.InlineJson,
+                    meta = conceptNode.Meta,
+                    loadedAt = DateTime.UtcNow
+                };
+            }
+
+            // Fallback to simulated data if concept not found
+            await Task.Delay(10); // Simulate network delay
+            return new { id = conceptId, data = $"Concept data for {conceptId}", loadedAt = DateTime.UtcNow };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error loading concept data for {conceptId}: {ex.Message}");
+            return new { id = conceptId, error = ex.Message, loadedAt = DateTime.UtcNow };
+        }
     }
 
     private (DateTime Start, DateTime End) ParseTimeRange(string? timeRange)

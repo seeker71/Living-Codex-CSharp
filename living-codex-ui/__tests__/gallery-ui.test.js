@@ -8,14 +8,43 @@ describe('Gallery UI Tests', () => {
   beforeAll(async () => {
     browser = await puppeteer.launch({ 
       headless: process.env.CI === 'true',
-      defaultViewport: { width: 1280, height: 800 }
+      defaultViewport: { width: 1280, height: 800 },
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
     });
     page = await browser.newPage();
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
+    // Clean up any open pages except the main one
     if (browser) {
-      await browser.close();
+      const pages = await browser.pages();
+      for (const p of pages) {
+        if (p !== page) {
+          try {
+            await p.close();
+          } catch (error) {
+            console.warn('Error closing extra page:', error.message);
+          }
+        }
+      }
+    }
+  });
+
+  afterAll(async () => {
+    try {
+      if (page) {
+        await page.close();
+      }
+    } catch (error) {
+      console.warn('Error closing page:', error.message);
+    }
+    
+    try {
+      if (browser) {
+        await browser.close();
+      }
+    } catch (error) {
+      console.warn('Error closing browser:', error.message);
     }
   });
 

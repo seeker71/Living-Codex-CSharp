@@ -17,9 +17,16 @@ interface RouteStatusBadgeProps {
   status: RouteStatus
   size?: 'sm' | 'md' | 'lg'
   showLabel?: boolean
+  className?: string
 }
 
-const statusConfig = {
+const statusConfig: Record<RouteStatus, {
+  color: string;
+  darkColor: string;
+  icon: string;
+  label: string;
+  description: string;
+}> = {
   Stub: {
     color: 'bg-gray-100 text-gray-600 border-gray-200',
     darkColor: 'dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700',
@@ -91,19 +98,20 @@ const sizeClasses = {
   lg: 'px-4 py-2 text-base'
 }
 
-export function RouteStatusBadge({ 
-  status, 
-  size = 'md', 
-  showLabel = true 
+export function RouteStatusBadge({
+  status,
+  size = 'md',
+  showLabel = true,
+  className = ''
 }: RouteStatusBadgeProps) {
   const config = statusConfig[status]
   const sizeClass = sizeClasses[size]
-  
+
   return (
-    <span 
+    <span
       className={`
         inline-flex items-center gap-1.5 rounded-full border font-medium
-        ${config.color} ${config.darkColor} ${sizeClass}
+        ${config.color} ${config.darkColor} ${sizeClass} ${className}
         transition-colors duration-200
       `}
       title={config.description}

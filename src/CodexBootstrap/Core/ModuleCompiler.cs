@@ -100,7 +100,7 @@ namespace CodexBootstrap.Core
         /// <summary>
         /// Validates that a compiled DLL can be loaded and contains valid module
         /// </summary>
-        public async Task<ValidationResult> ValidateCompiledModuleAsync(string dllPath)
+        public async Task<ModuleValidationResult> ValidateCompiledModuleAsync(string dllPath)
         {
             try
             {
@@ -110,7 +110,7 @@ namespace CodexBootstrap.Core
                 var assembly = Assembly.LoadFrom(dllPath);
                 if (assembly == null)
                 {
-                    return new ValidationResult(false, "Failed to load assembly");
+                    return new ModuleValidationResult(false, "Failed to load assembly");
                 }
 
                 // Check for IModule implementations
@@ -120,7 +120,7 @@ namespace CodexBootstrap.Core
 
                 if (!moduleTypes.Any())
                 {
-                    return new ValidationResult(false, "No IModule implementation found");
+                    return new ModuleValidationResult(false, "No IModule implementation found");
                 }
 
                 // Validate each module type
@@ -134,19 +134,19 @@ namespace CodexBootstrap.Core
                 }
 
                 _logger.LogInformation("Module validation successful: {DllPath}", dllPath);
-                return new ValidationResult(true, "Module validation successful");
+                return new ModuleValidationResult(true, "Module validation successful");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error validating module {DllPath}", dllPath);
-                return new ValidationResult(false, ex.Message);
+                return new ModuleValidationResult(false, ex.Message);
             }
         }
 
         /// <summary>
         /// Validates a specific module type
         /// </summary>
-        private async Task<ValidationResult> ValidateModuleTypeAsync(Type moduleType)
+        private async Task<ModuleValidationResult> ValidateModuleTypeAsync(Type moduleType)
         {
             try
             {
@@ -154,21 +154,21 @@ namespace CodexBootstrap.Core
                 var instance = Activator.CreateInstance(moduleType);
                 if (instance == null)
                 {
-                    return new ValidationResult(false, $"Failed to instantiate module type: {moduleType.Name}");
+                    return new ModuleValidationResult(false, $"Failed to instantiate module type: {moduleType.Name}");
                 }
 
                 // Check for required methods
                 var getModuleNodeMethod = moduleType.GetMethod("GetModuleNode");
                 if (getModuleNodeMethod == null)
                 {
-                    return new ValidationResult(false, $"Module {moduleType.Name} missing GetModuleNode method");
+                    return new ModuleValidationResult(false, $"Module {moduleType.Name} missing GetModuleNode method");
                 }
 
                 // Test GetModuleNode method
                 var moduleNode = getModuleNodeMethod.Invoke(instance, null);
                 if (moduleNode == null)
                 {
-                    return new ValidationResult(false, $"Module {moduleType.Name} GetModuleNode returned null");
+                    return new ModuleValidationResult(false, $"Module {moduleType.Name} GetModuleNode returned null");
                 }
 
                 // Check for API endpoints
@@ -182,14 +182,14 @@ namespace CodexBootstrap.Core
 
                 if (!hasEndpoints)
                 {
-                    return new ValidationResult(false, $"Module {moduleType.Name} has no API endpoints");
+                    return new ModuleValidationResult(false, $"Module {moduleType.Name} has no API endpoints");
                 }
 
-                return new ValidationResult(true, "Module type validation successful");
+                return new ModuleValidationResult(true, "Module type validation successful");
             }
             catch (Exception ex)
             {
-                return new ValidationResult(false, $"Error validating module type {moduleType.Name}: {ex.Message}");
+                return new ModuleValidationResult(false, $"Error validating module type {moduleType.Name}: {ex.Message}");
             }
         }
 
@@ -267,12 +267,12 @@ namespace CodexBootstrap.Core
     /// <summary>
     /// Result of a validation operation
     /// </summary>
-    public class ValidationResult
+    public class ModuleValidationResult
     {
         public bool Success { get; }
         public string ErrorMessage { get; }
 
-        public ValidationResult(bool success, string errorMessage)
+        public ModuleValidationResult(bool success, string errorMessage)
         {
             Success = success;
             ErrorMessage = errorMessage;

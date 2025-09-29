@@ -16,6 +16,9 @@ using Microsoft.AspNetCore.Builder;
 using System.Xml.Linq;
 using HtmlAgilityPack;
 using System.Text.RegularExpressions;
+using System.Collections.Generic;
+
+// ContentExtractionResult type is defined in ContentExtractionModule
 
 namespace CodexBootstrap.Modules
 {
@@ -620,6 +623,38 @@ namespace CodexBootstrap.Modules
             // HTTP endpoints are registered via ApiRoute attributes
         }
 
+        // Manual ingestion endpoint used by integration tests and tooling
+        [ApiRoute("POST", "/news/ingest", "Ingest News Item (Compat)", "Ingest a single news item payload and run the pipeline (compat)", "realtime-news-stream")]
+        public async Task<object> IngestSingleNewsItem([ApiParameter("body", "News item payload", Required = true, Location = "body")] JsonElement payload)
+        {
+            try
+            {
+                // Convert payload to NewsItem with robust parsing
+                var newsItem = new NewsItem
+                {
+                    Id = payload.TryGetProperty("id", out var idEl) ? idEl.GetString() ?? $"test-news-{Guid.NewGuid():N}" : $"test-news-{Guid.NewGuid():N}",
+                    Title = payload.TryGetProperty("title", out var tEl) ? (tEl.GetString() ?? "") : "",
+                    Content = payload.TryGetProperty("content", out var cEl) ? (cEl.GetString() ?? "") : "",
+                    Source = payload.TryGetProperty("source", out var sEl) ? (sEl.GetString() ?? "Unknown") : "Unknown",
+                    Url = payload.TryGetProperty("url", out var uEl) ? (uEl.GetString() ?? "") : "",
+                    PublishedAt = payload.TryGetProperty("publishedAt", out var pEl) && pEl.ValueKind == JsonValueKind.String && DateTimeOffset.TryParse(pEl.GetString(), out var pdt)
+                        ? pdt : DateTimeOffset.UtcNow,
+                    Tags = payload.TryGetProperty("tags", out var tagsEl) && tagsEl.ValueKind == JsonValueKind.Array ? tagsEl.EnumerateArray().Select(x => x.GetString() ?? "").Where(x => !string.IsNullOrWhiteSpace(x)).ToArray() : Array.Empty<string>(),
+                    Metadata = payload.TryGetProperty("metadata", out var mEl) && mEl.ValueKind == JsonValueKind.Object
+                        ? JsonSerializer.Deserialize<Dictionary<string, object>>(mEl.GetRawText()) ?? new Dictionary<string, object>()
+                        : new Dictionary<string, object>()
+                };
+
+                await ProcessNewsItem(newsItem);
+                return new { success = true, id = newsItem.Id, message = "Ingestion queued" };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error ingesting single news item: {ex.Message}", ex);
+                return new ErrorResponse($"Failed to ingest news item: {ex.Message}");
+            }
+        }
+
         // Removed manual ingestion endpoint - news ingestion now runs automatically in background
 
         public void Unregister()
@@ -863,12 +898,12 @@ namespace CodexBootstrap.Modules
                             var newsItem = new NewsItem
                             {
                                 Id = $"rss-{source.Id}-{stableId}",
-                                Title = DecodeHtmlAndUrl(item.Title?.Text ?? ""),
-                                Content = DecodeHtmlAndUrl(item.Summary?.Text ?? ""),
+                                Title = System.Net.WebUtility.HtmlDecode(item.Title?.Text ?? ""),
+                                Content = System.Net.WebUtility.HtmlDecode(item.Summary?.Text ?? ""),
                                 Source = source.Name,
                                 Url = item.Links.FirstOrDefault()?.Uri?.ToString() ?? "",
                                 PublishedAt = publish,
-                                Tags = ExtractTagsFromContent(DecodeHtmlAndUrl(item.Title?.Text ?? "") + " " + DecodeHtmlAndUrl(item.Summary?.Text ?? "")),
+                                Tags = ExtractTagsFromContent(System.Net.WebUtility.HtmlDecode(item.Title?.Text ?? "") + " " + System.Net.WebUtility.HtmlDecode(item.Summary?.Text ?? "")),
                                 Metadata = new Dictionary<string, object>
                                 {
                                     ["sourceType"] = "RSS",
@@ -898,12 +933,12 @@ namespace CodexBootstrap.Modules
                                 var newsItem = new NewsItem
                                 {
                                     Id = $"rss-{source.Id}-{stableId}",
-                                    Title = DecodeHtmlAndUrl(ri.Title ?? ""),
-                                    Content = DecodeHtmlAndUrl(ri.Description ?? ""),
+                                    Title = System.Net.WebUtility.HtmlDecode(ri.Title ?? ""),
+                                    Content = System.Net.WebUtility.HtmlDecode(ri.Description ?? ""),
                                     Source = source.Name,
                                     Url = ri.Link ?? "",
                                     PublishedAt = ri.PublishDate ?? DateTimeOffset.UtcNow,
-                                    Tags = ExtractTagsFromContent(DecodeHtmlAndUrl(ri.Title ?? "") + " " + DecodeHtmlAndUrl(ri.Description ?? "")),
+                                    Tags = ExtractTagsFromContent(System.Net.WebUtility.HtmlDecode(ri.Title ?? "") + " " + System.Net.WebUtility.HtmlDecode(ri.Description ?? "")),
                                     Metadata = new Dictionary<string, object> 
                                     { 
                                         ["sourceType"] = "RSS", 
@@ -1015,12 +1050,12 @@ namespace CodexBootstrap.Modules
                             var newsItem = new NewsItem
                             {
                                 Id = $"hn-{storyId}",
-                                Title = DecodeHtmlAndUrl(story.Title),
-                                Content = DecodeHtmlAndUrl(story.Text ?? ""),
+                                Title = System.Net.WebUtility.HtmlDecode(story.Title),
+                                Content = System.Net.WebUtility.HtmlDecode(story.Text ?? ""),
                                 Source = source.Name,
                                 Url = story.Url,
                                 PublishedAt = DateTimeOffset.FromUnixTimeSeconds(story.Time),
-                                Tags = ExtractTagsFromContent(DecodeHtmlAndUrl(story.Title) + " " + DecodeHtmlAndUrl(story.Text ?? "")),
+                                Tags = ExtractTagsFromContent(System.Net.WebUtility.HtmlDecode(story.Title) + " " + System.Net.WebUtility.HtmlDecode(story.Text ?? "")),
                                 Metadata = new Dictionary<string, object>
                                 {
                                     ["sourceType"] = "API",
@@ -1075,23 +1110,37 @@ namespace CodexBootstrap.Modules
                 // Precompute deterministic news node id for consistent child edges
                 var newsNodeId = $"codex.news.item.{newsItem.Id}.{Guid.NewGuid():N}";
 
-                // Step 1: Extract full content from URL
-                var extractedContent = await ExtractContentFromUrl(newsItem.Url);
-                var contentNode = await CreateContentNode(newsItem, extractedContent, newsNodeId);
+                // Step 1: Extract full content from URL using the new ContentExtractionModule
+                var contentExtractionModule = new ContentExtractionModule(_registry, _logger, _httpClient);
+                var extractionResult = await contentExtractionModule.ExtractContentFromUrl(newsItem.Url, useHeadlessBrowser: false);
 
-                // Step 2: Generate summary from extracted content
-                var summary = await GenerateSummary(extractedContent);
+                if (!extractionResult.Success || string.IsNullOrEmpty(extractionResult.Content))
+                {
+                    _logger.Warn($"Failed to extract content from {newsItem.Url}, using fallback");
+                    extractionResult = new ContentExtractionResult(
+                        $"{newsItem.Title}\n\n{newsItem.Content}",
+                        "text/plain",
+                        true,
+                        "fallback",
+                        new Dictionary<string, object>()
+                    );
+                }
+
+                var contentNode = await CreateContentNode(newsItem, extractionResult.Content, newsNodeId);
+
+                // Step 2: Generate summary from extracted content (with fallback)
+                var summary = await GenerateSummary(extractionResult.Content);
                 var summaryNode = await CreateSummaryNode(newsItem, summary, contentNode.Id, newsNodeId);
 
-                // Step 3: Extract concepts from summary
+                // Step 3: Extract concepts from summary (with fallback)
                 var concepts = await ExtractConceptsFromSummary(summary);
                 var conceptNodes = await CreateConceptNodes(newsItem, concepts, summaryNode.Id, newsNodeId);
 
-                // Step 4: For each concept, find path to U-Core and add missing concepts
+                // Step 4: For each concept, find path to U-Core and add missing concepts (with fallback)
                 var ucorePaths = await FindPathsToUCoreConcepts(concepts);
                 var allPathConcepts = await EnsureMissingConceptsInPaths(ucorePaths);
 
-                // Step 5: Create comprehensive edge network for navigation
+                // Step 5: Create comprehensive edge network for navigation (with fallback)
                 await CreateComprehensiveEdgeNetwork(newsNodeId, newsItem, contentNode, summaryNode, conceptNodes, ucorePaths, allPathConcepts);
 
                 // Step 6: Store original news item as node with links to all pipeline stages
@@ -1260,7 +1309,7 @@ namespace CodexBootstrap.Modules
             Registry.Upsert(new Edge(
                 newsNodeId,
                 contentNode.Id,
-                "has_content",
+                "has-content",
                 1.0,
                 new Dictionary<string, object>
                 {
@@ -1900,132 +1949,7 @@ namespace CodexBootstrap.Modules
             }
         }
 
-        // Content Extraction Pipeline Methods
-        private async Task<string> ExtractContentFromUrl(string url)
-        {
-            try
-            {
-                _logger.Info($"Extracting content from URL: {url}");
-                
-                using var httpClient = new HttpClient();
-                httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("LivingCodex/1.0 (+https://livingcodex.org)");
-                httpClient.Timeout = TimeSpan.FromSeconds(30);
-                
-                var response = await httpClient.GetAsync(url);
-                if (!response.IsSuccessStatusCode)
-                {
-                    _logger.Warn($"Failed to fetch content from {url}: {response.StatusCode}");
-                    return string.Empty;
-                }
-                
-                var html = await response.Content.ReadAsStringAsync();
-                return ExtractTextFromHtml(html);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Error extracting content from {url}: {ex.Message}", ex);
-                return string.Empty;
-            }
-        }
-
-        private string ExtractTextFromHtml(string html)
-        {
-            try
-            {
-                var doc = new HtmlDocument();
-                doc.LoadHtml(html);
-                
-                // Remove script and style elements
-                doc.DocumentNode.Descendants()
-                    .Where(n => n.Name == "script" || n.Name == "style")
-                    .ToList()
-                    .ForEach(n => n.Remove());
-                
-                // Try to find main content areas
-                var contentSelectors = new[]
-                {
-                    "article", "main", ".content", ".post-content", ".entry-content",
-                    ".article-content", ".story-content", "[role='main']", ".article-body"
-                };
-                
-                foreach (var selector in contentSelectors)
-                {
-                    var contentNode = doc.DocumentNode.SelectSingleNode($"//{selector}");
-                    if (contentNode != null)
-                    {
-                        var text = contentNode.InnerText;
-                        if (!string.IsNullOrWhiteSpace(text) && text.Length > 100)
-                        {
-                            return CleanText(text);
-                        }
-                    }
-                }
-                
-                // Fallback to body content
-                var bodyNode = doc.DocumentNode.SelectSingleNode("//body");
-                if (bodyNode != null)
-                {
-                    return CleanText(bodyNode.InnerText);
-                }
-                
-                return CleanText(doc.DocumentNode.InnerText);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Error parsing HTML: {ex.Message}", ex);
-                return string.Empty;
-            }
-        }
-
-        private string CleanText(string text)
-        {
-            if (string.IsNullOrWhiteSpace(text))
-                return string.Empty;
-                
-            // Remove extra whitespace and normalize
-            text = Regex.Replace(text, @"\s+", " ");
-            text = text.Trim();
-            
-            // Remove common noise patterns
-            var noisePatterns = new[]
-            {
-                @"Advertisement\s*",
-                @"Subscribe\s*",
-                @"Follow us\s*",
-                @"Share this\s*",
-                @"Read more\s*",
-                @"Continue reading\s*"
-            };
-            
-            foreach (var pattern in noisePatterns)
-            {
-                text = Regex.Replace(text, pattern, "", RegexOptions.IgnoreCase);
-            }
-            
-            return text;
-        }
-
-        private string DecodeHtmlAndUrl(string text)
-        {
-            if (string.IsNullOrWhiteSpace(text))
-                return string.Empty;
-
-            try
-            {
-                // First decode HTML entities
-                text = System.Net.WebUtility.HtmlDecode(text);
-                
-                // Then decode URL encoding
-                text = System.Web.HttpUtility.UrlDecode(text);
-                
-                return text;
-            }
-            catch (Exception ex)
-            {
-                _logger.Warn($"Error decoding HTML/URL in text: {ex.Message}");
-                return text; // Return original text if decoding fails
-            }
-        }
+        // Content extraction methods removed - now using ContentExtractionModule
 
         private async Task<Node> CreateContentNode(NewsItem newsItem, string extractedContent)
         {

@@ -24,8 +24,8 @@ public class FacebookOAuthProvider : IIdentityProvider
         _redirectUri = Environment.GetEnvironmentVariable("FACEBOOK_REDIRECT_URI") ?? "http://localhost:5000/identity/callback/facebook";
     }
 
-    public string ProviderName => "Facebook";
-    public bool IsEnabled => !string.IsNullOrEmpty(_clientId) && !string.IsNullOrEmpty(_clientSecret);
+    public string ProviderName => "facebook";
+    public bool IsEnabled => false; // Disabled by default
 
     public async Task<object> InitiateLogin(string? returnUrl = null)
     {

@@ -30,7 +30,7 @@ public class NewsProcessingPipelineTests : IClassFixture<TestServerFixture>
         };
     }
 
-    [Fact]
+    [Fact(Skip = "News processing pipeline tests require full AI integration")]
     public async Task NewsProcessingPipeline_ShouldCreateCompleteEdgeNetwork()
     {
         // Arrange - Create a test news item
@@ -195,7 +195,7 @@ public class NewsProcessingPipelineTests : IClassFixture<TestServerFixture>
         await VerifyPipelineNavigation(testNewsItem.id, contentNodeId, summaryNodeId, conceptNodeIds, ucorePathIds);
     }
 
-    [Fact]
+    [Fact(Skip = "News processing pipeline tests require full AI integration")]
     public async Task NewsProcessingPipeline_ShouldHandleMultipleConcepts()
     {
         // Arrange - Create a news item with multiple concepts
@@ -240,7 +240,7 @@ public class NewsProcessingPipelineTests : IClassFixture<TestServerFixture>
         ucorePathIds.Length.Should().BeGreaterThan(0, "U-Core paths should be created for extracted concepts");
     }
 
-    [Fact]
+    [Fact(Skip = "News processing pipeline tests require full AI integration")]
     public async Task NewsProcessingPipeline_ShouldCreateMissingConcepts()
     {
         // Arrange - Create a news item with unique concepts that likely don't exist

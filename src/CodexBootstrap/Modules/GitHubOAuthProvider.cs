@@ -24,8 +24,8 @@ public class GitHubOAuthProvider : IIdentityProvider
         _redirectUri = Environment.GetEnvironmentVariable("GITHUB_REDIRECT_URI") ?? "http://localhost:5000/identity/callback/github";
     }
 
-    public string ProviderName => "GitHub";
-    public bool IsEnabled => !string.IsNullOrEmpty(_clientId) && !string.IsNullOrEmpty(_clientSecret);
+    public string ProviderName => "github";
+    public bool IsEnabled => false; // Disabled by default
 
     public async Task<object> InitiateLogin(string? returnUrl = null)
     {
