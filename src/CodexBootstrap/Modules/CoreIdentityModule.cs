@@ -150,23 +150,10 @@ public sealed class CoreIdentityModule : ModuleBase
             return true;
         }
 
-        // Create edge from node to U-CORE root
-        var nodeToUcoreEdge = NodeHelpers.CreateEdge(
-            nodeId,
-            U_CORE_ROOT_NODE_ID,
-            "belongs_to",
-            1.0,
-            new Dictionary<string, object>
-            {
-                ["relationship"] = "node-to-ontology",
-                ["createdBy"] = "core-identity-module",
-                ["autoCreated"] = true
-            }
-        );
-        _registry.Upsert(nodeToUcoreEdge);
-        
-        _logger.Info($"Created edge from node {nodeId} to U-CORE root to ensure path to core identity");
-        return true;
+        // Per Node Connection Model: No shortcut edges allowed
+        // Nodes must connect through proper ontology/topology paths
+        _logger.Warn($"Node {nodeId} cannot reach core identity through proper ontology paths. Shortcut edges are not allowed per Node Connection Model.");
+        return false;
     }
 
     /// <summary>

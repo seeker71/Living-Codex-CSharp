@@ -872,7 +872,7 @@ namespace CodexBootstrap.Core
             var node = new Node(
                 Id: fullId,
                 TypeId: "codex.ontology.axis",
-                State: ContentState.Ice,
+                State: ContentState.Water,
                 Locale: "en-US",
                 Title: ToAxisTitle(shortId),
                 Description: $"Placeholder axis for '{shortId}' (auto-created to satisfy references)",
@@ -901,7 +901,8 @@ namespace CodexBootstrap.Core
                     ["dimensions"] = Array.Empty<string>(),
                     ["parentAxes"] = Array.Empty<string>(),
                     ["childAxes"] = Array.Empty<string>(),
-                    ["typeId"] = "codex.ontology.axis"
+                    ["typeId"] = "codex.ontology.axis",
+                    ["placeholder"] = true
                 }
             );
             registry.Upsert(node);
