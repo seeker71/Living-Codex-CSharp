@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTrackInteraction } from '@/lib/hooks';
-import { buildApiUrl } from '@/lib/config';
+import { endpoints } from '@/lib/api';
 
 interface ConceptCreationRequest {
   name: string;
@@ -40,6 +41,7 @@ interface ExtractedConcept {
 
 export default function CreatePage() {
   const { user } = useAuth();
+  const router = useRouter();
   const trackInteraction = useTrackInteraction();
   
   // Form state
@@ -91,7 +93,7 @@ export default function CreatePage() {
     setAiLoading(true);
     try {
       // Use AI module for concept assistance
-      const response = await fetch(buildApiUrl('/ai/extract-concepts'), {
+      const response = await fetch('http://localhost:5002/ai/extract-concepts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -140,33 +142,49 @@ export default function CreatePage() {
 
   const createConcept = async () => {
     if (!conceptName.trim() || !conceptDescription.trim()) {
-      alert('Please provide both name and description for the concept');
+      setCreationResult({ 
+        success: false, 
+        error: 'Please provide both name and description for the concept' 
+      });
       return;
     }
 
     setLoading(true);
+    setCreationResult(null);
+    
     try {
-      const conceptRequest: ConceptCreationRequest = {
+      const conceptData = {
         name: conceptName,
         description: conceptDescription,
         domain: conceptDomain,
         complexity: conceptComplexity,
-        tags: conceptTags
+        tags: conceptTags,
+        axes: [conceptDomain], // Map domain to axes
+        resonance: 0.5,
+        typeId: 'codex.concept',
+        locale: 'en',
+        meta: {
+          createdBy: user?.id || 'anonymous',
+          createdAt: new Date().toISOString(),
+          complexity: conceptComplexity,
+          domain: conceptDomain
+        }
       };
 
-      const response = await fetch(buildApiUrl('/concept/create'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(conceptRequest)
-      });
+      const response = await endpoints.createConcept(conceptData);
 
-      if (response.ok) {
-        const result = await response.json();
-        setCreationResult(result);
+      if (response.success && response.data) {
+        const conceptId = (response.data as any).id || (response.data as any).conceptId;
+        
+        setCreationResult({ 
+          success: true, 
+          conceptId,
+          message: 'Concept created successfully!' 
+        });
         
         // Track concept creation
-        if (user?.id) {
-          trackInteraction(result.conceptId || 'new-concept', 'create', {
+        if (user?.id && conceptId) {
+          trackInteraction(conceptId, 'create', {
             description: `User created concept: ${conceptName}`,
             domain: conceptDomain,
             complexity: conceptComplexity,
@@ -174,18 +192,25 @@ export default function CreatePage() {
           });
         }
         
-        // Reset form
-        setConceptName('');
-        setConceptDescription('');
-        setConceptTags([]);
-        setAiPrompt('');
-        setAiSuggestions([]);
-        setExtractedConcepts([]);
+        // Navigate to created concept after brief delay
+        setTimeout(() => {
+          if (conceptId) {
+            router.push(`/node/${conceptId}`);
+          }
+        }, 2000);
+        
       } else {
-        console.error('Failed to create concept');
+        setCreationResult({ 
+          success: false, 
+          error: response.error || 'Failed to create concept - please try again' 
+        });
       }
     } catch (error) {
       console.error('Error creating concept:', error);
+      setCreationResult({ 
+        success: false, 
+        error: error instanceof Error ? error.message : 'An unexpected error occurred' 
+      });
     } finally {
       setLoading(false);
     }
@@ -214,7 +239,7 @@ export default function CreatePage() {
         }
       };
 
-      const response = await fetch(buildApiUrl('/image/concept/create'), {
+      const response = await fetch('http://localhost:5002/image/concept/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(imageRequest)
@@ -261,18 +286,20 @@ export default function CreatePage() {
           </p>
         </div>
 
-        {/* Success Message */}
+        {/* Success/Error Message */}
         {creationResult && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+          <div className={`${creationResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'} border rounded-lg p-4 mb-6`}>
             <div className="flex items-center">
-              <div className="text-green-600 text-xl mr-3">✅</div>
+              <div className={`${creationResult.success ? 'text-green-600' : 'text-red-600'} text-xl mr-3`}>
+                {creationResult.success ? '✅' : '❌'}
+              </div>
               <div>
-                <h3 className="text-green-800 font-medium">
-                  {creationResult.message || 'Concept created successfully!'}
+                <h3 className={`${creationResult.success ? 'text-green-800' : 'text-red-800'} font-medium`}>
+                  {creationResult.message || creationResult.error || 'Operation completed'}
                 </h3>
                 {creationResult.conceptId && (
                   <p className="text-green-700 text-sm mt-1">
-                    Concept ID: {creationResult.conceptId}
+                    Redirecting to concept... ID: {creationResult.conceptId}
                   </p>
                 )}
               </div>
