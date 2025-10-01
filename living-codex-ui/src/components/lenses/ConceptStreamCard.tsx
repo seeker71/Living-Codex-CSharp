@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import { Heart, Share2, MessageCircle, Link2, Zap, Network, Users, TrendingUp, Clock, Star, Sparkles, ChevronDown, ChevronUp, ThumbsUp, ThumbsDown, Reply, MoreHorizontal, Bookmark, Flag } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/Card';
 import { useAttune, useAmplify } from '@/lib/hooks';
+import { formatRelativeTime } from '@/lib/utils';
+import { endpoints } from '@/lib/api';
 
 interface Concept {
   id: string;
@@ -85,9 +87,53 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
   const cardRef = useRef<HTMLDivElement>(null);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showMoreActions, setShowMoreActions] = useState(false);
+  const [loadingInteractions, setLoadingInteractions] = useState(true);
 
   const attuneMutation = useAttune();
   const amplifyMutation = useAmplify();
+
+  // Load user interactions from backend on mount
+  useEffect(() => {
+    const loadUserInteractions = async () => {
+      if (!userId || !concept.id) {
+        setLoadingInteractions(false);
+        return;
+      }
+
+      try {
+        // Load all user interactions for this concept
+        const response = await endpoints.getUserInteractions(userId, concept.id);
+        
+        if (response.success && response.data) {
+          const data = response.data as any;
+          setUserVote(data.vote || null);
+          setIsBookmarked(data.bookmarked || false);
+          // isAttuned is loaded via /userconcept/relationship endpoint if needed
+        }
+
+        // Load vote counts
+        const voteCounts = await endpoints.getVoteCounts(concept.id);
+        if (voteCounts.success && voteCounts.data) {
+          const voteData = voteCounts.data as any;
+          setUpvotes(voteData.upvotes || 0);
+          setDownvotes(voteData.downvotes || 0);
+        }
+
+        // Load share count
+        const shareCounts = await endpoints.getShareCount(concept.id);
+        if (shareCounts.success && shareCounts.data) {
+          const shareData = shareCounts.data as any;
+          setShareCount(shareData.shares || 0);
+        }
+      } catch (error) {
+        console.error('Failed to load user interactions:', error);
+      } finally {
+        setLoadingInteractions(false);
+      }
+    };
+
+    loadUserInteractions();
+  }, [userId, concept.id]);
 
   // Auto-expand trending or new concepts
   useEffect(() => {
@@ -96,11 +142,14 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
     }
   }, [concept.isTrending, concept.isNew]);
 
-  // Voting functions
-  const handleVote = (voteType: 'up' | 'down') => {
+  // Voting functions with backend persistence
+  const handleVote = async (voteType: 'up' | 'down') => {
     if (!userId) return;
 
     const newVote = userVote === voteType ? null : voteType;
+    
+    // Optimistic UI update
+    const previousVote = userVote;
     setUserVote(newVote);
 
     // Update counts based on previous state
@@ -119,13 +168,38 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
       if (voteType === 'up') setUpvotes(prev => prev + 1);
       else setDownvotes(prev => prev + 1);
     }
+
+    // Persist to backend
+    try {
+      await endpoints.setVote(userId, concept.id, newVote);
+    } catch (error) {
+      console.error('Failed to save vote:', error);
+      // Revert on error
+      setUserVote(previousVote);
+      setActionMessage({ type: 'error', text: 'Failed to save vote' });
+      setTimeout(() => setActionMessage(null), 2000);
+    }
   };
 
-  const handleBookmark = () => {
+  const handleBookmark = async () => {
     if (!userId) return;
+    
+    // Optimistic UI update
+    const previousState = isBookmarked;
     setIsBookmarked(!isBookmarked);
     setActionMessage({ type: 'success', text: !isBookmarked ? 'Saved to your list' : 'Removed from your list' });
     setTimeout(() => setActionMessage(null), 2000);
+
+    // Persist to backend
+    try {
+      await endpoints.toggleBookmark(userId, concept.id);
+    } catch (error) {
+      console.error('Failed to toggle bookmark:', error);
+      // Revert on error
+      setIsBookmarked(previousState);
+      setActionMessage({ type: 'error', text: 'Failed to save bookmark' });
+      setTimeout(() => setActionMessage(null), 2000);
+    }
   };
 
   const handleShare = async () => {
@@ -141,6 +215,12 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
         });
         setShareCount(prev => prev + 1);
         onAction?.('share', concept.id);
+        
+        // Record share in backend
+        endpoints.recordShare(userId, concept.id, 'native').catch(err => 
+          console.error('Failed to record share:', err)
+        );
+        
         setActionMessage({ type: 'success', text: 'Shared successfully' });
         setTimeout(() => setActionMessage(null), 2000);
       } else {
@@ -149,6 +229,12 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
         await navigator.clipboard.writeText(`${concept.name}\n\n${concept.description}\n\n${shareUrl}`);
         setShareCount(prev => prev + 1);
         onAction?.('share', concept.id);
+        
+        // Record share in backend
+        endpoints.recordShare(userId, concept.id, 'clipboard').catch(err => 
+          console.error('Failed to record share:', err)
+        );
+        
         setActionMessage({ type: 'success', text: 'Link copied to clipboard' });
         setTimeout(() => setActionMessage(null), 2000);
       }
@@ -160,6 +246,12 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
         await navigator.clipboard.writeText(`${concept.name}\n\n${concept.description}\n\n${shareUrl}`);
         setShareCount(prev => prev + 1);
         onAction?.('share', concept.id);
+        
+        // Record share in backend
+        endpoints.recordShare(userId, concept.id, 'clipboard').catch(err => 
+          console.error('Failed to record share:', err)
+        );
+        
         setActionMessage({ type: 'success', text: 'Link copied to clipboard' });
         setTimeout(() => setActionMessage(null), 2000);
       } catch (clipboardError) {

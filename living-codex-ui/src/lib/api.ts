@@ -301,6 +301,34 @@ export const endpoints = {
   unattuneConcept: (userId: string, conceptId: string) => 
     api.post('/userconcept/unlink', { userId, conceptId }),
   
+  // User interactions (votes, bookmarks, likes, shares)
+  setVote: (userId: string, entityId: string, vote: 'up' | 'down' | null, entityType = 'concept') =>
+    api.post('/interactions/vote', { userId, entityId, vote, entityType }),
+  getVote: (userId: string, entityId: string) =>
+    api.get(`/interactions/vote/${userId}/${entityId}`),
+  getVoteCounts: (entityId: string) =>
+    api.get(`/interactions/votes/${entityId}`),
+  
+  toggleBookmark: (userId: string, entityId: string, entityType = 'concept') =>
+    api.post('/interactions/bookmark', { userId, entityId, entityType }),
+  checkBookmark: (userId: string, entityId: string) =>
+    api.get(`/interactions/bookmark/${userId}/${entityId}`),
+  getBookmarks: (userId: string, skip = 0, take = 50) =>
+    api.get(`/interactions/bookmarks/${userId}?skip=${skip}&take=${take}`),
+  
+  toggleLike: (userId: string, entityId: string, entityType = 'concept') =>
+    api.post('/interactions/like', { userId, entityId, entityType }),
+  getLikeCount: (entityId: string) =>
+    api.get(`/interactions/likes/${entityId}`),
+  
+  recordShare: (userId: string, entityId: string, shareMethod = 'link', entityType = 'concept') =>
+    api.post('/interactions/share', { userId, entityId, shareMethod, entityType }),
+  getShareCount: (entityId: string) =>
+    api.get(`/interactions/shares/${entityId}`),
+  
+  getUserInteractions: (userId: string, entityId: string) =>
+    api.get(`/interactions/${userId}/${entityId}`),
+  
   // News
   getTrendingTopics: (limit = 10, hoursBack = 24) => 
     api.get(`/news/trending?limit=${limit}&hoursBack=${hoursBack}`),
