@@ -1,0 +1,55 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="5470bf1f-9d9c-4eaf-80f2-e4f60854d2ba" name="@Seeker-Mac 2025-09-22 13:37:47" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2025-09-22T13:37:47.8934340-06:00" queuing="2025-09-22T13:37:47.8934340-06:00" start="2025-09-22T13:37:45.6538080-06:00" finish="2025-09-22T13:37:47.8981210-06:00" />
+  <TestSettings name="default" id="6fa30fa3-58e5-4fa7-89c6-bc70ee62dc01">
+    <Deployment runDeploymentRoot="_Seeker-Mac_2025-09-22_13_37_47" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="05df8eb5-d681-4e70-b3e7-92691c8d3579" testId="1f3199f3-f842-d0f8-2cf4-0c685e5c5cf9" testName="CodexBootstrap.Tests.NewsSourceTests.NewsSourcesConfig_Should_LoadAllSources" computerName="Seeker-Mac" duration="00:00:01.0760837" startTime="2025-09-22T13:37:47.8444900-06:00" endTime="2025-09-22T13:37:47.8445030-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="05df8eb5-d681-4e70-b3e7-92691c8d3579">
+      <Output>
+        <ErrorInfo>
+          <Message>Expected at least 50 news sources, found 30
+Expected: True
+Actual:   False</Message>
+          <StackTrace>   at CodexBootstrap.Tests.NewsSourceTests.NewsSourcesConfig_Should_LoadAllSources() in /Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/NewsSourceTests.cs:line 50
+--- End of stack trace from previous location ---</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="CodexBootstrap.Tests.NewsSourceTests.NewsSourcesConfig_Should_LoadAllSources" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="1f3199f3-f842-d0f8-2cf4-0c685e5c5cf9">
+      <Execution id="05df8eb5-d681-4e70-b3e7-92691c8d3579" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.NewsSourceTests" name="NewsSourcesConfig_Should_LoadAllSources" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="1f3199f3-f842-d0f8-2cf4-0c685e5c5cf9" executionId="05df8eb5-d681-4e70-b3e7-92691c8d3579" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="1" executed="1" passed="0" failed="1" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.4.3+1b45f5407b (64-bit .NET 6.0.6)
+[xUnit.net 00:00:00.69]   Discovering: CodexBootstrap.Tests
+[xUnit.net 00:00:00.73]   Discovered:  CodexBootstrap.Tests
+[xUnit.net 00:00:00.74]   Starting:    CodexBootstrap.Tests
+[xUnit.net 00:00:01.85]       Expected at least 50 news sources, found 30
+[xUnit.net 00:00:01.85]       Expected: True
+[xUnit.net 00:00:01.85]       Actual:   False
+[xUnit.net 00:00:01.85]       Stack Trace:
+[xUnit.net 00:00:01.85]         /Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/NewsSourceTests.cs(50,0): at CodexBootstrap.Tests.NewsSourceTests.NewsSourcesConfig_Should_LoadAllSources()
+[xUnit.net 00:00:01.85]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:01.86]   Finished:    CodexBootstrap.Tests
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="Seeker-Mac" outcome="Error" timestamp="2025-09-22T13:37:47.8422980-06:00">
+        <Text>[xUnit.net 00:00:01.85]     CodexBootstrap.Tests.NewsSourceTests.NewsSourcesConfig_Should_LoadAllSources [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

@@ -1,0 +1,85 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="d2a3478b-5696-4455-8e0a-f4f009a99fc7" name="@Seeker-Mac 2025-09-22 13:36:36" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2025-09-22T13:36:36.1862420-06:00" queuing="2025-09-22T13:36:36.1862420-06:00" start="2025-09-22T13:36:32.8676230-06:00" finish="2025-09-22T13:36:45.3189040-06:00" />
+  <TestSettings name="default" id="1a6a13aa-573b-4b69-8807-a0721faee202">
+    <Deployment runDeploymentRoot="_Seeker-Mac_2025-09-22_13_36_36" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="5f31e265-04cd-485e-ad27-5547f2f863dd" testId="a5a2e4c8-009c-485c-9e59-a0329e36f740" testName="CodexBootstrap.Tests.NewsSourceTests.NewsConceptExtraction_Should_LinkToUCore" computerName="Seeker-Mac" duration="00:00:00.0212995" startTime="2025-09-22T13:36:35.0385040-06:00" endTime="2025-09-22T13:36:35.0385040-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="5f31e265-04cd-485e-ad27-5547f2f863dd" />
+    <UnitTestResult executionId="0e9c506f-b64b-482c-a518-2e9263c8d0cb" testId="e776ed9f-d0af-671b-5393-2bbcffd08132" testName="CodexBootstrap.Tests.NewsSourceTests.NewsSourceValidation_Should_CheckRandomSources" computerName="Seeker-Mac" duration="00:00:05.2017222" startTime="2025-09-22T13:36:45.2656360-06:00" endTime="2025-09-22T13:36:45.2656360-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="0e9c506f-b64b-482c-a518-2e9263c8d0cb" />
+    <UnitTestResult executionId="a636257b-0cca-4203-8e4f-665e9d553ff4" testId="9278bdb8-7599-f5f4-b1ea-3e31a3ba566f" testName="CodexBootstrap.Tests.NewsSourceTests.NewsIngestion_Should_CreateValidNewsItems" computerName="Seeker-Mac" duration="00:00:03.0104585" startTime="2025-09-22T13:36:40.0632820-06:00" endTime="2025-09-22T13:36:40.0632820-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="a636257b-0cca-4203-8e4f-665e9d553ff4" />
+    <UnitTestResult executionId="fc9d1db9-e488-44c5-bb3c-877f4f2e7ef0" testId="223d2f32-df21-1170-abbc-18413ef59c92" testName="CodexBootstrap.Tests.NewsSourceTests.NewsSourceTypes_Should_BeValid" computerName="Seeker-Mac" duration="00:00:01.0087495" startTime="2025-09-22T13:36:37.0522780-06:00" endTime="2025-09-22T13:36:37.0522780-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="fc9d1db9-e488-44c5-bb3c-877f4f2e7ef0" />
+    <UnitTestResult executionId="64f8b0cc-fbd4-47e6-a6d8-9d08014eef87" testId="1f3199f3-f842-d0f8-2cf4-0c685e5c5cf9" testName="CodexBootstrap.Tests.NewsSourceTests.NewsSourcesConfig_Should_LoadAllSources" computerName="Seeker-Mac" duration="00:00:01.0697669" startTime="2025-09-22T13:36:35.0230240-06:00" endTime="2025-09-22T13:36:35.0230650-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="64f8b0cc-fbd4-47e6-a6d8-9d08014eef87">
+      <Output>
+        <ErrorInfo>
+          <Message>Expected at least 50 news sources, found 30
+Expected: True
+Actual:   False</Message>
+          <StackTrace>   at CodexBootstrap.Tests.NewsSourceTests.NewsSourcesConfig_Should_LoadAllSources() in /Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/NewsSourceTests.cs:line 50
+--- End of stack trace from previous location ---</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="c6bd49c6-28e9-49fd-8e59-bbc098872bbc" testId="be0201d4-f64f-23ff-9843-409cbb744734" testName="CodexBootstrap.Tests.NewsSourceTests.NewsSourceCategories_Should_CoverAllDomains" computerName="Seeker-Mac" duration="00:00:01.0042039" startTime="2025-09-22T13:36:36.0430120-06:00" endTime="2025-09-22T13:36:36.0430130-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c6bd49c6-28e9-49fd-8e59-bbc098872bbc" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="CodexBootstrap.Tests.NewsSourceTests.NewsIngestion_Should_CreateValidNewsItems" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="9278bdb8-7599-f5f4-b1ea-3e31a3ba566f">
+      <Execution id="a636257b-0cca-4203-8e4f-665e9d553ff4" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.NewsSourceTests" name="NewsIngestion_Should_CreateValidNewsItems" />
+    </UnitTest>
+    <UnitTest name="CodexBootstrap.Tests.NewsSourceTests.NewsConceptExtraction_Should_LinkToUCore" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="a5a2e4c8-009c-485c-9e59-a0329e36f740">
+      <Execution id="5f31e265-04cd-485e-ad27-5547f2f863dd" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.NewsSourceTests" name="NewsConceptExtraction_Should_LinkToUCore" />
+    </UnitTest>
+    <UnitTest name="CodexBootstrap.Tests.NewsSourceTests.NewsSourcesConfig_Should_LoadAllSources" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="1f3199f3-f842-d0f8-2cf4-0c685e5c5cf9">
+      <Execution id="64f8b0cc-fbd4-47e6-a6d8-9d08014eef87" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.NewsSourceTests" name="NewsSourcesConfig_Should_LoadAllSources" />
+    </UnitTest>
+    <UnitTest name="CodexBootstrap.Tests.NewsSourceTests.NewsSourceValidation_Should_CheckRandomSources" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="e776ed9f-d0af-671b-5393-2bbcffd08132">
+      <Execution id="0e9c506f-b64b-482c-a518-2e9263c8d0cb" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.NewsSourceTests" name="NewsSourceValidation_Should_CheckRandomSources" />
+    </UnitTest>
+    <UnitTest name="CodexBootstrap.Tests.NewsSourceTests.NewsSourceTypes_Should_BeValid" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="223d2f32-df21-1170-abbc-18413ef59c92">
+      <Execution id="fc9d1db9-e488-44c5-bb3c-877f4f2e7ef0" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.NewsSourceTests" name="NewsSourceTypes_Should_BeValid" />
+    </UnitTest>
+    <UnitTest name="CodexBootstrap.Tests.NewsSourceTests.NewsSourceCategories_Should_CoverAllDomains" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="be0201d4-f64f-23ff-9843-409cbb744734">
+      <Execution id="c6bd49c6-28e9-49fd-8e59-bbc098872bbc" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.NewsSourceTests" name="NewsSourceCategories_Should_CoverAllDomains" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="a5a2e4c8-009c-485c-9e59-a0329e36f740" executionId="5f31e265-04cd-485e-ad27-5547f2f863dd" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e776ed9f-d0af-671b-5393-2bbcffd08132" executionId="0e9c506f-b64b-482c-a518-2e9263c8d0cb" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="9278bdb8-7599-f5f4-b1ea-3e31a3ba566f" executionId="a636257b-0cca-4203-8e4f-665e9d553ff4" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="223d2f32-df21-1170-abbc-18413ef59c92" executionId="fc9d1db9-e488-44c5-bb3c-877f4f2e7ef0" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="1f3199f3-f842-d0f8-2cf4-0c685e5c5cf9" executionId="64f8b0cc-fbd4-47e6-a6d8-9d08014eef87" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="be0201d4-f64f-23ff-9843-409cbb744734" executionId="c6bd49c6-28e9-49fd-8e59-bbc098872bbc" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="6" executed="6" passed="5" failed="1" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.4.3+1b45f5407b (64-bit .NET 6.0.6)
+[xUnit.net 00:00:00.67]   Discovering: CodexBootstrap.Tests
+[xUnit.net 00:00:00.71]   Discovered:  CodexBootstrap.Tests
+[xUnit.net 00:00:00.71]   Starting:    CodexBootstrap.Tests
+[xUnit.net 00:00:01.82]       Expected at least 50 news sources, found 30
+[xUnit.net 00:00:01.82]       Expected: True
+[xUnit.net 00:00:01.82]       Actual:   False
+[xUnit.net 00:00:01.82]       Stack Trace:
+[xUnit.net 00:00:01.82]         /Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/NewsSourceTests.cs(50,0): at CodexBootstrap.Tests.NewsSourceTests.NewsSourcesConfig_Should_LoadAllSources()
+[xUnit.net 00:00:01.82]         --- End of stack trace from previous location ---
+[xUnit.net 00:00:12.07]   Finished:    CodexBootstrap.Tests
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="Seeker-Mac" outcome="Error" timestamp="2025-09-22T13:36:35.0209330-06:00">
+        <Text>[xUnit.net 00:00:01.82]     CodexBootstrap.Tests.NewsSourceTests.NewsSourcesConfig_Should_LoadAllSources [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

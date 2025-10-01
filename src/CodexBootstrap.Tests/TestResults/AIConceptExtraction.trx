@@ -1,0 +1,76 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="d8f6163e-1f20-46f9-8a30-002dc271733d" name="@Seeker-Mac 2025-09-22 13:42:59" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2025-09-22T13:42:59.9019700-06:00" queuing="2025-09-22T13:42:59.9019700-06:00" start="2025-09-22T13:42:58.5869350-06:00" finish="2025-09-22T13:42:59.9068010-06:00" />
+  <TestSettings name="default" id="f98cd2c4-5385-4b28-a293-023790d04bf2">
+    <Deployment runDeploymentRoot="_Seeker-Mac_2025-09-22_13_42_59" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="329121b3-c282-402c-9cd0-15fd84b738b8" testId="2b00ad46-f32b-446f-acdc-2eea35c5f140" testName="CodexBootstrap.Tests.Modules.AIModuleTests.GetModuleNode_ShouldReturnModuleNode" computerName="Seeker-Mac" duration="00:00:00.0022568" startTime="2025-09-22T13:42:59.8251670-06:00" endTime="2025-09-22T13:42:59.8251670-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="329121b3-c282-402c-9cd0-15fd84b738b8" />
+    <UnitTestResult executionId="bda39dcc-ca7f-48c7-82f6-d54473329531" testId="65b80104-e391-765d-11f2-1a66e8fb8050" testName="CodexBootstrap.Tests.Modules.AIModuleTests.RegisterHttpEndpoints_ShouldNotThrow" computerName="Seeker-Mac" duration="00:00:00.0003529" startTime="2025-09-22T13:42:59.8298230-06:00" endTime="2025-09-22T13:42:59.8298230-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="bda39dcc-ca7f-48c7-82f6-d54473329531" />
+    <UnitTestResult executionId="ffc3ad3b-0ed3-42cf-9167-bb95d0e5ae5e" testId="44690745-9c88-3bf3-0c2f-a725a9065892" testName="CodexBootstrap.Tests.Modules.AIModuleTests.Register_ShouldRegisterModuleWithRegistry" computerName="Seeker-Mac" duration="00:00:00.0034674" startTime="2025-09-22T13:42:59.8294450-06:00" endTime="2025-09-22T13:42:59.8294450-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ffc3ad3b-0ed3-42cf-9167-bb95d0e5ae5e" />
+    <UnitTestResult executionId="05c9c44b-b733-4922-b149-8116feabdd7e" testId="e7b9a5d9-b357-ccab-0080-bfd9de9e4252" testName="CodexBootstrap.Tests.Modules.AIModuleTests.Version_ShouldReturnCorrectVersion" computerName="Seeker-Mac" duration="00:00:00.0040756" startTime="2025-09-22T13:42:59.8221750-06:00" endTime="2025-09-22T13:42:59.8221750-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="05c9c44b-b733-4922-b149-8116feabdd7e" />
+    <UnitTestResult executionId="9822f89f-cd9d-42d0-9d94-bd5bae53140c" testId="1f7976e5-938b-de19-e4f9-70a3b56afbf7" testName="CodexBootstrap.Tests.Modules.AIModuleTests.Description_ShouldReturnCorrectDescription" computerName="Seeker-Mac" duration="00:00:00.0003877" startTime="2025-09-22T13:42:59.8255960-06:00" endTime="2025-09-22T13:42:59.8255960-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9822f89f-cd9d-42d0-9d94-bd5bae53140c" />
+    <UnitTestResult executionId="84a088f2-d15f-4aa6-9e7a-6f2fa48bbfa8" testId="f26cae9a-0cfd-3b5a-d1f4-d5ed084eadad" testName="CodexBootstrap.Tests.Modules.AIModuleTests.RegisterApiHandlers_ShouldNotThrow" computerName="Seeker-Mac" duration="00:00:00.1100648" startTime="2025-09-22T13:42:59.8185900-06:00" endTime="2025-09-22T13:42:59.8186040-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="84a088f2-d15f-4aa6-9e7a-6f2fa48bbfa8" />
+    <UnitTestResult executionId="f68d1a74-1a83-44dd-b894-7eb46c8a9be1" testId="9f121c41-56cf-362b-92e5-cf6e1918417e" testName="CodexBootstrap.Tests.Modules.AIModuleTests.Name_ShouldReturnCorrectName" computerName="Seeker-Mac" duration="00:00:00.0003211" startTime="2025-09-22T13:42:59.8259480-06:00" endTime="2025-09-22T13:42:59.8259480-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f68d1a74-1a83-44dd-b894-7eb46c8a9be1" />
+    <UnitTestResult executionId="b9e24238-ed7a-48ec-b7b6-05746dcf8b80" testId="904747e7-ff5e-8218-74d7-bb12f2b82a35" testName="CodexBootstrap.Tests.Modules.AIModuleTests.Constructor_ShouldInitializeCorrectly" computerName="Seeker-Mac" duration="00:00:00.0006630" startTime="2025-09-22T13:42:59.8228680-06:00" endTime="2025-09-22T13:42:59.8228680-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b9e24238-ed7a-48ec-b7b6-05746dcf8b80" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="CodexBootstrap.Tests.Modules.AIModuleTests.Register_ShouldRegisterModuleWithRegistry" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="44690745-9c88-3bf3-0c2f-a725a9065892">
+      <Execution id="ffc3ad3b-0ed3-42cf-9167-bb95d0e5ae5e" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.Modules.AIModuleTests" name="Register_ShouldRegisterModuleWithRegistry" />
+    </UnitTest>
+    <UnitTest name="CodexBootstrap.Tests.Modules.AIModuleTests.RegisterApiHandlers_ShouldNotThrow" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="f26cae9a-0cfd-3b5a-d1f4-d5ed084eadad">
+      <Execution id="84a088f2-d15f-4aa6-9e7a-6f2fa48bbfa8" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.Modules.AIModuleTests" name="RegisterApiHandlers_ShouldNotThrow" />
+    </UnitTest>
+    <UnitTest name="CodexBootstrap.Tests.Modules.AIModuleTests.Constructor_ShouldInitializeCorrectly" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="904747e7-ff5e-8218-74d7-bb12f2b82a35">
+      <Execution id="b9e24238-ed7a-48ec-b7b6-05746dcf8b80" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.Modules.AIModuleTests" name="Constructor_ShouldInitializeCorrectly" />
+    </UnitTest>
+    <UnitTest name="CodexBootstrap.Tests.Modules.AIModuleTests.GetModuleNode_ShouldReturnModuleNode" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="2b00ad46-f32b-446f-acdc-2eea35c5f140">
+      <Execution id="329121b3-c282-402c-9cd0-15fd84b738b8" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.Modules.AIModuleTests" name="GetModuleNode_ShouldReturnModuleNode" />
+    </UnitTest>
+    <UnitTest name="CodexBootstrap.Tests.Modules.AIModuleTests.RegisterHttpEndpoints_ShouldNotThrow" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="65b80104-e391-765d-11f2-1a66e8fb8050">
+      <Execution id="bda39dcc-ca7f-48c7-82f6-d54473329531" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.Modules.AIModuleTests" name="RegisterHttpEndpoints_ShouldNotThrow" />
+    </UnitTest>
+    <UnitTest name="CodexBootstrap.Tests.Modules.AIModuleTests.Description_ShouldReturnCorrectDescription" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="1f7976e5-938b-de19-e4f9-70a3b56afbf7">
+      <Execution id="9822f89f-cd9d-42d0-9d94-bd5bae53140c" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.Modules.AIModuleTests" name="Description_ShouldReturnCorrectDescription" />
+    </UnitTest>
+    <UnitTest name="CodexBootstrap.Tests.Modules.AIModuleTests.Version_ShouldReturnCorrectVersion" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="e7b9a5d9-b357-ccab-0080-bfd9de9e4252">
+      <Execution id="05c9c44b-b733-4922-b149-8116feabdd7e" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.Modules.AIModuleTests" name="Version_ShouldReturnCorrectVersion" />
+    </UnitTest>
+    <UnitTest name="CodexBootstrap.Tests.Modules.AIModuleTests.Name_ShouldReturnCorrectName" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="9f121c41-56cf-362b-92e5-cf6e1918417e">
+      <Execution id="f68d1a74-1a83-44dd-b894-7eb46c8a9be1" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.Modules.AIModuleTests" name="Name_ShouldReturnCorrectName" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="2b00ad46-f32b-446f-acdc-2eea35c5f140" executionId="329121b3-c282-402c-9cd0-15fd84b738b8" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="65b80104-e391-765d-11f2-1a66e8fb8050" executionId="bda39dcc-ca7f-48c7-82f6-d54473329531" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="44690745-9c88-3bf3-0c2f-a725a9065892" executionId="ffc3ad3b-0ed3-42cf-9167-bb95d0e5ae5e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e7b9a5d9-b357-ccab-0080-bfd9de9e4252" executionId="05c9c44b-b733-4922-b149-8116feabdd7e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="1f7976e5-938b-de19-e4f9-70a3b56afbf7" executionId="9822f89f-cd9d-42d0-9d94-bd5bae53140c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f26cae9a-0cfd-3b5a-d1f4-d5ed084eadad" executionId="84a088f2-d15f-4aa6-9e7a-6f2fa48bbfa8" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="9f121c41-56cf-362b-92e5-cf6e1918417e" executionId="f68d1a74-1a83-44dd-b894-7eb46c8a9be1" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="904747e7-ff5e-8218-74d7-bb12f2b82a35" executionId="b9e24238-ed7a-48ec-b7b6-05746dcf8b80" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="8" executed="8" passed="8" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.4.3+1b45f5407b (64-bit .NET 6.0.6)
+[xUnit.net 00:00:00.71]   Discovering: CodexBootstrap.Tests
+[xUnit.net 00:00:00.75]   Discovered:  CodexBootstrap.Tests
+[xUnit.net 00:00:00.75]   Starting:    CodexBootstrap.Tests
+[xUnit.net 00:00:00.91]   Finished:    CodexBootstrap.Tests
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

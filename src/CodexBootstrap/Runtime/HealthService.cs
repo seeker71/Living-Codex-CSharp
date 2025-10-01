@@ -17,6 +17,13 @@ public sealed class HealthService
     private readonly object _lock = new object();
     private ModuleLoader? _moduleLoader;
     private bool _registryInitialized = false;
+    
+    // Cached counts to avoid expensive queries on every health check
+    private int _cachedNodeCount = 0;
+    private int _cachedEdgeCount = 0;
+    private int _cachedModuleCount = 0;
+    private DateTime _lastCacheUpdate = DateTime.MinValue;
+    private readonly TimeSpan _cacheExpiry = TimeSpan.FromSeconds(5);
 
     public HealthService(INodeRegistry registry)
     {
@@ -38,62 +45,112 @@ public sealed class HealthService
     /// </summary>
     public HealthStatus GetHealthStatus()
     {
-        lock (_lock)
+        var uptime = DateTime.UtcNow - _startTime;
+        int nodeCount = 0;
+        int edgeCount = 0;
+        int moduleCount = 0;
+        long dbOps = 0;
+        RegistrationMetrics? registrationMetrics = null;
+        
+        // Use cached counts if available and not expired
+        var now = DateTime.UtcNow;
+        var cacheValid = (now - _lastCacheUpdate) < _cacheExpiry;
+        
+        if (cacheValid && _registryInitialized)
         {
-            var uptime = DateTime.UtcNow - _startTime;
-            int nodeCount = 0;
-            int edgeCount = 0;
-            int moduleCount = 0;
-            long dbOps = 0;
-            
-            // Only query registry if initialized to avoid blocking
-            try
+            // Use cached values for fast response
+            nodeCount = _cachedNodeCount;
+            edgeCount = _cachedEdgeCount;
+            moduleCount = _cachedModuleCount;
+        }
+        else if (_registryInitialized)
+        {
+            // Update cache (only one thread at a time)
+            if (Monitor.TryEnter(_lock, 0))
             {
-                if (_registryInitialized)
+                try
                 {
                     nodeCount = _registry.AllNodes().Count();
                     edgeCount = _registry.AllEdges().Count();
                     moduleCount = _moduleLoader?.GetLoadedModules().Count ?? 
                                  (_registry.GetNodesByType("module").Count() + 
                                   _registry.GetNodesByType("codex.meta/module").Count());
+                    
+                    // Update cache
+                    _cachedNodeCount = nodeCount;
+                    _cachedEdgeCount = edgeCount;
+                    _cachedModuleCount = moduleCount;
+                    _lastCacheUpdate = now;
                 }
-                
-                // Get DB operations count from registry
-                if (_registry is NodeRegistry nr)
+                catch (Exception ex)
                 {
-                    dbOps = nr.GetDbOperationsInFlight();
+                    _logger.Warn($"Error updating health cache: {ex.Message}");
+                    // Use old cached values
+                    nodeCount = _cachedNodeCount;
+                    edgeCount = _cachedEdgeCount;
+                    moduleCount = _cachedModuleCount;
                 }
+                finally
+                {
+                    Monitor.Exit(_lock);
+                }
+            }
+            else
+            {
+                // Another thread is updating cache, use old values
+                nodeCount = _cachedNodeCount;
+                edgeCount = _cachedEdgeCount;
+                moduleCount = _cachedModuleCount;
+            }
+        }
+        
+        // Get DB operations count from registry (fast operation)
+        try
+        {
+            if (_registry is NodeRegistry nr)
+            {
+                dbOps = nr.GetDbOperationsInFlight();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"Error querying DB operations: {ex.Message}");
+        }
+        
+        // Calculate registration metrics only if cache needs update
+        if (_registryInitialized && !cacheValid)
+        {
+            try
+            {
+                registrationMetrics = CalculateRegistrationMetrics();
             }
             catch (Exception ex)
             {
-                _logger.Warn($"Error querying registry in health check: {ex.Message}");
+                _logger.Warn($"Error calculating registration metrics: {ex.Message}");
             }
-            
-            // Calculate registration metrics only if registry is initialized
-            var registrationMetrics = _registryInitialized ? CalculateRegistrationMetrics() : null;
-            
-            // Determine status
-            var status = _registryInitialized 
-                ? (registrationMetrics?.ModuleRegistrationSuccessRate >= 0.9 ? "healthy" : "degraded")
-                : "initializing";
-
-            return new HealthStatus(
-                Status: status,
-                Uptime: uptime,
-                RequestCount: _requestCount,
-                ActiveRequests: _activeRequests,
-                DbOperationsInFlight: dbOps,
-                NodeCount: nodeCount,
-                EdgeCount: edgeCount,
-                ModuleCount: moduleCount,
-                Timestamp: DateTime.UtcNow,
-                Version: GetVersion(),
-                RegistryInitialized: _registryInitialized,
-                MemoryUsageMB: GC.GetTotalMemory(false) / 1024 / 1024,
-                ThreadCount: System.Diagnostics.Process.GetCurrentProcess().Threads.Count,
-                RegistrationMetrics: registrationMetrics
-            );
         }
+            
+        // Determine status
+        var status = _registryInitialized 
+            ? (registrationMetrics?.ModuleRegistrationSuccessRate >= 0.9 ? "healthy" : "degraded")
+            : "initializing";
+
+        return new HealthStatus(
+            Status: status,
+            Uptime: uptime,
+            RequestCount: Interlocked.Read(ref _requestCount),
+            ActiveRequests: Interlocked.Read(ref _activeRequests),
+            DbOperationsInFlight: dbOps,
+            NodeCount: nodeCount,
+            EdgeCount: edgeCount,
+            ModuleCount: moduleCount,
+            Timestamp: DateTime.UtcNow,
+            Version: GetVersion(),
+            RegistryInitialized: _registryInitialized,
+            MemoryUsageMB: GC.GetTotalMemory(false) / 1024 / 1024,
+            ThreadCount: System.Diagnostics.Process.GetCurrentProcess().Threads.Count,
+            RegistrationMetrics: registrationMetrics
+        );
     }
 
     private RegistrationMetrics CalculateRegistrationMetrics()

@@ -1,0 +1,100 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="b7bedfc1-481b-4890-8bf7-cb86aa0250fa" name="@Seeker-Mac 2025-09-22 13:27:19" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2025-09-22T13:27:19.1195180-06:00" queuing="2025-09-22T13:27:19.1195180-06:00" start="2025-09-22T13:27:15.6629980-06:00" finish="2025-09-22T13:27:24.3001440-06:00" />
+  <TestSettings name="default" id="ec537990-3cb7-440b-ab19-6211a9f8a91f">
+    <Deployment runDeploymentRoot="_Seeker-Mac_2025-09-22_13_27_19" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="ffd70917-7437-418a-8b4d-34a0707d1d46" testId="d97a6a51-1d28-ab30-5e6f-d68d2a74dcbf" testName="CodexBootstrap.Tests.Modules.ConceptModuleApiTests.CreateConcept_ShouldReturnBadRequest_WhenInvalidRequest" computerName="Seeker-Mac" duration="00:00:00.0071538" startTime="2025-09-22T13:27:19.0622710-06:00" endTime="2025-09-22T13:27:19.0622720-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ffd70917-7437-418a-8b4d-34a0707d1d46" />
+    <UnitTestResult executionId="4fc08b63-2b80-49ec-8e0e-c369a74d3e31" testId="a4d19a43-eee6-b34b-17f0-66d7158f5890" testName="CodexBootstrap.Tests.Modules.ConceptModuleApiTests.GetConcept_ShouldReturnConcept_WhenConceptExists" computerName="Seeker-Mac" duration="00:00:00.0042509" startTime="2025-09-22T13:27:19.0667280-06:00" endTime="2025-09-22T13:27:19.0667280-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="4fc08b63-2b80-49ec-8e0e-c369a74d3e31" />
+    <UnitTestResult executionId="ec7ba1ca-84a4-40ac-904d-d14a21a97ce0" testId="cf881c4c-31da-3c3d-e657-0f7a60496f37" testName="CodexBootstrap.Tests.Modules.ConceptModuleApiTests.DeleteConcept_ShouldReturnNotFound_WhenConceptDoesNotExist" computerName="Seeker-Mac" duration="00:00:00.0114612" startTime="2025-09-22T13:27:19.0825610-06:00" endTime="2025-09-22T13:27:19.0825610-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ec7ba1ca-84a4-40ac-904d-d14a21a97ce0" />
+    <UnitTestResult executionId="568e5f1e-396f-4a67-8775-382c477e65d8" testId="af1e193b-6914-4dd6-b3ed-2ac18e2a1b23" testName="CodexBootstrap.Tests.Modules.ConceptModuleApiTests.UpdateConcept_ShouldReturnSuccess_WhenConceptExists" computerName="Seeker-Mac" duration="00:00:00.0038955" startTime="2025-09-22T13:27:19.0708190-06:00" endTime="2025-09-22T13:27:19.0708190-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="568e5f1e-396f-4a67-8775-382c477e65d8" />
+    <UnitTestResult executionId="25aa94d7-8435-4972-80db-73e8682c02d0" testId="9703efcc-6a13-36f7-cf46-5b1fef7db5be" testName="CodexBootstrap.Tests.Modules.ConceptModuleApiTests.CreateConceptLegacy_ShouldReturnSuccess_WhenValidRequest" computerName="Seeker-Mac" duration="00:00:00.0794044" startTime="2025-09-22T13:27:19.0413920-06:00" endTime="2025-09-22T13:27:19.0414040-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="25aa94d7-8435-4972-80db-73e8682c02d0" />
+    <UnitTestResult executionId="a8a63a2b-778b-4eeb-85f7-5d6101e30f59" testId="9398df0f-b7e2-21ef-6751-b96144b08a9b" testName="CodexBootstrap.Tests.Modules.ConceptModuleApiTests.GetConcept_ShouldReturnNotFound_WhenConceptDoesNotExist" computerName="Seeker-Mac" duration="00:00:00.0111617" startTime="2025-09-22T13:27:19.1155960-06:00" endTime="2025-09-22T13:27:19.1155960-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="a8a63a2b-778b-4eeb-85f7-5d6101e30f59" />
+    <UnitTestResult executionId="23163db7-7a74-46af-80a4-faef55c2a526" testId="95697913-300a-0d09-fede-d269c1c9cc5a" testName="CodexBootstrap.Tests.Modules.ConceptModuleApiTests.CreateConcept_ShouldReturnSuccess_WhenValidRequest" computerName="Seeker-Mac" duration="00:00:00.0056119" startTime="2025-09-22T13:27:19.1213870-06:00" endTime="2025-09-22T13:27:19.1213870-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="23163db7-7a74-46af-80a4-faef55c2a526" />
+    <UnitTestResult executionId="cc6d5f16-7c9a-4d96-a228-c8046681058e" testId="b99ace35-33d5-7d18-6ea4-38a87a6c5135" testName="CodexBootstrap.Tests.Modules.ConceptModuleApiTests.GetConcepts_ShouldRespondWithinAcceptableTime" computerName="Seeker-Mac" duration="00:00:00.0032840" startTime="2025-09-22T13:27:19.0891770-06:00" endTime="2025-09-22T13:27:19.0891770-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="cc6d5f16-7c9a-4d96-a228-c8046681058e" />
+    <UnitTestResult executionId="dc691092-6c31-4245-b01b-472718be731b" testId="f2016284-bdfc-f7ad-0e9e-b1b0fe7c0d74" testName="CodexBootstrap.Tests.Modules.ConceptModuleApiTests.GetConcepts_ShouldReturnConcepts_WhenConceptsExist" computerName="Seeker-Mac" duration="00:00:00.0042423" startTime="2025-09-22T13:27:19.1056530-06:00" endTime="2025-09-22T13:27:19.1056530-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="dc691092-6c31-4245-b01b-472718be731b" />
+    <UnitTestResult executionId="14b99fd1-d27e-4c08-9eba-2e7211ab2053" testId="6599a9fd-a45c-3f51-a550-7571741afdc8" testName="CodexBootstrap.Tests.Modules.ConceptModuleApiTests.GetConcepts_ShouldReturnValidConceptsArray" computerName="Seeker-Mac" duration="00:00:00.0125955" startTime="2025-09-22T13:27:19.0549410-06:00" endTime="2025-09-22T13:27:19.0549410-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="14b99fd1-d27e-4c08-9eba-2e7211ab2053" />
+    <UnitTestResult executionId="293a828a-d6fc-445a-ae63-734b4964d280" testId="8825c2ca-e48a-f1b9-4ae4-5d782ac55816" testName="CodexBootstrap.Tests.Modules.ConceptModuleApiTests.UpdateConcept_ShouldReturnNotFound_WhenConceptDoesNotExist" computerName="Seeker-Mac" duration="00:00:00.0104706" startTime="2025-09-22T13:27:19.0998490-06:00" endTime="2025-09-22T13:27:19.0998520-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="293a828a-d6fc-445a-ae63-734b4964d280" />
+    <UnitTestResult executionId="b3a323a1-b5a8-4230-a953-ec0af0f1baba" testId="db697f2e-ce6c-0e67-fba6-9e9dcf38b114" testName="CodexBootstrap.Tests.Modules.ConceptModuleApiTests.DeleteConcept_ShouldReturnSuccess_WhenConceptExists" computerName="Seeker-Mac" duration="00:00:00.0029675" startTime="2025-09-22T13:27:19.0857010-06:00" endTime="2025-09-22T13:27:19.0857010-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b3a323a1-b5a8-4230-a953-ec0af0f1baba" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="CodexBootstrap.Tests.Modules.ConceptModuleApiTests.CreateConcept_ShouldReturnSuccess_WhenValidRequest" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="95697913-300a-0d09-fede-d269c1c9cc5a">
+      <Execution id="23163db7-7a74-46af-80a4-faef55c2a526" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.Modules.ConceptModuleApiTests" name="CreateConcept_ShouldReturnSuccess_WhenValidRequest" />
+    </UnitTest>
+    <UnitTest name="CodexBootstrap.Tests.Modules.ConceptModuleApiTests.DeleteConcept_ShouldReturnSuccess_WhenConceptExists" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="db697f2e-ce6c-0e67-fba6-9e9dcf38b114">
+      <Execution id="b3a323a1-b5a8-4230-a953-ec0af0f1baba" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.Modules.ConceptModuleApiTests" name="DeleteConcept_ShouldReturnSuccess_WhenConceptExists" />
+    </UnitTest>
+    <UnitTest name="CodexBootstrap.Tests.Modules.ConceptModuleApiTests.DeleteConcept_ShouldReturnNotFound_WhenConceptDoesNotExist" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="cf881c4c-31da-3c3d-e657-0f7a60496f37">
+      <Execution id="ec7ba1ca-84a4-40ac-904d-d14a21a97ce0" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.Modules.ConceptModuleApiTests" name="DeleteConcept_ShouldReturnNotFound_WhenConceptDoesNotExist" />
+    </UnitTest>
+    <UnitTest name="CodexBootstrap.Tests.Modules.ConceptModuleApiTests.CreateConceptLegacy_ShouldReturnSuccess_WhenValidRequest" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="9703efcc-6a13-36f7-cf46-5b1fef7db5be">
+      <Execution id="25aa94d7-8435-4972-80db-73e8682c02d0" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.Modules.ConceptModuleApiTests" name="CreateConceptLegacy_ShouldReturnSuccess_WhenValidRequest" />
+    </UnitTest>
+    <UnitTest name="CodexBootstrap.Tests.Modules.ConceptModuleApiTests.UpdateConcept_ShouldReturnSuccess_WhenConceptExists" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="af1e193b-6914-4dd6-b3ed-2ac18e2a1b23">
+      <Execution id="568e5f1e-396f-4a67-8775-382c477e65d8" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.Modules.ConceptModuleApiTests" name="UpdateConcept_ShouldReturnSuccess_WhenConceptExists" />
+    </UnitTest>
+    <UnitTest name="CodexBootstrap.Tests.Modules.ConceptModuleApiTests.GetConcept_ShouldReturnConcept_WhenConceptExists" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="a4d19a43-eee6-b34b-17f0-66d7158f5890">
+      <Execution id="4fc08b63-2b80-49ec-8e0e-c369a74d3e31" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.Modules.ConceptModuleApiTests" name="GetConcept_ShouldReturnConcept_WhenConceptExists" />
+    </UnitTest>
+    <UnitTest name="CodexBootstrap.Tests.Modules.ConceptModuleApiTests.GetConcept_ShouldReturnNotFound_WhenConceptDoesNotExist" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="9398df0f-b7e2-21ef-6751-b96144b08a9b">
+      <Execution id="a8a63a2b-778b-4eeb-85f7-5d6101e30f59" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.Modules.ConceptModuleApiTests" name="GetConcept_ShouldReturnNotFound_WhenConceptDoesNotExist" />
+    </UnitTest>
+    <UnitTest name="CodexBootstrap.Tests.Modules.ConceptModuleApiTests.CreateConcept_ShouldReturnBadRequest_WhenInvalidRequest" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="d97a6a51-1d28-ab30-5e6f-d68d2a74dcbf">
+      <Execution id="ffd70917-7437-418a-8b4d-34a0707d1d46" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.Modules.ConceptModuleApiTests" name="CreateConcept_ShouldReturnBadRequest_WhenInvalidRequest" />
+    </UnitTest>
+    <UnitTest name="CodexBootstrap.Tests.Modules.ConceptModuleApiTests.GetConcepts_ShouldReturnConcepts_WhenConceptsExist" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="f2016284-bdfc-f7ad-0e9e-b1b0fe7c0d74">
+      <Execution id="dc691092-6c31-4245-b01b-472718be731b" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.Modules.ConceptModuleApiTests" name="GetConcepts_ShouldReturnConcepts_WhenConceptsExist" />
+    </UnitTest>
+    <UnitTest name="CodexBootstrap.Tests.Modules.ConceptModuleApiTests.GetConcepts_ShouldRespondWithinAcceptableTime" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="b99ace35-33d5-7d18-6ea4-38a87a6c5135">
+      <Execution id="cc6d5f16-7c9a-4d96-a228-c8046681058e" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.Modules.ConceptModuleApiTests" name="GetConcepts_ShouldRespondWithinAcceptableTime" />
+    </UnitTest>
+    <UnitTest name="CodexBootstrap.Tests.Modules.ConceptModuleApiTests.UpdateConcept_ShouldReturnNotFound_WhenConceptDoesNotExist" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="8825c2ca-e48a-f1b9-4ae4-5d782ac55816">
+      <Execution id="293a828a-d6fc-445a-ae63-734b4964d280" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.Modules.ConceptModuleApiTests" name="UpdateConcept_ShouldReturnNotFound_WhenConceptDoesNotExist" />
+    </UnitTest>
+    <UnitTest name="CodexBootstrap.Tests.Modules.ConceptModuleApiTests.GetConcepts_ShouldReturnValidConceptsArray" storage="/users/ursmuff/source/living-codex-csharp/src/codexbootstrap.tests/bin/debug/net6.0/codexbootstrap.tests.dll" id="6599a9fd-a45c-3f51-a550-7571741afdc8">
+      <Execution id="14b99fd1-d27e-4c08-9eba-2e7211ab2053" />
+      <TestMethod codeBase="/Users/ursmuff/source/Living-Codex-CSharp/src/CodexBootstrap.Tests/bin/Debug/net6.0/CodexBootstrap.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="CodexBootstrap.Tests.Modules.ConceptModuleApiTests" name="GetConcepts_ShouldReturnValidConceptsArray" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="d97a6a51-1d28-ab30-5e6f-d68d2a74dcbf" executionId="ffd70917-7437-418a-8b4d-34a0707d1d46" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="a4d19a43-eee6-b34b-17f0-66d7158f5890" executionId="4fc08b63-2b80-49ec-8e0e-c369a74d3e31" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="cf881c4c-31da-3c3d-e657-0f7a60496f37" executionId="ec7ba1ca-84a4-40ac-904d-d14a21a97ce0" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="af1e193b-6914-4dd6-b3ed-2ac18e2a1b23" executionId="568e5f1e-396f-4a67-8775-382c477e65d8" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="9703efcc-6a13-36f7-cf46-5b1fef7db5be" executionId="25aa94d7-8435-4972-80db-73e8682c02d0" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="9398df0f-b7e2-21ef-6751-b96144b08a9b" executionId="a8a63a2b-778b-4eeb-85f7-5d6101e30f59" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="95697913-300a-0d09-fede-d269c1c9cc5a" executionId="23163db7-7a74-46af-80a4-faef55c2a526" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="b99ace35-33d5-7d18-6ea4-38a87a6c5135" executionId="cc6d5f16-7c9a-4d96-a228-c8046681058e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f2016284-bdfc-f7ad-0e9e-b1b0fe7c0d74" executionId="dc691092-6c31-4245-b01b-472718be731b" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="6599a9fd-a45c-3f51-a550-7571741afdc8" executionId="14b99fd1-d27e-4c08-9eba-2e7211ab2053" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="8825c2ca-e48a-f1b9-4ae4-5d782ac55816" executionId="293a828a-d6fc-445a-ae63-734b4964d280" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="db697f2e-ce6c-0e67-fba6-9e9dcf38b114" executionId="b3a323a1-b5a8-4230-a953-ec0af0f1baba" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="12" executed="12" passed="12" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.4.3+1b45f5407b (64-bit .NET 6.0.6)
+[xUnit.net 00:00:00.69]   Discovering: CodexBootstrap.Tests
+[xUnit.net 00:00:00.73]   Discovered:  CodexBootstrap.Tests
+[xUnit.net 00:00:00.73]   Starting:    CodexBootstrap.Tests
+[xUnit.net 00:00:08.26]   Finished:    CodexBootstrap.Tests
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>
