@@ -464,6 +464,9 @@ public static class CodexBootstrapHost
         var healthService = app.Services.GetRequiredService<HealthService>();
         var configuration = app.Configuration;
 
+        // Add request tracker middleware for detailed logging
+        app.UseMiddleware<CodexBootstrap.Middleware.RequestTrackerMiddleware>();
+        
         // Add middleware to track active requests
         app.Use(async (context, next) =>
         {
@@ -483,6 +486,30 @@ public static class CodexBootstrapHost
         {
             healthService.IncrementRequestCount();
             return Results.Ok(healthService.GetHealthStatus());
+        });
+
+        // Map active requests monitoring endpoint
+        app.MapGet("/health/requests/active", () =>
+        {
+            var activeRequests = CodexBootstrap.Middleware.RequestTrackerMiddleware.GetActiveRequests();
+            var summary = CodexBootstrap.Middleware.RequestTrackerMiddleware.GetActiveRequestsSummary();
+            
+            return Results.Ok(new
+            {
+                success = true,
+                activeCount = activeRequests.Count(),
+                summary = summary,
+                requests = activeRequests.Select(r => new
+                {
+                    requestId = r.RequestId,
+                    method = r.Method,
+                    path = r.Path,
+                    startTime = r.StartTime,
+                    durationMs = (DateTime.UtcNow - r.StartTime).TotalMilliseconds,
+                    status = (DateTime.UtcNow - r.StartTime).TotalMilliseconds > 5000 ? "STUCK" :
+                            (DateTime.UtcNow - r.StartTime).TotalMilliseconds > 1000 ? "SLOW" : "OK"
+                }).OrderByDescending(r => r.durationMs)
+            });
         });
 
         app.MapGet("/", () => Results.Ok(new
