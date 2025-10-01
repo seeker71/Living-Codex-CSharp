@@ -31,6 +31,8 @@ jest.mock('@/lib/config', () => ({
 }))
 
 jest.mock('@/lib/utils', () => ({
+  ...jest.requireActual('@/lib/utils'),
+  cn: (...classes: any[]) => classes.filter(Boolean).join(' '),
   buildApiUrl: (path: string) => `http://localhost:5002${path}`,
 }))
 
