@@ -68,7 +68,7 @@ describe('Gallery Edge Cases and User Experience Tests', () => {
       ]
     }
 
-    global.fetch = jest.fn().mockImplementation((url) => {
+    global.fetch = jest.fn().mockImplementation((url: string) => {
       if (url.includes('/gallery/list')) {
         return Promise.resolve({
           ok: true,
