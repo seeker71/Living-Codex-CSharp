@@ -67,10 +67,11 @@ describe('Gallery Edge Cases and User Experience Tests', () => {
     }
 
     global.fetch = jest.fn().mockImplementation((url) => {
-      if (url.includes('/concepts')) {
+      if (url.includes('/gallery/list')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve(conceptsWithMissingData),
+          json: () => Promise.resolve({ success: true, items: conceptsWithMissingData }),
+          text: () => Promise.resolve(JSON.stringify({ success: true, items: conceptsWithMissingData }))
         })
       }
       return Promise.reject(new Error('Unhandled fetch request'))
@@ -106,10 +107,11 @@ describe('Gallery Edge Cases and User Experience Tests', () => {
     }
 
     global.fetch = jest.fn().mockImplementation((url) => {
-      if (url.includes('/concepts')) {
+      if (url.includes('/gallery/list')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve(conceptsWithLongNames),
+          json: () => Promise.resolve({ success: true, items: conceptsWithLongNames }),
+          text: () => Promise.resolve(JSON.stringify({ success: true, items: conceptsWithLongNames }))
         })
       }
       return Promise.reject(new Error('Unhandled fetch request'))
@@ -146,10 +148,11 @@ describe('Gallery Edge Cases and User Experience Tests', () => {
     }
 
     global.fetch = jest.fn().mockImplementation((url) => {
-      if (url.includes('/concepts')) {
+      if (url.includes('/gallery/list')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve(conceptsWithSpecialChars),
+          json: () => Promise.resolve({ success: true, items: conceptsWithSpecialChars }),
+          text: () => Promise.resolve(JSON.stringify({ success: true, items: conceptsWithSpecialChars }))
         })
       }
       return Promise.reject(new Error('Unhandled fetch request'))
@@ -264,10 +267,11 @@ describe('Gallery Edge Cases and User Experience Tests', () => {
     }
 
     global.fetch = jest.fn().mockImplementation((url) => {
-      if (url.includes('/concepts')) {
+      if (url.includes('/gallery/list')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve(conceptsWithExtremeValues),
+          json: () => Promise.resolve({ success: true, items: conceptsWithExtremeValues }),
+          text: () => Promise.resolve(JSON.stringify({ success: true, items: conceptsWithExtremeValues }))
         })
       }
       return Promise.reject(new Error('Unhandled fetch request'))
@@ -303,10 +307,11 @@ describe('Gallery Edge Cases and User Experience Tests', () => {
     }
 
     global.fetch = jest.fn().mockImplementation((url) => {
-      if (url.includes('/concepts')) {
+      if (url.includes('/gallery/list')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve(mockConcepts),
+          json: () => Promise.resolve({ success: true, items: mockConcepts }),
+          text: () => Promise.resolve(JSON.stringify({ success: true, items: mockConcepts }))
         })
       }
       return Promise.reject(new Error('Unhandled fetch request'))
@@ -349,10 +354,11 @@ describe('Gallery Edge Cases and User Experience Tests', () => {
     }
 
     global.fetch = jest.fn().mockImplementation((url) => {
-      if (url.includes('/concepts')) {
+      if (url.includes('/gallery/list')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve(mockConcepts),
+          json: () => Promise.resolve({ success: true, items: mockConcepts }),
+          text: () => Promise.resolve(JSON.stringify({ success: true, items: mockConcepts }))
         })
       }
       return Promise.reject(new Error('Unhandled fetch request'))
@@ -395,10 +401,11 @@ describe('Gallery Edge Cases and User Experience Tests', () => {
     }
 
     global.fetch = jest.fn().mockImplementation((url) => {
-      if (url.includes('/concepts')) {
+      if (url.includes('/gallery/list')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve(mockConcepts),
+          json: () => Promise.resolve({ success: true, items: mockConcepts }),
+          text: () => Promise.resolve(JSON.stringify({ success: true, items: mockConcepts }))
         })
       }
       return Promise.reject(new Error('Unhandled fetch request'))
@@ -432,10 +439,11 @@ describe('Gallery Edge Cases and User Experience Tests', () => {
     }))
 
     global.fetch = jest.fn().mockImplementation((url) => {
-      if (url.includes('/concepts')) {
+      if (url.includes('/gallery/list')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ concepts: largeConcepts }),
+          json: () => Promise.resolve({ success: true, items: largeConcepts }),
+          text: () => Promise.resolve(JSON.stringify({ success: true, items: largeConcepts }))
         })
       }
       return Promise.reject(new Error('Unhandled fetch request'))

@@ -1,0 +1,232 @@
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using CodexBootstrap.Core;
+using CodexBootstrap.Core.Storage;
+using CodexBootstrap.Modules;
+using CodexBootstrap.Tests.Modules;
+using Xunit;
+
+namespace CodexBootstrap.Tests
+{
+    public class EdgeDeduplicationTests
+    {
+        private readonly NodeRegistry _registry;
+        private readonly StorageEndpointsModule _storageModule;
+
+        public EdgeDeduplicationTests()
+        {
+            _registry = TestInfrastructure.CreateTestNodeRegistry();
+            var logger = TestInfrastructure.CreateTestLogger();
+            _storageModule = new StorageEndpointsModule(_registry, null, logger);
+        }
+
+        [Fact]
+        public async Task CreateEdgeAsync_ShouldReturnConflict_WhenEdgeAlreadyExists()
+        {
+            // Arrange
+            var fromId = "node1";
+            var toId = "node2";
+            var role = "relates_to";
+
+            // Create first edge
+            var firstRequest = new CreateEdgeRequest
+            {
+                FromId = fromId,
+                ToId = toId,
+                Role = role,
+                Weight = 1.0,
+                Meta = new Dictionary<string, object> { { "test", "data" } }
+            };
+
+            var firstResult = await _storageModule.CreateEdgeAsync(firstRequest);
+            Assert.NotNull(firstResult);
+            Assert.True(firstResult.GetType().GetProperty("success")?.GetValue(firstResult) as bool? == true);
+
+            // Act - Try to create the same edge again
+            var secondRequest = new CreateEdgeRequest
+            {
+                FromId = fromId,
+                ToId = toId,
+                Role = role,
+                Weight = 2.0, // Different weight
+                Meta = new Dictionary<string, object> { { "test", "different" } }
+            };
+
+            var secondResult = await _storageModule.CreateEdgeAsync(secondRequest);
+
+            // Assert
+            Assert.NotNull(secondResult);
+            var errorResponse = secondResult as ErrorResponse;
+            Assert.NotNull(errorResponse);
+            Assert.Equal(ErrorCodes.CONFLICT, errorResponse.Code);
+            Assert.Contains("Edge already exists with identical properties", errorResponse.Message);
+        }
+
+        [Fact]
+        public async Task CreateEdgeAsync_ShouldUpdate_WhenEdgeExistsWithDifferentProperties()
+        {
+            // Arrange
+            var fromId = "node3";
+            var toId = "node4";
+            var role = "relates_to";
+
+            // Create first edge
+            var firstRequest = new CreateEdgeRequest
+            {
+                FromId = fromId,
+                ToId = toId,
+                Role = role,
+                Weight = 1.0,
+                Meta = new Dictionary<string, object> { { "test", "original" } }
+            };
+
+            await _storageModule.CreateEdgeAsync(firstRequest);
+
+            // Act - Update the edge with different properties
+            var updateRequest = new CreateEdgeRequest
+            {
+                FromId = fromId,
+                ToId = toId,
+                Role = role,
+                Weight = 2.0, // Different weight
+                Meta = new Dictionary<string, object> { { "test", "updated" } }
+            };
+
+            var result = await _storageModule.CreateEdgeAsync(updateRequest);
+
+            // Assert
+            Assert.NotNull(result);
+            var successResponse = result as dynamic;
+            Assert.NotNull(successResponse);
+            Assert.True(successResponse.success);
+            Assert.False(successResponse.wasCreated);
+            Assert.True(successResponse.wasUpdated);
+        }
+
+        [Fact]
+        public void NodeRegistry_UpsertWithResult_ShouldReturnCorrectResult_ForNewEdge()
+        {
+            // Arrange
+            var edge = new Edge(
+                FromId: "node5",
+                ToId: "node6",
+                Role: "relates_to",
+                Weight: 1.0,
+                Meta: new Dictionary<string, object>()
+            );
+
+            // Act
+            var result = _registry.UpsertWithResult(edge);
+
+            // Assert
+            Assert.True(result.WasCreated);
+            Assert.False(result.WasUpdated);
+            Assert.NotNull(result.Edge);
+            Assert.Null(result.PreviousEdge);
+        }
+
+        [Fact]
+        public void NodeRegistry_UpsertWithResult_ShouldReturnCorrectResult_ForExistingEdge()
+        {
+            // Arrange
+            var edge1 = new Edge(
+                FromId: "node7",
+                ToId: "node8",
+                Role: "relates_to",
+                Weight: 1.0,
+                Meta: new Dictionary<string, object> { { "test", "original" } }
+            );
+
+            var edge2 = new Edge(
+                FromId: "node7",
+                ToId: "node8",
+                Role: "relates_to",
+                Weight: 2.0, // Different weight
+                Meta: new Dictionary<string, object> { { "test", "updated" } }
+            );
+
+            // Act
+            _registry.Upsert(edge1);
+            var result = _registry.UpsertWithResult(edge2);
+
+            // Assert
+            Assert.False(result.WasCreated);
+            Assert.True(result.WasUpdated);
+            Assert.NotNull(result.Edge);
+            Assert.NotNull(result.PreviousEdge);
+            Assert.Equal(2.0, result.Edge.Weight);
+            Assert.Equal("updated", result.Edge.Meta["test"]);
+        }
+
+        [Fact]
+        public void NodeRegistry_UpsertWithResult_ShouldReturnCorrectResult_ForIdenticalEdge()
+        {
+            // Arrange
+            var edge1 = new Edge(
+                FromId: "node9",
+                ToId: "node10",
+                Role: "relates_to",
+                Weight: 1.0,
+                Meta: new Dictionary<string, object> { { "test", "same" } }
+            );
+
+            var edge2 = new Edge(
+                FromId: "node9",
+                ToId: "node10",
+                Role: "relates_to",
+                Weight: 1.0,
+                Meta: new Dictionary<string, object> { { "test", "same" } }
+            );
+
+            // Act
+            _registry.Upsert(edge1);
+            var result = _registry.UpsertWithResult(edge2);
+
+            // Assert
+            Assert.False(result.WasCreated);
+            Assert.False(result.WasUpdated);
+            Assert.NotNull(result.Edge);
+            Assert.NotNull(result.PreviousEdge);
+        }
+
+        [Fact]
+        public async Task BatchStoreEdgesAsync_ShouldHandleDuplicates_WithoutThrowing()
+        {
+            // Arrange
+            var edges = new List<Edge>
+            {
+                new Edge("node11", "node12", "relates_to", 1.0, new Dictionary<string, object>()),
+                new Edge("node11", "node12", "relates_to", 2.0, new Dictionary<string, object>()), // Duplicate
+                new Edge("node13", "node14", "relates_to", 1.0, new Dictionary<string, object>()),
+                new Edge("node11", "node12", "relates_to", 3.0, new Dictionary<string, object>()) // Another duplicate
+            };
+
+            var storageBackend = _fixture.Services.GetRequiredService<IIceStorageBackend>();
+
+            // Act & Assert - Should not throw
+            await storageBackend.BatchStoreEdgesAsync(edges);
+        }
+
+        [Fact]
+        public async Task StorageBackend_StoreEdgeAsync_ShouldNotThrow_WhenEdgeExists()
+        {
+            // Arrange
+            var edge = new Edge(
+                FromId: "node15",
+                ToId: "node16",
+                Role: "relates_to",
+                Weight: 1.0,
+                Meta: new Dictionary<string, object>()
+            );
+
+            var storageBackend = _fixture.Services.GetRequiredService<IStorageBackend>();
+
+            // Act & Assert - First insert should succeed
+            await storageBackend.StoreEdgeAsync(edge);
+
+            // Second insert should not throw (INSERT OR IGNORE)
+            await storageBackend.StoreEdgeAsync(edge);
+        }
+    }
+}

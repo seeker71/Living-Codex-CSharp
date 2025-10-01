@@ -75,14 +75,16 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
   const [userVote, setUserVote] = useState<'up' | 'down' | null>(concept.userVote || null);
   const [isBookmarked, setIsBookmarked] = useState(concept.isBookmarked || false);
   const [showReplies, setShowReplies] = useState(false);
-  // Initialize with concept data or mock values for features not yet implemented
-  const [upvotes, setUpvotes] = useState(concept.upvotes || Math.floor(Math.random() * 50) + 10);
-  const [downvotes, setDownvotes] = useState(concept.downvotes || Math.floor(Math.random() * 10));
-  const [commentCount, setCommentCount] = useState(concept.commentCount || Math.floor(Math.random() * 20));
-  const [shareCount, setShareCount] = useState(concept.shareCount || Math.floor(Math.random() * 15));
+  // Initialize with concept data or default values
+  const [upvotes, setUpvotes] = useState(concept.upvotes || 0);
+  const [downvotes, setDownvotes] = useState(concept.downvotes || 0);
+  const [commentCount, setCommentCount] = useState(concept.commentCount || 0);
+  const [shareCount, setShareCount] = useState(concept.shareCount || 0);
   const [activeCollaborators, setActiveCollaborators] = useState(concept.collaborators?.filter(c => c.isActive) || []);
   const [showProperties, setShowProperties] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [showMoreActions, setShowMoreActions] = useState(false);
 
   const attuneMutation = useAttune();
   const amplifyMutation = useAmplify();
@@ -122,11 +124,50 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
   const handleBookmark = () => {
     if (!userId) return;
     setIsBookmarked(!isBookmarked);
+    setActionMessage({ type: 'success', text: !isBookmarked ? 'Saved to your list' : 'Removed from your list' });
+    setTimeout(() => setActionMessage(null), 2000);
   };
 
-  const handleShare = () => {
-    setShareCount(prev => prev + 1);
-    // In real app, would trigger share dialog
+  const handleShare = async () => {
+    if (!userId) return;
+    
+    try {
+      // Check if Web Share API is available
+      if (navigator.share) {
+        await navigator.share({
+          title: concept.name,
+          text: concept.description,
+          url: `${window.location.origin}/node/${concept.id}`
+        });
+        setShareCount(prev => prev + 1);
+        onAction?.('share', concept.id);
+        setActionMessage({ type: 'success', text: 'Shared successfully' });
+        setTimeout(() => setActionMessage(null), 2000);
+      } else {
+        // Fallback: copy to clipboard
+        const shareUrl = `${window.location.origin}/node/${concept.id}`;
+        await navigator.clipboard.writeText(`${concept.name}\n\n${concept.description}\n\n${shareUrl}`);
+        setShareCount(prev => prev + 1);
+        onAction?.('share', concept.id);
+        setActionMessage({ type: 'success', text: 'Link copied to clipboard' });
+        setTimeout(() => setActionMessage(null), 2000);
+      }
+    } catch (error) {
+      console.error('Share error:', error);
+      // Fallback: copy to clipboard
+      try {
+        const shareUrl = `${window.location.origin}/node/${concept.id}`;
+        await navigator.clipboard.writeText(`${concept.name}\n\n${concept.description}\n\n${shareUrl}`);
+        setShareCount(prev => prev + 1);
+        onAction?.('share', concept.id);
+        setActionMessage({ type: 'success', text: 'Link copied to clipboard' });
+        setTimeout(() => setActionMessage(null), 2000);
+      } catch (clipboardError) {
+        console.error('Clipboard error:', clipboardError);
+        setActionMessage({ type: 'error', text: 'Unable to share. Please copy link manually.' });
+        setTimeout(() => setActionMessage(null), 2500);
+      }
+    }
   };
 
   const totalScore = upvotes - downvotes;
@@ -138,13 +179,18 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
       if (isAttuned) {
         // TODO: Implement unattune
         setIsAttuned(false);
+        setActionMessage({ type: 'success', text: 'Stopped following concept' });
       } else {
         await attuneMutation.mutateAsync({ userId, conceptId: concept.id });
         setIsAttuned(true);
+        setActionMessage({ type: 'success', text: 'Now following concept' });
       }
       onAction?.('attune', concept.id);
     } catch (error) {
       console.error('Attune error:', error);
+      setActionMessage({ type: 'error', text: 'Could not update follow state' });
+    } finally {
+      setTimeout(() => setActionMessage(null), 2000);
     }
   };
 
@@ -159,11 +205,35 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
         contribution: `Amplified concept: ${concept.name}` 
       });
       onAction?.('amplify', concept.id);
+      setActionMessage({ type: 'success', text: 'Sent your boost' });
     } catch (error) {
       console.error('Amplify error:', error);
+      setActionMessage({ type: 'error', text: 'Boost failed. Try again.' });
     } finally {
       setIsAmplifying(false);
+      setTimeout(() => setActionMessage(null), 2000);
     }
+  };
+
+  const handleCopyLink = async () => {
+    try {
+      const shareUrl = `${window.location.origin}/node/${concept.id}`;
+      await navigator.clipboard.writeText(shareUrl);
+      setActionMessage({ type: 'success', text: 'Link copied' });
+    } catch {
+      setActionMessage({ type: 'error', text: 'Copy failed' });
+    } finally {
+      setTimeout(() => setActionMessage(null), 2000);
+    }
+  };
+
+  const handleOpenConcept = () => {
+    window.open(`/node/${concept.id}`, '_blank');
+  };
+
+  const handleReport = () => {
+    setActionMessage({ type: 'success', text: 'Thanks for the report' });
+    setTimeout(() => setActionMessage(null), 2000);
   };
 
   const getAxisColor = (axis: string) => {
@@ -201,31 +271,14 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
       aria-expanded={isExpanded}
       aria-label={`Concept: ${concept.name}. ${isExpanded ? 'Click to collapse' : 'Click to expand'}`}
     >
-      {/* Pinterest-style overlay badges */}
-      {(concept.isTrending || concept.isNew) && (
-        <div className="absolute top-4 right-4 z-20 flex flex-col space-y-2">
-          <div className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center space-x-1.5 backdrop-blur-sm ${
-            concept.isTrending
-              ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg'
-              : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg'
-          }`}>
-            {concept.isTrending ? (
-              <>
-                <TrendingUp className="w-3.5 h-3.5" />
-                <span className="font-bold">TRENDING</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-3.5 h-3.5" />
-                <span className="font-bold">NEW</span>
-              </>
-            )}
-          </div>
-          {concept.contributionCount && concept.contributionCount > 15 && (
-            <div className="px-2 py-1 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-full text-xs font-semibold text-gray-700 dark:text-gray-300 shadow-md">
-              🔥 {concept.contributionCount} contributions
-            </div>
-          )}
+      {/* Lightweight toast */}
+      {actionMessage && (
+        <div className={`absolute top-2 right-2 z-30 px-3 py-2 rounded-lg text-xs font-medium shadow-md ${
+          actionMessage.type === 'success'
+            ? 'bg-emerald-600 text-white'
+            : 'bg-red-600 text-white'
+        }`}>
+          {actionMessage.text}
         </div>
       )}
 
@@ -872,13 +925,17 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
           </button>
 
           <button
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              // Open concept in new tab for reflection/exploration
+              window.open(`/node/${concept.id}`, '_blank');
+            }}
             className="flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-semibold bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-700 dark:hover:text-blue-300 transition-all hover:scale-105 border border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            aria-label={`Reflect on concept: ${concept.name}${commentCount > 0 ? `. ${commentCount} reflections` : ''}`}
+            title="Reflect: open concept details to contemplate and comment"
+            aria-label={`Reflect on concept: ${concept.name}`}
           >
             <MessageCircle className="w-4 h-4" />
             <span>Reflect</span>
-            {commentCount > 0 && <span className="ml-1 text-xs">({commentCount})</span>}
           </button>
 
           <button
@@ -887,11 +944,11 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
               handleShare();
             }}
             className="flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-semibold bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-700 dark:hover:text-green-300 transition-all hover:scale-105 border border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-            aria-label={`Share concept: ${concept.name}${shareCount > 0 ? `. Shared ${shareCount} times` : ''}`}
+            title="Share: send this concept to others or copy a link"
+            aria-label={`Share concept: ${concept.name}`}
           >
             <Share2 className="w-4 h-4" />
             <span>Share</span>
-            {shareCount > 0 && <span className="ml-1 text-xs">({shareCount})</span>}
           </button>
 
           <button
@@ -904,6 +961,7 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
                 ? 'bg-blue-500 text-white'
                 : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-700 dark:hover:text-blue-300 border border-gray-200 dark:border-gray-600'
             }`}
+            title={isBookmarked ? 'Saved to your list' : 'Save to your list'}
             aria-label={`${isBookmarked ? 'Remove bookmark from' : 'Bookmark'} concept: ${concept.name}`}
             aria-pressed={isBookmarked}
           >
@@ -912,12 +970,53 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
           </button>
 
           <button
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowMoreActions(prev => !prev);
+            }}
             className="p-2 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
             aria-label={`More options for concept: ${concept.name}`}
           >
             <MoreHorizontal className="w-4 h-4" />
           </button>
+
+          {showMoreActions && (
+            <div className="relative">
+              <div className="absolute right-0 mt-2 z-30 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 w-44">
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleOpenConcept(); setShowMoreActions(false); }}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  Open
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleCopyLink(); setShowMoreActions(false); }}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  Copy link
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleShare(); setShowMoreActions(false); }}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  Share…
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleBookmark(); setShowMoreActions(false); }}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  {isBookmarked ? 'Unsave' : 'Save'}
+                </button>
+                <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleReport(); setShowMoreActions(false); }}
+                  className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                >
+                  Report…
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Score and time info */}

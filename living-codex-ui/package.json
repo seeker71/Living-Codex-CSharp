@@ -47,6 +47,7 @@
     "jest-environment-jsdom": "^29.7.0",
     "puppeteer": "^24.22.3",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "whatwg-fetch": "^3.6.20"
   }
 }

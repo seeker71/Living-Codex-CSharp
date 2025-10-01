@@ -64,7 +64,7 @@ public class SqliteIceStorageBackend : IIceStorageBackend
             CREATE INDEX IF NOT EXISTS idx_ice_nodes_created_at ON ice_nodes(created_at);
             CREATE INDEX IF NOT EXISTS idx_ice_edges_from_id ON ice_edges(from_id);
             CREATE INDEX IF NOT EXISTS idx_ice_edges_to_id ON ice_edges(to_id);
-            CREATE INDEX IF NOT EXISTS idx_ice_edges_type_id ON ice_edges(type_id);
+            CREATE INDEX IF NOT EXISTS idx_ice_edges_role ON ice_edges(role);
         ";
 
         using var command = connection.CreateCommand();
@@ -179,15 +179,15 @@ public class SqliteIceStorageBackend : IIceStorageBackend
         await connection.OpenAsync();
 
         var sql = @"
-            INSERT OR REPLACE INTO ice_edges (edge_id, from_id, to_id, type_id, weight, properties, updated_at)
-            VALUES (@edgeId, @fromId, @toId, @typeId, @weight, @properties, CURRENT_TIMESTAMP)";
+            INSERT OR REPLACE INTO ice_edges (edge_id, from_id, to_id, role, weight, properties, updated_at)
+            VALUES (@edgeId, @fromId, @toId, @role, @weight, @properties, CURRENT_TIMESTAMP)";
 
         using var command = connection.CreateCommand();
         command.CommandText = sql;
         command.Parameters.AddWithValue("@edgeId", $"{edge.FromId}-{edge.ToId}-{edge.Role}");
         command.Parameters.AddWithValue("@fromId", edge.FromId);
         command.Parameters.AddWithValue("@toId", edge.ToId);
-        command.Parameters.AddWithValue("@typeId", edge.Role);
+        command.Parameters.AddWithValue("@role", edge.Role);
         command.Parameters.AddWithValue("@weight", edge.Weight ?? 1.0);
         command.Parameters.AddWithValue("@properties", JsonSerializer.Serialize(edge.Meta ?? new Dictionary<string, object>(), _jsonOptions));
 
@@ -258,7 +258,7 @@ public class SqliteIceStorageBackend : IIceStorageBackend
         using var connection = new SqliteConnection(_connectionString);
         await connection.OpenAsync();
 
-        var sql = "DELETE FROM ice_edges WHERE from_id = @fromId AND to_id = @toId AND type_id = @role";
+        var sql = "DELETE FROM ice_edges WHERE from_id = @fromId AND to_id = @toId AND role = @role";
         using var command = connection.CreateCommand();
         command.CommandText = sql;
         command.Parameters.AddWithValue("@fromId", fromId);
@@ -356,8 +356,8 @@ public class SqliteIceStorageBackend : IIceStorageBackend
         try
         {
             var sql = @"
-                INSERT OR REPLACE INTO ice_edges (edge_id, from_id, to_id, type_id, weight, properties, updated_at)
-                VALUES (@edgeId, @fromId, @toId, @typeId, @weight, @properties, CURRENT_TIMESTAMP)";
+                INSERT OR REPLACE INTO ice_edges (edge_id, from_id, to_id, role, weight, properties, updated_at)
+                VALUES (@edgeId, @fromId, @toId, @role, @weight, @properties, CURRENT_TIMESTAMP)";
 
             foreach (var edge in edges)
             {
@@ -366,7 +366,7 @@ public class SqliteIceStorageBackend : IIceStorageBackend
                 command.Parameters.AddWithValue("@edgeId", $"{edge.FromId}-{edge.ToId}-{edge.Role}");
                 command.Parameters.AddWithValue("@fromId", edge.FromId);
                 command.Parameters.AddWithValue("@toId", edge.ToId);
-                command.Parameters.AddWithValue("@typeId", edge.Role);
+                command.Parameters.AddWithValue("@role", edge.Role);
                 command.Parameters.AddWithValue("@weight", edge.Weight ?? 1.0);
                 command.Parameters.AddWithValue("@properties", JsonSerializer.Serialize(edge.Meta ?? new Dictionary<string, object>(), _jsonOptions));
 

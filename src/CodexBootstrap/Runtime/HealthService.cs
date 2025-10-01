@@ -12,8 +12,11 @@ public sealed class HealthService
     private readonly Core.ICodexLogger _logger;
     private readonly DateTime _startTime;
     private long _requestCount;
+    private long _activeRequests;
+    private long _dbOperationsInFlight;
     private readonly object _lock = new object();
     private ModuleLoader? _moduleLoader;
+    private bool _registryInitialized = false;
 
     public HealthService(INodeRegistry registry)
     {
@@ -21,6 +24,8 @@ public sealed class HealthService
         _logger = new Log4NetLogger(typeof(HealthService));
         _startTime = DateTime.UtcNow;
         _requestCount = 0;
+        _activeRequests = 0;
+        _dbOperationsInFlight = 0;
     }
 
     public void SetModuleLoader(ModuleLoader moduleLoader)
@@ -36,26 +41,56 @@ public sealed class HealthService
         lock (_lock)
         {
             var uptime = DateTime.UtcNow - _startTime;
-            var nodeCount = _registry.AllNodes().Count();
-            var edgeCount = _registry.AllEdges().Count();
+            int nodeCount = 0;
+            int edgeCount = 0;
+            int moduleCount = 0;
+            long dbOps = 0;
             
-            // Calculate registration metrics
-            var registrationMetrics = CalculateRegistrationMetrics();
+            // Only query registry if initialized to avoid blocking
+            try
+            {
+                if (_registryInitialized)
+                {
+                    nodeCount = _registry.AllNodes().Count();
+                    edgeCount = _registry.AllEdges().Count();
+                    moduleCount = _moduleLoader?.GetLoadedModules().Count ?? 
+                                 (_registry.GetNodesByType("module").Count() + 
+                                  _registry.GetNodesByType("codex.meta/module").Count());
+                }
+                
+                // Get DB operations count from registry
+                if (_registry is NodeRegistry nr)
+                {
+                    dbOps = nr.GetDbOperationsInFlight();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"Error querying registry in health check: {ex.Message}");
+            }
             
-            // Use actual loaded module count from ModuleLoader instead of NodeRegistry count
-            var moduleCount = _moduleLoader?.GetLoadedModules().Count ?? 
-                             (_registry.GetNodesByType("module").Count() + 
-                              _registry.GetNodesByType("codex.meta/module").Count());
+            // Calculate registration metrics only if registry is initialized
+            var registrationMetrics = _registryInitialized ? CalculateRegistrationMetrics() : null;
+            
+            // Determine status
+            var status = _registryInitialized 
+                ? (registrationMetrics?.ModuleRegistrationSuccessRate >= 0.9 ? "healthy" : "degraded")
+                : "initializing";
 
             return new HealthStatus(
-                Status: registrationMetrics.ModuleRegistrationSuccessRate >= 0.9 ? "healthy" : "degraded",
+                Status: status,
                 Uptime: uptime,
                 RequestCount: _requestCount,
+                ActiveRequests: _activeRequests,
+                DbOperationsInFlight: dbOps,
                 NodeCount: nodeCount,
                 EdgeCount: edgeCount,
                 ModuleCount: moduleCount,
                 Timestamp: DateTime.UtcNow,
                 Version: GetVersion(),
+                RegistryInitialized: _registryInitialized,
+                MemoryUsageMB: GC.GetTotalMemory(false) / 1024 / 1024,
+                ThreadCount: System.Diagnostics.Process.GetCurrentProcess().Threads.Count,
                 RegistrationMetrics: registrationMetrics
             );
         }
@@ -66,17 +101,27 @@ public sealed class HealthService
         try
         {
             var totalModulesLoaded = _moduleLoader?.GetLoadedModules().Count ?? 0;
+            
+            // Get actual failure lists from ModuleLoader
+            var failedModules = _moduleLoader?.GetFailedModuleLoads().ToList() ?? new List<string>();
+            var failedRoutes = _moduleLoader?.GetFailedRouteRegistrations().ToList() ?? new List<string>();
+            
             var modulesInNodeRegistry = _registry.GetNodesByType("module").Count() + 
                                       _registry.GetNodesByType("codex.meta/module").Count();
-            var modulesWithFailedRegistration = Math.Max(0, totalModulesLoaded - modulesInNodeRegistry);
+            var modulesWithFailedRegistration = failedModules.Count;
             
             // Count routes by looking at API nodes (both standard and meta API types)
             var totalRoutesRegistered = _registry.GetNodesByType("api").Count() + 
                                       _registry.GetNodesByType("codex.meta/api").Count();
-            var routesWithFailedRegistration = 0; // This would need to be tracked separately
+            var routesWithFailedRegistration = failedRoutes.Count;
             
-            var moduleSuccessRate = totalModulesLoaded > 0 ? (double)modulesInNodeRegistry / totalModulesLoaded : 1.0;
-            var routeSuccessRate = 1.0; // This would need to be calculated based on actual route registration tracking
+            var moduleSuccessRate = (totalModulesLoaded + modulesWithFailedRegistration) > 0 
+                ? (double)totalModulesLoaded / (totalModulesLoaded + modulesWithFailedRegistration) 
+                : 1.0;
+            
+            var routeSuccessRate = (totalRoutesRegistered + routesWithFailedRegistration) > 0 
+                ? (double)totalRoutesRegistered / (totalRoutesRegistered + routesWithFailedRegistration) 
+                : 1.0;
             
             return new RegistrationMetrics(
                 TotalModulesLoaded: totalModulesLoaded,
@@ -86,8 +131,8 @@ public sealed class HealthService
                 RoutesWithFailedRegistration: routesWithFailedRegistration,
                 ModuleRegistrationSuccessRate: moduleSuccessRate,
                 RouteRegistrationSuccessRate: routeSuccessRate,
-                FailedModuleRegistrations: new List<string>(), // Would be populated from actual failure tracking
-                FailedRouteRegistrations: new List<string>()   // Would be populated from actual failure tracking
+                FailedModuleRegistrations: failedModules,
+                FailedRouteRegistrations: failedRoutes
             );
         }
         catch (Exception ex)
@@ -105,6 +150,44 @@ public sealed class HealthService
         lock (_lock)
         {
             _requestCount++;
+        }
+    }
+
+    /// <summary>
+    /// Tracks active request count
+    /// </summary>
+    public void BeginRequest()
+    {
+        Interlocked.Increment(ref _activeRequests);
+    }
+
+    public void EndRequest()
+    {
+        Interlocked.Decrement(ref _activeRequests);
+    }
+
+    /// <summary>
+    /// Tracks DB operations in flight
+    /// </summary>
+    public void BeginDbOperation()
+    {
+        Interlocked.Increment(ref _dbOperationsInFlight);
+    }
+
+    public void EndDbOperation()
+    {
+        Interlocked.Decrement(ref _dbOperationsInFlight);
+    }
+
+    /// <summary>
+    /// Marks registry as initialized
+    /// </summary>
+    public void MarkRegistryInitialized()
+    {
+        lock (_lock)
+        {
+            _registryInitialized = true;
+            _logger.Info("Registry marked as initialized in HealthService");
         }
     }
 
@@ -130,11 +213,16 @@ public record HealthStatus(
     string Status,
     TimeSpan Uptime,
     long RequestCount,
+    long ActiveRequests,
+    long DbOperationsInFlight,
     int NodeCount,
     int EdgeCount,
     int ModuleCount,
     DateTime Timestamp,
     string Version,
+    bool RegistryInitialized,
+    long MemoryUsageMB,
+    int ThreadCount,
     RegistrationMetrics? RegistrationMetrics = null
 );
 

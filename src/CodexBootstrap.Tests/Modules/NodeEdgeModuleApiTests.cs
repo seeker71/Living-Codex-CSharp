@@ -247,6 +247,109 @@ public class NodeEdgeModuleApiTests : IClassFixture<TestServerFixture>
 
     #endregion
 
+    #region Edge Metadata Tests
+
+    [Fact]
+    public async Task GetEdgeMetadata_ShouldReturnRolesAndRelationshipTypes()
+    {
+        // Act
+        var response = await _client.GetAsync("/storage-endpoints/edges/metadata");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var content = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content, _jsonOptions);
+        
+        result.Should().NotBeNull();
+        result.Should().ContainKey("success");
+        result.Should().ContainKey("data");
+        
+        var successElement = (JsonElement)result!["success"];
+        successElement.GetBoolean().Should().Be(true);
+        
+        var dataElement = (JsonElement)result!["data"];
+        var data = JsonSerializer.Deserialize<Dictionary<string, object>>(dataElement.GetRawText(), _jsonOptions);
+        
+        data.Should().NotBeNull();
+        data.Should().ContainKey("roles");
+        data.Should().ContainKey("relationshipTypes");
+        data.Should().ContainKey("totalRoles");
+        data.Should().ContainKey("totalRelationshipTypes");
+        
+        // Verify roles is a non-empty array
+        var roles = data!["roles"] as List<object>;
+        roles.Should().NotBeNull();
+        roles.Should().NotBeEmpty();
+        roles.Should().OnlyContain(role => !string.IsNullOrWhiteSpace(role != null ? role.ToString() : null));
+        
+        // Verify relationshipTypes is a non-empty array
+        var relationshipTypes = data!["relationshipTypes"] as List<object>;
+        relationshipTypes.Should().NotBeNull();
+        relationshipTypes.Should().NotBeEmpty();
+        relationshipTypes.Should().OnlyContain(relType => !string.IsNullOrWhiteSpace(relType != null ? relType.ToString() : null));
+        
+        // Verify counts match array lengths
+        var totalRoles = Convert.ToInt32(data!["totalRoles"]);
+        var totalRelationshipTypes = Convert.ToInt32(data!["totalRelationshipTypes"]);
+        
+        totalRoles.Should().Be(roles.Count);
+        totalRelationshipTypes.Should().Be(relationshipTypes.Count);
+    }
+
+    [Fact]
+    public async Task GetEdgeMetadata_ShouldReturnConsistentData()
+    {
+        // Act - Make multiple requests to ensure consistency
+        var tasks = new List<Task<HttpResponseMessage>>();
+        for (int i = 0; i < 3; i++)
+        {
+            tasks.Add(_client.GetAsync("/storage-endpoints/edges/metadata"));
+        }
+        
+        var responses = await Task.WhenAll(tasks);
+        
+        // Assert - All requests should succeed
+        foreach (var response in responses)
+        {
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+        
+        // Parse all responses and verify they're identical
+        var results = new List<Dictionary<string, object>>();
+        foreach (var response in responses)
+        {
+            var content = await response.Content.ReadAsStringAsync();
+            var result = JsonSerializer.Deserialize<Dictionary<string, object>>(content, _jsonOptions);
+            results.Add(result!);
+        }
+        
+        // All responses should be identical
+        for (int i = 1; i < results.Count; i++)
+        {
+            var firstData = results[0]["data"];
+            var currentData = results[i]["data"];
+            
+            firstData.Should().BeEquivalentTo(currentData);
+        }
+    }
+
+    [Fact]
+    public async Task GetEdgeMetadata_ShouldRespondWithinAcceptableTime()
+    {
+        // Arrange
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        // Act
+        var response = await _client.GetAsync("/storage-endpoints/edges/metadata");
+        stopwatch.Stop();
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        stopwatch.ElapsedMilliseconds.Should().BeLessThan(1000); // Should respond within 1 second
+    }
+
+    #endregion
+
     #region Future Implementation Tests (Placeholder for when endpoints are implemented)
 
     [Fact]

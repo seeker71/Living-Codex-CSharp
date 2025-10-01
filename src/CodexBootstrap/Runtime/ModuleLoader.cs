@@ -12,6 +12,8 @@ public sealed class ModuleLoader
     private readonly IApiRouter _router;
     private readonly IServiceProvider _serviceProvider;
     private readonly List<IModule> _loadedModules = new();
+    private readonly List<string> _failedModuleLoads = new();
+    private readonly List<string> _failedRouteRegistrations = new();
     private readonly Core.ICodexLogger _logger;
 
     public ModuleLoader(INodeRegistry registry, IApiRouter router, IServiceProvider serviceProvider)
@@ -23,6 +25,10 @@ public sealed class ModuleLoader
     }
 
     public IReadOnlyList<IModule> GetLoadedModules() => _loadedModules.AsReadOnly();
+    
+    public IReadOnlyList<string> GetFailedModuleLoads() => _failedModuleLoads.AsReadOnly();
+    
+    public IReadOnlyList<string> GetFailedRouteRegistrations() => _failedRouteRegistrations.AsReadOnly();
 
     public void GenerateMetaNodes()
     {
@@ -57,7 +63,9 @@ public sealed class ModuleLoader
             }
             catch (Exception ex)
             {
-                _logger.Error($"Failed to register HTTP endpoints for module {module.GetModuleNode().Id}: {ex.Message}", ex);
+                var moduleId = module.GetModuleNode().Id;
+                _logger.Error($"Failed to register HTTP endpoints for module {moduleId}: {ex.Message}", ex);
+                _failedRouteRegistrations.Add($"{moduleId}: {ex.Message}");
             }
         }
     }
@@ -104,6 +112,7 @@ public sealed class ModuleLoader
             catch (Exception ex)
             {
                 _logger.Error($"Failed to load module {moduleType.Name}: {ex.Message}", ex);
+                _failedModuleLoads.Add($"{moduleType.Name}: {ex.Message}");
             }
         }
     }
@@ -267,7 +276,9 @@ public sealed class ModuleLoader
             }
             catch (Exception ex)
             {
-                _logger.Error($"Failed to register API handlers for module {module.GetType().Name}: {ex.Message}", ex);
+                var moduleName = module.GetType().Name;
+                _logger.Error($"Failed to register API handlers for module {moduleName}: {ex.Message}", ex);
+                _failedRouteRegistrations.Add($"{moduleName} (API handlers): {ex.Message}");
                 // Continue loading even if API handler registration fails
             }
             
@@ -295,7 +306,9 @@ public sealed class ModuleLoader
         }
         catch (Exception ex)
         {
-            _logger.Error($"Error loading module {module.GetType().Name}: {ex.Message}", ex);
+            var moduleName = module.GetType().Name;
+            _logger.Error($"Error loading module {moduleName}: {ex.Message}", ex);
+            _failedModuleLoads.Add($"{moduleName}: {ex.Message}");
             throw;
         }
     }

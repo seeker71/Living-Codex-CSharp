@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Image as ImageIcon, Heart, Share2, MessageCircle, ExternalLink, AlertCircle, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,7 +22,7 @@ export function GalleryLens({ controls = {}, userId, className = '', readOnly = 
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
-  const fetchImages = async () => {
+  const fetchImages = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -37,12 +37,27 @@ export function GalleryLens({ controls = {}, userId, className = '', readOnly = 
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
+        let errorText = '';
         let errorData;
         try {
-          errorData = JSON.parse(errorText);
+          // Try to get text if the method exists (for mocked responses)
+          if (typeof response.text === 'function') {
+            errorText = await response.text();
+          } else {
+            // For real API responses, try to get JSON
+            errorData = await response.json();
+            errorText = errorData.message || `HTTP ${response.status}`;
+          }
         } catch {
-          errorData = { error: errorText };
+          errorText = `HTTP ${response.status}`;
+        }
+        
+        if (!errorData) {
+          try {
+            errorData = JSON.parse(errorText);
+          } catch {
+            errorData = { error: errorText };
+          }
         }
 
         const errorMessage = errorData?.error || `HTTP ${response.status}: ${response.statusText}`;
@@ -111,11 +126,11 @@ export function GalleryLens({ controls = {}, userId, className = '', readOnly = 
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id, trackInteraction]);
 
   useEffect(() => {
     fetchImages();
-  }, [controls, retryCount]);
+  }, [user?.id, retryCount]);
 
   const handleRetry = () => {
     setRetryCount(prev => prev + 1);

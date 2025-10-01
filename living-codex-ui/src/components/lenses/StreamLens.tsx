@@ -7,6 +7,7 @@ import { PaginationControls } from '@/components/ui/PaginationControls';
 import { useConceptDiscovery, useUserDiscovery } from '@/lib/hooks';
 import { UILens } from '@/lib/atoms';
 import { Clock, Network, Sparkles, Star, TrendingUp, Users } from 'lucide-react';
+import { formatRelativeTime } from '@/lib/utils';
 
 interface StreamLensProps {
   lens: UILens;
@@ -42,6 +43,11 @@ export function StreamLens({ lens, controls = {}, userId, className = '', readOn
 
   useEffect(() => {
     const loadStreamData = async () => {
+      // Only proceed if we have data from both queries
+      if (!conceptQuery.data && !userQuery.data) {
+        return;
+      }
+
       setLoading(true);
       setError(null);
 
@@ -65,12 +71,12 @@ export function StreamLens({ lens, controls = {}, userId, className = '', readOn
           isNew: concept.createdAt && new Date(concept.createdAt) > new Date(Date.now() - 24 * 60 * 60 * 1000),
           isTrending: concept.resonance && concept.resonance > 0.8,
           tags: concept.tags || concept.axes || [],
-          // Mock data for features not yet implemented in backend
+          // Real data from backend
           relatedConcepts: concept.relatedConcepts || [],
-          upvotes: Math.floor(Math.random() * 50) + 10,
-          downvotes: Math.floor(Math.random() * 10),
-          commentCount: Math.floor(Math.random() * 20),
-          shareCount: Math.floor(Math.random() * 15),
+          upvotes: concept.upvotes || 0,
+          downvotes: concept.downvotes || 0,
+          commentCount: concept.commentCount || 0,
+          shareCount: concept.shareCount || 0,
           backlinks: [],
           forwardLinks: [],
           status: 'published',
@@ -86,7 +92,7 @@ export function StreamLens({ lens, controls = {}, userId, className = '', readOn
           axes: user.interests || user.axes || [],
           // Add engagement features for users
           contributors: user.contributors || [],
-          contributionCount: user.contributionCount || Math.floor(Math.random() * 20) + 1,
+          contributionCount: user.contributionCount || 0,
           trendingScore: 0,
           lastActivity: user.lastSeen || '1 day ago',
           energyLevel: 0.6,
@@ -116,7 +122,7 @@ export function StreamLens({ lens, controls = {}, userId, className = '', readOn
     };
 
     loadStreamData();
-  }, []);
+  }, [conceptQuery.data, userQuery.data, lens.ranking, controls.joy]);
 
   const handleAction = (action: string, itemId: string) => {
     console.log(`Action ${action} on item ${itemId}`);
@@ -306,15 +312,6 @@ export function StreamLens({ lens, controls = {}, userId, className = '', readOn
                 }}
                 aria-label={`Concept: ${item.name}. ${recommendationReason}`}
               >
-                {/* Recommendation indicator with accessibility */}
-                <div className="absolute -left-4 top-6 z-10" aria-hidden="true">
-                  <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-2 border border-gray-200 dark:border-gray-600">
-                    <div className="text-xs font-medium text-gray-600 dark:text-gray-300 text-center">
-                      {recommendationReason}
-                    </div>
-                    <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-white dark:border-t-gray-800 mx-auto mt-1"></div>
-                  </div>
-                </div>
 
                 <div className="transform transition-all duration-500 hover:scale-[1.01] hover:translate-x-2">
                   <ConceptStreamCard
@@ -325,7 +322,7 @@ export function StreamLens({ lens, controls = {}, userId, className = '', readOn
                 </div>
 
                 {/* Discovery metadata with accessibility */}
-                <div className="mt-2 ml-8 flex flex-wrap items-center gap-4 text-xs text-gray-500 dark:text-gray-400" role="group" aria-label={`Metadata for ${item.name}`}>
+                <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-gray-500 dark:text-gray-400" role="group" aria-label={`Metadata for ${item.name}`}>
                   <div className="flex items-center space-x-1" role="status" aria-label={`Resonance level: ${Math.round((item.resonance || 0) * 100)} percent`}>
                     <div className={`w-2 h-2 rounded-full ${
                       item.resonance && item.resonance > 0.8 ? 'bg-green-500' :
@@ -338,9 +335,9 @@ export function StreamLens({ lens, controls = {}, userId, className = '', readOn
                     <span>{item.contributionCount || 0} contributors</span>
                   </div>
                   {item.lastActivity && (
-                    <div className="flex items-center space-x-1" aria-label={`Last updated: ${item.lastActivity}`}>
+                    <div className="flex items-center space-x-1" aria-label={`Last updated: ${formatRelativeTime(item.lastActivity)}`}>
                       <Clock className="w-3 h-3" aria-hidden="true" />
-                      <span>{item.lastActivity}</span>
+                      <span>{formatRelativeTime(item.lastActivity)}</span>
                     </div>
                   )}
                 </div>

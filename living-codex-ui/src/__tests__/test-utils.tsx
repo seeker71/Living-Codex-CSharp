@@ -1,7 +1,7 @@
 import React, { PropsWithChildren } from 'react'
 import { render, RenderOptions } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { AuthProvider } from '@/contexts/AuthContext'
+import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 
 // Test infrastructure validation
 export const TEST_INFRASTRUCTURE = {
@@ -117,7 +117,52 @@ jest.mock('lucide-react', () => {
   }
 })
 
-function Providers({ children }: PropsWithChildren) {
+// Mock AuthContext
+const MockAuthContext = React.createContext<any>(null)
+
+function MockAuthProvider({ children, authValue }: PropsWithChildren<{ authValue?: any }>) {
+  const defaultAuthValue = {
+    user: null,
+    token: null,
+    isLoading: false,
+    isAuthenticated: false,
+    login: jest.fn(),
+    register: jest.fn(),
+    logout: jest.fn(),
+    refreshUser: jest.fn(),
+    testConnection: jest.fn(),
+  }
+
+  return (
+    <MockAuthContext.Provider value={authValue || defaultAuthValue}>
+      {children}
+    </MockAuthContext.Provider>
+  )
+}
+
+// Mock the useAuth hook
+jest.mock('@/contexts/AuthContext', () => ({
+  ...jest.requireActual('@/contexts/AuthContext'),
+  useAuth: () => {
+    const context = React.useContext(MockAuthContext)
+    if (!context) {
+      return {
+        user: null,
+        token: null,
+        isLoading: false,
+        isAuthenticated: false,
+        login: jest.fn(),
+        register: jest.fn(),
+        logout: jest.fn(),
+        refreshUser: jest.fn(),
+        testConnection: jest.fn(),
+      }
+    }
+    return context
+  },
+}))
+
+function Providers({ children, authValue }: PropsWithChildren<{ authValue?: any }>) {
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false, staleTime: 0 },
@@ -131,16 +176,17 @@ function Providers({ children }: PropsWithChildren) {
   })
 
   return (
-    <AuthProvider>
+    <MockAuthProvider authValue={authValue}>
       <QueryClientProvider client={client}>{children}</QueryClientProvider>
-    </AuthProvider>
+    </MockAuthProvider>
   )
 }
 
-export function renderWithProviders(ui: React.ReactElement, options?: RenderOptions) {
+export function renderWithProviders(ui: React.ReactElement, options?: { authValue?: any } & RenderOptions) {
+  const { authValue, ...renderOptions } = options || {}
   return render(ui, {
-    wrapper: ({ children }) => <Providers>{children}</Providers>,
-    ...options,
+    wrapper: ({ children }) => <Providers authValue={authValue}>{children}</Providers>,
+    ...renderOptions,
   })
 }
 
@@ -179,9 +225,47 @@ export const mockFetch = (responses: any[]) => {
   return jest.fn().mockImplementation(() => {
     const response = responses[callCount % responses.length]
     callCount++
-    return Promise.resolve(response)
+    
+    // Create a proper Response-like object
+    const mockResponse = {
+      ok: response.success !== false,
+      status: response.success !== false ? 200 : 400,
+      statusText: response.success !== false ? 'OK' : 'Bad Request',
+      json: () => Promise.resolve(response),
+      text: () => Promise.resolve(JSON.stringify(response)),
+      headers: new Headers(),
+      url: '',
+      type: 'basic' as ResponseType,
+      redirected: false,
+      clone: () => mockResponse,
+      body: null,
+      bodyUsed: false,
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+      blob: () => Promise.resolve(new Blob()),
+      formData: () => Promise.resolve(new FormData()),
+    }
+    
+    return Promise.resolve(mockResponse as Response)
   })
 }
+
+// Use real API calls - we want to test the real system
+// jest.mock('@/lib/api', () => ({
+//   api: {
+//     get: jest.fn(),
+//     post: jest.fn(),
+//     put: jest.fn(),
+//     delete: jest.fn(),
+//   },
+//   endpoints: {
+//     login: jest.fn(),
+//     register: jest.fn(),
+//     logout: jest.fn(),
+//     validateToken: jest.fn(),
+//     getUserProfile: jest.fn(),
+//     health: jest.fn(),
+//   },
+// }))
 
 export const mockClipboard = {
   writeText: jest.fn().mockResolvedValue(undefined),

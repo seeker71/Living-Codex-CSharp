@@ -2,6 +2,7 @@ import React from 'react'
 import { screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { renderWithProviders } from './test-utils'
 import { GalleryLens } from '@/components/lenses/GalleryLens'
+import { testConfig, getFetchMock, isBackendAvailable } from './test-config'
 
 // Mock Next.js navigation
 const mockPush = jest.fn()
@@ -33,53 +34,28 @@ jest.mock('@/lib/hooks', () => ({
   useTrackInteraction: () => jest.fn(),
 }))
 
-// Mock data for gallery items
-const mockGalleryItems = [
-  {
-    id: 'concept-1',
-    name: 'Quantum Computing',
-    description: 'Computing based on quantum mechanical phenomena',
-    domain: 'Technology',
-    complexity: 8,
-    resonance: 0.85,
-    tags: ['quantum', 'computing', 'technology'],
-    createdAt: '2024-01-15T10:00:00Z',
-    energy: 0.7
-  },
-  {
-    id: 'concept-2',
-    name: 'Consciousness',
-    description: 'The state of being aware and able to think',
-    domain: 'Philosophy',
-    complexity: 9,
-    resonance: 0.92,
-    tags: ['consciousness', 'philosophy', 'awareness'],
-    createdAt: '2024-01-14T15:30:00Z',
-    energy: 0.8
-  }
-]
-
 describe('Gallery Image Display - Simple Tests', () => {
+  beforeAll(async () => {
+    // If using real API, check if backend is available
+    if (testConfig.useRealApi) {
+      const backendAvailable = await isBackendAvailable()
+      if (!backendAvailable) {
+        console.warn('⚠️  Backend not available, tests will be skipped. Start backend with: ./start-server.sh')
+        pending('Backend not available')
+      }
+    }
+  })
+
   beforeEach(() => {
     // Reset mocks
     jest.clearAllMocks()
     
-    // Mock fetch for concepts endpoint
-    global.fetch = jest.fn()
-      .mockImplementation((url: string) => {
-        if (url.includes('/concepts')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({
-              concepts: mockGalleryItems
-            })
-          })
-        }
-        return Promise.resolve({
-          ok: false,
-          status: 404
-        })
-      })
+    // Set up fetch mock based on configuration
+    const fetchMock = getFetchMock()
+    if (fetchMock) {
+      global.fetch = fetchMock
+    }
+    // If fetchMock is undefined, we'll use real fetch (when useRealApi is true)
   })
 
   afterEach(() => {
@@ -91,7 +67,7 @@ describe('Gallery Image Display - Simple Tests', () => {
       renderWithProviders(<GalleryLens />)
       
       await waitFor(() => {
-        expect(screen.getByText('Concept Gallery')).toBeInTheDocument()
+        expect(screen.getByText('Visual Discovery Gallery')).toBeInTheDocument()
       })
       
       // Check that concepts are displayed
@@ -114,7 +90,7 @@ describe('Gallery Image Display - Simple Tests', () => {
       renderWithProviders(<GalleryLens />)
       
       await waitFor(() => {
-        expect(screen.getByText('Concept Gallery')).toBeInTheDocument()
+        expect(screen.getByText('Visual Discovery Gallery')).toBeInTheDocument()
       })
       
       // Check that images are using placeholder URLs with concept initials
@@ -131,7 +107,7 @@ describe('Gallery Image Display - Simple Tests', () => {
       renderWithProviders(<GalleryLens />)
       
       await waitFor(() => {
-        expect(screen.getByText('Concept Gallery')).toBeInTheDocument()
+        expect(screen.getByText('Visual Discovery Gallery')).toBeInTheDocument()
       })
       
       // Check that images have proper CSS classes for styling
@@ -145,7 +121,7 @@ describe('Gallery Image Display - Simple Tests', () => {
       renderWithProviders(<GalleryLens />)
       
       await waitFor(() => {
-        expect(screen.getByText('Concept Gallery')).toBeInTheDocument()
+        expect(screen.getByText('Visual Discovery Gallery')).toBeInTheDocument()
       })
       
       // Check that resonance values are displayed
@@ -157,7 +133,7 @@ describe('Gallery Image Display - Simple Tests', () => {
       renderWithProviders(<GalleryLens />)
       
       await waitFor(() => {
-        expect(screen.getByText('Concept Gallery')).toBeInTheDocument()
+        expect(screen.getByText('Visual Discovery Gallery')).toBeInTheDocument()
       })
       
       // Check that domains are displayed
@@ -171,7 +147,7 @@ describe('Gallery Image Display - Simple Tests', () => {
       renderWithProviders(<GalleryLens />)
       
       await waitFor(() => {
-        expect(screen.getByText('Concept Gallery')).toBeInTheDocument()
+        expect(screen.getByText('Visual Discovery Gallery')).toBeInTheDocument()
       })
       
       // Click on the first gallery item
@@ -188,7 +164,7 @@ describe('Gallery Image Display - Simple Tests', () => {
       renderWithProviders(<GalleryLens />)
       
       await waitFor(() => {
-        expect(screen.getByText('Concept Gallery')).toBeInTheDocument()
+        expect(screen.getByText('Visual Discovery Gallery')).toBeInTheDocument()
       })
       
       // Click on a gallery item to open modal
@@ -210,7 +186,7 @@ describe('Gallery Image Display - Simple Tests', () => {
       renderWithProviders(<GalleryLens />)
       
       await waitFor(() => {
-        expect(screen.getByText('Concept Gallery')).toBeInTheDocument()
+        expect(screen.getByText('Visual Discovery Gallery')).toBeInTheDocument()
       })
       
       // Click on a gallery item to open modal
@@ -233,7 +209,7 @@ describe('Gallery Image Display - Simple Tests', () => {
       renderWithProviders(<GalleryLens />)
       
       await waitFor(() => {
-        expect(screen.getByText('Concept Gallery')).toBeInTheDocument()
+        expect(screen.getByText('Visual Discovery Gallery')).toBeInTheDocument()
       })
       
       // Click on quantum computing item
@@ -260,7 +236,7 @@ describe('Gallery Image Display - Simple Tests', () => {
       renderWithProviders(<GalleryLens />)
       
       await waitFor(() => {
-        expect(screen.getByText('Concept Gallery')).toBeInTheDocument()
+        expect(screen.getByText('Visual Discovery Gallery')).toBeInTheDocument()
       })
       
       // Check that filter dropdown is present
@@ -281,7 +257,7 @@ describe('Gallery Image Display - Simple Tests', () => {
       renderWithProviders(<GalleryLens />)
       
       await waitFor(() => {
-        expect(screen.getByText('Concept Gallery')).toBeInTheDocument()
+        expect(screen.getByText('Visual Discovery Gallery')).toBeInTheDocument()
       })
       
       // Check that sort dropdown is present
@@ -293,7 +269,7 @@ describe('Gallery Image Display - Simple Tests', () => {
       
       // Check that items are re-sorted
       await waitFor(() => {
-        expect(screen.getByText('Concept Gallery')).toBeInTheDocument()
+        expect(screen.getByText('Visual Discovery Gallery')).toBeInTheDocument()
       })
     })
   })
@@ -351,7 +327,7 @@ describe('Gallery Image Display - Simple Tests', () => {
       renderWithProviders(<GalleryLens />)
       
       await waitFor(() => {
-        expect(screen.getByText('Concept Gallery')).toBeInTheDocument()
+        expect(screen.getByText('Visual Discovery Gallery')).toBeInTheDocument()
       })
       
       // Check that images have proper alt text
@@ -366,7 +342,7 @@ describe('Gallery Image Display - Simple Tests', () => {
       renderWithProviders(<GalleryLens />)
       
       await waitFor(() => {
-        expect(screen.getByText('Concept Gallery')).toBeInTheDocument()
+        expect(screen.getByText('Visual Discovery Gallery')).toBeInTheDocument()
       })
       
       // Test keyboard navigation on gallery items
@@ -383,7 +359,7 @@ describe('Gallery Image Display - Simple Tests', () => {
       renderWithProviders(<GalleryLens />)
       
       await waitFor(() => {
-        expect(screen.getByText('Concept Gallery')).toBeInTheDocument()
+        expect(screen.getByText('Visual Discovery Gallery')).toBeInTheDocument()
       })
       
       // Check that images are loaded with proper attributes

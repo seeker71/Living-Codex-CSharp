@@ -348,24 +348,38 @@ public static class CodexBootstrapHost
     private static void InitializePersistence(WebApplication app)
     {
         var options = app.Services.GetRequiredService<NodeRegistryBootstrapOptions>();
+        var logger = app.Services.GetRequiredService<ICodexLogger>();
 
         try
         {
             if (!options.PersistenceEnabled)
             {
+                logger.Info("Persistence is disabled");
                 return;
             }
 
-            var iceStorage = app.Services.GetRequiredService<IIceStorageBackend>();
-            var waterStorage = app.Services.GetRequiredService<IWaterStorageBackend>();
+            // Initialize registry in background to avoid blocking startup
+            logger.Info("Starting registry initialization in background...");
             var registry = app.Services.GetRequiredService<INodeRegistry>();
-
-            registry.InitializeAsync().GetAwaiter().GetResult();
+            var healthService = app.Services.GetRequiredService<HealthService>();
+            
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await registry.InitializeAsync();
+                    healthService.MarkRegistryInitialized();
+                    logger.Info("Registry initialization completed successfully");
+                }
+                catch (Exception ex)
+                {
+                    logger.Error($"Registry initialization failed: {ex.Message}", ex);
+                }
+            });
         }
         catch (Exception ex)
         {
-            var logger = app.Services.GetRequiredService<ICodexLogger>();
-            logger.Warn($"Persistence initialization failed: {ex.Message}");
+            logger.Warn($"Persistence initialization setup failed: {ex.Message}");
         }
     }
 
@@ -450,46 +464,98 @@ public static class CodexBootstrapHost
         var healthService = app.Services.GetRequiredService<HealthService>();
         var configuration = app.Configuration;
 
-        logger.Info("[Hosting] About to initialize registry...");
-        registry.InitializeAsync().GetAwaiter().GetResult();
-        logger.Info("[Hosting] Registry initialized");
-        InitializeMetaNodeSystem(registry);
-        logger.Info("[Hosting] Meta node system initialized");
-        
-        // FOREGROUND: Perform U-CORE seeding synchronously to guarantee availability
-        try
+        // Add middleware to track active requests
+        app.Use(async (context, next) =>
         {
-            logger.Info("[Hosting] Starting U-CORE seeding (synchronous)...");
-            var startTime = DateTime.UtcNow;
-            UCoreInitializer.SeedIfMissing(registry, logger).GetAwaiter().GetResult();
-            logger.Info($"[Hosting] U-CORE seeding completed in {(DateTime.UtcNow - startTime).TotalMilliseconds}ms");
-        }
-        catch (Exception ex)
+            healthService.BeginRequest();
+            try
+            {
+                await next();
+            }
+            finally
+            {
+                healthService.EndRequest();
+            }
+        });
+
+        // Map health endpoint FIRST before any heavy initialization
+        app.MapGet("/health", () =>
         {
-            logger.Error($"U-CORE seeding failed: {ex.Message}", ex);
-        }
+            healthService.IncrementRequestCount();
+            return Results.Ok(healthService.GetHealthStatus());
+        });
 
-        logger.Info("[Hosting] About to load built-in modules...");
-        moduleLoader.LoadBuiltInModules();
-        logger.Info("[Hosting] Built-in modules loaded");
-        var moduleDirectory = configuration.GetValue<string>("ModuleDirectory") ??
-                              Path.Combine(AppContext.BaseDirectory, "modules");
-        logger.Info("[Hosting] About to load external modules from: " + moduleDirectory);
-        moduleLoader.LoadExternalModules(moduleDirectory);
-        logger.Info("[Hosting] External modules loaded");
-        logger.Info("[Hosting] About to generate meta nodes...");
-        moduleLoader.GenerateMetaNodes();
-        logger.Info("[Hosting] Meta nodes generated");
-        healthService.SetModuleLoader(moduleLoader);
+        app.MapGet("/", () => Results.Ok(new
+        {
+            message = "Living Codex API",
+            version = "1.0.0",
+            status = "running",
+            timestamp = DateTime.UtcNow,
+            endpoints = new
+            {
+                health = "/health",
+                modules = "/modules",
+                nodes = "/nodes",
+                swagger = "/swagger"
+            }
+        }));
 
-        LogModuleSummary(logger, moduleLoader.GetLoadedModules());
-
-        logger.Info("[Hosting] About to register HTTP endpoints...");
-        moduleLoader.RegisterHttpEndpoints(app, registry, coreApi);
-        logger.Info("[Hosting] HTTP endpoints registered");
-
-        // Ensure every encountered typeId has a corresponding meta-node (types-as-nodes invariant)
-        MetaNodeSystem.EnsureTypeMetaNodes(registry, logger);
+        // Do ALL heavy initialization in background
+        logger.Info("[Hosting] Starting background initialization...");
+        Console.WriteLine("[DEBUG] Starting background initialization task...");
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                Console.WriteLine("[DEBUG] Inside background task - starting registry init");
+                logger.Info("[Background] Initializing registry...");
+                await registry.InitializeAsync();
+                healthService.MarkRegistryInitialized();
+                logger.Info("[Background] Registry initialized");
+                
+                InitializeMetaNodeSystem(registry);
+                logger.Info("[Background] Meta node system initialized");
+                
+                // U-CORE seeding
+                logger.Info("[Background] Starting U-CORE seeding...");
+                var startTime = DateTime.UtcNow;
+                await UCoreInitializer.SeedIfMissing(registry, logger);
+                logger.Info($"[Background] U-CORE seeding completed in {(DateTime.UtcNow - startTime).TotalMilliseconds}ms");
+                
+                // Load modules
+                logger.Info("[Background] Loading built-in modules...");
+                moduleLoader.LoadBuiltInModules();
+                logger.Info("[Background] Built-in modules loaded");
+                
+                var moduleDirectory = configuration.GetValue<string>("ModuleDirectory") ??
+                                      Path.Combine(AppContext.BaseDirectory, "modules");
+                logger.Info($"[Background] Loading external modules from: {moduleDirectory}");
+                moduleLoader.LoadExternalModules(moduleDirectory);
+                logger.Info("[Background] External modules loaded");
+                
+                logger.Info("[Background] Generating meta nodes...");
+                moduleLoader.GenerateMetaNodes();
+                logger.Info("[Background] Meta nodes generated");
+                
+                // CRITICAL: Set the module loader reference in health service
+                Console.WriteLine($"[DEBUG] About to set module loader in health service. Loaded modules count: {moduleLoader.GetLoadedModules().Count}");
+                healthService.SetModuleLoader(moduleLoader);
+                Console.WriteLine($"[DEBUG] Module loader set in health service successfully");
+                LogModuleSummary(logger, moduleLoader.GetLoadedModules());
+                
+                logger.Info("[Background] Registering HTTP endpoints...");
+                moduleLoader.RegisterHttpEndpoints(app, registry, coreApi);
+                logger.Info("[Background] HTTP endpoints registered");
+                
+                // Ensure type meta-nodes
+                MetaNodeSystem.EnsureTypeMetaNodes(registry, logger);
+                logger.Info("[Background] All initialization complete!");
+            }
+            catch (Exception ex)
+            {
+                logger.Error($"[Background] Initialization failed: {ex.Message}", ex);
+            }
+        });
 
         app.MapGet("/nodes", () => coreApi.GetNodes());
         app.MapGet("/nodes/{id}", (string id) =>
@@ -583,11 +649,7 @@ public static class CodexBootstrapHost
             }
         }));
 
-        app.MapGet("/health", () =>
-        {
-            healthService.IncrementRequestCount();
-            return Results.Ok(healthService.GetHealthStatus());
-        });
+        // Health endpoint already mapped at the top of this method
 
         app.MapGet("/metrics/errors", (ErrorMetrics metrics) =>
         {

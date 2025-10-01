@@ -48,6 +48,18 @@ jest.mock('@/lib/hooks', () => ({
     ], 
     isLoading: false 
   }),
+  useResonanceControls: () => ({
+    data: {
+      fields: [
+        {
+          id: 'axes',
+          options: ['resonance', 'energy', 'complexity']
+        }
+      ],
+      status: 'active'
+    },
+    isLoading: false
+  }),
 }))
 
 describe('Gallery Discover Integration Tests', () => {

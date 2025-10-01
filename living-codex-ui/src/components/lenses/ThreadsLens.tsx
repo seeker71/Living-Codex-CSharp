@@ -7,6 +7,7 @@ import { useTrackInteraction } from '@/lib/hooks';
 import { buildApiUrl } from '@/lib/config';
 import { UXPrimitives } from '@/components/primitives/UXPrimitives';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/Card';
+import { formatRelativeTime, formatCompactTime } from '@/lib/utils';
 
 interface Conversation {
   id: string;
@@ -106,6 +107,38 @@ function ThreadsLens({ controls = {}, userId, className = '', readOnly = false }
   useEffect(() => {
     loadConversations();
     loadGroups();
+  }, []);
+
+  // Realtime updates via WebSocket
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    try {
+      const apiBase = new URL(buildApiUrl('/')).origin.replace('http', 'ws');
+      ws = new WebSocket(`${apiBase}/ws`);
+      ws.onopen = () => {
+        // Optional: could send a subscription message if backend supports per-type filtering
+      };
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          const type = msg?.Type || msg?.type;
+          // Refresh conversations on thread/reply/reaction changes
+          if (type === 'thread.created' || type === 'reply.created' || type === 'reaction.added' || type === 'reaction.removed') {
+            loadConversations();
+          }
+        } catch (e) {
+          // Ignore non-JSON messages
+        }
+      };
+      ws.onerror = () => {
+        // Fail silently, UI keeps polling manually when users interact
+      };
+    } catch {
+      // Ignore init errors
+    }
+    return () => {
+      try { ws?.close(); } catch {}
+    };
   }, []);
 
   // Virtual scrolling implementation
@@ -213,33 +246,36 @@ function ThreadsLens({ controls = {}, userId, className = '', readOnly = false }
   };
 
   const createGroup = async () => {
-    if (!newGroup.name.trim() || !newGroup.description.trim()) {
-      setError('Group name and description are required');
+    if (!newGroup.name.trim()) {
+      setError('Group name is required');
       return;
     }
 
     setError(null);
     setSuccess(null);
     try {
-      const response = await fetch('http://localhost:5002/threads/groups/create', {
+      const payload: Record<string, any> = {
+        name: newGroup.name.trim(),
+        color: newGroup.color
+      };
+      if (newGroup.description.trim()) {
+        payload.description = newGroup.description.trim();
+      }
+
+      const response = await fetch(buildApiUrl('/threads/groups/create'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: newGroup.name,
-          description: newGroup.description,
-          color: newGroup.color
-        })
+        body: JSON.stringify(payload)
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const rawText = await response.text();
+      const data = (() => {
+        try { return JSON.parse(rawText); } catch { return null; }
+      })();
       
-      if (data.success && data.group) {
+      if (response.ok && data && data.success && data.group) {
         const newGroupData: Group = {
           id: data.group.id,
           name: data.group.name,
@@ -254,7 +290,8 @@ function ThreadsLens({ controls = {}, userId, className = '', readOnly = false }
         setNewGroup({ name: '', description: '', color: '#3B82F6' });
         setSuccess('Group created successfully!');
       } else {
-        throw new Error(data.error || 'Failed to create group');
+        const message = (data && (data.message || data.error || data.details)) || rawText || 'Failed to create group';
+        throw new Error(message);
       }
     } catch (error) {
       console.error('Error creating group:', error);
@@ -344,10 +381,37 @@ function ThreadsLens({ controls = {}, userId, className = '', readOnly = false }
     
     const matchesAxis = !filterAxis || conversation.axes.includes(filterAxis);
     
-    const matchesGroup = !selectedGroup || conversation.primaryGroupId === selectedGroup;
+    const matchesGroup = !selectedGroup || 
+      conversation.primaryGroupId === selectedGroup || 
+      conversation.groupIds.includes(selectedGroup);
+    
+    // Debug logging
+    if (selectedGroup) {
+      console.log('Filtering conversation:', {
+        title: conversation.title,
+        primaryGroupId: conversation.primaryGroupId,
+        groupIds: conversation.groupIds,
+        selectedGroup,
+        matchesGroup
+      });
+    }
     
     return matchesSearch && matchesAxis && matchesGroup;
   });
+
+  // Debug logging for filtering
+  useEffect(() => {
+    console.log('Filtering debug:', {
+      selectedGroup,
+      totalConversations: conversations.length,
+      filteredCount: filteredConversations.length,
+      conversations: conversations.map(c => ({
+        title: c.title,
+        primaryGroupId: c.primaryGroupId,
+        groupIds: c.groupIds
+      }))
+    });
+  }, [selectedGroup, conversations, filteredConversations]);
 
   useEffect(() => {
     if (filteredConversations.length > 0) {
@@ -381,8 +445,15 @@ function ThreadsLens({ controls = {}, userId, className = '', readOnly = false }
         await loadConversations();
         setShowEmojiPicker(null);
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        setError(errorData.message || 'Failed to add reaction');
+        const text = await response.text();
+        let message = 'Failed to add reaction';
+        try {
+          const json = JSON.parse(text);
+          message = json.message || json.error || json.details || message;
+        } catch {
+          if (text) message = text;
+        }
+        setError(message);
       }
     } catch (error) {
       console.error('Error adding reaction:', error);
@@ -404,8 +475,15 @@ function ThreadsLens({ controls = {}, userId, className = '', readOnly = false }
       if (response.ok) {
         await loadConversations();
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        setError(errorData.message || 'Failed to remove reaction');
+        const text = await response.text();
+        let message = 'Failed to remove reaction';
+        try {
+          const json = JSON.parse(text);
+          message = json.message || json.error || json.details || message;
+        } catch {
+          if (text) message = text;
+        }
+        setError(message);
       }
     } catch (error) {
       console.error('Error removing reaction:', error);
@@ -660,7 +738,10 @@ function ThreadsLens({ controls = {}, userId, className = '', readOnly = false }
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
             {/* All Conversations Card */}
           <button
-            onClick={() => setSelectedGroup(null)}
+            onClick={() => {
+              console.log('Setting selectedGroup to null (All Conversations)');
+              setSelectedGroup(null);
+            }}
               className={`group p-3 rounded-xl border-2 transition-all duration-200 text-left ${
               selectedGroup === null
                   ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 shadow-sm'
@@ -686,7 +767,10 @@ function ThreadsLens({ controls = {}, userId, className = '', readOnly = false }
           {groups.map((group) => (
             <button
               key={group.id}
-              onClick={() => setSelectedGroup(group.id)}
+              onClick={() => {
+                console.log('Setting selectedGroup to:', group.id, group.name);
+                setSelectedGroup(group.id);
+              }}
                 className={`group p-3 rounded-xl border-2 transition-all duration-200 text-left relative overflow-hidden ${
                 selectedGroup === group.id
                     ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 shadow-sm transform scale-105'
@@ -844,6 +928,12 @@ function ThreadsLens({ controls = {}, userId, className = '', readOnly = false }
                   ))}
                 </div>
               </div>
+              {error && (
+                <div className="text-sm text-red-600 dark:text-red-400 flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4" />
+                  <span>{error}</span>
+                </div>
+              )}
             </CardContent>
             <CardFooter className="flex space-x-3">
               <button

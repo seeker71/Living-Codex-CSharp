@@ -204,6 +204,7 @@ export const KnowledgeMap: React.FC<KnowledgeMapProps> = ({ nodes, selectedNodeI
         ref={canvasRef}
         className="border border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer"
         style={{ width: '100%', height: '400px' }}
+        data-testid="map-canvas"
         onClick={handleCanvasClick}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -212,7 +213,7 @@ export const KnowledgeMap: React.FC<KnowledgeMapProps> = ({ nodes, selectedNodeI
       />
 
       {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 shadow-lg">
+      <div className="absolute bottom-4 left-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 shadow-lg" data-testid="map-legend">
         <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Legend</h4>
         <div className="space-y-1 text-xs">
           <div className="flex items-center space-x-2">
@@ -248,10 +249,10 @@ export const KnowledgeMap: React.FC<KnowledgeMapProps> = ({ nodes, selectedNodeI
       </div>
 
       {/* Stats */}
-      <div className="absolute top-4 right-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 shadow-lg">
+      <div className="absolute top-4 right-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 shadow-lg" data-testid="map-stats">
         <div className="text-xs text-gray-600 dark:text-gray-400">
           <div>Nodes: {nodes.length}</div>
-          <div>Connections: {nodes.reduce((acc, node) => acc + node.connections.length, 0) / 2}</div>
+          <div>Connections: {nodes.reduce((acc, node) => acc + ((node.connections && Array.isArray(node.connections)) ? node.connections.length : 0), 0) / 2}</div>
         </div>
       </div>
     </div>

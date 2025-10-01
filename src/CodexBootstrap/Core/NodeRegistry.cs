@@ -28,6 +28,9 @@ public class NodeRegistry : INodeRegistry
     private readonly Dictionary<string, EdgeRecord> _edgeRecords = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, HashSet<string>> _nodeEdgeIndex = new(StringComparer.OrdinalIgnoreCase);
     private bool _isInitialized = false;
+    
+    // Track DB operations for health monitoring
+    private long _dbOperationsInFlight = 0;
 
     private sealed class EdgeRecord
     {
@@ -60,8 +63,16 @@ public class NodeRegistry : INodeRegistry
         if (_isInitialized) return;
 
         // Initialize storage backends outside of lock
-        await _iceStorage.InitializeAsync();
-        await _waterStorage.InitializeAsync();
+        Interlocked.Increment(ref _dbOperationsInFlight);
+        try
+        {
+            await _iceStorage.InitializeAsync();
+            await _waterStorage.InitializeAsync();
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _dbOperationsInFlight);
+        }
 
         List<Node> iceNodes = new();
         List<Node> waterNodes = new();
@@ -178,6 +189,7 @@ public class NodeRegistry : INodeRegistry
 
     private async Task LoadEdgesFromStorageAsync()
     {
+        Interlocked.Increment(ref _dbOperationsInFlight);
         try
         {
             // Load edges from Ice storage
@@ -216,6 +228,10 @@ public class NodeRegistry : INodeRegistry
         {
             _logger.Error($"Error loading edges from storage: {ex.Message}", ex);
         }
+        finally
+        {
+            Interlocked.Decrement(ref _dbOperationsInFlight);
+        }
     }
 
     public void Upsert(Node node)
@@ -253,6 +269,7 @@ public class NodeRegistry : INodeRegistry
             // Also store in persistent storage asynchronously
             _ = Task.Run(async () =>
             {
+                Interlocked.Increment(ref _dbOperationsInFlight);
                 try
                 {
                     switch (node.State)
@@ -273,6 +290,10 @@ public class NodeRegistry : INodeRegistry
                 catch (Exception ex)
                 {
                     _logger.Error($"Error storing {node.State} node {node.Id}: {ex.Message}", ex);
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref _dbOperationsInFlight);
                 }
             });
 
@@ -1491,6 +1512,14 @@ public class NodeRegistry : INodeRegistry
         {
             _lock.ExitWriteLock();
         }
+    }
+
+    /// <summary>
+    /// Gets the current count of DB operations in flight (for health monitoring)
+    /// </summary>
+    public long GetDbOperationsInFlight()
+    {
+        return Interlocked.Read(ref _dbOperationsInFlight);
     }
 }
 

@@ -185,12 +185,36 @@ export default function ProfilePage() {
         setBio(normalized.bio || '')
         setLocation(normalized.location || '')
         setInterests(normalized.interests || [])
+      } else if (res.success && (res.data as any)?.data?.profile) {
+        const p = (res.data as any).data.profile
+        const normalized: UserProfile = {
+          userId: p.id || user.id,
+          displayName: p.displayName || user.username || '',
+          email: p.email || user.email || '',
+          location: p.location || '',
+          interests: Array.isArray(p.interests) ? p.interests : (typeof p.interests === 'string' ? p.interests.split(',').map((i: string) => i.trim()).filter(Boolean) : []),
+          contributions: Array.isArray(p.contributions) ? p.contributions : (typeof p.contributions === 'string' ? p.contributions.split(',').map((c: string) => c.trim()).filter(Boolean) : []),
+          avatarUrl: p.avatarUrl || '',
+          coverImageUrl: p.coverImageUrl || '',
+          bio: p.bio || '',
+          joinedDate: p.joinedDate || new Date().toISOString(),
+          lastActive: p.lastActive || new Date().toISOString(),
+          resonanceLevel: p.resonanceLevel || 0,
+          totalContributions: p.totalContributions || 0,
+          profileCompletion: p.profileCompletion || 0,
+        }
+        setProfile(normalized)
+        setDisplayName(normalized.displayName)
+        setEmail(normalized.email)
+        setBio(normalized.bio || '')
+        setLocation(normalized.location || '')
+        setInterests(normalized.interests || [])
 
       } else {
         // Fallback to stored user
         const fallbackProfile: UserProfile = {
           userId: user?.id || '',
-          displayName: user?.username || '',
+          displayName: user?.displayName || user?.username || '',
           email: user?.email || '',
           location: '',
           interests: [],
@@ -367,7 +391,11 @@ export default function ProfilePage() {
     return (
       <div className="min-h-screen bg-page text-foreground flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <div 
+            className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"
+            role="progressbar"
+            aria-label="Loading profile"
+          ></div>
           <p className="text-medium-contrast">Loading your resonance profile...</p>
         </div>
       </div>

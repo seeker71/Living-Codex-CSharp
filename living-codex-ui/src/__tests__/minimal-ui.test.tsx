@@ -128,7 +128,7 @@ describe('Minimal UI Component Tests', () => {
       
       expect(streamModule.StreamLens).toBeDefined()
       expect(galleryModule.GalleryLens).toBeDefined()
-      expect(threadsModule.ThreadsLens).toBeDefined()
+      expect(threadsModule.default).toBeDefined()
     })
 
     it('validates page component exports', () => {
