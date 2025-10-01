@@ -3,6 +3,10 @@ import '@testing-library/jest-dom'
 // Global test timeout
 jest.setTimeout(30000)
 
+// Increase default waitFor timeout for async operations
+import { configure } from '@testing-library/react'
+configure({ asyncUtilTimeout: 5000 }) // 5 seconds for waitFor
+
 // Add fetch polyfill for Node.js compatibility
 import 'whatwg-fetch'
 
