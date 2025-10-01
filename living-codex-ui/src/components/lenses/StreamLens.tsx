@@ -269,13 +269,7 @@ export function StreamLens({ lens, controls = {}, userId, className = '', readOn
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4" role="list" aria-label="Discovery metrics">
-            <div className="text-center" role="listitem">
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400" aria-label={`${Math.round(items.reduce((acc, item) => acc + (item.resonance || 0), 0) / items.length * 100)} percent average relevance`}>
-                {Math.round(items.reduce((acc, item) => acc + (item.resonance || 0), 0) / items.length * 100)}%
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-300">Average Relevance</div>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4" role="list" aria-label="Discovery metrics">
             <div className="text-center" role="listitem">
               <div className="text-2xl font-bold text-green-600 dark:text-green-400" aria-label={`${items.filter(item => item.isNew).length} fresh discoveries`}>
                 {items.filter(item => item.isNew).length}
@@ -283,10 +277,10 @@ export function StreamLens({ lens, controls = {}, userId, className = '', readOn
               <div className="text-sm text-gray-600 dark:text-gray-300">Fresh Discoveries</div>
             </div>
             <div className="text-center" role="listitem">
-              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400" aria-label={`${items.filter(item => item.isTrending).length} trending items`}>
-                {items.filter(item => item.isTrending).length}
+              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400" aria-label={`${items.reduce((acc, item) => acc + (item.contributionCount || 0), 0)} total contributors`}>
+                {items.reduce((acc, item) => acc + (item.contributionCount || 0), 0)}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-300">Trending Now</div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">Total Contributors</div>
             </div>
           </div>
         </section>

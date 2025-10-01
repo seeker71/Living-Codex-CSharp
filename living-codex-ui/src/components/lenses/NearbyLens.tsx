@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { MapPin, Users, Clock, MessageCircle, Heart, ExternalLink } from 'lucide-react';
+import { formatRelativeTime } from '@/lib/utils';
 
 interface NearbyLensProps {
   controls?: Record<string, any>;
@@ -212,7 +213,7 @@ export function NearbyLens({ controls = {}, userId, className = '', readOnly = f
                   <div className="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400 mb-3">
                     <div className="flex items-center space-x-1">
                       <Clock className="w-3 h-3" />
-                      <span>{user.lastSeen}</span>
+                      <span>{formatRelativeTime(user.lastSeen)}</span>
                     </div>
                     {user.mutualConnections > 0 && (
                       <div className="flex items-center space-x-1">

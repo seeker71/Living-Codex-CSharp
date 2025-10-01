@@ -10,13 +10,16 @@ namespace CodexBootstrap.Modules;
 /// </summary>
 public class UserInteractionsModule : ModuleBase
 {
+    private readonly HttpClient _httpClient;
+
     public override string Name => "User Interactions Module";
     public override string Description => "Manages user interactions (votes, bookmarks, likes, shares) with persistent backend storage";
     public override string Version => "1.0.0";
 
-    public UserInteractionsModule(INodeRegistry registry, ICodexLogger logger)
+    public UserInteractionsModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient)
         : base(registry, logger)
     {
+        _httpClient = httpClient;
     }
 
     public override Node GetModuleNode()
@@ -37,6 +40,59 @@ public class UserInteractionsModule : ModuleBase
         _logger.Info("User Interactions Module HTTP endpoints registered");
     }
 
+    /// <summary>
+    /// Ensure user node exists in Ice for edge persistence
+    /// </summary>
+    private void EnsureUserNodeExists(string userId)
+    {
+        if (!_registry.TryGet(userId, out _))
+        {
+            var userNode = new Node(
+                Id: userId,
+                TypeId: "codex.user",
+                State: ContentState.Ice,
+                Locale: null,
+                Title: userId,
+                Description: $"User {userId}",
+                Content: null,
+                Meta: new Dictionary<string, object>
+                {
+                    ["createdBy"] = "UserInteractionsModule",
+                    ["createdAt"] = DateTime.UtcNow.ToString("o")
+                }
+            );
+            _registry.Upsert(userNode);
+            _logger.Debug($"Created Ice user node: {userId}");
+        }
+    }
+
+    /// <summary>
+    /// Ensure entity node exists in Ice for edge persistence
+    /// </summary>
+    private void EnsureEntityNodeExists(string entityId, string entityType)
+    {
+        if (!_registry.TryGet(entityId, out _))
+        {
+            var entityNode = new Node(
+                Id: entityId,
+                TypeId: $"codex.{entityType}",
+                State: ContentState.Ice,
+                Locale: null,
+                Title: entityId,
+                Description: $"{entityType} {entityId}",
+                Content: null,
+                Meta: new Dictionary<string, object>
+                {
+                    ["createdBy"] = "UserInteractionsModule",
+                    ["createdAt"] = DateTime.UtcNow.ToString("o"),
+                    ["entityType"] = entityType
+                }
+            );
+            _registry.Upsert(entityNode);
+            _logger.Debug($"Created Ice entity node: {entityId} ({entityType})");
+        }
+    }
+
     // ==================== VOTES ====================
 
     /// <summary>
@@ -52,6 +108,12 @@ public class UserInteractionsModule : ModuleBase
             {
                 return new ErrorResponse("UserId and EntityId are required");
             }
+
+            // Ensure user node exists in Ice for persistence
+            EnsureUserNodeExists(request.UserId);
+            
+            // Ensure concept/entity node exists (or will be created by concept modules)
+            EnsureEntityNodeExists(request.EntityId, request.EntityType ?? "concept");
 
             var voteEdgeId = $"vote-{request.UserId}-{request.EntityId}";
 
@@ -171,6 +233,10 @@ public class UserInteractionsModule : ModuleBase
                 return new ErrorResponse("UserId and EntityId are required");
             }
 
+            // Ensure nodes exist for Ice persistence
+            EnsureUserNodeExists(request.UserId);
+            EnsureEntityNodeExists(request.EntityId, request.EntityType ?? "concept");
+
             // Check if bookmark exists
             var existingBookmarks = _registry.GetEdgesFrom(request.UserId)
                 .Where(e => e.ToId == request.EntityId && e.Role == "bookmarked")
@@ -287,6 +353,10 @@ public class UserInteractionsModule : ModuleBase
                 return new ErrorResponse("UserId and EntityId are required");
             }
 
+            // Ensure nodes exist for Ice persistence
+            EnsureUserNodeExists(request.UserId);
+            EnsureEntityNodeExists(request.EntityId, request.EntityType ?? "concept");
+
             // Check if like exists
             var existingLikes = _registry.GetEdgesFrom(request.UserId)
                 .Where(e => e.ToId == request.EntityId && e.Role == "liked")
@@ -365,6 +435,10 @@ public class UserInteractionsModule : ModuleBase
             {
                 return new ErrorResponse("UserId and EntityId are required");
             }
+
+            // Ensure nodes exist for Ice persistence
+            EnsureUserNodeExists(request.UserId);
+            EnsureEntityNodeExists(request.EntityId, request.EntityType ?? "concept");
 
             var shareEdge = new Edge(
                 FromId: request.UserId,

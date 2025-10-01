@@ -721,7 +721,7 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
                             </div>
                             <div>
                               <div className="text-sm font-medium text-gray-700 dark:text-gray-300">{concept.lastEditedBy.name}</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">{concept.lastEditedBy.timestamp}</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">{formatRelativeTime(concept.lastEditedBy.timestamp)}</div>
                             </div>
                           </div>
                         )}
@@ -756,7 +756,7 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
                 )}
               </div>
 
-              {/* Enhanced contribution celebration */}
+              {/* Enhanced contribution celebration - simplified to avoid duplicate count */}
               {concept.contributionCount && concept.contributionCount > 20 && (
                 <div className="mb-6 p-4 bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 dark:from-amber-900/30 dark:via-orange-900/30 dark:to-yellow-900/30 rounded-xl border border-amber-200 dark:border-amber-800 shadow-sm">
                   <div className="flex items-center space-x-3">
@@ -765,18 +765,10 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
                     </div>
                     <div className="flex-1">
                       <div className="text-lg font-bold text-amber-800 dark:text-amber-300 mb-1">
-                        🌟 Highly Contributed Concept!
+                        🌟 Top 1% Most Contributed Concept!
                       </div>
                       <div className="text-sm text-amber-700 dark:text-amber-400">
-                        {concept.contributionCount} brilliant minds have shaped this concept
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-black text-amber-600 dark:text-amber-400">
-                        {concept.contributionCount}
-                      </div>
-                      <div className="text-xs text-amber-600 dark:text-amber-500 uppercase tracking-wide">
-                        Contributors
+                        This concept has been shaped by brilliant minds across the community
                       </div>
                     </div>
                   </div>
@@ -909,7 +901,7 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
                             {reply.name.charAt(0).toUpperCase()}
                           </div>
                           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{reply.name}</span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">{reply.lastActivity}</span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">{formatRelativeTime(reply.lastActivity || '')}</span>
                         </div>
                         <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2">{reply.description}</p>
                         <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
@@ -955,7 +947,7 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
                           <span className="font-medium text-blue-600 dark:text-blue-400">{contributor.name}</span> {contributor.contribution}
                         </p>
                         <div className="flex items-center space-x-2 mt-1">
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{contributor.timestamp}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{formatRelativeTime(contributor.timestamp)}</p>
                           {contributor.id === userId && (
                             <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs rounded-full">
                               You
@@ -1111,15 +1103,11 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
           )}
         </div>
 
-        {/* Score and time info */}
+        {/* Score info - removed duplicate lastActivity */}
         <div className="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
           <div className="text-center">
             <div className="font-semibold">{totalScore > 0 ? '+' : ''}{totalScore}</div>
             <div>score</div>
-          </div>
-          <div className="text-center">
-            <div className="font-semibold">{concept.lastActivity}</div>
-            <div>updated</div>
           </div>
           <button
             onClick={(e) => {
