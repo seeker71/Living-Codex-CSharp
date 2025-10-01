@@ -6,4 +6,6 @@ logs/
 data/
 *.log
 generated/
-src/CodexBootstrap.Tests/TestResults
+src/CodexBootstrap.Tests/TestResultssrc/CodexBootstrap/ice_dev.db*
+src/CodexBootstrap/water_dev.db*
+bin/*.db*
