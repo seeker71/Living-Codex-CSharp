@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Image as ImageIcon, Heart, Share2, MessageCircle, ExternalLink, AlertCircle, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTrackInteraction } from '@/lib/hooks';
-import { ApiErrorHandler } from '@/lib/api';
+import { ApiErrorHandler, endpoints } from '@/lib/api';
 
 interface GalleryLensProps {
   controls?: Record<string, any>;
@@ -144,6 +144,9 @@ export function GalleryLens({ controls = {}, userId, className = '', readOnly = 
       setImages(prev => prev.map(img =>
         img.id === imageId ? { ...img, likes: img.likes + 1 } : img
       ));
+
+      // Persist to backend
+      await endpoints.toggleLike(user.id, imageId, 'gallery-image');
 
       // Track the interaction
       trackInteraction(imageId, 'gallery-like', {
