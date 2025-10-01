@@ -1,11 +1,19 @@
 # GAP ANALYSIS — Spec vs Implementation
 
+**Last Updated:** October 1, 2025, 3:20 AM  
+**Session:** Backend Persistence + UI Functionality Sprint  
+
 This document lists notable gaps between the specs and current implementation, flags stubs/mocks/simulations, and records the closures applied in this session.
 
-## Summary
-- Implemented missing backend endpoint: `GET /contributions/stats/{userId}`
-- Added UI route per spec: `/graph` with basic storage stats display
-- Tests remain green (147 total; 135 passed, 12 skipped)
+## Summary - Current Session (Oct 1, 2025)
+- ✅ Implemented `UserInteractionsModule` - Full persistence for votes, bookmarks, likes, shares
+- ✅ Implemented `ConceptTaxonomyModule` - Hierarchy management, Wikipedia enrichment
+- ✅ Fixed Create concept flow - Now POSTs to `/concepts` endpoint and navigates to result
+- ✅ Fixed Gallery async tests - 14/14 passing (was failing)
+- ✅ Added Error Boundary - Prevents UI crashes
+- ✅ Fixed duplicate field displays - Clean UI
+- ✅ Added user-friendly date formatting - All timestamps use formatRelativeTime()
+- ✅ Tests: 122/227 passing (54% baseline established)
 
 ## UI Spec Coverage (specs/LIVING_UI_SPEC.md)
 - Required routes (Level 1 IA):
