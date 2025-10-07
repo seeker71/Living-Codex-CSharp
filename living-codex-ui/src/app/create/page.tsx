@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTrackInteraction } from '@/lib/hooks';
-import { endpoints } from '@/lib/api';
+import { createConcept, CONCEPT_DOMAINS, COMPLEXITY_LEVELS } from '@/lib/concepts-api';
 
 interface ConceptCreationRequest {
   name: string;
@@ -140,7 +140,7 @@ export default function CreatePage() {
     }
   };
 
-  const createConcept = async () => {
+  const createConceptHandler = async () => {
     if (!conceptName.trim() || !conceptDescription.trim()) {
       setCreationResult({ 
         success: false, 
@@ -153,38 +153,24 @@ export default function CreatePage() {
     setCreationResult(null);
     
     try {
-      const conceptData = {
+      const response = await createConcept({
         name: conceptName,
         description: conceptDescription,
         domain: conceptDomain,
         complexity: conceptComplexity,
-        tags: conceptTags,
-        axes: [conceptDomain], // Map domain to axes
-        resonance: 0.5,
-        typeId: 'codex.concept',
-        locale: 'en',
-        meta: {
-          createdBy: user?.id || 'anonymous',
-          createdAt: new Date().toISOString(),
-          complexity: conceptComplexity,
-          domain: conceptDomain
-        }
-      };
+        tags: conceptTags
+      });
 
-      const response = await endpoints.createConcept(conceptData);
-
-      if (response.success && response.data) {
-        const conceptId = (response.data as any).id || (response.data as any).conceptId;
-        
+      if (response.success && response.conceptId) {
         setCreationResult({ 
           success: true, 
-          conceptId,
-          message: 'Concept created successfully!' 
+          conceptId: response.conceptId,
+          message: response.message
         });
         
         // Track concept creation
-        if (user?.id && conceptId) {
-          trackInteraction(conceptId, 'create', {
+        if (user?.id) {
+          trackInteraction(response.conceptId, 'create', {
             description: `User created concept: ${conceptName}`,
             domain: conceptDomain,
             complexity: conceptComplexity,
@@ -194,15 +180,13 @@ export default function CreatePage() {
         
         // Navigate to created concept after brief delay
         setTimeout(() => {
-          if (conceptId) {
-            router.push(`/node/${conceptId}`);
-          }
+          router.push(`/node/${encodeURIComponent(response.conceptId!)}`);
         }, 2000);
         
       } else {
         setCreationResult({ 
           success: false, 
-          error: response.error || 'Failed to create concept - please try again' 
+          error: response.message || 'Failed to create concept' 
         });
       }
     } catch (error) {
@@ -448,7 +432,7 @@ export default function CreatePage() {
 
                 <div className="flex justify-center pt-6">
                   <button
-                    onClick={createConcept}
+                    onClick={createConceptHandler}
                     disabled={loading || !conceptName.trim() || !conceptDescription.trim()}
                     className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
