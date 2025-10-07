@@ -56,14 +56,7 @@ jest.mock('@/components/renderers/CodeRenderer', () => ({
     }, content)
 }));
 
-jest.mock('@/components/renderers/ContentRenderer', () => ({
-  __esModule: true,
-  default: ({ content, className = '' }) => 
-    require('react').createElement('div', { 
-      'data-testid': 'content-renderer', 
-      className 
-    }, content)
-}));
+// Do not mock ContentRenderer globally; some tests validate real rendering
 
 // Mock utility functions
 jest.mock('@/lib/utils', () => ({
@@ -73,22 +66,4 @@ jest.mock('@/lib/utils', () => ({
 }));
 
 // Mock KnowledgeMap hook
-jest.mock('@/components/ui/KnowledgeMap', () => ({
-  __esModule: true,
-  default: ({ nodes, ...props }) => 
-    require('react').createElement('div', { 
-      'data-testid': 'knowledge-map',
-      ...props 
-    }, `Knowledge Map with ${nodes?.length || 0} nodes`),
-  useMockKnowledgeNodes: (count = 20) => 
-    Array.from({ length: count }, (_, i) => ({
-      id: `node-${i}`,
-      title: `Concept ${i}`,
-      domain: 'General',
-      x: Math.random(),
-      y: Math.random(),
-      connections: [],
-      size: 1,
-      resonance: 50 + Math.random() * 50
-    }))
-}));
+// Do not mock KnowledgeMap globally; component and integration tests rely on it

@@ -1,0 +1,388 @@
+using System;
+using System.Collections.Generic;
+using System.Text.Json;
+using System.Threading.Tasks;
+using StackExchange.Redis;
+using CodexBootstrap.Core;
+
+namespace CodexBootstrap.Core;
+
+/// <summary>
+/// Distributed Session Storage - Redis-based session management
+/// Embodying the principle of interconnectedness - sessions shared across all server instances
+/// Like the mycelium network that connects all trees in a forest, enabling collective wisdom
+/// </summary>
+public interface IDistributedSessionStorage
+{
+    Task<bool> StoreSessionAsync(string sessionId, UserSession session, TimeSpan? expiry = null);
+    Task<UserSession?> GetSessionAsync(string sessionId);
+    Task<bool> RemoveSessionAsync(string sessionId);
+    Task<bool> UpdateSessionActivityAsync(string sessionId);
+    Task<IEnumerable<string>> GetExpiredSessionsAsync();
+    Task<long> GetSessionCountAsync();
+    Task<bool> RevokeTokenAsync(string token, DateTime revokedAt);
+    Task<bool> IsTokenRevokedAsync(string token);
+    Task<IEnumerable<string>> CleanupExpiredTokensAsync(DateTime cutoffTime);
+    Task<long> GetRevokedTokenCountAsync();
+    Task<SessionStorageMetrics> GetMetricsAsync();
+}
+
+/// <summary>
+/// Redis-based distributed session storage implementation
+/// Provides compassionate, resilient session management across server instances
+/// </summary>
+public sealed class DistributedSessionStorage : IDistributedSessionStorage, IDisposable
+{
+    private readonly IDatabase _database;
+    private readonly ICodexLogger _logger;
+    private readonly JsonSerializerOptions _jsonOptions;
+    private readonly string _sessionPrefix;
+    private readonly string _revokedTokenPrefix;
+    
+    // Configuration constants - embodying natural balance
+    private const string SESSION_KEY_PREFIX = "session:";
+    private const string REVOKED_TOKEN_KEY_PREFIX = "revoked:";
+    private const string SESSION_INDEX_KEY = "sessions:index";
+    private const string REVOKED_TOKENS_INDEX_KEY = "revoked:index";
+    
+    // Natural cleanup intervals (Fibonacci-inspired for harmony)
+    private const int DEFAULT_SESSION_TTL_MINUTES = 1440; // 24 hours
+    private const int DEFAULT_REVOKED_TOKEN_TTL_HOURS = 48; // 2 days
+    private const int CLEANUP_BATCH_SIZE = 100; // Process in batches for compassion
+
+    public DistributedSessionStorage(IConnectionMultiplexer redis, ICodexLogger logger)
+    {
+        _database = redis.GetDatabase();
+        _logger = logger;
+        _sessionPrefix = SESSION_KEY_PREFIX;
+        _revokedTokenPrefix = REVOKED_TOKEN_KEY_PREFIX;
+        
+        _jsonOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = false
+        };
+        
+        _logger.Info("[DistributedSessionStorage] Initialized with Redis backend");
+    }
+
+    /// <summary>
+    /// Store a user session in Redis - embodying the principle of sharing wisdom
+    /// </summary>
+    public async Task<bool> StoreSessionAsync(string sessionId, UserSession session, TimeSpan? expiry = null)
+    {
+        try
+        {
+            var sessionKey = $"{_sessionPrefix}{sessionId}";
+            var sessionJson = JsonSerializer.Serialize(session, _jsonOptions);
+            var ttl = expiry ?? TimeSpan.FromMinutes(DEFAULT_SESSION_TTL_MINUTES);
+            
+            // Store session data
+            await _database.StringSetAsync(sessionKey, sessionJson, ttl);
+            
+            // Add to session index for tracking
+            await _database.SetAddAsync(SESSION_INDEX_KEY, sessionId);
+            
+            // Set expiry on index entry (cleanup mechanism)
+            await _database.KeyExpireAsync(SESSION_INDEX_KEY, ttl);
+            
+            _logger.Debug($"[DistributedSessionStorage] Stored session: {sessionId}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[DistributedSessionStorage] Failed to store session {sessionId}", ex);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Retrieve a user session from Redis - embodying the principle of remembering
+    /// </summary>
+    public async Task<UserSession?> GetSessionAsync(string sessionId)
+    {
+        try
+        {
+            var sessionKey = $"{_sessionPrefix}{sessionId}";
+            var sessionJson = await _database.StringGetAsync(sessionKey);
+            
+            if (!sessionJson.HasValue)
+            {
+                return null;
+            }
+            
+            var session = JsonSerializer.Deserialize<UserSession>(sessionJson, _jsonOptions);
+            _logger.Debug($"[DistributedSessionStorage] Retrieved session: {sessionId}");
+            return session;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[DistributedSessionStorage] Failed to retrieve session {sessionId}", ex);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Remove a session from Redis - embodying the principle of letting go
+    /// </summary>
+    public async Task<bool> RemoveSessionAsync(string sessionId)
+    {
+        try
+        {
+            var sessionKey = $"{_sessionPrefix}{sessionId}";
+            
+            // Remove session data
+            var removed = await _database.KeyDeleteAsync(sessionKey);
+            
+            // Remove from session index
+            await _database.SetRemoveAsync(SESSION_INDEX_KEY, sessionId);
+            
+            _logger.Debug($"[DistributedSessionStorage] Removed session: {sessionId}");
+            return removed;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[DistributedSessionStorage] Failed to remove session {sessionId}", ex);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Update session activity timestamp - embodying the principle of continuous presence
+    /// </summary>
+    public async Task<bool> UpdateSessionActivityAsync(string sessionId)
+    {
+        try
+        {
+            var session = await GetSessionAsync(sessionId);
+            if (session == null)
+            {
+                return false;
+            }
+            
+            // Update last activity time
+            var updatedSession = session with { LastActivity = DateTime.UtcNow };
+            
+            // Store updated session (preserves existing TTL)
+            var sessionKey = $"{_sessionPrefix}{sessionId}";
+            var sessionJson = JsonSerializer.Serialize(updatedSession, _jsonOptions);
+            
+            // Get current TTL and preserve it
+            var ttl = await _database.KeyTimeToLiveAsync(sessionKey);
+            await _database.StringSetAsync(sessionKey, sessionJson, ttl);
+            
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[DistributedSessionStorage] Failed to update session activity {sessionId}", ex);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Get expired sessions for cleanup - embodying the principle of natural cycles
+    /// </summary>
+    public async Task<IEnumerable<string>> GetExpiredSessionsAsync()
+    {
+        try
+        {
+            var expiredSessions = new List<string>();
+            var sessionIds = await _database.SetMembersAsync(SESSION_INDEX_KEY);
+            
+            foreach (var sessionId in sessionIds)
+            {
+                var sessionKey = $"{_sessionPrefix}{sessionId}";
+                var exists = await _database.KeyExistsAsync(sessionKey);
+                
+                if (!exists)
+                {
+                    expiredSessions.Add(sessionId);
+                }
+            }
+            
+            // Clean up expired session IDs from index
+            if (expiredSessions.Count > 0)
+            {
+                var values = expiredSessions.Select(s => (RedisValue)s).ToArray();
+                await _database.SetRemoveAsync(SESSION_INDEX_KEY, values);
+            }
+            
+            return expiredSessions;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("[DistributedSessionStorage] Failed to get expired sessions", ex);
+            return Enumerable.Empty<string>();
+        }
+    }
+
+    /// <summary>
+    /// Get total session count - embodying the principle of awareness
+    /// </summary>
+    public async Task<long> GetSessionCountAsync()
+    {
+        try
+        {
+            return await _database.SetLengthAsync(SESSION_INDEX_KEY);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("[DistributedSessionStorage] Failed to get session count", ex);
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// Revoke a token - embodying the principle of conscious release
+    /// </summary>
+    public async Task<bool> RevokeTokenAsync(string token, DateTime revokedAt)
+    {
+        try
+        {
+            var revokedKey = $"{_revokedTokenPrefix}{token}";
+            var ttl = TimeSpan.FromHours(DEFAULT_REVOKED_TOKEN_TTL_HOURS);
+            
+            // Store revocation timestamp
+            await _database.StringSetAsync(revokedKey, revokedAt.ToBinary(), ttl);
+            
+            // Add to revoked tokens index
+            await _database.SetAddAsync(REVOKED_TOKENS_INDEX_KEY, token);
+            await _database.KeyExpireAsync(REVOKED_TOKENS_INDEX_KEY, ttl);
+            
+            _logger.Debug($"[DistributedSessionStorage] Revoked token: {token}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[DistributedSessionStorage] Failed to revoke token {token}", ex);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Check if a token is revoked - embodying the principle of mindful validation
+    /// </summary>
+    public async Task<bool> IsTokenRevokedAsync(string token)
+    {
+        try
+        {
+            var revokedKey = $"{_revokedTokenPrefix}{token}";
+            return await _database.KeyExistsAsync(revokedKey);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[DistributedSessionStorage] Failed to check token revocation {token}", ex);
+            return false; // Default to not revoked for safety
+        }
+    }
+
+    /// <summary>
+    /// Cleanup expired revoked tokens - embodying the principle of natural cleanup
+    /// </summary>
+    public async Task<IEnumerable<string>> CleanupExpiredTokensAsync(DateTime cutoffTime)
+    {
+        try
+        {
+            var expiredTokens = new List<string>();
+            var tokenIds = await _database.SetMembersAsync(REVOKED_TOKENS_INDEX_KEY);
+            
+            foreach (var tokenId in tokenIds)
+            {
+                var revokedKey = $"{_revokedTokenPrefix}{tokenId}";
+                var exists = await _database.KeyExistsAsync(revokedKey);
+                
+                if (!exists)
+                {
+                    expiredTokens.Add(tokenId);
+                }
+            }
+            
+            // Clean up expired token IDs from index
+            if (expiredTokens.Count > 0)
+            {
+                var values = expiredTokens.Select(t => (RedisValue)t).ToArray();
+                await _database.SetRemoveAsync(REVOKED_TOKENS_INDEX_KEY, values);
+            }
+            
+            return expiredTokens;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("[DistributedSessionStorage] Failed to cleanup expired tokens", ex);
+            return Enumerable.Empty<string>();
+        }
+    }
+
+    /// <summary>
+    /// Get revoked token count - embodying the principle of awareness
+    /// </summary>
+    public async Task<long> GetRevokedTokenCountAsync()
+    {
+        try
+        {
+            return await _database.SetLengthAsync(REVOKED_TOKENS_INDEX_KEY);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("[DistributedSessionStorage] Failed to get revoked token count", ex);
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// Get comprehensive storage metrics - embodying the principle of holistic awareness
+    /// </summary>
+    public async Task<SessionStorageMetrics> GetMetricsAsync()
+    {
+        try
+        {
+            var sessionCount = await GetSessionCountAsync();
+            var revokedTokenCount = await GetRevokedTokenCountAsync();
+            var expiredSessions = await GetExpiredSessionsAsync();
+            var expiredTokens = await CleanupExpiredTokensAsync(DateTime.UtcNow.AddHours(-DEFAULT_REVOKED_TOKEN_TTL_HOURS));
+            
+            return new SessionStorageMetrics(
+                Timestamp: DateTime.UtcNow,
+                ActiveSessionCount: sessionCount,
+                RevokedTokenCount: revokedTokenCount,
+                ExpiredSessionsFound: expiredSessions.Count(),
+                ExpiredTokensFound: expiredTokens.Count(),
+                StorageType: "Redis",
+                IsHealthy: true // TODO: Add health check logic
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("[DistributedSessionStorage] Failed to get metrics", ex);
+            return new SessionStorageMetrics(
+                Timestamp: DateTime.UtcNow,
+                ActiveSessionCount: 0,
+                RevokedTokenCount: 0,
+                ExpiredSessionsFound: 0,
+                ExpiredTokensFound: 0,
+                StorageType: "Redis",
+                IsHealthy: false
+            );
+        }
+    }
+
+    public void Dispose()
+    {
+        // Redis connection is managed by DI container
+        _logger.Info("[DistributedSessionStorage] Disposed");
+    }
+}
+
+/// <summary>
+/// Session storage metrics - embodying the principle of mindful measurement
+/// </summary>
+public record SessionStorageMetrics(
+    DateTime Timestamp,
+    long ActiveSessionCount,
+    long RevokedTokenCount,
+    int ExpiredSessionsFound,
+    int ExpiredTokensFound,
+    string StorageType,
+    bool IsHealthy
+);

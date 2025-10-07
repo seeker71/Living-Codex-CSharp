@@ -267,6 +267,75 @@ public class SystemMetricsModule : ModuleBase
         }
     }
 
+    [Get("/metrics/prometheus", "Get Prometheus Metrics", "Get metrics in Prometheus format", "metrics")]
+    public async Task<object> GetPrometheusMetricsAsync(JsonElement? request)
+    {
+        try
+        {
+            // Update metrics first
+            await UpdateMetricsAsync();
+
+            // Generate Prometheus-formatted metrics with grace and clarity
+            var prometheusMetrics = new List<string>();
+            
+            // Core system metrics
+            prometheusMetrics.Add("# HELP codex_uptime_seconds Total uptime in seconds");
+            prometheusMetrics.Add("# TYPE codex_uptime_seconds counter");
+            prometheusMetrics.Add($"codex_uptime_seconds {(DateTime.UtcNow - _startTime).TotalSeconds}");
+            prometheusMetrics.Add("");
+            
+            prometheusMetrics.Add("# HELP codex_requests_total Total number of requests");
+            prometheusMetrics.Add("# TYPE codex_requests_total counter");
+            prometheusMetrics.Add($"codex_requests_total {_metrics["totalRequests"]}");
+            prometheusMetrics.Add("");
+            
+            prometheusMetrics.Add("# HELP codex_active_connections Current number of active connections");
+            prometheusMetrics.Add("# TYPE codex_active_connections gauge");
+            prometheusMetrics.Add($"codex_active_connections {_metrics["activeConnections"]}");
+            prometheusMetrics.Add("");
+            
+            prometheusMetrics.Add("# HELP codex_memory_usage_mb Memory usage in megabytes");
+            prometheusMetrics.Add("# TYPE codex_memory_usage_mb gauge");
+            prometheusMetrics.Add($"codex_memory_usage_mb {_metrics["memoryUsage"]}");
+            prometheusMetrics.Add("");
+            
+            prometheusMetrics.Add("# HELP codex_cpu_usage_percent CPU usage percentage");
+            prometheusMetrics.Add("# TYPE codex_cpu_usage_percent gauge");
+            prometheusMetrics.Add($"codex_cpu_usage_percent {_metrics["cpuUsage"]}");
+            prometheusMetrics.Add("");
+            
+            prometheusMetrics.Add("# HELP codex_nodes_total Total number of nodes in the registry");
+            prometheusMetrics.Add("# TYPE codex_nodes_total gauge");
+            prometheusMetrics.Add($"codex_nodes_total {_metrics["nodeCount"]}");
+            prometheusMetrics.Add("");
+            
+            prometheusMetrics.Add("# HELP codex_edges_total Total number of edges in the registry");
+            prometheusMetrics.Add("# TYPE codex_edges_total gauge");
+            prometheusMetrics.Add($"codex_edges_total {_metrics["edgeCount"]}");
+            prometheusMetrics.Add("");
+            
+            prometheusMetrics.Add("# HELP codex_modules_total Total number of loaded modules");
+            prometheusMetrics.Add("# TYPE codex_modules_total gauge");
+            prometheusMetrics.Add($"codex_modules_total {_metrics["moduleCount"]}");
+
+            var prometheusData = string.Join("\n", prometheusMetrics);
+            
+            return new
+            {
+                success = true,
+                message = "Prometheus metrics retrieved successfully",
+                timestamp = DateTime.UtcNow,
+                format = "prometheus",
+                data = prometheusData
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Error getting Prometheus metrics", ex);
+            return new { success = false, error = ex.Message };
+        }
+    }
+
     private async Task UpdateMetricsAsync()
     {
         try

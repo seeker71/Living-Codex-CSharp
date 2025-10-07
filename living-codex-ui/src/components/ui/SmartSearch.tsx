@@ -363,4 +363,6 @@ const getResultIcon = (typeId: string): string => {
   return '🔵'
 }
 
+export default SmartSearch
+
 

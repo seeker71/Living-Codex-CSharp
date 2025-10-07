@@ -369,9 +369,7 @@ export function ChatsLens({ controls = {}, userId, className = '' }: ChatsLensPr
               <Card
                 key={thread.id}
                 onClick={() => handleSelectThread(thread.id)}
-                clickable
-                hover
-                className={`p-4 ${selectedThreadId === thread.id ? 'border-blue-400 dark:border-blue-500' : ''}`}
+                className={`p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 ${selectedThreadId === thread.id ? 'border-blue-400 dark:border-blue-500' : ''}`}
               >
                 <CardTitle className="text-base mb-1 text-gray-900 dark:text-gray-100">
                   {thread.title || 'Untitled conversation'}

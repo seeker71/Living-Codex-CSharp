@@ -1,0 +1,262 @@
+using System;
+using System.Threading.Tasks;
+using StackExchange.Redis;
+using CodexBootstrap.Core;
+
+namespace CodexBootstrap.Core;
+
+/// <summary>
+/// Redis Configuration Service - Manages Redis connections with compassion and resilience
+/// Embodying the principle of interconnectedness - connecting all server instances through shared memory
+/// Like the mycelium network that enables trees to share nutrients and wisdom
+/// </summary>
+public interface IRedisConfiguration
+{
+    Task<IConnectionMultiplexer> GetConnectionAsync();
+    Task<bool> TestConnectionAsync();
+    RedisConfigurationOptions GetConfiguration();
+    void Dispose();
+}
+
+/// <summary>
+/// Redis Configuration implementation with graceful error handling and connection pooling
+/// </summary>
+public sealed class RedisConfiguration : IRedisConfiguration, IDisposable
+{
+    private readonly ICodexLogger _logger;
+    private readonly RedisConfigurationOptions _options;
+    private IConnectionMultiplexer? _connection;
+    private bool _disposed = false;
+
+    public RedisConfiguration(ICodexLogger logger, RedisConfigurationOptions? options = null)
+    {
+        _logger = logger;
+        _options = options ?? new RedisConfigurationOptions();
+        
+        _logger.Info($"[RedisConfiguration] Initialized with endpoint: {_options.Endpoint}");
+    }
+
+    /// <summary>
+    /// Get Redis connection with automatic reconnection and error handling
+    /// Embodying the principle of resilience - graceful handling of connection issues
+    /// </summary>
+    public async Task<IConnectionMultiplexer> GetConnectionAsync()
+    {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(RedisConfiguration));
+        }
+
+        if (_connection != null && _connection.IsConnected)
+        {
+            return _connection;
+        }
+
+        try
+        {
+            _logger.Info("[RedisConfiguration] Establishing Redis connection...");
+            
+            var configuration = new ConfigurationOptions
+            {
+                EndPoints = { _options.Endpoint },
+                Password = _options.Password,
+                DefaultDatabase = _options.Database,
+                ConnectTimeout = _options.ConnectTimeoutMs,
+                SyncTimeout = _options.SyncTimeoutMs,
+                AsyncTimeout = _options.AsyncTimeoutMs,
+                ConnectRetry = _options.ConnectRetryCount,
+                ReconnectRetryPolicy = new ExponentialRetry(_options.ReconnectRetryDelayMs),
+                AbortOnConnectFail = false, // Don't abort on connect fail for graceful fallback
+                KeepAlive = 60, // Keep connection alive
+                ClientName = $"LivingCodex-{Environment.MachineName}-{Environment.ProcessId}"
+            };
+
+            _connection = await ConnectionMultiplexer.ConnectAsync(configuration);
+            
+            // Subscribe to connection events for monitoring
+            _connection.ConnectionFailed += OnConnectionFailed;
+            _connection.ConnectionRestored += OnConnectionRestored;
+            
+            _logger.Info("[RedisConfiguration] Redis connection established successfully");
+            
+            // Test the connection
+            var db = _connection.GetDatabase();
+            await db.PingAsync();
+            
+            _logger.Info("[RedisConfiguration] Redis connection test successful");
+            
+            return _connection;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("[RedisConfiguration] Failed to establish Redis connection", ex);
+            throw new InvalidOperationException("Failed to establish Redis connection", ex);
+        }
+    }
+
+    /// <summary>
+    /// Test Redis connection - embodying the principle of mindful validation
+    /// </summary>
+    public async Task<bool> TestConnectionAsync()
+    {
+        try
+        {
+            var connection = await GetConnectionAsync();
+            var db = connection.GetDatabase();
+            var ping = await db.PingAsync();
+            
+            _logger.Debug($"[RedisConfiguration] Redis ping: {ping.TotalMilliseconds}ms");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("[RedisConfiguration] Redis connection test failed", ex);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Get current configuration - embodying the principle of transparency
+    /// </summary>
+    public RedisConfigurationOptions GetConfiguration()
+    {
+        return _options;
+    }
+
+    /// <summary>
+    /// Handle connection failure with compassion - embodying the principle of graceful degradation
+    /// </summary>
+    private void OnConnectionFailed(object? sender, ConnectionFailedEventArgs e)
+    {
+        _logger.Warn($"[RedisConfiguration] Redis connection failed: {e.FailureType}, {e.EndPoint}, {e.Exception?.Message}");
+        
+        // Log additional context for troubleshooting
+        if (e.Exception != null)
+        {
+            _logger.Error($"[RedisConfiguration] Connection failure details", e.Exception);
+        }
+    }
+
+    /// <summary>
+    /// Handle connection restoration with gratitude - embodying the principle of resilience
+    /// </summary>
+    private void OnConnectionRestored(object? sender, ConnectionFailedEventArgs e)
+    {
+        _logger.Info($"[RedisConfiguration] Redis connection restored: {e.EndPoint}");
+    }
+
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            if (_connection != null)
+            {
+                _connection.ConnectionFailed -= OnConnectionFailed;
+                _connection.ConnectionRestored -= OnConnectionRestored;
+                
+                try
+                {
+                    _connection.Close();
+                    _connection.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error("[RedisConfiguration] Error disposing Redis connection", ex);
+                }
+            }
+            
+            _disposed = true;
+            _logger.Info("[RedisConfiguration] Disposed");
+        }
+    }
+}
+
+/// <summary>
+/// Redis Configuration Options - embodying the principle of flexible harmony
+/// </summary>
+public sealed class RedisConfigurationOptions
+{
+    public string Endpoint { get; set; } = "localhost:6379";
+    public string? Password { get; set; } = null;
+    public int Database { get; set; } = 0;
+    public int ConnectTimeoutMs { get; set; } = 5000;
+    public int SyncTimeoutMs { get; set; } = 5000;
+    public int AsyncTimeoutMs { get; set; } = 5000;
+    public int ConnectRetryCount { get; set; } = 3;
+    public int ReconnectRetryDelayMs { get; set; } = 2000;
+    public bool EnableFallback { get; set; } = true;
+    
+    /// <summary>
+    /// Create from environment variables - embodying the principle of natural configuration
+    /// </summary>
+    public static RedisConfigurationOptions FromEnvironment()
+    {
+        return new RedisConfigurationOptions
+        {
+            Endpoint = Environment.GetEnvironmentVariable("REDIS_ENDPOINT") ?? "localhost:6379",
+            Password = Environment.GetEnvironmentVariable("REDIS_PASSWORD"),
+            Database = int.TryParse(Environment.GetEnvironmentVariable("REDIS_DATABASE"), out var db) ? db : 0,
+            ConnectTimeoutMs = int.TryParse(Environment.GetEnvironmentVariable("REDIS_CONNECT_TIMEOUT_MS"), out var connectTimeout) ? connectTimeout : 5000,
+            SyncTimeoutMs = int.TryParse(Environment.GetEnvironmentVariable("REDIS_SYNC_TIMEOUT_MS"), out var syncTimeout) ? syncTimeout : 5000,
+            AsyncTimeoutMs = int.TryParse(Environment.GetEnvironmentVariable("REDIS_ASYNC_TIMEOUT_MS"), out var asyncTimeout) ? asyncTimeout : 5000,
+            ConnectRetryCount = int.TryParse(Environment.GetEnvironmentVariable("REDIS_CONNECT_RETRY_COUNT"), out var retryCount) ? retryCount : 3,
+            ReconnectRetryDelayMs = int.TryParse(Environment.GetEnvironmentVariable("REDIS_RECONNECT_RETRY_DELAY_MS"), out var retryDelay) ? retryDelay : 2000,
+            EnableFallback = bool.TryParse(Environment.GetEnvironmentVariable("REDIS_ENABLE_FALLBACK"), out var enableFallback) ? enableFallback : true
+        };
+    }
+    
+    /// <summary>
+    /// Create from connection string - embodying the principle of simplicity
+    /// </summary>
+    public static RedisConfigurationOptions FromConnectionString(string connectionString)
+    {
+        var options = new RedisConfigurationOptions();
+        
+        if (string.IsNullOrEmpty(connectionString))
+        {
+            return options;
+        }
+        
+        try
+        {
+            // Parse connection string format: host:port,password=xxx,database=0
+            var parts = connectionString.Split(',');
+            
+            if (parts.Length > 0)
+            {
+                options.Endpoint = parts[0].Trim();
+            }
+            
+            for (int i = 1; i < parts.Length; i++)
+            {
+                var part = parts[i].Trim();
+                var keyValue = part.Split('=', 2);
+                
+                if (keyValue.Length == 2)
+                {
+                    var key = keyValue[0].Trim().ToLowerInvariant();
+                    var value = keyValue[1].Trim();
+                    
+                    switch (key)
+                    {
+                        case "password":
+                            options.Password = value;
+                            break;
+                        case "database":
+                            if (int.TryParse(value, out var db))
+                            {
+                                options.Database = db;
+                            }
+                            break;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            throw new ArgumentException($"Invalid Redis connection string: {connectionString}", ex);
+        }
+        
+        return options;
+    }
+}

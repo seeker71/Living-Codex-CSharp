@@ -49,6 +49,7 @@ export function Navigation() {
     { href: '/people', label: 'People', icon: '🌍' },
     { href: '/create', label: 'Create', icon: '✨' },
     { href: '/portals', label: 'Portals', icon: '🚪' },
+    { href: '/ai-dashboard', label: 'AI Dashboard', icon: '🧠' },
     { href: '/dev', label: 'Dev', icon: '🛠️' },
     // Expose Swagger for developers
     { href: process.env.NEXT_PUBLIC_BACKEND_BASE_URL ? `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/swagger` : 'http://127.0.0.1:5002/swagger', label: 'Swagger', icon: '📜' },
@@ -67,6 +68,7 @@ export function Navigation() {
     '/people': 60,
     '/create': 70,
     '/portals': 80,
+    '/ai-dashboard': 85,
     '/code': 90,
     '/dev': 100,
     '/profile': 110,

@@ -23,9 +23,18 @@ public abstract class ModuleBase : IModule
     protected object? _realtimeModule; // Will be set during inter-module communication setup
     protected IServiceProvider? _serviceProvider; // Will be set during inter-module communication setup
     
+    // Readiness tracking
+    private ReadinessState _currentReadinessState = ReadinessState.NotStarted;
+    private ReadinessResult _lastReadinessResult = new();
+    private readonly List<string> _providedEndpoints = new();
+    
     public abstract string Name { get; }
     public abstract string Description { get; }
     public abstract string Version { get; }
+    
+    // IModule readiness implementation
+    public ReadinessState CurrentReadinessState => _currentReadinessState;
+    public event EventHandler<ReadinessChangedEventArgs>? ReadinessChanged;
     
     protected ModuleBase(INodeRegistry registry, ICodexLogger logger)
     {
@@ -132,8 +141,129 @@ public abstract class ModuleBase : IModule
         
         // Default implementation - modules can override to register HTTP endpoints
         _logger.Info($"HTTP endpoints registered for module: {Name}");
+        
+        // Auto-register common endpoints for this module
+        AutoRegisterCommonEndpoints();
+    }
+
+    /// <summary>
+    /// Auto-register common endpoints for this module
+    /// Override this method to register specific endpoints
+    /// </summary>
+    protected virtual void AutoRegisterCommonEndpoints()
+    {
+        // Register common API patterns for this module
+        var moduleName = Name.ToLowerInvariant().Replace("module", "");
+        
+        // Common endpoint patterns
+        AddProvidedEndpoint($"/api/{moduleName}");
+        AddProvidedEndpoint($"/api/{moduleName}/health");
+        AddProvidedEndpoint($"/api/{moduleName}/status");
+        
+        // Add module-specific endpoints if any
+        RegisterModuleSpecificEndpoints();
+    }
+
+    /// <summary>
+    /// Override this method to register module-specific endpoints
+    /// </summary>
+    protected virtual void RegisterModuleSpecificEndpoints()
+    {
+        // Default implementation - modules can override to add specific endpoints
     }
     
+    public virtual async Task InitializeAsync()
+    {
+        // Default implementation - modules can override to perform async initialization
+        _logger.Info($"Async initialization for module: {Name}");
+        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Wait for registry initialization to complete before proceeding
+    /// Use this in modules that need to access nodes during async initialization
+    /// </summary>
+    protected async Task WaitForRegistryInitializationAsync()
+    {
+        _logger.Info($"Module {Name} waiting for registry initialization to complete...");
+        await _registry.WaitForInitializationAsync();
+        _logger.Info($"Module {Name} registry initialization complete, proceeding with async initialization");
+    }
+
+    /// <summary>
+    /// Update the module's readiness state
+    /// </summary>
+    protected void UpdateReadinessState(ReadinessResult result)
+    {
+        var previousState = _currentReadinessState;
+        _currentReadinessState = result.State;
+        _lastReadinessResult = result;
+
+        _logger.Info($"Module {Name} readiness state changed: {previousState} -> {result.State} ({result.Message})");
+
+        ReadinessChanged?.Invoke(this, new ReadinessChangedEventArgs
+        {
+            ComponentId = Name,
+            PreviousState = previousState,
+            CurrentState = result.State,
+            Result = result
+        });
+    }
+
+    /// <summary>
+    /// Mark the module as initializing
+    /// </summary>
+    protected void MarkAsInitializing(string message = "Initializing")
+    {
+        UpdateReadinessState(ReadinessResult.Initializing(message));
+    }
+
+    /// <summary>
+    /// Mark the module as ready
+    /// </summary>
+    protected void MarkAsReady(string message = "Ready")
+    {
+        UpdateReadinessState(ReadinessResult.Success(message));
+    }
+
+    /// <summary>
+    /// Mark the module as failed
+    /// </summary>
+    protected void MarkAsFailed(string message, Exception? exception = null)
+    {
+        UpdateReadinessState(ReadinessResult.Failed(message, exception));
+    }
+
+    /// <summary>
+    /// Mark the module as degraded
+    /// </summary>
+    protected void MarkAsDegraded(string message)
+    {
+        UpdateReadinessState(ReadinessResult.Degraded(message));
+    }
+
+    /// <summary>
+    /// Add an endpoint provided by this module
+    /// </summary>
+    protected void AddProvidedEndpoint(string endpoint)
+    {
+        if (!_providedEndpoints.Contains(endpoint))
+        {
+            _providedEndpoints.Add(endpoint);
+        }
+    }
+
+    // IModule interface implementation
+    public ReadinessResult GetReadinessResult()
+    {
+        return _lastReadinessResult;
+    }
+
+    public IEnumerable<string> GetProvidedEndpoints()
+    {
+        return _providedEndpoints.AsReadOnly();
+    }
+
     public virtual void SetupInterModuleCommunication(IServiceProvider services)
     {
         // Store the service provider for modules to access services

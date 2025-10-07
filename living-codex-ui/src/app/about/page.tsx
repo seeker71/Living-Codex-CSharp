@@ -194,7 +194,7 @@ export default function AboutPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-gray-700 dark:text-gray-300">
-                  Living Codex isn't just another app—it's a new way of preserving and sharing 
+                  Living Codex isn&apos;t just another app—it&apos;s a new way of preserving and sharing 
                   human knowledge that can help solve some of our biggest challenges:
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -28,6 +28,7 @@ public class NodeRegistry : INodeRegistry
     private readonly Dictionary<string, EdgeRecord> _edgeRecords = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, HashSet<string>> _nodeEdgeIndex = new(StringComparer.OrdinalIgnoreCase);
     private bool _isInitialized = false;
+    private readonly TaskCompletionSource<bool> _initializationComplete = new();
     
     // Track DB operations for health monitoring
     private long _dbOperationsInFlight = 0;
@@ -74,50 +75,6 @@ public class NodeRegistry : INodeRegistry
             Interlocked.Decrement(ref _dbOperationsInFlight);
         }
 
-        List<Node> iceNodes = new();
-        List<Node> waterNodes = new();
-
-        try
-        {
-            var loadedIceNodes = await _iceStorage.GetAllIceNodesAsync();
-            if (loadedIceNodes != null)
-            {
-                iceNodes = loadedIceNodes.ToList();
-                _logger.Info($"Loaded {iceNodes.Count} Ice nodes from storage backend");
-            }
-            else
-            {
-                _logger.Warn("Ice storage backend returned null nodes");
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"Error hydrating Ice nodes: {ex.Message}", ex);
-        }
-
-        try
-        {
-            var loadedWaterNodes = await _waterStorage.GetAllWaterNodesAsync();
-            if (loadedWaterNodes != null)
-            {
-                waterNodes = loadedWaterNodes.ToList();
-                _logger.Info($"Loaded {waterNodes.Count} Water nodes from storage backend");
-            }
-            else
-            {
-                _logger.Warn("Water storage backend returned null nodes");
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"Error hydrating Water nodes: {ex.Message}", ex);
-        }
-
-        var hydrationPerformed = false;
-        var skippedWaterCount = 0;
-        var hydratedIceCount = 0;
-        var hydratedWaterCount = 0;
-
         _lock.EnterWriteLock();
         try
         {
@@ -126,65 +83,26 @@ public class NodeRegistry : INodeRegistry
                 return;
             }
 
-            hydrationPerformed = true;
-
-            foreach (var node in iceNodes)
-            {
-                if (node == null) continue; // Skip null nodes
-                
-                var normalizedNode = node.State == ContentState.Ice
-                    ? node
-                    : node with { State = ContentState.Ice };
-
-                CacheNodeInMemory(normalizedNode);
-            }
-
-            foreach (var node in waterNodes)
-            {
-                if (node == null) continue; // Skip null nodes
-                
-                if (_iceNodes.ContainsKey(node.Id))
-                {
-                    skippedWaterCount++;
-                    continue;
-                }
-
-                var normalizedNode = node.State == ContentState.Water
-                    ? node
-                    : node with { State = ContentState.Water };
-
-                CacheNodeInMemory(normalizedNode);
-            }
-
-            hydratedIceCount = _iceNodes.Count;
-            hydratedWaterCount = _waterNodes.Count;
-            var totalHydratedCount = hydratedIceCount + hydratedWaterCount;
-
-            _logger.Info($"NodeRegistry initialization complete - RAM collections: Ice={hydratedIceCount}, Water={hydratedWaterCount}, Total={totalHydratedCount}");
-            _logger.Info($"Skipped {skippedWaterCount} Water nodes (already in Ice collection)");
-
-            // Load edges from storage
-            await LoadEdgesFromStorageAsync();
+            _logger.Info("NodeRegistry initialization complete - storage backends initialized, nodes will be loaded on-demand");
+            _logger.Info("Lazy loading enabled - nodes will be loaded from storage as needed rather than all at startup");
 
             _isInitialized = true;
+            _initializationComplete.SetResult(true);
         }
         finally
         {
             _lock.ExitWriteLock();
         }
 
-        if (hydrationPerformed)
-        {
-            _logger.Info("UnifiedNodeRegistry initialized with Ice and Water storage backends");
-            if (skippedWaterCount > 0)
-            {
-                _logger.Info($"Hydrated {hydratedIceCount} Ice nodes and {hydratedWaterCount} Water nodes into memory (skipped {skippedWaterCount} Water nodes shadowed by Ice)");
-            }
-            else
-            {
-                _logger.Info($"Hydrated {hydratedIceCount} Ice nodes and {hydratedWaterCount} Water nodes into memory");
-            }
-        }
+        _logger.Info("UnifiedNodeRegistry initialized with Ice and Water storage backends (lazy loading mode)");
+    }
+
+    /// <summary>
+    /// Wait for registry initialization to complete
+    /// </summary>
+    public async Task WaitForInitializationAsync()
+    {
+        await _initializationComplete.Task;
     }
 
     private async Task LoadEdgesFromStorageAsync()

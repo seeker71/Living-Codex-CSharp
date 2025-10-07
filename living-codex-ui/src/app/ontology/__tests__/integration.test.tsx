@@ -100,43 +100,52 @@ const mockEdgesData = {
 }
 
 // Mock the SmartSearch component
-jest.mock('../../../components/ui/SmartSearch', () => {
-  return function MockSmartSearch({ placeholder, onResultSelect, onResultsChange, showFilters, className }: any) {
-    return (
-      <div className={className} data-testid="smart-search">
-        <input
-          placeholder={placeholder}
-          data-testid="search-input"
-          onChange={(e) => {
-            if (onResultsChange) onResultsChange(e.target.value);
-          }}
-        />
-        {showFilters && (
-          <div data-testid="search-filters">
-            {['concepts', 'people', 'code', 'news'].map(filter => (
-              <button key={filter} data-testid={`filter-${filter}`}>
-                {filter}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    )
-  }
-})
+jest.mock('../../../components/ui/SmartSearch', () => ({
+  __esModule: true,
+  SmartSearch: ({ placeholder, onResultSelect, onResultsChange, showFilters, className }: any) => (
+    <div className={className} data-testid="smart-search">
+      <input
+        placeholder={placeholder}
+        data-testid="search-input"
+        onChange={(e) => {
+          if (onResultsChange) onResultsChange(e.target.value);
+        }}
+      />
+      {showFilters && (
+        <div data-testid="search-filters">
+          {['concepts', 'people', 'code', 'news'].map((filter: string) => (
+            <button key={filter} data-testid={`filter-${filter}`}>
+              {filter}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  ),
+}))
 
-// Mock the KnowledgeMap component
-jest.mock('../../../components/ui/KnowledgeMap', () => {
-  return function MockKnowledgeMap({ nodes, className }: any) {
-    return (
-      <div className={className} data-testid="knowledge-map">
-        <canvas data-testid="map-canvas" />
-        <div data-testid="map-legend">Legend</div>
-        <div data-testid="map-stats">Stats</div>
-      </div>
-    )
-  }
-})
+// Mock the KnowledgeMap component but also provide the hook used by the page
+jest.mock('../../../components/ui/KnowledgeMap', () => ({
+  __esModule: true,
+  default: ({ nodes, className }: any) => (
+    <div className={className} data-testid="knowledge-map">
+      <canvas data-testid="map-canvas" />
+      <div data-testid="map-legend">Legend</div>
+      <div data-testid="map-stats">Stats</div>
+      <div>{`Knowledge Map with ${nodes?.length || 0} nodes`}</div>
+    </div>
+  ),
+  useMockKnowledgeNodes: (count: number = 20) => Array.from({ length: count }, (_, i) => ({
+    id: `node-${i}`,
+    title: `Concept ${i}`,
+    domain: 'General',
+    x: Math.random(),
+    y: Math.random(),
+    connections: [],
+    size: 1,
+    resonance: 60,
+  })),
+}))
 
 describe('OntologyPage Integration', () => {
   const user = userEvent.setup()

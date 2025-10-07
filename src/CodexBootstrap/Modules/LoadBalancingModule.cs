@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using CodexBootstrap.Core;
 using CodexBootstrap.Runtime;
@@ -10,11 +11,21 @@ namespace CodexBootstrap.Modules;
 /// </summary>
 public class LoadBalancingModule : ModuleBase
 {
-    private readonly Dictionary<string, ServiceInstance> _serviceInstances = new();
-    private readonly Dictionary<string, LoadBalancingStrategy> _strategies = new();
-    private readonly List<PerformanceMetric> _performanceMetrics = new();
-    private readonly Dictionary<string, ScalingRecommendation> _scalingRecommendations = new();
+    private readonly ConcurrentDictionary<string, ServiceInstance> _serviceInstances = new();
+    private readonly ConcurrentDictionary<string, LoadBalancingStrategy> _strategies = new();
+    private readonly ConcurrentQueue<PerformanceMetric> _performanceMetrics = new();
+    private readonly ConcurrentDictionary<string, ScalingRecommendation> _scalingRecommendations = new();
     private readonly object _metricsLock = new();
+    
+    // Memory management constants - embodying compassionate resource stewardship
+    private const int MAX_SERVICE_INSTANCES = 1000;
+    private const int MAX_PERFORMANCE_METRICS = 10000;
+    private const int MAX_SCALING_RECOMMENDATIONS = 500;
+    private const int CLEANUP_INTERVAL_MINUTES = 30;
+    private const int METRICS_TTL_HOURS = 24;
+    private const int RECOMMENDATIONS_TTL_HOURS = 48;
+    
+    private readonly Timer _cleanupTimer;
 
     public override string Name => "Load Balancing Module";
     public override string Description => "Load Balancing and Performance Optimization Module";
@@ -24,6 +35,11 @@ public class LoadBalancingModule : ModuleBase
         : base(registry, logger)
     {
         InitializeLoadBalancingStrategies();
+        
+        // Start cleanup timer - embodying compassionate resource stewardship
+        _cleanupTimer = new Timer(CleanupExpiredData, null, 
+            TimeSpan.FromMinutes(CLEANUP_INTERVAL_MINUTES), 
+            TimeSpan.FromMinutes(CLEANUP_INTERVAL_MINUTES));
     }
 
     public override Node GetModuleNode()
@@ -579,7 +595,7 @@ public class LoadBalancingModule : ModuleBase
             var instancesToRemove = instances.Take(currentCount - targetCount).ToList();
             foreach (var instance in instancesToRemove)
             {
-                _serviceInstances.Remove(instance.Id);
+                _serviceInstances.TryRemove(instance.Id, out _);
             }
             return currentCount - targetCount;
         }
@@ -726,6 +742,88 @@ public class LoadBalancingModule : ModuleBase
         var match = System.Text.RegularExpressions.Regex.Match(impact, @"(\d+)%");
         return match.Success ? double.Parse(match.Groups[1].Value) / 100.0 : 0.0;
     }
+    
+    /// <summary>
+    /// Cleanup expired data - embodying compassionate resource stewardship
+    /// Removes old metrics and maintains healthy collection sizes
+    /// </summary>
+    private void CleanupExpiredData(object? state)
+    {
+        try
+        {
+            var now = DateTime.UtcNow;
+            var cleanupStats = new
+            {
+                ServiceInstancesBefore = _serviceInstances.Count,
+                PerformanceMetricsBefore = _performanceMetrics.Count,
+                ScalingRecommendationsBefore = _scalingRecommendations.Count
+            };
+
+            // Cleanup expired scaling recommendations
+            var expiredRecommendations = _scalingRecommendations
+                .Where(kvp => now - kvp.Value.GeneratedAt > TimeSpan.FromHours(RECOMMENDATIONS_TTL_HOURS))
+                .Select(kvp => kvp.Key)
+                .ToList();
+            foreach (var key in expiredRecommendations)
+            {
+                _scalingRecommendations.TryRemove(key, out _);
+            }
+
+            // Size-based eviction for service instances (evict oldest)
+            if (_serviceInstances.Count > MAX_SERVICE_INSTANCES)
+            {
+                var excessCount = _serviceInstances.Count - MAX_SERVICE_INSTANCES;
+                var oldestInstances = _serviceInstances
+                    .OrderBy(kvp => kvp.Value.LastHealthCheck)
+                    .Take(excessCount)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+                foreach (var key in oldestInstances)
+                {
+                    _serviceInstances.TryRemove(key, out _);
+                }
+            }
+
+            // Size-based eviction for scaling recommendations (evict oldest)
+            if (_scalingRecommendations.Count > MAX_SCALING_RECOMMENDATIONS)
+            {
+                var excessCount = _scalingRecommendations.Count - MAX_SCALING_RECOMMENDATIONS;
+                var oldestRecommendations = _scalingRecommendations
+                    .OrderBy(kvp => kvp.Value.GeneratedAt)
+                    .Take(excessCount)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+                foreach (var key in oldestRecommendations)
+                {
+                    _scalingRecommendations.TryRemove(key, out _);
+                }
+            }
+
+            // Cleanup performance metrics queue (keep only recent ones)
+            var maxMetrics = MAX_PERFORMANCE_METRICS;
+            while (_performanceMetrics.Count > maxMetrics)
+            {
+                _performanceMetrics.TryDequeue(out _);
+            }
+
+            _logger.Info($"[LoadBalancingModule] Cleanup completed - " +
+                        $"ServiceInstances: {cleanupStats.ServiceInstancesBefore} → {_serviceInstances.Count}, " +
+                        $"PerformanceMetrics: {cleanupStats.PerformanceMetricsBefore} → {_performanceMetrics.Count}, " +
+                        $"ScalingRecommendations: {cleanupStats.ScalingRecommendationsBefore} → {_scalingRecommendations.Count}");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[LoadBalancingModule] Error during cleanup: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Dispose resources - embodying graceful completion
+    /// </summary>
+    public void Dispose()
+    {
+        _cleanupTimer?.Dispose();
+    }
 }
 
 // Load Balancing DTOs
@@ -839,6 +937,7 @@ public class ScalingRecommendation
     public string Reason { get; set; } = "";
     public string Priority { get; set; } = "";
     public string EstimatedImpact { get; set; } = "";
+    public DateTime GeneratedAt { get; set; } = DateTime.UtcNow;
 }
 
 [ResponseType("codex.loadbalancing.optimization", "LoadBalancingOptimization", "Load balancing optimization entity")]

@@ -22,6 +22,9 @@ interface UserProfile {
   resonanceLevel?: number
   totalContributions?: number
   profileCompletion?: number
+  totalPoints?: number
+  level?: number
+  badges?: UserBadge[]
 }
 
 interface BeliefSystem {
@@ -48,6 +51,25 @@ interface ProfileSection {
   points: number
 }
 
+interface UserBadge {
+  badgeId: string
+  name: string
+  description: string
+  icon: string
+  rarity: string
+  points: number
+  earnedAt: string
+}
+
+interface UserPointsData {
+  userId: string
+  totalPoints: number
+  level: number
+  badges: UserBadge[]
+  achievements: any[]
+  lastUpdated: string
+}
+
 const DEFAULT_PROFILE_SECTIONS: ProfileSection[] = [
   { id: 'basic', title: 'Basic Information', description: 'Display name, email, and bio', icon: '👤', completed: false, required: true, points: 10 },
   { id: 'avatar', title: 'Profile Picture', description: 'Add a profile photo to personalize your presence', icon: '📸', completed: false, required: false, points: 5 },
@@ -62,6 +84,7 @@ export default function ProfilePage() {
   const authLoading = auth?.isLoading ?? false
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [beliefSystem, setBeliefSystem] = useState<BeliefSystem | null>(null)
+  // const [pointsData, setPointsData] = useState<UserPointsData | null>(null)
   const [loading, setLoading] = useState<boolean>(authLoading || !!user?.id)
   const [saving, setSaving] = useState(false)
   const [activeSection, setActiveSection] = useState('overview')
@@ -112,7 +135,7 @@ export default function ProfilePage() {
     if (level >= 75) return { title: '🌟 High Resonance', color: 'from-blue-500 to-cyan-500', description: 'You\'re deeply connected to the collective consciousness' }
     if (level >= 60) return { title: '🔮 Resonance Seeker', color: 'from-green-500 to-teal-500', description: 'You\'re exploring deeper levels of awareness' }
     if (level >= 40) return { title: '🌱 Growing Resonance', color: 'from-yellow-500 to-orange-500', description: 'Your resonance field is expanding' }
-    if (level >= 20) return { title: '🌿 Emerging', color: 'from-emerald-500 to-green-500', description: 'You\'re beginning your resonance journey' }
+    if (level >= 20) return { title: '🌿 Emerging', color: 'from-emerald-500 to-green-500', description: 'You&apos;re beginning your resonance journey' }
     return { title: '🌸 Newcomer', color: 'from-gray-500 to-gray-600', description: 'Welcome to the Living Codex community' }
   }
 
@@ -287,6 +310,18 @@ export default function ProfilePage() {
     }
   }
 
+  // const loadUserPoints = async () => {
+  //   try {
+  //     if (!user?.id) return
+  //     const response = await api.get(`/points/${user.id}`)
+  //     if (response.success && response.data) {
+  //       setPointsData(response.data)
+  //     }
+  //   } catch (error) {
+  //     console.error('Error loading user points:', error)
+  //   }
+  // }
+
   const saveProfile = async () => {
     setSaving(true)
     setMessage(null)
@@ -307,7 +342,7 @@ export default function ProfilePage() {
 
       if (response.success) {
         setMessage({ type: 'success', text: 'Profile updated successfully!' })
-        await loadUserProfile() // Reload to get updated data
+        await loadUserProfile()
       } else {
         setMessage({ type: 'error', text: `Failed to update profile: ${response.error}` })
       }
@@ -342,7 +377,7 @@ export default function ProfilePage() {
 
       if (response.success) {
         setMessage({ type: 'success', text: 'Belief system updated successfully!' })
-        await loadBeliefSystem() // Reload to get updated data
+        await loadBeliefSystem()
       } else {
         setMessage({ type: 'error', text: `Failed to update belief system: ${response.error}` })
       }
@@ -960,7 +995,7 @@ export default function ProfilePage() {
               <h4 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">🔒 Privacy & Safety</h4>
               <p className="text-sm text-yellow-700 dark:text-yellow-300">
                 Your location is used only for personalization and discovery within the Living Codex community.
-                You can control who sees your location in your privacy settings, and it's never shared with external services.
+                You can control who sees your location in your privacy settings, and it&apos;s never shared with external services.
               </p>
             </div>
 
@@ -1085,6 +1120,67 @@ export default function ProfilePage() {
                 <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-lg hover:shadow-xl transition-all duration-200">
                   Share Profile
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Profile Stats Summary */}
+        <div className="bg-card rounded-2xl p-6 shadow-xl border border-card mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-semibold text-high-contrast mb-1">Your Profile Stats</h2>
+              <p className="text-medium-contrast text-sm">Track your profile completion and activity</p>
+            </div>
+            <div className="text-right">
+              <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{completion}%</div>
+              <div className="text-sm text-medium-contrast">Complete</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Profile Completion */}
+            <div className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-700">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="text-2xl">📊</div>
+                <div>
+                  <h3 className="font-semibold text-blue-800 dark:text-blue-200">Profile Complete</h3>
+                  <p className="text-sm text-blue-600 dark:text-blue-300">{completion}% finished</p>
+                </div>
+              </div>
+              <div className="w-full bg-blue-200 dark:bg-blue-700/30 rounded-full h-2">
+                <div
+                  className="bg-gradient-to-r from-blue-500 to-cyan-500 h-2 rounded-full transition-all duration-500"
+                  style={{ width: `${completion}%` }}
+                ></div>
+              </div>
+            </div>
+
+            {/* Interests */}
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl p-4 border border-green-200 dark:border-green-700">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="text-2xl">💫</div>
+                <div>
+                  <h3 className="font-semibold text-green-800 dark:text-green-200">Interests</h3>
+                  <p className="text-sm text-green-600 dark:text-green-300">{profile?.interests?.length || 0} added</p>
+                </div>
+              </div>
+              <div className="text-sm text-green-700 dark:text-green-300">
+                {profile?.interests?.length === 0 ? 'Add interests to connect with like-minded people' : 'Great! You&apos;re building your resonance network'}
+              </div>
+            </div>
+
+            {/* Contributions */}
+            <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl p-4 border border-purple-200 dark:border-purple-700">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="text-2xl">🌟</div>
+                <div>
+                  <h3 className="font-semibold text-purple-800 dark:text-purple-200">Contributions</h3>
+                  <p className="text-sm text-purple-600 dark:text-purple-300">{profile?.totalContributions || 0} shared</p>
+                </div>
+              </div>
+              <div className="text-sm text-purple-700 dark:text-purple-300">
+                {profile?.totalContributions === 0 ? 'Start sharing concepts to build your influence' : 'You&apos;re actively contributing to the community'}
               </div>
             </div>
           </div>
@@ -1342,20 +1438,21 @@ export default function ProfilePage() {
               ].map((badge) => (
                 <div
                   key={badge.id}
-                  className={`relative p-4 rounded-xl border-2 transition-all duration-200 ${
+                  className={`relative p-3 rounded-xl border-2 transition-all duration-200 hover:scale-105 ${
                     badge.earned
                       ? `bg-gradient-to-br ${getBadgeColor(badge.rarity)} border-current shadow-lg`
                       : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 opacity-60'
                   }`}
+                  title={badge.description} // Tooltip for full description
                 >
                   <div className="text-center">
-                    <div className={`text-3xl mb-2 ${badge.earned ? '' : 'grayscale'}`}>
+                    <div className={`text-2xl mb-2 ${badge.earned ? '' : 'grayscale'}`}>
                       {badge.icon}
                     </div>
-                    <div className={`font-semibold text-sm mb-1 ${badge.earned ? 'text-current' : 'text-gray-500 dark:text-gray-400'}`}>
+                    <div className={`font-semibold text-xs mb-1 ${badge.earned ? 'text-current' : 'text-gray-500 dark:text-gray-400'} truncate`}>
                       {badge.name}
                     </div>
-                    <div className={`text-xs mb-2 ${badge.earned ? 'text-current opacity-80' : 'text-gray-400 dark:text-gray-500'}`}>
+                    <div className={`text-xs mb-2 ${badge.earned ? 'text-current opacity-80' : 'text-gray-400 dark:text-gray-500'} line-clamp-2 h-8 overflow-hidden`}>
                       {badge.description}
                     </div>
                     <div className="flex items-center justify-center gap-1">

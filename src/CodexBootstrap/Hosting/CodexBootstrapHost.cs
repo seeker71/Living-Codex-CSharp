@@ -11,6 +11,7 @@ using CodexBootstrap.Modules;
 using CodexBootstrap.Runtime;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.OpenApi.Models;
+// using StackExchange.Redis; // Temporarily disabled
 
 namespace CodexBootstrap.Hosting;
 
@@ -46,24 +47,34 @@ public static class CodexBootstrapHost
 
     private static void ConfigureShutdownServices(WebApplicationBuilder builder)
     {
-        // Create a global cancellation token source for graceful shutdown
-        var shutdownCts = new CancellationTokenSource();
-        
-        // Add the cancellation token source to the service container
-        builder.Services.AddSingleton<CancellationTokenSource>(shutdownCts);
+        // Register shutdown coordinator as hosted service
+        builder.Services.AddHostedService<ShutdownCoordinator>();
+        builder.Services.AddSingleton<ShutdownCoordinator>(sp => 
+            sp.GetServices<IHostedService>().OfType<ShutdownCoordinator>().First());
     }
 
     private static void ConfigureShutdownHandling(WebApplication app)
     {
-        // Get the shutdown cancellation token source from the service container
-        var shutdownCts = app.Services.GetRequiredService<CancellationTokenSource>();
+        var logger = app.Services.GetRequiredService<ICodexLogger>();
         
-        // Register shutdown handler
+        // Register shutdown timeout protection
         app.Lifetime.ApplicationStopping.Register(() =>
         {
-            shutdownCts.Cancel();
-            var logger = app.Services.GetRequiredService<ICodexLogger>();
-            logger.Info("Application is shutting down - canceling outstanding AI operations...");
+            logger.Info("[Shutdown] Application stopping - initiating graceful shutdown...");
+            
+            // Force exit after 30 seconds if graceful shutdown hangs
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(30));
+                logger.Error("[Shutdown] FORCE EXIT - graceful shutdown timed out after 30s");
+                logger.Error("[Shutdown] This indicates background tasks are not respecting cancellation tokens");
+                Environment.Exit(1);
+            });
+        });
+        
+        app.Lifetime.ApplicationStopped.Register(() =>
+        {
+            logger.Info("[Shutdown] Application stopped successfully");
         });
     }
 
@@ -80,6 +91,9 @@ public static class CodexBootstrapHost
             options.HttpsPort = 5001;
         });
 
+        // Add controllers for all environments
+        builder.Services.AddControllers();
+        
         if (builder.Environment.IsDevelopment())
         {
             builder.Services.AddRazorPages().AddRazorRuntimeCompilation();
@@ -116,6 +130,9 @@ public static class CodexBootstrapHost
         builder.Services.AddSingleton(new NodeRegistryBootstrapOptions(persistenceEnabled, environment));
         builder.Services.AddSingleton<ICodexLogger>(_ => new Log4NetLogger(typeof(CodexBootstrapHost)));
         builder.Services.AddSingleton<StartupStateService>();
+        
+        // Database monitoring
+        builder.Services.AddSingleton<DatabaseOperationMonitor>();
 
         if (persistenceEnabled)
         {
@@ -131,10 +148,12 @@ public static class CodexBootstrapHost
                 var iceConnectionString = Environment.GetEnvironmentVariable("ICE_CONNECTION_STRING") ??
                                           "Host=localhost;Database=codex_ice;Username=codex;Password=codex";
 
+                // Temporarily disable database monitoring to fix initialization issue
+                // var monitor = sp.GetRequiredService<DatabaseOperationMonitor>();
                 return iceStorageType.ToLowerInvariant() switch
                 {
                     "postgresql" => new PostgreSqlIceStorageBackend(iceConnectionString),
-                    "sqlite" => new SqliteIceStorageBackend(iceConnectionString),
+                    "sqlite" => new SqliteIceStorageBackend(iceConnectionString), // Remove monitor parameter
                     _ => new PostgreSqlIceStorageBackend(iceConnectionString)
                 };
             });
@@ -149,7 +168,9 @@ public static class CodexBootstrapHost
 
                 var waterConnectionString = Environment.GetEnvironmentVariable("WATER_CONNECTION_STRING") ??
                                              "Data Source=data/water_cache.db";
-                return new SqliteWaterStorageBackend(waterConnectionString);
+                // Temporarily disable database monitoring to fix initialization issue
+                // var monitor = sp.GetRequiredService<DatabaseOperationMonitor>();
+                return new SqliteWaterStorageBackend(waterConnectionString); // Remove monitor parameter
             });
         }
         else
@@ -177,6 +198,15 @@ public static class CodexBootstrapHost
         builder.Services.AddSingleton<ModuleCommunicationWrapper>();
         builder.Services.AddSingleton<PerformanceProfiler>();
         builder.Services.AddSingleton<IInputValidator, InputValidator>();
+        
+        // Performance Optimization Services
+        // ConfigurePerformanceOptimization(builder, bootLogger); // Temporarily disabled
+        
+        // AI Pipeline Monitoring Services
+        ConfigureAIPipelineMonitoring(builder, bootLogger);
+        
+        // Redis and Distributed Session Storage Configuration
+        // ConfigureDistributedSessionStorage(builder, bootLogger); // Temporarily disabled
         builder.Services.AddSingleton<CodexBootstrap.Core.Security.IUserRepository, NodeRegistryUserRepository>();
         builder.Services.AddSingleton<CodexBootstrap.Core.Security.IAuthenticationService, AuthenticationService>();
         builder.Services.AddSingleton<ModuleCompiler>();
@@ -196,11 +226,17 @@ public static class CodexBootstrapHost
         builder.Services.AddSingleton(sp => new ModuleLoader(
             sp.GetRequiredService<INodeRegistry>(),
             sp.GetRequiredService<IApiRouter>(),
-            sp));
+            sp,
+            sp.GetRequiredService<ReadinessTracker>()));
         builder.Services.AddSingleton<RouteDiscovery>();
         builder.Services.AddSingleton<CoreApiService>();
         builder.Services.AddSingleton<HealthService>();
+        builder.Services.AddSingleton<PrometheusMetricsService>();
         builder.Services.AddSingleton<CodexBootstrap.Core.ConfigurationManager>();
+        
+        // Readiness tracking services
+        builder.Services.AddSingleton<ReadinessTracker>();
+        builder.Services.AddSingleton<ReadinessEventStream>();
         builder.Services.AddLogging(configure => configure.AddConsole().AddDebug());
 
         builder.Services.AddSignalR();
@@ -210,6 +246,8 @@ public static class CodexBootstrapHost
         {
             options.AddDefaultPolicy(policy => policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
         });
+
+        // Controllers already added in ConfigureServer
 
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen(c =>
@@ -464,8 +502,18 @@ public static class CodexBootstrapHost
         var healthService = app.Services.GetRequiredService<HealthService>();
         var configuration = app.Configuration;
 
+        // Add performance profiling middleware for mindful measurement
+        app.UseMiddleware<CodexBootstrap.Middleware.PerformanceProfilingMiddleware>();
+        
+        // Add response caching middleware for efficient data delivery
+        app.UseMiddleware<CodexBootstrap.Middleware.ResponseCachingMiddleware>();
+        
         // Add request tracker middleware for detailed logging
         app.UseMiddleware<CodexBootstrap.Middleware.RequestTrackerMiddleware>();
+        
+        // Add readiness middleware to check endpoint availability
+        var readinessTracker = app.Services.GetRequiredService<ReadinessTracker>();
+        app.UseMiddleware<CodexBootstrap.Middleware.ReadinessMiddleware>(readinessTracker, logger);
         
         // Add middleware to track active requests
         app.Use(async (context, next) =>
@@ -487,6 +535,34 @@ public static class CodexBootstrapHost
             healthService.IncrementRequestCount();
             return Results.Ok(healthService.GetHealthStatus());
         });
+
+        // Map memory health endpoint for compassionate resource monitoring
+        app.MapGet("/health/memory", () =>
+        {
+            healthService.IncrementRequestCount();
+            return Results.Ok(healthService.GetMemoryHealthStatus());
+        });
+
+        // Map AI pipeline health endpoint for compassionate AI monitoring
+        app.MapGet("/health/ai-pipeline", () =>
+        {
+            healthService.IncrementRequestCount();
+            var aiTracker = app.Services.GetService<AIPipelineTracker>();
+            if (aiTracker != null)
+            {
+                return Results.Ok(aiTracker.GetMetrics());
+            }
+            return Results.Ok(new { message = "AI pipeline monitoring not available", enabled = false });
+        });
+
+        // API endpoints for the AI Dashboard
+        app.MapGet("/api/health", () =>
+        {
+            healthService.IncrementRequestCount();
+            return Results.Ok(healthService.GetHealthStatus());
+        });
+
+        // Note: /metrics endpoint is provided by SystemMetricsModule
 
         // Map active requests monitoring endpoint
         app.MapGet("/health/requests/active", () =>
@@ -523,9 +599,16 @@ public static class CodexBootstrapHost
                 health = "/health",
                 modules = "/modules",
                 nodes = "/nodes",
-                swagger = "/swagger"
+                swagger = "/swagger",
+                readiness = "/readiness"
             }
         }));
+
+        // Map readiness endpoints
+        app.MapControllerRoute(
+            name: "readiness",
+            pattern: "readiness/{action=GetSystemReadiness}",
+            defaults: new { controller = "Readiness" });
 
         // Do ALL heavy initialization in background
         logger.Info("[Hosting] Starting background initialization...");
@@ -536,22 +619,38 @@ public static class CodexBootstrapHost
             {
                 Console.WriteLine("[DEBUG] Inside background task - starting registry init");
                 logger.Info("[Background] Initializing registry...");
+                Console.WriteLine("[DEBUG] About to call registry.InitializeAsync()");
                 await registry.InitializeAsync();
+                Console.WriteLine("[DEBUG] registry.InitializeAsync() completed successfully");
                 healthService.MarkRegistryInitialized();
                 logger.Info("[Background] Registry initialized");
                 
+                Console.WriteLine("[DEBUG] About to initialize meta node system");
                 InitializeMetaNodeSystem(registry);
+                Console.WriteLine("[DEBUG] Meta node system initialized");
                 logger.Info("[Background] Meta node system initialized");
                 
-                // U-CORE seeding
-                logger.Info("[Background] Starting U-CORE seeding...");
-                var startTime = DateTime.UtcNow;
-                await UCoreInitializer.SeedIfMissing(registry, logger);
-                logger.Info($"[Background] U-CORE seeding completed in {(DateTime.UtcNow - startTime).TotalMilliseconds}ms");
+                // U-CORE seeding - defer to background task to avoid blocking module loading
+                logger.Info("[Background] Starting U-CORE seeding in background...");
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var startTime = DateTime.UtcNow;
+                        await UCoreInitializer.SeedIfMissing(registry, logger);
+                        logger.Info($"[Background] U-CORE seeding completed in {(DateTime.UtcNow - startTime).TotalMilliseconds}ms");
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Error($"[Background] U-CORE seeding failed: {ex.Message}", ex);
+                    }
+                });
                 
                 // Load modules
+                Console.WriteLine("[DEBUG] About to load built-in modules");
                 logger.Info("[Background] Loading built-in modules...");
                 moduleLoader.LoadBuiltInModules();
+                Console.WriteLine("[DEBUG] Built-in modules loaded");
                 logger.Info("[Background] Built-in modules loaded");
                 
                 var moduleDirectory = configuration.GetValue<string>("ModuleDirectory") ??
@@ -580,6 +679,8 @@ public static class CodexBootstrapHost
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"[DEBUG] Background initialization failed: {ex.Message}");
+                Console.WriteLine($"[DEBUG] Exception: {ex}");
                 logger.Error($"[Background] Initialization failed: {ex.Message}", ex);
             }
         });
@@ -606,15 +707,25 @@ public static class CodexBootstrapHost
             return module != null ? Results.Ok(module) : Results.NotFound();
         });
 
-        app.MapGet("/modules/loading-report", () => new
+        app.MapGet("/modules/loading-report", () =>
         {
-            loadedModules = moduleLoader.GetLoadedModules().Count,
-            modules = moduleLoader.GetLoadedModules().Select(m => new
+            var (discovered, created, registered, asyncInitialized, asyncComplete) = moduleLoader.GetModuleLoadingMetrics();
+            return Results.Ok(new
             {
-                name = m.GetModuleNode().Title,
-                id = m.GetModuleNode().Id,
-                version = m.GetModuleNode().Meta?.GetValueOrDefault("version")?.ToString() ?? "0.1.0"
-            })
+                discovered,
+                created,
+                registered,
+                asyncInitialized,
+                asyncComplete,
+                loadedModules = moduleLoader.GetLoadedModules().Count,
+                stuckModules = moduleLoader.GetStuckModules(),
+                modules = moduleLoader.GetLoadedModules().Select(m => new
+                {
+                    name = m.GetModuleNode().Title,
+                    id = m.GetModuleNode().Id,
+                    version = m.GetModuleNode().Meta?.GetValueOrDefault("version")?.ToString() ?? "0.1.0"
+                })
+            });
         });
 
         app.MapGet("/modules/status", () =>
@@ -856,6 +967,146 @@ public static class CodexBootstrapHost
             return 1;
         }
     }
+
+    /// <summary>
+    /// Configure AI pipeline monitoring services
+    /// Embodying the principle of mindful AI flow - tracking AI processing with compassion
+    /// </summary>
+    private static void ConfigureAIPipelineMonitoring(WebApplicationBuilder builder, ICodexLogger logger)
+    {
+        var enableAIMonitoring = Environment.GetEnvironmentVariable("ENABLE_AI_PIPELINE_MONITORING") ?? "true";
+        
+        logger.Info($"[AIPipelineMonitoring] Configuration - Enabled: {enableAIMonitoring}");
+        
+        if (enableAIMonitoring.Equals("true", StringComparison.OrdinalIgnoreCase))
+        {
+            // Register AI pipeline tracker
+            builder.Services.AddSingleton<AIPipelineTracker>();
+            logger.Info("[AIPipelineMonitoring] AI pipeline tracking enabled");
+            
+            // Register AI Request Queue
+            builder.Services.AddSingleton<AIRequestQueue>();
+            logger.Info("[AIPipelineMonitoring] AI request queue enabled");
+        }
+        else
+        {
+            logger.Info("[AIPipelineMonitoring] AI pipeline monitoring disabled via configuration");
+        }
+    }
+
+    /// <summary>
+    /// Configure performance optimization services
+    /// Embodying the principle of mindful efficiency - optimizing system performance with compassion
+    /// </summary>
+    /*
+    private static void ConfigurePerformanceOptimization(WebApplicationBuilder builder, ICodexLogger logger)
+    {
+        var enablePerformanceOptimization = Environment.GetEnvironmentVariable("ENABLE_PERFORMANCE_OPTIMIZATION") ?? "true";
+        var enableResponseCaching = Environment.GetEnvironmentVariable("ENABLE_RESPONSE_CACHING") ?? "true";
+        var enableDatabaseOptimization = Environment.GetEnvironmentVariable("ENABLE_DATABASE_OPTIMIZATION") ?? "true";
+        
+        logger.Info($"[PerformanceOptimization] Configuration - " +
+                   $"Optimization: {enablePerformanceOptimization}, " +
+                   $"Caching: {enableResponseCaching}, " +
+                   $"Database: {enableDatabaseOptimization}");
+        
+        if (enablePerformanceOptimization.Equals("true", StringComparison.OrdinalIgnoreCase))
+        {
+            // Register performance metrics service
+            builder.Services.AddSingleton<PerformanceMetrics>();
+            
+            if (enableResponseCaching.Equals("true", StringComparison.OrdinalIgnoreCase))
+            {
+                // Register response cache service
+                builder.Services.AddSingleton<ResponseCache>();
+                logger.Info("[PerformanceOptimization] Response caching enabled");
+            }
+            
+            if (enableDatabaseOptimization.Equals("true", StringComparison.OrdinalIgnoreCase))
+            {
+                // Register database query profiler
+                builder.Services.AddSingleton<DatabaseQueryProfiler>();
+                logger.Info("[PerformanceOptimization] Database optimization enabled");
+            }
+            
+            logger.Info("[PerformanceOptimization] Performance optimization services configured successfully");
+        }
+        else
+        {
+            logger.Info("[PerformanceOptimization] Performance optimization disabled via configuration");
+        }
+    }
+    */
+
+    /// <summary>
+    /// Configure Redis and distributed session storage services
+    /// Embodying the principle of interconnectedness - enabling shared session state across server instances
+    /// </summary>
+    /*
+    private static void ConfigureDistributedSessionStorage(WebApplicationBuilder builder, ICodexLogger logger)
+    {
+        var redisConnectionString = Environment.GetEnvironmentVariable("REDIS_CONNECTION_STRING") ?? 
+                                  Environment.GetEnvironmentVariable("ConnectionStrings__Redis") ??
+                                  "localhost:6379";
+        
+        var enableDistributedSessions = Environment.GetEnvironmentVariable("ENABLE_DISTRIBUTED_SESSIONS") ?? "true";
+        var useDistributedStorage = enableDistributedSessions.Equals("true", StringComparison.OrdinalIgnoreCase);
+        
+        logger.Info($"[DistributedSessions] Configuration - Redis: {redisConnectionString}, Enabled: {useDistributedStorage}");
+        
+        if (useDistributedStorage)
+        {
+            try
+            {
+                // Register Redis configuration
+                builder.Services.AddSingleton<IRedisConfiguration>(sp =>
+                {
+                    var redisOptions = RedisConfigurationOptions.FromConnectionString(redisConnectionString);
+                    return new RedisConfiguration(sp.GetRequiredService<ICodexLogger>(), redisOptions);
+                });
+                
+                // Register Redis connection multiplexer
+                builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+                {
+                    var redisConfig = sp.GetRequiredService<IRedisConfiguration>();
+                    return redisConfig.GetConnectionAsync().Result;
+                });
+                
+                // Register distributed session storage
+                builder.Services.AddSingleton<IDistributedSessionStorage>(sp =>
+                {
+                    var redis = sp.GetRequiredService<IConnectionMultiplexer>();
+                    var logger = sp.GetRequiredService<ICodexLogger>();
+                    return new DistributedSessionStorage(redis, logger);
+                });
+                
+                logger.Info("[DistributedSessions] Redis and distributed session storage configured successfully");
+            }
+            catch (Exception ex)
+            {
+                logger.Error("[DistributedSessions] Failed to configure Redis, falling back to in-memory storage", ex);
+                useDistributedStorage = false;
+            }
+        }
+        
+        // Register session storage adapter (supports both distributed and in-memory)
+        builder.Services.AddSingleton<ISessionStorageAdapter>(sp =>
+        {
+            var distributedStorage = useDistributedStorage ? sp.GetService<IDistributedSessionStorage>() : null;
+            var logger = sp.GetRequiredService<ICodexLogger>();
+            var enableFallback = Environment.GetEnvironmentVariable("SESSION_STORAGE_ENABLE_FALLBACK") ?? "true";
+            
+            return new SessionStorageAdapter(
+                distributedStorage,
+                logger,
+                useDistributedStorage,
+                enableFallback.Equals("true", StringComparison.OrdinalIgnoreCase)
+            );
+        });
+        
+        logger.Info($"[DistributedSessions] Session storage adapter configured - Type: {(useDistributedStorage ? "Redis" : "InMemory")}, Fallback: true");
+    }
+    */
 
     private sealed record NodeRegistryBootstrapOptions(bool PersistenceEnabled, string EnvironmentName);
 }

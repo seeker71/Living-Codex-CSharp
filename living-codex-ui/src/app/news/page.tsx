@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 import { endpoints } from '@/lib/api';
 import { useTrackInteraction } from '@/lib/hooks';
@@ -74,27 +75,12 @@ export default function NewsPage() {
     }
   }, [user?.id, trackInteraction]);
 
-  // Load news data
-  useEffect(() => {
-    setCurrentPage(1); // Reset to first page when filters change
-    loadNewsData();
-    loadStats();
-  }, [selectedCategory, timeRange, user?.id]); // loadNewsData is stable due to useState setters
-
-  // Load news data when page changes
-  useEffect(() => {
-    if (currentPage > 1) {
-      loadNewsData();
-    }
-  }, [currentPage]);
-
-  const loadNewsData = async () => {
+  const loadNewsData = useCallback(async () => {
     setLoading(true);
     try {
       const skip = (currentPage - 1) * pageSize;
       
       if (selectedCategory === 'personalized' && user?.id) {
-        // Load personalized news feed
         const response = await endpoints.getNewsFeed(user.id, pageSize, timeRange, skip);
         if (response.success && response.data) {
           const data = response.data as any;
@@ -102,19 +88,16 @@ export default function NewsPage() {
           setTotalCount(data.totalCount || 0);
         }
       } else if (selectedCategory === 'trending') {
-        // Load trending news
         const response = await fetch(buildApiUrl(`/news/trending?limit=${pageSize}&hoursBack=${timeRange}`));
         const data = await response.json();
         setTrendingTopics(data.topics || []);
         setTotalCount(data.topics?.length || 0);
       } else if (selectedCategory === 'personalized' && !user?.id) {
-        // Fallback to general news when user is not authenticated
         const response = await fetch(buildApiUrl(`/news/latest?limit=${pageSize}&skip=${skip}`));
         const data = await response.json();
         setNewsItems(data.items || []);
         setTotalCount(data.totalCount || 0);
       } else {
-        // Load general news by search
         const searchRequest = {
           interests: selectedCategory === 'all' ? [] : [selectedCategory],
           limit: pageSize,
@@ -135,9 +118,9 @@ export default function NewsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, endpoints, selectedCategory, timeRange, user?.id, pageSize]);
 
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       const search = selectedCategory === 'all' || selectedCategory === 'personalized' || selectedCategory === 'trending'
         ? undefined
@@ -151,7 +134,22 @@ export default function NewsPage() {
     } catch (e) {
       // ignore stats errors
     }
-  };
+  }, [endpoints, selectedCategory, timeRange]);
+
+  // Load news data
+  useEffect(() => {
+    setCurrentPage(1); // Reset to first page when filters change
+    loadNewsData();
+    loadStats();
+  }, [selectedCategory, timeRange, user?.id, loadNewsData, loadStats]);
+
+  // Load news data when page changes
+  useEffect(() => {
+    if (currentPage > 1) {
+      loadNewsData();
+    }
+  }, [currentPage, loadNewsData]);
+
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -429,9 +427,11 @@ export default function NewsPage() {
                         <article key={index} className="p-6 hover:bg-gray-50 dark:hover:bg-gray-700">
                         <div className="flex items-start space-x-4">
                           {item.imageUrl && (
-                            <img
+                            <Image
                               src={item.imageUrl}
                               alt={item.title}
+                              width={80}
+                              height={80}
                               className="w-20 h-20 object-cover rounded-lg flex-shrink-0"
                             />
                           )}

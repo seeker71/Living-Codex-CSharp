@@ -14,10 +14,11 @@ scrape_configs:
   # Living Codex API
   - job_name: 'living-codex-api'
     static_configs:
-      - targets: ['living-codex-api:5000']
-    metrics_path: '/metrics'
+      - targets: ['living-codex-service:5000']
+    metrics_path: '/metrics/prometheus'
     scrape_interval: 10s
     scrape_timeout: 5s
+    honor_labels: true
 
   # PostgreSQL
   - job_name: 'postgres'

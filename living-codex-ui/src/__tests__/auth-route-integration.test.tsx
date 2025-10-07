@@ -5,9 +5,10 @@
  */
 
 import React from 'react'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { screen, fireEvent, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
-import { renderWithProviders, TEST_INFRASTRUCTURE } from './test-utils'
+import { renderWithProviders } from './test-utils'
+import AuthPage from '@/app/auth/page'
 
 // Mock the auth page component
 jest.mock('@/app/auth/page', () => ({
@@ -20,7 +21,7 @@ jest.mock('@/app/auth/page', () => ({
       displayName: ''
     })
     const [loading, setLoading] = React.useState(false)
-    const [error, setError] = React.useState('')
+    const [, setError] = React.useState('')
     const [success, setSuccess] = React.useState('')
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -168,7 +169,6 @@ describe('Authentication Route Integration Tests', () => {
     })
 
     it('should display auth header and description', async () => {
-      const AuthPage = require('@/app/auth/page').default
 
       renderWithProviders(<AuthPage />)
 
@@ -178,7 +178,6 @@ describe('Authentication Route Integration Tests', () => {
     })
 
     it('should show login/register toggle buttons', async () => {
-      const AuthPage = require('@/app/auth/page').default
 
       renderWithProviders(<AuthPage />)
 
@@ -191,7 +190,6 @@ describe('Authentication Route Integration Tests', () => {
 
   describe('Login Form Functionality', () => {
     it('should show login form by default', async () => {
-      const AuthPage = require('@/app/auth/page').default
 
       renderWithProviders(<AuthPage />)
 
@@ -203,7 +201,6 @@ describe('Authentication Route Integration Tests', () => {
     })
 
     it('should validate required fields for login', async () => {
-      const AuthPage = require('@/app/auth/page').default
 
       renderWithProviders(<AuthPage />)
 
@@ -213,7 +210,6 @@ describe('Authentication Route Integration Tests', () => {
     })
 
     it('should handle successful login', async () => {
-      const AuthPage = require('@/app/auth/page').default
 
       renderWithProviders(<AuthPage />)
 
@@ -240,7 +236,6 @@ describe('Authentication Route Integration Tests', () => {
     })
 
     it('should handle login failure with invalid credentials', async () => {
-      const AuthPage = require('@/app/auth/page').default
 
       renderWithProviders(<AuthPage />)
 
@@ -269,7 +264,6 @@ describe('Authentication Route Integration Tests', () => {
 
   describe('Registration Form Functionality', () => {
     it('should switch to registration form', async () => {
-      const AuthPage = require('@/app/auth/page').default
 
       renderWithProviders(<AuthPage />)
 
@@ -282,7 +276,6 @@ describe('Authentication Route Integration Tests', () => {
     })
 
     it('should validate required fields for registration', async () => {
-      const AuthPage = require('@/app/auth/page').default
 
       renderWithProviders(<AuthPage />)
 
@@ -298,7 +291,6 @@ describe('Authentication Route Integration Tests', () => {
     })
 
     it('should handle successful registration', async () => {
-      const AuthPage = require('@/app/auth/page').default
 
       renderWithProviders(<AuthPage />)
 
@@ -333,7 +325,6 @@ describe('Authentication Route Integration Tests', () => {
 
   describe('Form Validation', () => {
     it('should validate email format', async () => {
-      const AuthPage = require('@/app/auth/page').default
 
       renderWithProviders(<AuthPage />)
 
@@ -347,7 +338,6 @@ describe('Authentication Route Integration Tests', () => {
     })
 
     it('should handle empty form submission', async () => {
-      const AuthPage = require('@/app/auth/page').default
 
       renderWithProviders(<AuthPage />)
 
@@ -363,7 +353,6 @@ describe('Authentication Route Integration Tests', () => {
 
   describe('Features Preview', () => {
     it('should display authentication features', async () => {
-      const AuthPage = require('@/app/auth/page').default
 
       renderWithProviders(<AuthPage />)
 
@@ -374,7 +363,6 @@ describe('Authentication Route Integration Tests', () => {
     })
 
     it('should show backend connectivity status', async () => {
-      const AuthPage = require('@/app/auth/page').default
 
       renderWithProviders(<AuthPage />)
 
@@ -386,7 +374,6 @@ describe('Authentication Route Integration Tests', () => {
 
   describe('Error Handling', () => {
     it('should display error messages properly', async () => {
-      const AuthPage = require('@/app/auth/page').default
 
       renderWithProviders(<AuthPage />)
 
@@ -410,7 +397,6 @@ describe('Authentication Route Integration Tests', () => {
     })
 
     it('should display success messages properly', async () => {
-      const AuthPage = require('@/app/auth/page').default
 
       renderWithProviders(<AuthPage />)
 
@@ -436,7 +422,6 @@ describe('Authentication Route Integration Tests', () => {
 
   describe('Loading States', () => {
     it('should show loading state during form submission', async () => {
-      const AuthPage = require('@/app/auth/page').default
 
       renderWithProviders(<AuthPage />)
 
@@ -456,7 +441,6 @@ describe('Authentication Route Integration Tests', () => {
     })
 
     it('should disable form during loading', async () => {
-      const AuthPage = require('@/app/auth/page').default
 
       renderWithProviders(<AuthPage />)
 
@@ -479,7 +463,6 @@ describe('Authentication Route Integration Tests', () => {
 
   describe('Accessibility', () => {
     it('should have proper form labels and accessibility', async () => {
-      const AuthPage = require('@/app/auth/page').default
 
       renderWithProviders(<AuthPage />)
 
@@ -493,7 +476,6 @@ describe('Authentication Route Integration Tests', () => {
     })
 
     it('should support keyboard navigation', async () => {
-      const AuthPage = require('@/app/auth/page').default
 
       renderWithProviders(<AuthPage />)
 
@@ -513,7 +495,6 @@ describe('Authentication Route Integration Tests', () => {
 
   describe('Backend Integration Readiness', () => {
     it('should be ready for real authentication API integration', async () => {
-      const AuthPage = require('@/app/auth/page').default
 
       renderWithProviders(<AuthPage />)
 
@@ -526,7 +507,6 @@ describe('Authentication Route Integration Tests', () => {
     })
 
     it('should handle OAuth provider integration', async () => {
-      const AuthPage = require('@/app/auth/page').default
 
       renderWithProviders(<AuthPage />)
 

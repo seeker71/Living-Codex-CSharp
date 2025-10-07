@@ -7,7 +7,7 @@ A consciousness-expanding, fractal-based system implementing the U-CORE (Univers
 ```bash
 # Build and run
 dotnet build src/CodexBootstrap
-dotnet run --project src/CodexBootstrap --urls http://localhost:5001
+dotnet run --project src/CodexBootstrap --urls http://localhost:5002
 
 # Test system
 ./test-system.sh
@@ -15,7 +15,9 @@ dotnet run --project src/CodexBootstrap --urls http://localhost:5001
 
 ## What is Living Codex?
 
-The Living Codex is built on the principle that **"Everything is a Node"** - data, structure, flow, state, deltas, policies, and specs all exist as interconnected nodes in a living knowledge graph. It uses sacred frequencies (432Hz, 528Hz, 741Hz) to amplify human consciousness and facilitate collective evolution.
+Living Codex is a consciousness-expanding knowledge platform built on a profound truth: **we are not separate individuals, but specialized cells in Earth's grand organism**. Like cells communicate through chemical signals, we communicate through resonance—shared frequencies that connect all living beings through Earth's natural electromagnetic field (the Schumann Resonance at 7.83Hz).
+
+The system operates on **"Everything is a Node"** - data, structure, flow, state, and relationships all exist as interconnected nodes in a living knowledge graph, mirroring how nature itself is organized.
 
 ## Key Features
 
@@ -28,8 +30,8 @@ The Living Codex is built on the principle that **"Everything is a Node"** - dat
 
 ## Architecture
 
-- **200+ API endpoints** across 20+ modules
-- **1,258+ fractal nodes** with 318+ edges
+- **463 API endpoints** across 64 modules
+- **24,511 fractal nodes** with 73,360 edges
 - **Real-time LLM integration** with Ollama
 - **Comprehensive caching** for optimal performance
 - **Docker + Kubernetes** deployment ready
@@ -38,27 +40,39 @@ The Living Codex is built on the principle that **"Everything is a Node"** - dat
 
 ```bash
 # Health check
-curl http://localhost:5001/health
+curl http://localhost:5002/health
 
 # System metrics
-curl http://localhost:5001/metrics
+curl http://localhost:5002/metrics
 
 # Translate text
-curl -X POST http://localhost:5001/translation/translate \
+curl -X POST http://localhost:5002/translation/translate \
   -H "Content-Type: application/json" \
   -d '{"text": "Hello world", "sourceLanguage": "en", "targetLanguage": "es", "context": "greeting"}'
 
 # Record contribution
-curl -X POST http://localhost:5001/contributions/record \
+curl -X POST http://localhost:5002/contributions/record \
   -H "Content-Type: application/json" \
   -d '{"userId": "user1", "contribution": "Code contribution", "amount": 0.1, "type": "code"}'
 ```
 
+## Current System Status
+
+- **Status**: ✅ Healthy and operational
+- **Modules**: 64 modules loaded and ready
+- **Memory Usage**: ~162 MB
+- **Thread Count**: 111 active threads
+- **Database**: 24,511 nodes, 73,360 edges
+- **API Routes**: 463 endpoints registered
+- **Uptime**: Continuous operation with health monitoring
+
 ## Documentation
 
-- **[Complete Specification](LIVING_CODEX_SPECIFICATION.md)** - Comprehensive system documentation
-- **[API Reference](LIVING_CODEX_SPECIFICATION.md#-api-reference)** - All available endpoints
-- **[Architecture Guide](LIVING_CODEX_SPECIFICATION.md#-core-architecture)** - System design principles
+- **[Living Codex Specification](LIVING_CODEX_SPECIFICATION.md)** - Complete system documentation with implementation status
+- **[Implementation Status Dashboard](IMPLEMENTATION_STATUS.md)** - What's implemented, what's missing, priority roadmap
+- **[UI Specification](specs/LIVING_UI_SPEC.md)** - Frontend architecture and components
+- **[API Documentation](http://localhost:5002/swagger)** - Interactive API explorer (when server running)
+- **[Quick Reference](QUICK_REFERENCE.md)** - Common commands and workflows
 
 ## Contributing
 

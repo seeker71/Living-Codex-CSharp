@@ -1,0 +1,206 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: living-codex-api-staging
+  namespace: living-codex-staging
+  labels:
+    app: living-codex-api
+    version: v1.0.0
+    environment: staging
+spec:
+  replicas: 2  # Start with fewer replicas for staging
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: living-codex-api
+      environment: staging
+  template:
+    metadata:
+      labels:
+        app: living-codex-api
+        version: v1.0.0
+        environment: staging
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5000"
+        prometheus.io/path: "/metrics/prometheus"
+    spec:
+      containers:
+      - name: living-codex-api
+        image: living-codex-api:staging
+        ports:
+        - containerPort: 5000
+          name: http
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Staging"
+        - name: ConnectionStrings__DefaultConnection
+          valueFrom:
+            configMapKeyRef:
+              name: living-codex-config-staging
+              key: ConnectionStrings__DefaultConnection
+        - name: ConnectionStrings__Redis
+          valueFrom:
+            configMapKeyRef:
+              name: living-codex-config-staging
+              key: ConnectionStrings__Redis
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: living-codex-secrets-staging
+              key: JWT_SECRET
+        - name: ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: living-codex-secrets-staging
+              key: ENCRYPTION_KEY
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "125m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 60  # Longer delay for staging
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        # Memory monitoring startup probe
+        startupProbe:
+          httpGet:
+            path: /health/memory
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 20  # More forgiving for staging
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        - name: data
+          mountPath: /app/data
+      volumes:
+      - name: logs
+        emptyDir: {}
+      - name: data
+        emptyDir: {}
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: living-codex-service-staging
+  namespace: living-codex-staging
+  labels:
+    app: living-codex-api
+    environment: staging
+spec:
+  selector:
+    app: living-codex-api
+    environment: staging
+  ports:
+  - name: http
+    port: 5000
+    targetPort: 5000
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: living-codex-hpa-staging
+  namespace: living-codex-staging
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: living-codex-api-staging
+  minReplicas: 2
+  maxReplicas: 5  # Lower max for staging
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 60  # Lower threshold for staging
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 70  # Lower threshold for staging
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: living-codex-config-staging
+  namespace: living-codex-staging
+data:
+  # Staging-specific configuration
+  ASPNETCORE_ENVIRONMENT: "Staging"
+  ASPNETCORE_URLS: "http://+:5000"
+  LOG_LEVEL: "Debug"  # More verbose logging for staging
+  
+  # Database Configuration (staging database)
+  ConnectionStrings__DefaultConnection: "Host=postgres-service-staging;Database=livingcodex_staging;Username=postgres;Password=postgres;Port=5432"
+  ConnectionStrings__Redis: "redis-service-staging:6379"
+  
+  # LLM Configuration
+  OLLAMA_BASE_URL: "http://ollama-service-staging:11434"
+  
+  # Monitoring Configuration
+  PROMETHEUS_ENDPOINT: "http://prometheus-service-staging:9090"
+  
+  # Security Configuration
+  JWT_ISSUER: "living-codex-staging"
+  JWT_AUDIENCE: "living-codex-users-staging"
+  JWT_EXPIRY_HOURS: "24"
+  
+  # Performance Configuration (more conservative for staging)
+  CACHE_TTL_MINUTES: "30"
+  MAX_CONCURRENT_REQUESTS: "50"
+  REQUEST_TIMEOUT_SECONDS: "60"
+  
+  # Feature Flags (enable everything for testing)
+  ENABLE_SWAGGER: "true"
+  ENABLE_METRICS: "true"
+  ENABLE_TRACING: "true"
+  ENABLE_CACHING: "true"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: living-codex-secrets-staging
+  namespace: living-codex-staging
+type: Opaque
+data:
+  # Base64 encoded secrets for staging (different from production)
+  JWT_SECRET: c3RhZ2luZy1zdXBlci1zZWNyZXQtand0LWtleS1mb3ItdGVzdGluZw==
+  ENCRYPTION_KEY: c3RhZ2luZy0zMi1jaGFyYWN0ZXItZW5jcnlwdGlvbi1rZXk=
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: living-codex-staging
+  labels:
+    name: living-codex-staging
+    app: living-codex
+    environment: staging
+

@@ -23,12 +23,27 @@ public sealed class UserContributionsModule : ModuleBase
     private readonly ConcurrentDictionary<string, UserReward> _userRewards = new();
     private readonly ConcurrentDictionary<string, Attribution> _attributions = new();
     private readonly ConcurrentQueue<ContributionEvent> _contributionHistory = new();
-    private readonly Dictionary<string, ContributorEnergy> _contributorEnergies = new();
-    private readonly Dictionary<string, CollectiveResonance> _collectiveResonances = new();
-    private readonly List<AbundanceEvent> _abundanceEvents = new();
-    private readonly Dictionary<string, EnergyAmplification> _energyAmplifications = new();
+    private readonly ConcurrentDictionary<string, ContributorEnergy> _contributorEnergies = new();
+    private readonly ConcurrentDictionary<string, CollectiveResonance> _collectiveResonances = new();
+    private readonly ConcurrentQueue<AbundanceEvent> _abundanceEvents = new();
+    private readonly ConcurrentDictionary<string, EnergyAmplification> _energyAmplifications = new();
     private readonly object _lock = new object();
     private int _maxHistorySize = 1000;
+    
+    // Memory management constants - embodying compassionate resource stewardship
+    private const int MAX_CONTRIBUTIONS = 10000;
+    private const int MAX_USER_REWARDS = 5000;
+    private const int MAX_ATTRIBUTIONS = 5000;
+    private const int MAX_CONTRIBUTOR_ENERGIES = 1000;
+    private const int MAX_COLLECTIVE_RESONANCES = 500;
+    private const int MAX_ABUNDANCE_EVENTS = 2000;
+    private const int MAX_ENERGY_AMPLIFICATIONS = 1000;
+    private const int CLEANUP_INTERVAL_MINUTES = 30;
+    private const int ENERGY_TTL_HOURS = 24;
+    private const int RESONANCE_TTL_HOURS = 48;
+    private const int AMPLIFICATION_TTL_HOURS = 12;
+    
+    private readonly Timer _cleanupTimer;
 
     public override string Name => "User Contributions Module";
     public override string Description => "User contributions module with ETH ledger, change tracking, attribution, and reward sharing";
@@ -39,6 +54,11 @@ public sealed class UserContributionsModule : ModuleBase
     {
         // Initialize Web3 with environment configuration or default to null
         _web3 = InitializeWeb3();
+        
+        // Start cleanup timer - embodying compassionate resource stewardship
+        _cleanupTimer = new Timer(CleanupExpiredData, null, 
+            TimeSpan.FromMinutes(CLEANUP_INTERVAL_MINUTES), 
+            TimeSpan.FromMinutes(CLEANUP_INTERVAL_MINUTES));
     }
 
     public override Node GetModuleNode()
@@ -1028,7 +1048,7 @@ public sealed class UserContributionsModule : ModuleBase
             Timestamp: DateTimeOffset.UtcNow
         );
 
-        _abundanceEvents.Add(abundanceEvent);
+        _abundanceEvents.Enqueue(abundanceEvent);
 
         // Update contributor energy
         var energyLevel = CalculateContributorEnergyLevel(contribution.UserId);
@@ -1779,5 +1799,173 @@ Respond in JSON format with scores and brief explanations.
             _logger.Error($"UserContributionsModule: Failed to initialize Web3: {ex.Message}", ex);
             return null;
         }
+    }
+    
+    /// <summary>
+    /// Cleanup expired data - embodying compassionate resource stewardship
+    /// Removes old entries and maintains healthy collection sizes
+    /// </summary>
+    private void CleanupExpiredData(object? state)
+    {
+        try
+        {
+            var now = DateTime.UtcNow;
+            var cleanupStats = new
+            {
+                ContributionsBefore = _contributions.Count,
+                UserRewardsBefore = _userRewards.Count,
+                AttributionsBefore = _attributions.Count,
+                ContributorEnergiesBefore = _contributorEnergies.Count,
+                CollectiveResonancesBefore = _collectiveResonances.Count,
+                EnergyAmplificationsBefore = _energyAmplifications.Count
+            };
+
+            // Cleanup expired contributor energies
+            var expiredEnergies = _contributorEnergies
+                .Where(kvp => now - kvp.Value.LastUpdated > TimeSpan.FromHours(ENERGY_TTL_HOURS))
+                .Select(kvp => kvp.Key)
+                .ToList();
+            foreach (var key in expiredEnergies)
+            {
+                _contributorEnergies.TryRemove(key, out _);
+            }
+
+            // Cleanup expired collective resonances
+            var expiredResonances = _collectiveResonances
+                .Where(kvp => now - kvp.Value.MeasuredAt > TimeSpan.FromHours(RESONANCE_TTL_HOURS))
+                .Select(kvp => kvp.Key)
+                .ToList();
+            foreach (var key in expiredResonances)
+            {
+                _collectiveResonances.TryRemove(key, out _);
+            }
+
+            // Cleanup expired energy amplifications
+            var expiredAmplifications = _energyAmplifications
+                .Where(kvp => now - kvp.Value.LastCalculated > TimeSpan.FromHours(AMPLIFICATION_TTL_HOURS))
+                .Select(kvp => kvp.Key)
+                .ToList();
+            foreach (var key in expiredAmplifications)
+            {
+                _energyAmplifications.TryRemove(key, out _);
+            }
+
+            // Size-based eviction for contributions (evict oldest)
+            if (_contributions.Count > MAX_CONTRIBUTIONS)
+            {
+                var excessCount = _contributions.Count - MAX_CONTRIBUTIONS;
+                var oldestContributions = _contributions
+                    .OrderBy(kvp => kvp.Value.Timestamp)
+                    .Take(excessCount)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+                foreach (var key in oldestContributions)
+                {
+                    _contributions.TryRemove(key, out _);
+                }
+            }
+
+            // Size-based eviction for user rewards (evict oldest)
+            if (_userRewards.Count > MAX_USER_REWARDS)
+            {
+                var excessCount = _userRewards.Count - MAX_USER_REWARDS;
+                var oldestRewards = _userRewards
+                    .OrderBy(kvp => kvp.Value.CreatedAt)
+                    .Take(excessCount)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+                foreach (var key in oldestRewards)
+                {
+                    _userRewards.TryRemove(key, out _);
+                }
+            }
+
+            // Size-based eviction for attributions (evict oldest)
+            if (_attributions.Count > MAX_ATTRIBUTIONS)
+            {
+                var excessCount = _attributions.Count - MAX_ATTRIBUTIONS;
+                var oldestAttributions = _attributions
+                    .OrderBy(kvp => kvp.Value.CreatedAt)
+                    .Take(excessCount)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+                foreach (var key in oldestAttributions)
+                {
+                    _attributions.TryRemove(key, out _);
+                }
+            }
+
+            // Size-based eviction for contributor energies (evict oldest)
+            if (_contributorEnergies.Count > MAX_CONTRIBUTOR_ENERGIES)
+            {
+                var excessCount = _contributorEnergies.Count - MAX_CONTRIBUTOR_ENERGIES;
+                var oldestEnergies = _contributorEnergies
+                    .OrderBy(kvp => kvp.Value.LastUpdated)
+                    .Take(excessCount)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+                foreach (var key in oldestEnergies)
+                {
+                    _contributorEnergies.TryRemove(key, out _);
+                }
+            }
+
+            // Size-based eviction for collective resonances (evict oldest)
+            if (_collectiveResonances.Count > MAX_COLLECTIVE_RESONANCES)
+            {
+                var excessCount = _collectiveResonances.Count - MAX_COLLECTIVE_RESONANCES;
+                var oldestResonances = _collectiveResonances
+                    .OrderBy(kvp => kvp.Value.MeasuredAt)
+                    .Take(excessCount)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+                foreach (var key in oldestResonances)
+                {
+                    _collectiveResonances.TryRemove(key, out _);
+                }
+            }
+
+            // Size-based eviction for energy amplifications (evict oldest)
+            if (_energyAmplifications.Count > MAX_ENERGY_AMPLIFICATIONS)
+            {
+                var excessCount = _energyAmplifications.Count - MAX_ENERGY_AMPLIFICATIONS;
+                var oldestAmplifications = _energyAmplifications
+                    .OrderBy(kvp => kvp.Value.LastCalculated)
+                    .Take(excessCount)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+                foreach (var key in oldestAmplifications)
+                {
+                    _energyAmplifications.TryRemove(key, out _);
+                }
+            }
+
+            // Cleanup abundance events queue (keep only recent ones)
+            var maxAbundanceEvents = MAX_ABUNDANCE_EVENTS;
+            while (_abundanceEvents.Count > maxAbundanceEvents)
+            {
+                _abundanceEvents.TryDequeue(out _);
+            }
+
+            _logger.Info($"[UserContributionsModule] Cleanup completed - " +
+                        $"Contributions: {cleanupStats.ContributionsBefore} → {_contributions.Count}, " +
+                        $"UserRewards: {cleanupStats.UserRewardsBefore} → {_userRewards.Count}, " +
+                        $"Attributions: {cleanupStats.AttributionsBefore} → {_attributions.Count}, " +
+                        $"Energies: {cleanupStats.ContributorEnergiesBefore} → {_contributorEnergies.Count}, " +
+                        $"Resonances: {cleanupStats.CollectiveResonancesBefore} → {_collectiveResonances.Count}, " +
+                        $"Amplifications: {cleanupStats.EnergyAmplificationsBefore} → {_energyAmplifications.Count}");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[UserContributionsModule] Error during cleanup: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Dispose resources - embodying graceful completion
+    /// </summary>
+    public void Dispose()
+    {
+        _cleanupTimer?.Dispose();
     }
 }

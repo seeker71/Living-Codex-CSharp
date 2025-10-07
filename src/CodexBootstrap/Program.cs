@@ -1,4 +1,5 @@
 using CodexBootstrap.Hosting;
+using CodexBootstrap.Core;
 using System;
 using System.IO;
 
@@ -57,6 +58,9 @@ bootLogger.Info($"Starting Living Codex on {hostingUrl}");
 var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
 if (string.Equals(env, "Testing", StringComparison.OrdinalIgnoreCase))
 {
+    // Even in Testing mode, we need to initialize modules for proper functionality
+    bootLogger.Info("[Testing] Running in Testing environment - initializing modules...");
+    InitializeModulesInTesting(app, bootLogger);
     app.Run();
 }
 else
@@ -86,6 +90,9 @@ else
             }
 
             // BACKGROUND: Start expensive initialization tasks asynchronously
+            var shutdownCoordinator = services.GetService<CodexBootstrap.Runtime.ShutdownCoordinator>();
+            var shutdownToken = shutdownCoordinator?.ShutdownToken ?? CancellationToken.None;
+            
             _ = Task.Run(async () =>
             {
                 try
@@ -93,11 +100,24 @@ else
                     bootLogger.Info("[Background] Starting expensive initialization tasks...");
                     var startTime = DateTime.UtcNow;
 
+                    // Check cancellation before each expensive operation
+                    if (shutdownToken.IsCancellationRequested)
+                    {
+                        bootLogger.Info("[Background] Initialization cancelled before starting");
+                        return;
+                    }
+
                     // Build reflection tree for current AppDomain assemblies
                     var reflection = new CodexBootstrap.Modules.ReflectionTreeModule(registry, logger);
                     var buildTask = reflection.BuildCompleteReflectionTreeAsync();
                     await (buildTask as System.Threading.Tasks.Task<object>);
                     bootLogger.Info($"[Background] Reflection tree built in {(DateTime.UtcNow - startTime).TotalMilliseconds}ms");
+
+                    if (shutdownToken.IsCancellationRequested)
+                    {
+                        bootLogger.Info("[Background] Initialization cancelled after reflection tree");
+                        return;
+                    }
 
                     // Ensure edges across the graph (meta-node links, shared metadata, U-CORE)
                     try
@@ -114,12 +134,16 @@ else
 
                     bootLogger.Info($"[Background] All initialization tasks completed in {(DateTime.UtcNow - startTime).TotalMilliseconds}ms");
                 }
+                catch (OperationCanceledException)
+                {
+                    bootLogger.Info("[Background] Initialization cancelled during shutdown");
+                }
                 catch (Exception ex)
                 {
                     bootLogger.Error($"[Background] Background initialization failed: {ex.Message}");
                     logger.Error($"Background initialization failed: {ex.Message}", ex);
                 }
-            });
+            }, shutdownToken);
         }
     }
     catch (Exception ex)
@@ -147,4 +171,94 @@ else
     bootLogger.Info("[Startup] About to start HTTP server...");
     app.Run();
     bootLogger.Info("[Startup] HTTP server started successfully!");
+}
+
+/// <summary>
+/// Initialize modules in Testing environment to ensure proper functionality
+/// </summary>
+static void InitializeModulesInTesting(WebApplication app, CodexBootstrap.Core.ICodexLogger bootLogger)
+{
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var services = scope.ServiceProvider;
+
+        var registry = services.GetService<CodexBootstrap.Core.INodeRegistry>();
+        CodexBootstrap.Core.ICodexLogger logger = services.GetService<CodexBootstrap.Core.ICodexLogger>()
+            ?? new CodexBootstrap.Core.Log4NetLogger(typeof(Program));
+
+        if (registry != null)
+        {
+            // Initialize core identity module synchronously
+            try
+            {
+                var coreIdentity = new CodexBootstrap.Modules.CoreIdentityModule(registry, logger);
+                coreIdentity.Register(registry);
+                bootLogger.Info("[Testing] Core Identity Module initialized");
+            }
+            catch (Exception ex)
+            {
+                bootLogger.Warn($"[Testing] Core Identity Module initialization failed: {ex.Message}");
+            }
+
+            // Start background initialization tasks
+            var shutdownCoordinator = services.GetService<CodexBootstrap.Runtime.ShutdownCoordinator>();
+            var shutdownToken = shutdownCoordinator?.ShutdownToken ?? CancellationToken.None;
+            
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    bootLogger.Info("[Testing] Starting background initialization tasks...");
+                    var startTime = DateTime.UtcNow;
+
+                    if (shutdownToken.IsCancellationRequested)
+                    {
+                        bootLogger.Info("[Testing] Initialization cancelled before starting");
+                        return;
+                    }
+
+                    // Build reflection tree
+                    var reflection = new CodexBootstrap.Modules.ReflectionTreeModule(registry, logger);
+                    var buildTask = reflection.BuildCompleteReflectionTreeAsync();
+                    await (buildTask as System.Threading.Tasks.Task<object>);
+                    bootLogger.Info($"[Testing] Reflection tree built in {(DateTime.UtcNow - startTime).TotalMilliseconds}ms");
+
+                    if (shutdownToken.IsCancellationRequested)
+                    {
+                        bootLogger.Info("[Testing] Initialization cancelled after reflection tree");
+                        return;
+                    }
+
+                    // Ensure edges across the graph
+                    try
+                    {
+                        var edgeEnsurance = new CodexBootstrap.Modules.EdgeEnsuranceModule(registry, logger);
+                        var ensureTask = edgeEnsurance.EnsureAllEdgesAsync();
+                        await (ensureTask as System.Threading.Tasks.Task<object>);
+                        bootLogger.Info($"[Testing] Edge ensurance completed in {(DateTime.UtcNow - startTime).TotalMilliseconds}ms");
+                    }
+                    catch (Exception ex)
+                    {
+                        bootLogger.Warn($"[Testing] EdgeEnsurance failed: {ex.Message}");
+                    }
+
+                    bootLogger.Info($"[Testing] All initialization tasks completed in {(DateTime.UtcNow - startTime).TotalMilliseconds}ms");
+                }
+                catch (OperationCanceledException)
+                {
+                    bootLogger.Info("[Testing] Initialization cancelled during shutdown");
+                }
+                catch (Exception ex)
+                {
+                    bootLogger.Error($"[Testing] Background initialization failed: {ex.Message}");
+                    logger.Error($"Testing background initialization failed: {ex.Message}", ex);
+                }
+            }, shutdownToken);
+        }
+    }
+    catch (Exception ex)
+    {
+        bootLogger.Error($"[Testing] Module initialization failed: {ex.Message}");
+    }
 }

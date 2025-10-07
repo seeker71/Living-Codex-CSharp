@@ -100,7 +100,7 @@ const normalizeStorageNode = (storageNode: StorageNode): FileNode => {
   }
 }
 
-export function CodeEditor({ 
+function CodeEditor({ 
   nodeId, 
   onSave, 
   onClose, 
@@ -386,7 +386,6 @@ export function CodeEditor({
   )
 }
 
-export default CodeEditor
 
 function isPreviewable(type?: string) {
   if (!type) return false
@@ -401,3 +400,5 @@ function isPreviewable(type?: string) {
     t.includes('toml')
   )
 }
+
+export default CodeEditor

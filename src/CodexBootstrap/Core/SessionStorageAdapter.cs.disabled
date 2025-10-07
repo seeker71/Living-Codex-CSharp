@@ -1,0 +1,579 @@
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using CodexBootstrap.Core;
+
+namespace CodexBootstrap.Core;
+
+/// <summary>
+/// Session Storage Adapter - Unified interface for session management
+/// Embodying the principle of graceful transition - supporting both in-memory and distributed storage
+/// Like a bridge that connects the old and new, enabling smooth migration with compassion
+/// </summary>
+public interface ISessionStorageAdapter
+{
+    Task<bool> StoreSessionAsync(string sessionId, UserSession session, TimeSpan? expiry = null);
+    Task<UserSession?> GetSessionAsync(string sessionId);
+    Task<bool> RemoveSessionAsync(string sessionId);
+    Task<bool> UpdateSessionActivityAsync(string sessionId);
+    Task<IEnumerable<string>> GetExpiredSessionsAsync();
+    Task<long> GetSessionCountAsync();
+    Task<bool> RevokeTokenAsync(string token, DateTime revokedAt);
+    Task<bool> IsTokenRevokedAsync(string token);
+    Task<IEnumerable<string>> CleanupExpiredTokensAsync(DateTime cutoffTime);
+    Task<long> GetRevokedTokenCountAsync();
+    Task<SessionStorageMetrics> GetMetricsAsync();
+    bool IsDistributed { get; }
+    string StorageType { get; }
+}
+
+/// <summary>
+/// Hybrid Session Storage Adapter - Supports both in-memory and Redis storage
+/// Provides graceful fallback and migration capabilities
+/// </summary>
+public sealed class SessionStorageAdapter : ISessionStorageAdapter, IDisposable
+{
+    private readonly IDistributedSessionStorage? _distributedStorage;
+    private readonly ICodexLogger _logger;
+    private readonly bool _useDistributedStorage;
+    private readonly bool _enableFallback;
+    
+    // In-memory storage for fallback
+    private readonly ConcurrentDictionary<string, UserSession> _activeSessions;
+    private readonly ConcurrentDictionary<string, DateTime> _revokedTokens;
+    private readonly Timer? _cleanupTimer;
+    
+    // Configuration
+    private const int MAX_ACTIVE_SESSIONS = 10000;
+    private const int MAX_REVOKED_TOKENS = 50000;
+    private const int CLEANUP_INTERVAL_MINUTES = 15;
+    private const int REVOKED_TOKEN_TTL_HOURS = 48;
+
+    public bool IsDistributed => _useDistributedStorage && _distributedStorage != null;
+    public string StorageType => _useDistributedStorage ? "Redis" : "InMemory";
+
+    public SessionStorageAdapter(
+        IDistributedSessionStorage? distributedStorage,
+        ICodexLogger logger,
+        bool useDistributedStorage = true,
+        bool enableFallback = true)
+    {
+        _distributedStorage = distributedStorage;
+        _logger = logger;
+        _useDistributedStorage = useDistributedStorage && distributedStorage != null;
+        _enableFallback = enableFallback;
+        
+        // Initialize in-memory storage for fallback
+        _activeSessions = new ConcurrentDictionary<string, UserSession>();
+        _revokedTokens = new ConcurrentDictionary<string, DateTime>();
+        
+        // Start cleanup timer for in-memory storage
+        if (_enableFallback)
+        {
+            _cleanupTimer = new Timer(
+                CleanupExpiredDataInMemory,
+                null,
+                TimeSpan.FromMinutes(5),
+                TimeSpan.FromMinutes(CLEANUP_INTERVAL_MINUTES)
+            );
+        }
+        
+        _logger.Info($"[SessionStorageAdapter] Initialized with storage type: {StorageType}, Fallback: {_enableFallback}");
+    }
+
+    /// <summary>
+    /// Store session with graceful fallback - embodying the principle of resilience
+    /// </summary>
+    public async Task<bool> StoreSessionAsync(string sessionId, UserSession session, TimeSpan? expiry = null)
+    {
+        try
+        {
+            if (_useDistributedStorage)
+            {
+                var success = await _distributedStorage!.StoreSessionAsync(sessionId, session, expiry);
+                if (success || !_enableFallback)
+                {
+                    return success;
+                }
+                
+                _logger.Warn($"[SessionStorageAdapter] Distributed storage failed, falling back to in-memory for session: {sessionId}");
+            }
+            
+            // Fallback to in-memory storage
+            if (_enableFallback)
+            {
+                _activeSessions[sessionId] = session;
+                return true;
+            }
+            
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[SessionStorageAdapter] Failed to store session {sessionId}", ex);
+            
+            if (_enableFallback)
+            {
+                _logger.Info($"[SessionStorageAdapter] Falling back to in-memory storage for session: {sessionId}");
+                _activeSessions[sessionId] = session;
+                return true;
+            }
+            
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Get session with graceful fallback - embodying the principle of persistence
+    /// </summary>
+    public async Task<UserSession?> GetSessionAsync(string sessionId)
+    {
+        try
+        {
+            if (_useDistributedStorage)
+            {
+                var session = await _distributedStorage!.GetSessionAsync(sessionId);
+                if (session != null || !_enableFallback)
+                {
+                    return session;
+                }
+            }
+            
+            // Fallback to in-memory storage
+            if (_enableFallback && _activeSessions.TryGetValue(sessionId, out var inMemorySession))
+            {
+                // Check if session is expired
+                if (inMemorySession.ExpiresAt > DateTime.UtcNow)
+                {
+                    return inMemorySession;
+                }
+                else
+                {
+                    // Remove expired session
+                    _activeSessions.TryRemove(sessionId, out _);
+                }
+            }
+            
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[SessionStorageAdapter] Failed to get session {sessionId}", ex);
+            
+            if (_enableFallback && _activeSessions.TryGetValue(sessionId, out var session))
+            {
+                return session;
+            }
+            
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Remove session with graceful fallback - embodying the principle of conscious release
+    /// </summary>
+    public async Task<bool> RemoveSessionAsync(string sessionId)
+    {
+        try
+        {
+            bool distributedSuccess = true;
+            if (_useDistributedStorage)
+            {
+                distributedSuccess = await _distributedStorage!.RemoveSessionAsync(sessionId);
+            }
+            
+            bool inMemorySuccess = true;
+            if (_enableFallback)
+            {
+                inMemorySuccess = _activeSessions.TryRemove(sessionId, out _);
+            }
+            
+            return distributedSuccess && inMemorySuccess;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[SessionStorageAdapter] Failed to remove session {sessionId}", ex);
+            
+            if (_enableFallback)
+            {
+                return _activeSessions.TryRemove(sessionId, out _);
+            }
+            
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Update session activity with graceful fallback - embodying the principle of continuous presence
+    /// </summary>
+    public async Task<bool> UpdateSessionActivityAsync(string sessionId)
+    {
+        try
+        {
+            if (_useDistributedStorage)
+            {
+                var success = await _distributedStorage!.UpdateSessionActivityAsync(sessionId);
+                if (success || !_enableFallback)
+                {
+                    return success;
+                }
+            }
+            
+            // Fallback to in-memory storage
+            if (_enableFallback && _activeSessions.TryGetValue(sessionId, out var session))
+            {
+                var updatedSession = session with { LastActivity = DateTime.UtcNow };
+                _activeSessions[sessionId] = updatedSession;
+                return true;
+            }
+            
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[SessionStorageAdapter] Failed to update session activity {sessionId}", ex);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Get expired sessions - embodying the principle of natural cleanup
+    /// </summary>
+    public async Task<IEnumerable<string>> GetExpiredSessionsAsync()
+    {
+        try
+        {
+            var distributedExpired = Enumerable.Empty<string>();
+            if (_useDistributedStorage)
+            {
+                distributedExpired = await _distributedStorage!.GetExpiredSessionsAsync();
+            }
+            
+            var inMemoryExpired = Enumerable.Empty<string>();
+            if (_enableFallback)
+            {
+                inMemoryExpired = GetExpiredSessionsInMemory();
+            }
+            
+            return distributedExpired.Union(inMemoryExpired);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("[SessionStorageAdapter] Failed to get expired sessions", ex);
+            return Enumerable.Empty<string>();
+        }
+    }
+
+    /// <summary>
+    /// Get session count - embodying the principle of awareness
+    /// </summary>
+    public async Task<long> GetSessionCountAsync()
+    {
+        try
+        {
+            long distributedCount = 0;
+            if (_useDistributedStorage)
+            {
+                distributedCount = await _distributedStorage!.GetSessionCountAsync();
+            }
+            
+            long inMemoryCount = 0;
+            if (_enableFallback)
+            {
+                inMemoryCount = _activeSessions.Count;
+            }
+            
+            return distributedCount + inMemoryCount;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("[SessionStorageAdapter] Failed to get session count", ex);
+            return _enableFallback ? _activeSessions.Count : 0;
+        }
+    }
+
+    /// <summary>
+    /// Revoke token with graceful fallback - embodying the principle of conscious release
+    /// </summary>
+    public async Task<bool> RevokeTokenAsync(string token, DateTime revokedAt)
+    {
+        try
+        {
+            bool distributedSuccess = true;
+            if (_useDistributedStorage)
+            {
+                distributedSuccess = await _distributedStorage!.RevokeTokenAsync(token, revokedAt);
+            }
+            
+            bool inMemorySuccess = true;
+            if (_enableFallback)
+            {
+                inMemorySuccess = _revokedTokens.TryAdd(token, revokedAt);
+            }
+            
+            return distributedSuccess && inMemorySuccess;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[SessionStorageAdapter] Failed to revoke token {token}", ex);
+            
+            if (_enableFallback)
+            {
+                return _revokedTokens.TryAdd(token, revokedAt);
+            }
+            
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Check if token is revoked - embodying the principle of mindful validation
+    /// </summary>
+    public async Task<bool> IsTokenRevokedAsync(string token)
+    {
+        try
+        {
+            if (_useDistributedStorage)
+            {
+                var isRevoked = await _distributedStorage!.IsTokenRevokedAsync(token);
+                if (isRevoked || !_enableFallback)
+                {
+                    return isRevoked;
+                }
+            }
+            
+            // Fallback to in-memory storage
+            if (_enableFallback)
+            {
+                return _revokedTokens.ContainsKey(token);
+            }
+            
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[SessionStorageAdapter] Failed to check token revocation {token}", ex);
+            
+            if (_enableFallback)
+            {
+                return _revokedTokens.ContainsKey(token);
+            }
+            
+            return false; // Default to not revoked for safety
+        }
+    }
+
+    /// <summary>
+    /// Cleanup expired tokens - embodying the principle of natural cleanup
+    /// </summary>
+    public async Task<IEnumerable<string>> CleanupExpiredTokensAsync(DateTime cutoffTime)
+    {
+        try
+        {
+            var distributedCleaned = Enumerable.Empty<string>();
+            if (_useDistributedStorage)
+            {
+                distributedCleaned = await _distributedStorage!.CleanupExpiredTokensAsync(cutoffTime);
+            }
+            
+            var inMemoryCleaned = Enumerable.Empty<string>();
+            if (_enableFallback)
+            {
+                inMemoryCleaned = CleanupExpiredTokensInMemory(cutoffTime);
+            }
+            
+            return distributedCleaned.Union(inMemoryCleaned);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("[SessionStorageAdapter] Failed to cleanup expired tokens", ex);
+            return Enumerable.Empty<string>();
+        }
+    }
+
+    /// <summary>
+    /// Get revoked token count - embodying the principle of awareness
+    /// </summary>
+    public async Task<long> GetRevokedTokenCountAsync()
+    {
+        try
+        {
+            long distributedCount = 0;
+            if (_useDistributedStorage)
+            {
+                distributedCount = await _distributedStorage!.GetRevokedTokenCountAsync();
+            }
+            
+            long inMemoryCount = 0;
+            if (_enableFallback)
+            {
+                inMemoryCount = _revokedTokens.Count;
+            }
+            
+            return distributedCount + inMemoryCount;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("[SessionStorageAdapter] Failed to get revoked token count", ex);
+            return _enableFallback ? _revokedTokens.Count : 0;
+        }
+    }
+
+    /// <summary>
+    /// Get comprehensive metrics - embodying the principle of holistic awareness
+    /// </summary>
+    public async Task<SessionStorageMetrics> GetMetricsAsync()
+    {
+        try
+        {
+            SessionStorageMetrics? distributedMetrics = null;
+            if (_useDistributedStorage)
+            {
+                distributedMetrics = await _distributedStorage!.GetMetricsAsync();
+            }
+            
+            var inMemoryMetrics = GetInMemoryMetrics();
+            
+            if (distributedMetrics != null)
+            {
+                return new SessionStorageMetrics(
+                    Timestamp: DateTime.UtcNow,
+                    ActiveSessionCount: distributedMetrics.ActiveSessionCount + inMemoryMetrics.ActiveSessionCount,
+                    RevokedTokenCount: distributedMetrics.RevokedTokenCount + inMemoryMetrics.RevokedTokenCount,
+                    ExpiredSessionsFound: distributedMetrics.ExpiredSessionsFound + inMemoryMetrics.ExpiredSessionsFound,
+                    ExpiredTokensFound: distributedMetrics.ExpiredTokensFound + inMemoryMetrics.ExpiredTokensFound,
+                    StorageType: $"{distributedMetrics.StorageType}+InMemory",
+                    IsHealthy: distributedMetrics.IsHealthy && inMemoryMetrics.IsHealthy
+                );
+            }
+            
+            return inMemoryMetrics;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("[SessionStorageAdapter] Failed to get metrics", ex);
+            return GetInMemoryMetrics();
+        }
+    }
+
+    // Helper methods for in-memory storage fallback
+    
+    private IEnumerable<string> GetExpiredSessionsInMemory()
+    {
+        var now = DateTime.UtcNow;
+        var expiredSessions = _activeSessions
+            .Where(kvp => kvp.Value.ExpiresAt < now)
+            .Select(kvp => kvp.Key)
+            .ToList();
+        
+        foreach (var sessionId in expiredSessions)
+        {
+            _activeSessions.TryRemove(sessionId, out _);
+        }
+        
+        return expiredSessions;
+    }
+    
+    private IEnumerable<string> CleanupExpiredTokensInMemory(DateTime cutoffTime)
+    {
+        var expiredTokens = _revokedTokens
+            .Where(kvp => kvp.Value < cutoffTime)
+            .Select(kvp => kvp.Key)
+            .ToList();
+        
+        foreach (var token in expiredTokens)
+        {
+            _revokedTokens.TryRemove(token, out _);
+        }
+        
+        return expiredTokens;
+    }
+    
+    private SessionStorageMetrics GetInMemoryMetrics()
+    {
+        var now = DateTime.UtcNow;
+        var expiredSessions = _activeSessions.Count(kvp => kvp.Value.ExpiresAt < now);
+        var expiredTokens = _revokedTokens.Count(kvp => kvp.Value < now.AddHours(-REVOKED_TOKEN_TTL_HOURS));
+        
+        return new SessionStorageMetrics(
+            Timestamp: now,
+            ActiveSessionCount: _activeSessions.Count,
+            RevokedTokenCount: _revokedTokens.Count,
+            ExpiredSessionsFound: expiredSessions,
+            ExpiredTokensFound: expiredTokens,
+            StorageType: "InMemory",
+            IsHealthy: true
+        );
+    }
+    
+    private void CleanupExpiredDataInMemory(object? state)
+    {
+        try
+        {
+            var now = DateTime.UtcNow;
+            var cleaned = 0;
+            
+            // Cleanup expired sessions
+            var expiredSessions = GetExpiredSessionsInMemory();
+            cleaned += expiredSessions.Count();
+            
+            // Cleanup expired revoked tokens
+            var cutoffTime = now.AddHours(-REVOKED_TOKEN_TTL_HOURS);
+            var expiredTokens = CleanupExpiredTokensInMemory(cutoffTime);
+            cleaned += expiredTokens.Count();
+            
+            // Size-based eviction
+            if (_activeSessions.Count > MAX_ACTIVE_SESSIONS)
+            {
+                var toRemove = _activeSessions
+                    .OrderBy(kvp => kvp.Value.LastActivity)
+                    .Take(_activeSessions.Count - MAX_ACTIVE_SESSIONS)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+                
+                foreach (var key in toRemove)
+                {
+                    if (_activeSessions.TryRemove(key, out _))
+                    {
+                        cleaned++;
+                    }
+                }
+            }
+            
+            if (_revokedTokens.Count > MAX_REVOKED_TOKENS)
+            {
+                var toRemove = _revokedTokens
+                    .OrderBy(kvp => kvp.Value)
+                    .Take(_revokedTokens.Count - MAX_REVOKED_TOKENS)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+                
+                foreach (var key in toRemove)
+                {
+                    if (_revokedTokens.TryRemove(key, out _))
+                    {
+                        cleaned++;
+                    }
+                }
+            }
+            
+            if (cleaned > 0)
+            {
+                _logger.Info($"[SessionStorageAdapter] In-memory cleanup: removed {cleaned} expired entries. " +
+                            $"Active sessions: {_activeSessions.Count}, " +
+                            $"Revoked tokens: {_revokedTokens.Count}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("[SessionStorageAdapter] Error during in-memory cleanup", ex);
+        }
+    }
+
+    public void Dispose()
+    {
+        _cleanupTimer?.Dispose();
+        _logger.Info("[SessionStorageAdapter] Disposed");
+    }
+}

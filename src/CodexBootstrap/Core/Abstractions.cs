@@ -138,6 +138,13 @@ public interface IModule
     void RegisterHttpEndpoints(WebApplication app, INodeRegistry registry, CoreApiService coreApi, ModuleLoader moduleLoader);
     
     /// <summary>
+    /// Initialize the module asynchronously after construction
+    /// This allows modules to perform heavy initialization work without blocking the module loading process
+    /// Default implementation does nothing
+    /// </summary>
+    Task InitializeAsync() => Task.CompletedTask;
+    
+    /// <summary>
     /// Setup inter-module communication after all modules are created
     /// This allows modules to reference each other and set up dependencies
     /// Default implementation does nothing
@@ -149,6 +156,27 @@ public interface IModule
     /// Default implementation does nothing
     /// </summary>
     void Unregister() { }
+
+    // Readiness tracking properties and events
+    /// <summary>
+    /// Current readiness state of the module
+    /// </summary>
+    ReadinessState CurrentReadinessState { get; }
+    
+    /// <summary>
+    /// Event fired when the module's readiness state changes
+    /// </summary>
+    event EventHandler<ReadinessChangedEventArgs>? ReadinessChanged;
+    
+    /// <summary>
+    /// Get detailed readiness information for the module
+    /// </summary>
+    ReadinessResult GetReadinessResult();
+    
+    /// <summary>
+    /// Get list of endpoints provided by this module
+    /// </summary>
+    IEnumerable<string> GetProvidedEndpoints();
 }
 
 public interface IApiRouter

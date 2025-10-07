@@ -20,8 +20,8 @@ This document describes how to set up and run the Living Codex system using Dock
    ```
 
 3. **Access the Services**
-   - Living Codex API: http://localhost:5000
-   - API Documentation: http://localhost:5000/swagger
+   - Living Codex API: http://localhost:5002
+   - API Documentation: http://localhost:5002/swagger
    - Grafana Dashboard: http://localhost:3000 (admin/admin)
    - Prometheus: http://localhost:9090
 
@@ -93,8 +93,8 @@ GRAFANA_ADMIN_PASSWORD=admin
 
 | Service | Port | Description |
 |---------|------|-------------|
-| Living Codex API | 5000 | HTTP API |
-| Living Codex API | 5001 | HTTPS API |
+| Living Codex API | 5002 | HTTP API |
+| Living Codex API | 5003 | HTTPS API |
 | Nginx | 80 | HTTP Load Balancer |
 | Nginx | 443 | HTTPS Load Balancer |
 | PostgreSQL | 5432 | Database |

@@ -15,13 +15,22 @@ public sealed class ModuleLoader
     private readonly List<string> _failedModuleLoads = new();
     private readonly List<string> _failedRouteRegistrations = new();
     private readonly Core.ICodexLogger _logger;
+    private readonly ReadinessTracker? _readinessTracker;
+    private int _discoveredModuleTypes = 0;
+    private int _createdModules = 0;
+    private int _registeredModules = 0;
+    private int _asyncInitializedModules = 0;
+    private volatile bool _asyncInitializationComplete = false;
+    private readonly Dictionary<string, string> _stuckModules = new();
+    private readonly TimeSpan _moduleInitTimeout = TimeSpan.FromSeconds(30);
 
-    public ModuleLoader(INodeRegistry registry, IApiRouter router, IServiceProvider serviceProvider)
+    public ModuleLoader(INodeRegistry registry, IApiRouter router, IServiceProvider serviceProvider, ReadinessTracker? readinessTracker = null)
     {
         _registry = registry;
         _router = router;
         _serviceProvider = serviceProvider;
         _logger = new Log4NetLogger(typeof(ModuleLoader));
+        _readinessTracker = readinessTracker;
     }
 
     public IReadOnlyList<IModule> GetLoadedModules() => _loadedModules.AsReadOnly();
@@ -29,6 +38,13 @@ public sealed class ModuleLoader
     public IReadOnlyList<string> GetFailedModuleLoads() => _failedModuleLoads.AsReadOnly();
     
     public IReadOnlyList<string> GetFailedRouteRegistrations() => _failedRouteRegistrations.AsReadOnly();
+
+    public (int discovered, int created, int registered, int asyncInitialized, bool asyncComplete) GetModuleLoadingMetrics()
+    {
+        return (_discoveredModuleTypes, _createdModules, _registeredModules, _asyncInitializedModules, _asyncInitializationComplete);
+    }
+
+    public IReadOnlyDictionary<string, string> GetStuckModules() => _stuckModules;
 
     public void GenerateMetaNodes()
     {
@@ -89,7 +105,13 @@ public sealed class ModuleLoader
             _logger.Info($"  - {moduleType.Name} (Namespace: {moduleType.Namespace})");
         }
 
-        foreach (var moduleType in moduleTypes)
+        // Track discovered
+        var discoveredList = moduleTypes.ToList();
+        _discoveredModuleTypes += discoveredList.Count;
+
+        // Phase 1: Create and register all modules
+        var modules = new List<IModule>();
+        foreach (var moduleType in discoveredList)
         {
             try
             {
@@ -100,6 +122,8 @@ public sealed class ModuleLoader
                 {
                     _logger.Info($"[ModuleLoader] Successfully created module: {moduleType.Name}");
                     _logger.Info($"Successfully created module: {moduleType.Name}");
+                    Interlocked.Increment(ref _createdModules);
+                    modules.Add(module);
                     LoadModule(module);
                     _logger.Info($"[ModuleLoader] Successfully loaded module: {moduleType.Name}");
                 }
@@ -115,6 +139,63 @@ public sealed class ModuleLoader
                 _failedModuleLoads.Add($"{moduleType.Name}: {ex.Message}");
             }
         }
+
+        // Phase 2: Initialize modules asynchronously (in background) with timeout per module
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var initTasks = new List<Task>();
+                foreach (var module in modules)
+                {
+                    var moduleName = module.GetType().Name;
+                    var initTask = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            // Mark module as initializing
+                            _readinessTracker?.UpdateReadiness(moduleName, ReadinessResult.Initializing("Starting async initialization"));
+
+                            var moduleInit = module.InitializeAsync();
+                            var timeoutTask = Task.Delay(_moduleInitTimeout);
+                            var completed = await Task.WhenAny(moduleInit, timeoutTask);
+                            if (completed == timeoutTask)
+                            {
+                                lock (_stuckModules)
+                                {
+                                    _stuckModules[moduleName] = $"InitializeAsync exceeded {_moduleInitTimeout.TotalSeconds:N0}s";
+                                }
+                                _logger.Warn($"Module {moduleName} InitializeAsync timed out after {_moduleInitTimeout.TotalSeconds:N0}s");
+                                _readinessTracker?.UpdateReadiness(moduleName, ReadinessResult.Failed($"Initialization timed out after {_moduleInitTimeout.TotalSeconds:N0}s"));
+                            }
+                            else
+                            {
+                                Interlocked.Increment(ref _asyncInitializedModules);
+                                _logger.Info($"Async initialization completed for {moduleName}");
+                                _readinessTracker?.UpdateReadiness(moduleName, ReadinessResult.Success("Async initialization completed"));
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            lock (_stuckModules)
+                            {
+                                _stuckModules[moduleName] = $"InitializeAsync failed: {ex.Message}";
+                            }
+                            _logger.Error($"Failed async initialization for {moduleName}: {ex.Message}", ex);
+                            _readinessTracker?.UpdateReadiness(moduleName, ReadinessResult.Failed($"Initialization failed: {ex.Message}", ex));
+                        }
+                    });
+                    initTasks.Add(initTask);
+                }
+
+                await Task.WhenAll(initTasks);
+            }
+            finally
+            {
+                _asyncInitializationComplete = true;
+                _logger.Info($"[ModuleLoader] Async initialization complete for all built-in modules");
+            }
+        });
     }
 
     public void LoadExternalModules(string moduleDirectory)
@@ -148,6 +229,7 @@ public sealed class ModuleLoader
                 moduleTypes.Add(type);
             }
         }
+        _discoveredModuleTypes += moduleTypes.Count;
         
         // Phase 2: Create all modules with required dependencies
         var modules = new List<IModule>();
@@ -159,6 +241,7 @@ public sealed class ModuleLoader
                 if (module != null)
                 {
                     modules.Add(module);
+                    Interlocked.Increment(ref _createdModules);
                 }
             }
             catch (Exception ex)
@@ -186,6 +269,62 @@ public sealed class ModuleLoader
         {
             LoadModule(module);
         }
+
+        // Phase 5: Initialize modules asynchronously (in background) with timeout per module
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var initTasks = new List<Task>();
+                foreach (var module in modules)
+                {
+                    var moduleName = module.GetType().Name;
+                    var initTask = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            // Mark module as initializing
+                            _readinessTracker?.UpdateReadiness(moduleName, ReadinessResult.Initializing("Starting async initialization"));
+
+                            var moduleInit = module.InitializeAsync();
+                            var timeoutTask = Task.Delay(_moduleInitTimeout);
+                            var completed = await Task.WhenAny(moduleInit, timeoutTask);
+                            if (completed == timeoutTask)
+                            {
+                                lock (_stuckModules)
+                                {
+                                    _stuckModules[moduleName] = $"InitializeAsync exceeded {_moduleInitTimeout.TotalSeconds:N0}s";
+                                }
+                                _logger.Warn($"Module {moduleName} InitializeAsync timed out after {_moduleInitTimeout.TotalSeconds:N0}s");
+                                _readinessTracker?.UpdateReadiness(moduleName, ReadinessResult.Failed($"Initialization timed out after {_moduleInitTimeout.TotalSeconds:N0}s"));
+                            }
+                            else
+                            {
+                                Interlocked.Increment(ref _asyncInitializedModules);
+                                _logger.Info($"Async initialization completed for {moduleName}");
+                                _readinessTracker?.UpdateReadiness(moduleName, ReadinessResult.Success("Async initialization completed"));
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            lock (_stuckModules)
+                            {
+                                _stuckModules[moduleName] = $"InitializeAsync failed: {ex.Message}";
+                            }
+                            _logger.Error($"Failed async initialization for {moduleName}: {ex.Message}", ex);
+                            _readinessTracker?.UpdateReadiness(moduleName, ReadinessResult.Failed($"Initialization failed: {ex.Message}", ex));
+                        }
+                    });
+                    initTasks.Add(initTask);
+                }
+
+                await Task.WhenAll(initTasks);
+            }
+            finally
+            {
+                _asyncInitializationComplete = true;
+            }
+        });
     }
     
     /// <summary>
@@ -199,6 +338,18 @@ public sealed class ModuleLoader
             var logger = _serviceProvider.GetRequiredService<ICodexLogger>();
             var httpClient = _serviceProvider.GetService<HttpClient>() ?? new HttpClient();
             var shutdownCts = _serviceProvider.GetService<CancellationTokenSource>();
+            
+            // Try constructor with AIPipelineTracker
+            var constructorWithAITracker = moduleType.GetConstructor(new[] { typeof(INodeRegistry), typeof(ICodexLogger), typeof(HttpClient), typeof(AIPipelineTracker) });
+            if (constructorWithAITracker != null)
+            {
+                var aiTracker = _serviceProvider.GetService<AIPipelineTracker>();
+                if (aiTracker != null)
+                {
+                    _logger.Info($"Creating module {moduleType.Name} with AI pipeline tracker");
+                    return (IModule)constructorWithAITracker.Invoke(new object[] { _registry, logger, httpClient, aiTracker });
+                }
+            }
             
             // Try constructor with CancellationTokenSource first
             var constructorWithShutdown = moduleType.GetConstructor(new[] { typeof(INodeRegistry), typeof(ICodexLogger), typeof(HttpClient), typeof(CancellationTokenSource) });
@@ -240,6 +391,9 @@ public sealed class ModuleLoader
             _logger.Info($"Loading module: {module.GetType().Name}");
             var moduleNode = module.GetModuleNode();
             _logger.Info($"Module node ID: {moduleNode.Id}");
+
+            // Register module for readiness tracking
+            _readinessTracker?.RegisterComponent(module.GetType().Name, "Module");
             
             // Use enhanced module registration with spec tracking
             try
@@ -299,6 +453,7 @@ public sealed class ModuleLoader
             
             // Track loaded modules
             _loadedModules.Add(module);
+            Interlocked.Increment(ref _registeredModules);
             
             var name = moduleNode.Meta?.GetValueOrDefault("name")?.ToString() ?? moduleNode.Title;
             var version = moduleNode.Meta?.GetValueOrDefault("version")?.ToString() ?? "0.1.0";

@@ -5,9 +5,10 @@
  */
 
 import React from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
-import { renderWithProviders, TEST_INFRASTRUCTURE } from './test-utils'
+import { renderWithProviders } from './test-utils'
+import HomePage from '@/app/page'
 
 // Mock the home page component
 jest.mock('@/app/page', () => ({
@@ -26,6 +27,8 @@ jest.mock('@/app/page', () => ({
             recentContributions: 15,
             activeConcepts: 8,
           }
+          // Simulate a short loading delay so tests can observe loading state
+          await new Promise(r => setTimeout(r, 10))
           setResonanceData(mockResonance)
         } catch (error) {
           console.error('Failed to load resonance data:', error)
@@ -89,7 +92,6 @@ describe('Home Page Integration Tests', () => {
     })
 
     it('should display loading state initially', async () => {
-      const HomePage = require('@/app/page').default
 
       renderWithProviders(<HomePage />)
 
@@ -99,7 +101,6 @@ describe('Home Page Integration Tests', () => {
     })
 
     it('should render complete home page after loading', async () => {
-      const HomePage = require('@/app/page').default
 
       renderWithProviders(<HomePage />)
 
@@ -118,7 +119,6 @@ describe('Home Page Integration Tests', () => {
 
   describe('Resonance Data Display', () => {
     it('should display collective energy metrics', async () => {
-      const HomePage = require('@/app/page').default
 
       renderWithProviders(<HomePage />)
 
@@ -133,7 +133,6 @@ describe('Home Page Integration Tests', () => {
     })
 
     it('should display proper header content', async () => {
-      const HomePage = require('@/app/page').default
 
       renderWithProviders(<HomePage />)
 
@@ -148,7 +147,6 @@ describe('Home Page Integration Tests', () => {
 
   describe('Stream Lens Integration', () => {
     it('should render stream content section', async () => {
-      const HomePage = require('@/app/page').default
 
       renderWithProviders(<HomePage />)
 
@@ -161,7 +159,6 @@ describe('Home Page Integration Tests', () => {
     })
 
     it('should be ready for StreamLens component integration', async () => {
-      const HomePage = require('@/app/page').default
 
       renderWithProviders(<HomePage />)
 
@@ -176,7 +173,6 @@ describe('Home Page Integration Tests', () => {
 
   describe('User Experience Flow', () => {
     it('should provide smooth loading to content transition', async () => {
-      const HomePage = require('@/app/page').default
 
       renderWithProviders(<HomePage />)
 
@@ -195,7 +191,6 @@ describe('Home Page Integration Tests', () => {
     })
 
     it('should maintain responsive layout structure', async () => {
-      const HomePage = require('@/app/page').default
 
       renderWithProviders(<HomePage />)
 
@@ -218,7 +213,6 @@ describe('Home Page Integration Tests', () => {
       // This test would validate error handling when backend is unavailable
       // For now, we validate that the component renders without crashing
 
-      const HomePage = require('@/app/page').default
 
       renderWithProviders(<HomePage />)
 
@@ -230,7 +224,6 @@ describe('Home Page Integration Tests', () => {
 
     it('should be ready for error boundary integration', async () => {
       // This validates that the component structure supports error boundaries
-      const HomePage = require('@/app/page').default
 
       renderWithProviders(<HomePage />)
 
@@ -245,7 +238,6 @@ describe('Home Page Integration Tests', () => {
 
   describe('Accessibility Compliance', () => {
     it('should have proper semantic HTML structure', async () => {
-      const HomePage = require('@/app/page').default
 
       renderWithProviders(<HomePage />)
 
@@ -260,7 +252,6 @@ describe('Home Page Integration Tests', () => {
     })
 
     it('should support keyboard navigation structure', async () => {
-      const HomePage = require('@/app/page').default
 
       renderWithProviders(<HomePage />)
 
@@ -278,7 +269,6 @@ describe('Home Page Integration Tests', () => {
     it('should render within acceptable time limits', async () => {
       const startTime = Date.now()
 
-      const HomePage = require('@/app/page').default
 
       renderWithProviders(<HomePage />)
 
@@ -293,7 +283,6 @@ describe('Home Page Integration Tests', () => {
     })
 
     it('should not cause memory leaks in repeated renders', async () => {
-      const HomePage = require('@/app/page').default
 
       // Render multiple times to check for memory leaks
       for (let i = 0; i < 5; i++) {
@@ -313,7 +302,6 @@ describe('Home Page Integration Tests', () => {
 
   describe('Backend Integration Readiness', () => {
     it('should be ready for real resonance API integration', async () => {
-      const HomePage = require('@/app/page').default
 
       renderWithProviders(<HomePage />)
 
@@ -328,7 +316,6 @@ describe('Home Page Integration Tests', () => {
     })
 
     it('should be ready for StreamLens component integration', async () => {
-      const HomePage = require('@/app/page').default
 
       renderWithProviders(<HomePage />)
 

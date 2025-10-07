@@ -15,7 +15,7 @@ describe('Profile Page Utilities', () => {
       ]
 
       let completed = 0
-      let total = sections.length
+      const total = sections.length
 
       // Basic info completion
       if (profile?.displayName && profile?.email) completed++

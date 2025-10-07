@@ -1,6 +1,7 @@
 import React from 'react'
 import { screen, render } from '@testing-library/react'
 import { ContentRenderer } from '@/components/renderers/ContentRenderer'
+jest.unmock('@/components/renderers/ContentRenderer')
 
 describe('ContentRenderer', () => {
   it('should preserve newlines in text/plain content', () => {

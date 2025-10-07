@@ -16,6 +16,15 @@ public sealed class RealtimeModule : ModuleBase
     private readonly ConcurrentDictionary<string, WebSocket> _webSockets = new();
     private readonly ConcurrentDictionary<string, HashSet<string>> _subscriptions = new();
     private readonly ConcurrentDictionary<string, RealtimeSession> _sessions = new();
+    
+    // Memory management constants - embodying compassionate resource stewardship
+    private const int MAX_WEBSOCKETS = 1000;
+    private const int MAX_SUBSCRIPTIONS = 5000;
+    private const int MAX_SESSIONS = 1000;
+    private const int CLEANUP_INTERVAL_MINUTES = 15;
+    private const int SESSION_TTL_HOURS = 24;
+    
+    private readonly Timer _cleanupTimer;
 
     public override string Name => "Realtime Module";
     public override string Description => "Real-time communication module providing WebSocket and SignalR support";
@@ -24,6 +33,10 @@ public sealed class RealtimeModule : ModuleBase
     public RealtimeModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
+        // Start cleanup timer - embodying compassionate resource stewardship
+        _cleanupTimer = new Timer(CleanupExpiredData, null, 
+            TimeSpan.FromMinutes(CLEANUP_INTERVAL_MINUTES), 
+            TimeSpan.FromMinutes(CLEANUP_INTERVAL_MINUTES));
     }
 
     public override Node GetModuleNode()
@@ -542,6 +555,134 @@ public sealed class RealtimeModule : ModuleBase
     )
     {
         public RealtimeSession() : this("", null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, new HashSet<string>(), true) { }
+    }
+    
+    /// <summary>
+    /// Cleanup expired data - embodying compassionate resource stewardship
+    /// Removes old sessions and maintains healthy collection sizes
+    /// </summary>
+    private void CleanupExpiredData(object? state)
+    {
+        try
+        {
+            var now = DateTimeOffset.UtcNow;
+            var cleanupStats = new
+            {
+                WebSocketsBefore = _webSockets.Count,
+                SubscriptionsBefore = _subscriptions.Count,
+                SessionsBefore = _sessions.Count
+            };
+
+            // Cleanup expired sessions
+            var expiredSessions = _sessions
+                .Where(kvp => now - kvp.Value.LastActivity > TimeSpan.FromHours(SESSION_TTL_HOURS))
+                .Select(kvp => kvp.Key)
+                .ToList();
+            foreach (var key in expiredSessions)
+            {
+                _sessions.TryRemove(key, out _);
+                _subscriptions.TryRemove(key, out _);
+                _webSockets.TryRemove(key, out var webSocket);
+                webSocket?.Dispose();
+            }
+
+            // Cleanup closed WebSocket connections
+            var closedWebSockets = _webSockets
+                .Where(kvp => kvp.Value.State == WebSocketState.Closed || kvp.Value.State == WebSocketState.Aborted)
+                .Select(kvp => kvp.Key)
+                .ToList();
+            foreach (var key in closedWebSockets)
+            {
+                _webSockets.TryRemove(key, out var webSocket);
+                _subscriptions.TryRemove(key, out _);
+                _sessions.TryRemove(key, out _);
+                webSocket?.Dispose();
+            }
+
+            // Size-based eviction for WebSockets (evict oldest)
+            if (_webSockets.Count > MAX_WEBSOCKETS)
+            {
+                var excessCount = _webSockets.Count - MAX_WEBSOCKETS;
+                var oldestWebSockets = _webSockets
+                    .OrderBy(kvp => _sessions.TryGetValue(kvp.Key, out var session) ? session.ConnectedAt : DateTimeOffset.MinValue)
+                    .Take(excessCount)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+                foreach (var key in oldestWebSockets)
+                {
+                    _webSockets.TryRemove(key, out var webSocket);
+                    _subscriptions.TryRemove(key, out _);
+                    _sessions.TryRemove(key, out _);
+                    webSocket?.Dispose();
+                }
+            }
+
+            // Size-based eviction for sessions (evict oldest)
+            if (_sessions.Count > MAX_SESSIONS)
+            {
+                var excessCount = _sessions.Count - MAX_SESSIONS;
+                var oldestSessions = _sessions
+                    .OrderBy(kvp => kvp.Value.ConnectedAt)
+                    .Take(excessCount)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+                foreach (var key in oldestSessions)
+                {
+                    _sessions.TryRemove(key, out _);
+                    _subscriptions.TryRemove(key, out _);
+                    _webSockets.TryRemove(key, out var webSocket);
+                    webSocket?.Dispose();
+                }
+            }
+
+            // Size-based eviction for subscriptions (evict oldest)
+            if (_subscriptions.Count > MAX_SUBSCRIPTIONS)
+            {
+                var excessCount = _subscriptions.Count - MAX_SUBSCRIPTIONS;
+                var oldestSubscriptions = _subscriptions
+                    .OrderBy(kvp => _sessions.TryGetValue(kvp.Key, out var session) ? session.ConnectedAt : DateTimeOffset.MinValue)
+                    .Take(excessCount)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+                foreach (var key in oldestSubscriptions)
+                {
+                    _subscriptions.TryRemove(key, out _);
+                }
+            }
+
+            _logger.Info($"[RealtimeModule] Cleanup completed - " +
+                        $"WebSockets: {cleanupStats.WebSocketsBefore} → {_webSockets.Count}, " +
+                        $"Subscriptions: {cleanupStats.SubscriptionsBefore} → {_subscriptions.Count}, " +
+                        $"Sessions: {cleanupStats.SessionsBefore} → {_sessions.Count}");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[RealtimeModule] Error during cleanup: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Dispose resources - embodying graceful completion
+    /// </summary>
+    public void Dispose()
+    {
+        _cleanupTimer?.Dispose();
+        
+        // Dispose all WebSocket connections
+        foreach (var kvp in _webSockets)
+        {
+            try
+            {
+                kvp.Value.Dispose();
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error disposing WebSocket {kvp.Key}: {ex.Message}", ex);
+            }
+        }
+        _webSockets.Clear();
+        _subscriptions.Clear();
+        _sessions.Clear();
     }
 }
 

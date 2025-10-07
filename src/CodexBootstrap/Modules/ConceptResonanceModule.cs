@@ -48,6 +48,14 @@ public sealed class ConceptResonanceModule : ModuleBase
     private static readonly double[] SchumannFrequencies = { 7.83, 14.3, 20.8, 27.3, 33.8, 40.3, 46.8, 53.3, 59.8, 66.3 };
     private const double SchumannBaseHz = 7.83;  // Earth's fundamental heartbeat
     private const double SchumannTolerance = 0.1; // Hz tolerance for Schumann resonance matching
+    
+    // ====== Universal Resonance Integration ======
+    // Natural frequencies that resonate with all life
+    private static readonly double[] LifeFrequencies = { 7.83, 528, 639, 741, 852, 963 }; // Hz frequencies for life harmony
+    private const double InterdependenceWeight = 0.3; // Weight for universal interconnectedness
+    private const double CompassionWeight = 0.25; // Weight for beneficial resonance
+    private const double FluidityWeight = 0.25; // Weight for natural flow and flexibility
+    private const double HarmonyWeight = 0.2; // Weight for natural alignment
 
     // ====== Tunables: CRK tolerant kernels ======
     private const double SigmaOmega = 1e-2;   // frequency tolerance
@@ -373,6 +381,303 @@ public sealed class ConceptResonanceModule : ModuleBase
         var d = (totalWeight > 0.0) ? (totalWeighted / totalWeight) : totalWeighted;
         return (Math.Max(0.0, d), true);
     }
+
+    /// <summary>
+    /// Calculate universal resonance incorporating natural interconnectedness, compassion, and harmony
+    /// </summary>
+    [ApiRoute("POST", "/resonance/universal/calculate", "Calculate universal resonance with natural wisdom", "Resonance calculation enhanced with universal principles", "application/json")]
+    public async Task<object> CalculateUniversalResonance([ApiParameter("request", "Universal resonance request with natural wisdom", Required = true, Location = "body")] ResonanceCompareRequest request)
+    {
+        try
+        {
+            // Calculate traditional CRK resonance using existing method
+            var crkResult = await CompareConceptsAsync(request);
+            if (crkResult is EnhancedResonanceCompareResponse crkResponse)
+            {
+                var crkScore = crkResponse.CRK;
+                
+                // Enhance with universal principles working directly with ConceptSymbols
+                var interdependence = CalculateInterdependenceResonance(request.S1, request.S2);
+                var compassion = CalculateCompassionResonance(request.S1, request.S2);
+                var fluidity = CalculateFluidityResonance(request.S1, request.S2);
+                var harmony = CalculateHarmonyResonance(request.S1, request.S2);
+
+                // Combine traditional and universal resonance
+                var traditionalWeight = 0.5;
+                var universalWeight = 0.5;
+                
+                var enhancedResonance = 
+                    (crkScore * traditionalWeight) +
+                    ((interdependence * InterdependenceWeight + 
+                      compassion * CompassionWeight + 
+                      fluidity * FluidityWeight + 
+                      harmony * HarmonyWeight) * universalWeight);
+
+                // Create enhanced result with universal insights
+                var result = new EnhancedResonanceCompareResponse(
+                    CRK: crkScore,
+                    Dres: crkResponse.Dres,
+                    DOTPhi: crkResponse.DOTPhi,
+                    Coherence: crkResponse.Coherence,
+                    DCodex: crkResponse.DCodex,
+                    UsedOtPhi: crkResponse.UsedOtPhi,
+                    SchumannAlignment: crkResponse.SchumannAlignment,
+                    PlanetaryBenefits: crkResponse.PlanetaryBenefits
+                );
+
+                // Add universal insights to the response
+                var universalInsights = new
+                {
+                    EnhancedResonance = enhancedResonance,
+                    Interdependence = interdependence,
+                    Compassion = compassion,
+                    Fluidity = fluidity,
+                    Harmony = harmony,
+                    UniversalInsights = GenerateUniversalInsights(enhancedResonance),
+                    NaturalGuidance = GenerateNaturalGuidance(enhancedResonance),
+                    LiberationPotential = CalculateLiberationPotential(enhancedResonance),
+                    LifeFrequency = LifeFrequencies[0], // Use Earth's base frequency
+                    NaturalPattern = DetermineNaturalPattern(enhancedResonance)
+                };
+
+                _logger.Info($"Universal resonance calculated: enhanced resonance = {enhancedResonance:F3}");
+                return new { success = true, result, universalInsights };
+            }
+            else
+            {
+                return new { success = false, message = "Failed to calculate base resonance" };
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error calculating universal resonance: {ex.Message}", ex);
+            return new { success = false, message = "Error calculating universal resonance", error = ex.Message };
+        }
+    }
+
+    #region Universal Resonance Calculations
+
+    private double CalculateInterdependenceResonance(ConceptSymbol symbol1, ConceptSymbol symbol2)
+    {
+        // Universal interconnectedness: all things exist in relation to each other
+        // Calculate based on the mathematical properties of the symbols themselves
+        
+        // Count of harmonic components represents interconnectedness
+        var components1 = symbol1.Components.Count;
+        var components2 = symbol2.Components.Count;
+        var totalComponents = components1 + components2;
+        
+        // Higher component count = higher interconnectedness potential
+        var interdependenceScore = Math.Min(1.0, totalComponents * 0.05);
+        
+        // Add bonus for shared frequency bands (harmonics that resonate together)
+        var sharedBands = 0;
+        if (symbol1.BandWeights != null && symbol2.BandWeights != null)
+        {
+            foreach (var band in symbol1.BandWeights.Keys)
+            {
+                if (symbol2.BandWeights.ContainsKey(band))
+                    sharedBands++;
+            }
+        }
+        interdependenceScore += Math.Min(0.3, sharedBands * 0.1);
+        
+        _logger.Info($"Interdependence resonance: components={totalComponents}, sharedBands={sharedBands} = {interdependenceScore:F3}");
+        return interdependenceScore;
+    }
+
+    private double CalculateCompassionResonance(ConceptSymbol symbol1, ConceptSymbol symbol2)
+    {
+        // Compassion: how much does this connection benefit all beings?
+        // Calculate based on harmonic frequencies that promote healing and well-being
+        
+        var compassionScore = 0.0;
+        
+        // Check for healing frequencies in both symbols
+        foreach (var component in symbol1.Components)
+        {
+            if (LifeFrequencies.Any(freq => Math.Abs(component.Omega - freq) < 0.1))
+                compassionScore += 0.2;
+        }
+        
+        foreach (var component in symbol2.Components)
+        {
+            if (LifeFrequencies.Any(freq => Math.Abs(component.Omega - freq) < 0.1))
+                compassionScore += 0.2;
+        }
+        
+        // Add bonus for Schumann resonance alignment (Earth's healing frequency)
+        var schumannAlignment = CalculateSchumannAlignment(symbol1, symbol2);
+        compassionScore += schumannAlignment * 0.3;
+        
+        // Higher amplitude components suggest stronger beneficial energy
+        var avgAmplitude1 = symbol1.Components.Average(c => Math.Abs(c.Amplitude));
+        var avgAmplitude2 = symbol2.Components.Average(c => Math.Abs(c.Amplitude));
+        var combinedAmplitude = (avgAmplitude1 + avgAmplitude2) / 2.0;
+        compassionScore += Math.Min(0.3, combinedAmplitude * 0.1);
+
+        _logger.Info($"Compassion resonance: healingFreqs={compassionScore:F3}, schumann={schumannAlignment:F3}, amplitude={combinedAmplitude:F3}");
+        return Math.Max(0, Math.Min(1.0, compassionScore));
+    }
+
+    private double CalculateFluidityResonance(ConceptSymbol symbol1, ConceptSymbol symbol2)
+    {
+        // Natural flow: concepts are fluid and flexible, not rigid or fixed
+        // Calculate based on the dynamic properties of harmonic components
+        
+        var fluidityScore = 0.0;
+        
+        // Higher frequency diversity suggests more dynamic, flowing nature
+        var freqRange1 = symbol1.Components.Max(c => c.Omega) - symbol1.Components.Min(c => c.Omega);
+        var freqRange2 = symbol2.Components.Max(c => c.Omega) - symbol2.Components.Min(c => c.Omega);
+        var combinedFreqRange = (freqRange1 + freqRange2) / 2.0;
+        fluidityScore += Math.Min(0.4, combinedFreqRange * 0.01);
+        
+        // Phase diversity suggests flow and movement
+        var phaseVariance1 = symbol1.Components.Select(c => c.Phase).ToArray();
+        var phaseVariance2 = symbol2.Components.Select(c => c.Phase).ToArray();
+        var avgPhaseVariance = (CalculateVariance(phaseVariance1) + CalculateVariance(phaseVariance2)) / 2.0;
+        fluidityScore += Math.Min(0.3, avgPhaseVariance * 0.1);
+        
+        // K-vector diversity suggests multi-dimensional flow
+        var kDiversity1 = symbol1.Components.Select(c => (double)(c.K?.Length ?? 0)).ToArray();
+        var kDiversity2 = symbol2.Components.Select(c => (double)(c.K?.Length ?? 0)).ToArray();
+        var avgKDiversity = (CalculateVariance(kDiversity1) + CalculateVariance(kDiversity2)) / 2.0;
+        fluidityScore += Math.Min(0.3, avgKDiversity * 0.05);
+
+        _logger.Info($"Fluidity resonance: freqRange={combinedFreqRange:F3}, phaseVar={avgPhaseVariance:F3}, kDiversity={avgKDiversity:F3} = {fluidityScore:F3}");
+        return Math.Max(0, Math.Min(1.0, fluidityScore));
+    }
+    
+    private double CalculateVariance(double[] values)
+    {
+        if (values.Length <= 1) return 0.0;
+        var mean = values.Average();
+        var variance = values.Sum(v => Math.Pow(v - mean, 2)) / (values.Length - 1);
+        return Math.Sqrt(variance); // Return standard deviation
+    }
+
+    private double CalculateHarmonyResonance(ConceptSymbol symbol1, ConceptSymbol symbol2)
+    {
+        // Natural harmony: how well do these concepts align with natural patterns?
+        // Calculate based on mathematical harmony and natural frequency relationships
+        
+        var harmonyScore = 0.0;
+        
+        // Check for harmonic relationships (integer ratios)
+        var harmonicRelations = 0;
+        foreach (var comp1 in symbol1.Components)
+        {
+            foreach (var comp2 in symbol2.Components)
+            {
+                var ratio = comp1.Omega / comp2.Omega;
+                // Check for simple harmonic ratios (1:1, 1:2, 2:3, 3:4, 4:5, etc.)
+                if (Math.Abs(ratio - 1.0) < 0.1 || Math.Abs(ratio - 2.0) < 0.1 || 
+                    Math.Abs(ratio - 1.5) < 0.1 || Math.Abs(ratio - 0.75) < 0.1 ||
+                    Math.Abs(ratio - 0.8) < 0.1 || Math.Abs(ratio - 1.25) < 0.1)
+                {
+                    harmonicRelations++;
+                }
+            }
+        }
+        harmonyScore += Math.Min(0.4, harmonicRelations * 0.05);
+        
+        // Check for golden ratio relationships (1.618...)
+        foreach (var comp1 in symbol1.Components)
+        {
+            foreach (var comp2 in symbol2.Components)
+            {
+                var ratio = comp1.Omega / comp2.Omega;
+                var goldenRatio = 1.618033988749;
+                if (Math.Abs(ratio - goldenRatio) < 0.1 || Math.Abs(ratio - 1.0/goldenRatio) < 0.1)
+                {
+                    harmonyScore += 0.2; // Golden ratio is especially harmonious
+                }
+            }
+        }
+        
+        // Check for Fibonacci sequence relationships
+        var fibonacciRatios = new[] { 1.0, 1.618, 2.618, 4.236, 6.854 };
+        foreach (var comp1 in symbol1.Components)
+        {
+            foreach (var comp2 in symbol2.Components)
+            {
+                var ratio = comp1.Omega / comp2.Omega;
+                foreach (var fibRatio in fibonacciRatios)
+                {
+                    if (Math.Abs(ratio - fibRatio) < 0.1)
+                    {
+                        harmonyScore += 0.15;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Add base harmony from Schumann resonance alignment
+        var schumannAlignment = CalculateSchumannAlignment(symbol1, symbol2);
+        harmonyScore += schumannAlignment * 0.2;
+
+        _logger.Info($"Harmony resonance: harmonicRelations={harmonicRelations}, schumann={schumannAlignment:F3} = {harmonyScore:F3}");
+        return Math.Max(0, Math.Min(1.0, harmonyScore));
+    }
+
+    private List<string> GenerateUniversalInsights(double enhancedResonance)
+    {
+        var insights = new List<string>();
+        
+        if (enhancedResonance > 0.8)
+        {
+            insights.Add("These concepts are deeply woven into the fabric of reality.");
+            insights.Add("This connection reveals the natural harmony underlying all knowledge.");
+            insights.Add("These symbols demonstrate the universal principle of interconnectedness.");
+        }
+        else if (enhancedResonance > 0.6)
+        {
+            insights.Add("These concepts show meaningful relationships that can deepen understanding.");
+            insights.Add("This connection has the potential to reduce confusion and increase wisdom.");
+            insights.Add("These symbols reveal natural patterns that support learning.");
+        }
+        else
+        {
+            insights.Add("These concepts may have hidden connections waiting to be discovered.");
+            insights.Add("All concepts exist in relationship - sometimes the connections are subtle.");
+            insights.Add("These symbols invite deeper exploration of their natural relationships.");
+        }
+
+        insights.Add("May this understanding benefit all beings and support natural harmony.");
+        return insights;
+    }
+
+    private List<string> GenerateNaturalGuidance(double enhancedResonance)
+    {
+        var suggestions = new List<string>();
+        
+        suggestions.Add("Let this understanding flow naturally to benefit all beings.");
+        suggestions.Add("Share these insights with kindness and wisdom.");
+        suggestions.Add("Allow this knowledge to support natural harmony and understanding.");
+        suggestions.Add("Use this resonance to cultivate awareness and compassion.");
+        suggestions.Add("Let this connection inspire natural growth and learning.");
+        
+        return suggestions;
+    }
+
+    private string DetermineNaturalPattern(double enhancedResonance)
+    {
+        // Determine the natural pattern based on resonance level
+        if (enhancedResonance > 0.8) return "spiral";
+        if (enhancedResonance > 0.6) return "wave";
+        if (enhancedResonance > 0.4) return "flow";
+        return "seed";
+    }
+
+    private double CalculateLiberationPotential(double enhancedResonance)
+    {
+        // Liberation potential: how much does this resonance support freedom from suffering?
+        return enhancedResonance * 0.9; // High resonance leads to liberation
+    }
+
+    #endregion
 
     private static double[,] BuildGroundCost(IReadOnlyList<HarmonicComponent> a1, IReadOnlyList<HarmonicComponent> a2)
     {

@@ -23,7 +23,6 @@ public class FileSystemModule : ModuleBase, IDisposable
 
     public FileSystemModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) : base(registry, logger)
     {
-        
         // Determine project root (allow override via env var for tests), else find .sln
         var overrideRoot = Environment.GetEnvironmentVariable("FILESYSTEM_PROJECT_ROOT");
         if (!string.IsNullOrWhiteSpace(overrideRoot) && Directory.Exists(overrideRoot))
@@ -63,19 +62,27 @@ public class FileSystemModule : ModuleBase, IDisposable
             _logger.Error($"Failed to setup file system watcher: {ex.Message}");
         }
 
-        // Start automatic file system initialization in background
-        _ = Task.Run(async () =>
+        // Note: Heavy initialization work moved to InitializeAsync() method
+        // This prevents blocking the module loading process
+    }
+
+    /// <summary>
+    /// Initialize the module asynchronously after construction
+    /// This method is called by the module loading system to perform heavy initialization work
+    /// </summary>
+    public async Task InitializeAsync()
+    {
+        try
         {
-            try
-            {
-                await Task.Delay(2000); // Wait 2 seconds for system to stabilize
-                await InitializeFileSystemInBackground();
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Failed to initialize file system in background: {ex.Message}");
-            }
-        });
+            _logger.Info("FileSystemModule: Starting async initialization");
+            await Task.Delay(2000); // Wait 2 seconds for system to stabilize
+            await InitializeFileSystemInBackground();
+            _logger.Info("FileSystemModule: Async initialization completed");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"FileSystemModule: Async initialization failed: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -144,7 +151,7 @@ public class FileSystemModule : ModuleBase, IDisposable
     /// <summary>
     /// Initialize all project files as nodes in the registry
     /// </summary>
-    // Removed manual initialization endpoint - file system now initializes automatically in background
+    [ApiRoute("POST", "/filesystem/initialize", "filesystem-initialize", "Manually initialize all project files as nodes", "codex.filesystem")]
     public async Task<object> InitializeFileSystemNodes()
     {
         try
@@ -198,7 +205,8 @@ public class FileSystemModule : ModuleBase, IDisposable
     [ApiRoute("GET", "/filesystem/files", "filesystem-files", "Get all project files as nodes", "codex.filesystem")]
     public async Task<object> GetAllFileNodes([ApiParameter("type", "File type filter (cs, tsx, md, etc.)", Required = false)] string? type = null,
                                              [ApiParameter("directory", "Directory filter", Required = false)] string? directory = null,
-                                             [ApiParameter("limit", "Maximum number of files to return", Required = false)] int limit = 100)
+                                             [ApiParameter("limit", "Maximum number of files to return", Required = false)] int limit = 100,
+                                             [ApiParameter("offset", "Number of files to skip for pagination", Required = false)] int offset = 0)
     {
         try
         {
@@ -219,7 +227,11 @@ public class FileSystemModule : ModuleBase, IDisposable
                 ).ToList();
             }
 
-            var result = fileNodes.Take(limit).Select(n => new
+            var result = fileNodes
+                .OrderBy(n => n.Meta?.ContainsKey("relativePath") == true ? n.Meta["relativePath"].ToString() : n.Title)
+                .Skip(offset)
+                .Take(limit)
+                .Select(n => new
             {
                 id = n.Id,
                 name = n.Title,
@@ -661,22 +673,38 @@ public class FileSystemModule : ModuleBase, IDisposable
     {
         var directories = new Queue<string>();
         directories.Enqueue(_projectRoot);
+        var processedDirs = new HashSet<string>();
+
+        _logger.Info($"FileSystemModule: Starting file scan from root: {_projectRoot}");
 
         while (directories.Count > 0)
         {
             var currentDir = directories.Dequeue();
             
-            if (ShouldExcludeDirectory(currentDir))
+            if (processedDirs.Contains(currentDir))
                 continue;
+                
+            processedDirs.Add(currentDir);
+
+            var relativePath = Path.GetRelativePath(_projectRoot, currentDir);
+            _logger.Debug($"FileSystemModule: Processing directory: {relativePath}");
+            
+            if (ShouldExcludeDirectory(currentDir))
+            {
+                _logger.Debug($"FileSystemModule: Excluding directory: {relativePath}");
+                continue;
+            }
 
             // Get files in current directory
             string[] files;
             try
             {
                 files = Directory.GetFiles(currentDir);
+                _logger.Debug($"FileSystemModule: Found {files.Length} files in {relativePath}");
             }
             catch (UnauthorizedAccessException)
             {
+                _logger.Warn($"FileSystemModule: Cannot access directory: {relativePath}");
                 continue; // Skip directories we can't access
             }
 
@@ -692,6 +720,7 @@ public class FileSystemModule : ModuleBase, IDisposable
             try
             {
                 var subdirs = Directory.GetDirectories(currentDir);
+                _logger.Debug($"FileSystemModule: Found {subdirs.Length} subdirectories in {relativePath}");
                 foreach (var subdir in subdirs)
                 {
                     directories.Enqueue(subdir);
@@ -699,9 +728,12 @@ public class FileSystemModule : ModuleBase, IDisposable
             }
             catch (UnauthorizedAccessException)
             {
+                _logger.Warn($"FileSystemModule: Cannot access subdirectories in: {relativePath}");
                 // Skip directories we can't access
             }
         }
+        
+        _logger.Info($"FileSystemModule: Completed file scan. Processed {processedDirs.Count} directories.");
     }
 
     private async Task<(string nodeId, bool created)> CreateOrUpdateFileNode(string absolutePath)

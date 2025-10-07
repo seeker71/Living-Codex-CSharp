@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { PaginationControls } from '@/components/ui/PaginationControls';
 import { useAuth } from '@/contexts/AuthContext';
@@ -247,9 +248,11 @@ export default function PeoplePage() {
                           {/* Avatar */}
                           <div className="flex-shrink-0">
                             {person.avatarUrl ? (
-                              <img
+                              <Image
                                 src={person.avatarUrl}
                                 alt={person.displayName}
+                                width={48}
+                                height={48}
                                 className="w-12 h-12 rounded-full object-cover"
                               />
                             ) : (
@@ -494,9 +497,11 @@ export default function PeoplePage() {
                     <div className="flex items-start space-x-4">
                       <div className="flex-shrink-0">
                         {contributor.avatarUrl ? (
-                          <img
+                          <Image
                             src={contributor.avatarUrl}
                             alt={contributor.displayName}
+                            width={40}
+                            height={40}
                             className="w-10 h-10 rounded-full object-cover"
                           />
                         ) : (

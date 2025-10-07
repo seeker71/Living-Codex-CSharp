@@ -54,6 +54,10 @@ public class ConceptModule : ModuleBase
     }
 
     /// <summary>
+    /// Create a new concept
+    /// </summary>
+
+    /// <summary>
     /// Browse existing concepts with resonance-based discovery
     /// </summary>
     [Post("/concepts/browse", "concepts-browse", "Browse existing concepts by resonance criteria", "codex.concept")]

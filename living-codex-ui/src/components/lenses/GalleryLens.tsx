@@ -130,7 +130,7 @@ export function GalleryLens({ controls = {}, userId, className = '', readOnly = 
 
   useEffect(() => {
     fetchImages();
-  }, [user?.id, retryCount]);
+  }, [fetchImages, retryCount]);
 
   const handleRetry = () => {
     setRetryCount(prev => prev + 1);

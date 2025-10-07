@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 
 interface ImageRendererProps {
   content: string; // base64 encoded image or URL
@@ -95,11 +96,14 @@ export function ImageRenderer({ content, mediaType, className = '' }: ImageRende
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
           )}
-          <img
+          <Image
             src={getImageSrc()}
             alt="Content image"
-            onError={handleImageError}
-            onLoad={handleImageLoad}
+            width={1024}
+            height={768}
+            unoptimized
+            onError={handleImageError as unknown as () => void}
+            onLoad={handleImageLoad as unknown as () => void}
             className={`w-full h-auto rounded-lg ${isExpanded ? 'max-h-96' : 'max-h-64'} object-contain transition-opacity duration-200 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
           />
         </div>

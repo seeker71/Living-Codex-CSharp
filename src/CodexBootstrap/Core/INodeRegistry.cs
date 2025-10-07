@@ -14,6 +14,11 @@ public interface INodeRegistry
     Task InitializeAsync();
 
     /// <summary>
+    /// Wait for registry initialization to complete
+    /// </summary>
+    Task WaitForInitializationAsync();
+
+    /// <summary>
     /// Store or update a node
     /// </summary>
     void Upsert(Node node);

@@ -105,7 +105,8 @@ describe('News → AI Concepts → U-CORE navigation', () => {
     openSpy.mockRestore()
 
     const fetchUrls = (global.fetch as jest.Mock).mock.calls.map((c: any[]) => String(c[0]))
-    expect(fetchUrls.some(url => url.includes('/news/feed/'))).toBe(true)
+    // Accept /news/feed or /news/feed?... variants
+    expect(fetchUrls.some(url => url.includes('/news/feed'))).toBe(true)
     expect(fetchUrls.some(url => url.includes('/news/stats'))).toBe(true)
   })
 })

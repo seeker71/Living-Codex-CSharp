@@ -1,6 +1,4 @@
 import React from 'react'
-import { screen, waitFor } from '@testing-library/react'
-import { renderWithProviders } from './test-utils'
 
 // Mock Next.js navigation
 jest.mock('next/navigation', () => ({

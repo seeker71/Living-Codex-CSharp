@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { ConceptStreamCard } from './ConceptStreamCard';
 import { Card, CardContent } from '@/components/ui/Card';
 import { PaginationControls } from '@/components/ui/PaginationControls';
@@ -18,12 +18,8 @@ interface StreamLensProps {
 }
 
 export function StreamLens({ lens, controls = {}, userId, className = '', readOnly = false }: StreamLensProps) {
-  const [items, setItems] = useState<any[]>([]);
-  const [totalCount, setTotalCount] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(12);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   // Use the lens adapters to fetch data
   const conceptQuery = useConceptDiscovery({
@@ -40,89 +36,98 @@ export function StreamLens({ lens, controls = {}, userId, className = '', readOn
     skip: (currentPage - 1) * pageSize,
   });
 
+  // Derive items and totalCount from query data using useMemo
+  const { items, totalCount, loading, error } = useMemo(() => {
+    // Show loading if either query is loading
+    const isLoading = conceptQuery.isLoading || userQuery.isLoading;
+    
+    // Check for errors
+    const hasError = conceptQuery.error || userQuery.error;
+    const errorMessage = hasError 
+      ? (conceptQuery.error?.message || userQuery.error?.message || 'Failed to load stream')
+      : null;
 
-  useEffect(() => {
-    const loadStreamData = async () => {
-      // Only proceed if we have data from both queries
-      if (!conceptQuery.data && !userQuery.data) {
-        return;
+    // Only proceed if we have data from at least one query
+    if (!conceptQuery.data && !userQuery.data) {
+      return { items: [], totalCount: 0, loading: isLoading, error: errorMessage };
+    }
+
+    try {
+      // Combine concepts and users into a unified stream
+      const concepts = conceptQuery.data?.concepts || conceptQuery.data?.discoveredConcepts || [];
+      const conceptTotal = (conceptQuery.data?.totalCount ?? conceptQuery.data?.totalDiscovered) || concepts.length;
+      const users = userQuery.data?.users || [];
+      const usersTotal = userQuery.data?.totalCount || users.length;
+
+      // Transform and merge data with real backend features
+      const conceptItems = concepts.map((concept: any) => ({
+        ...concept,
+        type: 'concept',
+        // Real backend features that are actually implemented
+        contributors: concept.contributors || [],
+        contributionCount: concept.contributionCount || 0,
+        trendingScore: concept.resonance && concept.resonance > 0.8 ? Math.floor(Math.random() * 100) + 10 : 0,
+        lastActivity: concept.updatedAt || concept.createdAt || '2 hours ago',
+        energyLevel: concept.resonance || 0.5,
+        isNew: concept.createdAt && new Date(concept.createdAt) > new Date(Date.now() - 24 * 60 * 60 * 1000),
+        isTrending: concept.resonance && concept.resonance > 0.8,
+        tags: concept.tags || concept.axes || [],
+        // Real data from backend
+        relatedConcepts: concept.relatedConcepts || [],
+        upvotes: concept.upvotes || 0,
+        downvotes: concept.downvotes || 0,
+        commentCount: concept.commentCount || 0,
+        shareCount: concept.shareCount || 0,
+        backlinks: [],
+        forwardLinks: [],
+        status: 'published',
+        priority: 'medium',
+        version: 1,
+      }));
+
+      const userItems = users.map((user: any) => ({
+        id: user.id,
+        name: user.name || user.username,
+        description: user.bio || user.description || `User interested in ${user.interests?.join(', ')}`,
+        type: 'user',
+        axes: user.interests || user.axes || [],
+        // Add engagement features for users
+        contributors: user.contributors || [],
+        contributionCount: user.contributionCount || 0,
+        trendingScore: 0,
+        lastActivity: user.lastSeen || '1 day ago',
+        energyLevel: 0.6,
+        isNew: false,
+        isTrending: false,
+        tags: user.interests || [],
+      }));
+
+      // Apply ranking if specified
+      let combinedItems = [...conceptItems, ...userItems];
+
+      if (lens.ranking === 'resonance*joy*recency') {
+        combinedItems = combinedItems.sort((a, b) => {
+          const aScore = (a.resonance || 0.5) * (controls.joy || 0.7) * (a.timestamp || 1) * (a.isTrending ? 1.5 : 1) * (a.isNew ? 1.2 : 1);
+          const bScore = (b.resonance || 0.5) * (controls.joy || 0.7) * (b.timestamp || 1) * (b.isTrending ? 1.5 : 1) * (b.isNew ? 1.2 : 1);
+          return bScore - aScore;
+        });
       }
 
-      setLoading(true);
-      setError(null);
-
-      try {
-        // Combine concepts and users into a unified stream
-        const concepts = conceptQuery.data?.concepts || conceptQuery.data?.discoveredConcepts || [];
-        const conceptTotal = (conceptQuery.data?.totalCount ?? conceptQuery.data?.totalDiscovered) || concepts.length;
-        const users = userQuery.data?.users || [];
-        const usersTotal = userQuery.data?.totalCount || users.length;
-
-        // Transform and merge data with real backend features
-        const conceptItems = concepts.map((concept: any) => ({
-          ...concept,
-          type: 'concept',
-          // Real backend features that are actually implemented
-          contributors: concept.contributors || [],
-          contributionCount: concept.contributionCount || 0,
-          trendingScore: concept.resonance && concept.resonance > 0.8 ? Math.floor(Math.random() * 100) + 10 : 0,
-          lastActivity: concept.updatedAt || concept.createdAt || '2 hours ago',
-          energyLevel: concept.resonance || 0.5,
-          isNew: concept.createdAt && new Date(concept.createdAt) > new Date(Date.now() - 24 * 60 * 60 * 1000),
-          isTrending: concept.resonance && concept.resonance > 0.8,
-          tags: concept.tags || concept.axes || [],
-          // Real data from backend
-          relatedConcepts: concept.relatedConcepts || [],
-          upvotes: concept.upvotes || 0,
-          downvotes: concept.downvotes || 0,
-          commentCount: concept.commentCount || 0,
-          shareCount: concept.shareCount || 0,
-          backlinks: [],
-          forwardLinks: [],
-          status: 'published',
-          priority: 'medium',
-          version: 1,
-        }));
-
-        const userItems = users.map((user: any) => ({
-          id: user.id,
-          name: user.name || user.username,
-          description: user.bio || user.description || `User interested in ${user.interests?.join(', ')}`,
-          type: 'user',
-          axes: user.interests || user.axes || [],
-          // Add engagement features for users
-          contributors: user.contributors || [],
-          contributionCount: user.contributionCount || 0,
-          trendingScore: 0,
-          lastActivity: user.lastSeen || '1 day ago',
-          energyLevel: 0.6,
-          isNew: false,
-          isTrending: false,
-          tags: user.interests || [],
-        }));
-
-        // Apply ranking if specified
-        let combinedItems = [...conceptItems, ...userItems];
-
-        if (lens.ranking === 'resonance*joy*recency') {
-          combinedItems = combinedItems.sort((a, b) => {
-            const aScore = (a.resonance || 0.5) * (controls.joy || 0.7) * (a.timestamp || 1) * (a.isTrending ? 1.5 : 1) * (a.isNew ? 1.2 : 1);
-            const bScore = (b.resonance || 0.5) * (controls.joy || 0.7) * (b.timestamp || 1) * (b.isTrending ? 1.5 : 1) * (b.isNew ? 1.2 : 1);
-            return bScore - aScore;
-          });
-        }
-
-        setItems(combinedItems);
-        setTotalCount(conceptTotal + usersTotal);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load stream');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadStreamData();
-  }, [conceptQuery.data, userQuery.data, lens.ranking, controls.joy]);
+      return {
+        items: combinedItems,
+        totalCount: conceptTotal + usersTotal,
+        loading: false,
+        error: errorMessage
+      };
+    } catch (err) {
+      return {
+        items: [],
+        totalCount: 0,
+        loading: false,
+        error: err instanceof Error ? err.message : 'Failed to load stream'
+      };
+    }
+  }, [conceptQuery.data, conceptQuery.isLoading, conceptQuery.error, userQuery.data, userQuery.isLoading, userQuery.error, lens.ranking, controls.joy]);
 
   const handleAction = (action: string, itemId: string) => {
     console.log(`Action ${action} on item ${itemId}`);
@@ -378,7 +383,7 @@ export function StreamLens({ lens, controls = {}, userId, className = '', readOn
                     <TrendingUp className="w-4 h-4 text-white" />
                   </div>
                   <div className="text-sm font-semibold text-blue-700 dark:text-blue-300">Trending Topics</div>
-                  <div className="text-xs text-blue-600 dark:text-blue-400">Follow what's hot</div>
+                  <div className="text-xs text-blue-600 dark:text-blue-400">Follow what&apos;s hot</div>
                 </div>
                 <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                   <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-2">

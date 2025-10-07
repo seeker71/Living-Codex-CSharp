@@ -13,11 +13,13 @@ public class SqliteIceStorageBackend : IIceStorageBackend
     private readonly string _connectionString;
     private readonly JsonSerializerOptions _jsonOptions;
     private readonly ICodexLogger _logger;
+    private readonly DatabaseOperationMonitor _monitor;
 
-    public SqliteIceStorageBackend(string connectionString)
+    public SqliteIceStorageBackend(string connectionString, DatabaseOperationMonitor? monitor = null)
     {
         _connectionString = connectionString;
         _logger = new Log4NetLogger(typeof(SqliteIceStorageBackend));
+        _monitor = monitor ?? new DatabaseOperationMonitor(_logger);
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -29,7 +31,7 @@ public class SqliteIceStorageBackend : IIceStorageBackend
 
     public async Task InitializeAsync()
     {
-        using var connection = new SqliteConnection(_connectionString);
+        using var connection = new MonitoredSqliteConnection(_connectionString, _monitor, _logger);
         await connection.OpenAsync();
 
         // Create tables with optimized schema for Ice nodes
@@ -82,7 +84,7 @@ public class SqliteIceStorageBackend : IIceStorageBackend
 
     public async Task StoreIceNodeAsync(Node node)
     {
-        using var connection = new SqliteConnection(_connectionString);
+        using var connection = new MonitoredSqliteConnection(_connectionString, _monitor, _logger);
         await connection.OpenAsync();
 
         var sql = @"

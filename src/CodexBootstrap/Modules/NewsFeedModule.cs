@@ -605,6 +605,15 @@ public sealed class NewsFeedModule : ModuleBase
         }
     }
 
+    /// <summary>
+    /// API endpoint for the AI Dashboard
+    /// </summary>
+    [ApiRoute("GET", "/api/news-stats", "api-news-stats", "Get news stats for dashboard", "codex.news-feed")]
+    public async Task<object> GetApiNewsStats()
+    {
+        return await GetNewsStats();
+    }
+
     // Get news items for specific interests
     private async Task<List<NewsFeedItem>> GetNewsFeedItemsForInterests(
         List<string> interests, 

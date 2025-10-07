@@ -285,6 +285,8 @@ namespace CodexBootstrap.Tests.Modules
 
             public Task InitializeAsync() => Task.CompletedTask;
 
+            public Task WaitForInitializationAsync() => Task.CompletedTask;
+
             public void Upsert(Node node) => _nodes[node.Id] = node;
 
             public void Upsert(Edge edge)

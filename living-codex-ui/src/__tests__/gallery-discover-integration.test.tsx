@@ -1,24 +1,24 @@
-import React from 'react'
-import { screen, waitFor, fireEvent, within } from '@testing-library/react'
-import { renderWithProviders } from './test-utils'
-import DiscoverPage from '@/app/discover/page'
-
 // Mock Next.js navigation
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
   useSearchParams: () => new URLSearchParams(),
   usePathname: () => '/discover',
-}))
+}));
 
-// Mock the AuthContext
-jest.mock('@/contexts/AuthContext', () => ({
-  useAuth: () => ({
-    user: { id: 'test-user', username: 'testuser' },
-    token: 'test-token',
-    isLoading: false,
-    isAuthenticated: true,
-  }),
-}))
+// Mock API endpoints - provide minimal implementation needed for tests
+jest.mock('@/lib/api', () => ({
+  endpoints: {
+    recordContribution: jest.fn().mockResolvedValue({ success: true }),
+  },
+  ApiErrorHandler: class {
+    handle(error: any) { console.error(error); }
+  },
+}));
+
+import React from 'react';
+import { screen, waitFor, fireEvent, within } from '@testing-library/react';
+import { renderWithProviders } from './test-utils';
+import DiscoverPage from '@/app/discover/page';
 
 // Mock the config and buildApiUrl function
 jest.mock('@/lib/config', () => ({
@@ -37,6 +37,18 @@ jest.mock('@/lib/utils', () => ({
 }))
 
 // Mock the hooks
+// Mock the ConceptStreamCard component to avoid complex dependencies
+jest.mock('@/components/lenses/ConceptStreamCard', () => ({
+  ConceptStreamCard: ({ concept }: any) => (
+    <div data-testid="concept-card">
+      <h3>{concept.name}</h3>
+      <p>{concept.description}</p>
+      <span>Domain: {concept.domain}</span>
+      <span>Resonance: {concept.resonance}</span>
+    </div>
+  )
+}))
+
 jest.mock('@/lib/hooks', () => ({
   usePages: () => ({ isLoading: false }),
   useLenses: () => ({ 
@@ -62,9 +74,59 @@ jest.mock('@/lib/hooks', () => ({
     },
     isLoading: false
   }),
+  // Provide a stub for useConceptDiscovery used by StreamLens in Discover
+  useConceptDiscovery: () => ({
+    data: {
+      concepts: [
+        { id: 'c1', name: 'Quantum', domain: 'General', resonance: 0.75, description: 'Quantum mechanics and quantum computing concepts' },
+        { id: 'c2', name: 'Consciousness', domain: 'General', resonance: 0.85, description: 'The state of being aware and able to think and perceive' },
+        { id: 'c3', name: 'Fractal Pattern', domain: 'Mathematics', resonance: 0.65, description: 'A geometric pattern that repeats at different scales' },
+      ]
+    },
+    isLoading: false,
+    isError: false,
+    error: null,
+  }),
+  // Provide a stub for useUserDiscovery used by StreamLens in Discover
+  useUserDiscovery: () => ({
+    data: {
+      users: [
+        { id: 'u1', username: 'user1', displayName: 'User One', lastSeen: '2025-01-01T00:00:00Z' },
+        { id: 'u2', username: 'user2', displayName: 'User Two', lastSeen: '2025-01-01T00:00:00Z' },
+      ]
+    },
+    isLoading: false,
+    isError: false,
+    error: null,
+  }),
+  // Provide stubs for interaction hooks used by ConceptStreamCard
+  useAttune: () => ({
+    mutate: jest.fn(),
+    isLoading: false,
+    isError: false,
+    error: null,
+  }),
+  useAmplify: () => ({
+    mutate: jest.fn(),
+    isLoading: false,
+    isError: false,
+    error: null,
+  }),
 }))
 
 describe('Gallery Discover Integration Tests', () => {
+  const mockAuthValue = {
+    user: { id: 'test-user', username: 'testuser' },
+    token: 'test-token',
+    isLoading: false,
+    isAuthenticated: true,
+    login: jest.fn(),
+    register: jest.fn(),
+    logout: jest.fn(),
+    refreshUser: jest.fn(),
+    testConnection: jest.fn(),
+  };
+
   const mockConceptsData = {
     concepts: [
       {
@@ -130,7 +192,7 @@ describe('Gallery Discover Integration Tests', () => {
   })
 
   test('should display Gallery tab in navigation', async () => {
-    renderWithProviders(<DiscoverPage />)
+    renderWithProviders(<DiscoverPage />, { authValue: mockAuthValue })
     
     await waitFor(() => {
       expect(screen.getByText('Gallery')).toBeInTheDocument()
@@ -138,7 +200,7 @@ describe('Gallery Discover Integration Tests', () => {
   })
 
   test('should switch to Gallery lens when Gallery tab is clicked', async () => {
-    renderWithProviders(<DiscoverPage />)
+    renderWithProviders(<DiscoverPage />, { authValue: mockAuthValue })
     
     // Click on Gallery tab
     const galleryTab = screen.getByText('Gallery')
@@ -151,7 +213,7 @@ describe('Gallery Discover Integration Tests', () => {
   })
 
   test('should display concepts in gallery grid format', async () => {
-    renderWithProviders(<DiscoverPage />)
+    renderWithProviders(<DiscoverPage />, { authValue: mockAuthValue })
     
     // Switch to Gallery tab
     const galleryTab = screen.getByText('Gallery')
@@ -166,7 +228,7 @@ describe('Gallery Discover Integration Tests', () => {
   })
 
   test('should display concept names in gallery cards', async () => {
-    renderWithProviders(<DiscoverPage />)
+    renderWithProviders(<DiscoverPage />, { authValue: mockAuthValue })
     
     // Switch to Gallery tab
     const galleryTab = screen.getByText('Gallery')
@@ -185,7 +247,7 @@ describe('Gallery Discover Integration Tests', () => {
   })
 
   test('should display concept domains in gallery cards', async () => {
-    renderWithProviders(<DiscoverPage />)
+    renderWithProviders(<DiscoverPage />, { authValue: mockAuthValue })
     
     // Switch to Gallery tab
     const galleryTab = screen.getByText('Gallery')
@@ -199,7 +261,7 @@ describe('Gallery Discover Integration Tests', () => {
   })
 
   test('should display resonance values in gallery cards', async () => {
-    renderWithProviders(<DiscoverPage />)
+    renderWithProviders(<DiscoverPage />, { authValue: mockAuthValue })
     
     // Switch to Gallery tab
     const galleryTab = screen.getByText('Gallery')
@@ -214,7 +276,7 @@ describe('Gallery Discover Integration Tests', () => {
   })
 
   test('should show concept count in gallery header', async () => {
-    renderWithProviders(<DiscoverPage />)
+    renderWithProviders(<DiscoverPage />, { authValue: mockAuthValue })
     
     // Switch to Gallery tab
     const galleryTab = screen.getByText('Gallery')
@@ -227,7 +289,7 @@ describe('Gallery Discover Integration Tests', () => {
   })
 
   test('should handle gallery item click to open modal', async () => {
-    renderWithProviders(<DiscoverPage />)
+    renderWithProviders(<DiscoverPage />, { authValue: mockAuthValue })
     
     // Switch to Gallery tab
     const galleryTab = screen.getByText('Gallery')
@@ -249,7 +311,7 @@ describe('Gallery Discover Integration Tests', () => {
   })
 
   test('should display filter and sort controls', async () => {
-    renderWithProviders(<DiscoverPage />)
+    renderWithProviders(<DiscoverPage />, { authValue: mockAuthValue })
     
     // Switch to Gallery tab
     const galleryTab = screen.getByText('Gallery')
@@ -275,7 +337,7 @@ describe('Gallery Discover Integration Tests', () => {
       return Promise.reject(new Error('Unhandled fetch request'))
     })
 
-    renderWithProviders(<DiscoverPage />)
+    renderWithProviders(<DiscoverPage />, { authValue: mockAuthValue })
     
     // Switch to Gallery tab
     const galleryTab = screen.getByText('Gallery')
@@ -304,7 +366,7 @@ describe('Gallery Discover Integration Tests', () => {
       return Promise.reject(new Error('Unhandled fetch request'))
     })
 
-    renderWithProviders(<DiscoverPage />)
+    renderWithProviders(<DiscoverPage />, { authValue: mockAuthValue })
     
     // Switch to Gallery tab
     const galleryTab = screen.getByText('Gallery')

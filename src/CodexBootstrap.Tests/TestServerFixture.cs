@@ -110,9 +110,25 @@ namespace CodexBootstrap.Tests
                     
                     if (response.IsSuccessStatusCode)
                     {
-                        serverReady = true;
-                        Console.WriteLine($"[TestServerFixture] SUCCESS: Server is ready on port {_port} after {elapsed.TotalSeconds:F1}s");
-                        break;
+                        // Check if readiness system is available
+                        try
+                        {
+                            var readinessResponse = await testClient.GetAsync($"http://localhost:{_port}/readiness");
+                            if (readinessResponse.IsSuccessStatusCode)
+                            {
+                                serverReady = true;
+                                Console.WriteLine($"[TestServerFixture] SUCCESS: Server and readiness system ready on port {_port} after {elapsed.TotalSeconds:F1}s");
+                                break;
+                            }
+                            else
+                            {
+                                Console.WriteLine($"[TestServerFixture] Health check passed but readiness system not ready yet: {readinessResponse.StatusCode}");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[TestServerFixture] Readiness check failed: {ex.Message}");
+                        }
                     }
                 }
                 catch (Exception ex)

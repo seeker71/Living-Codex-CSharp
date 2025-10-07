@@ -7,8 +7,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTrackInteraction } from '@/lib/hooks';
 import { buildApiUrl } from '@/lib/config';
 
-import { SmartSearch } from '@/components/ui/SmartSearch';
-import KnowledgeMap, { useMockKnowledgeNodes } from '@/components/ui/KnowledgeMap';
+import SmartSearch from '@/components/ui/SmartSearch';
+import { KnowledgeMap, useMockKnowledgeNodes } from '@/components/ui/KnowledgeMap';
 
 interface OntologyNode {
   id: string;
@@ -292,7 +292,7 @@ const handleSearchResultsChange = (results: ConceptSummary[]) => {
         <div className="text-gray-400 text-6xl">😕</div>
         <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Connection Lost</h2>
         <p className="text-gray-600 dark:text-gray-300">
-          We're having trouble connecting to the knowledge network. This might be temporary.
+          We&apos;re having trouble connecting to the knowledge network. This might be temporary.
         </p>
         <div className="flex items-center justify-center gap-3 text-sm">
           <button

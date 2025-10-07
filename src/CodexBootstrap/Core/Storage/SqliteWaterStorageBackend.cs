@@ -13,12 +13,14 @@ public class SqliteWaterStorageBackend : IWaterStorageBackend
     private readonly string _connectionString;
     private readonly JsonSerializerOptions _jsonOptions;
     private readonly ICodexLogger _logger;
+    private readonly DatabaseOperationMonitor _monitor;
     private readonly TimeSpan _defaultExpiry = TimeSpan.FromMinutes(30);
 
-    public SqliteWaterStorageBackend(string connectionString = "Data Source=data/water_cache.db")
+    public SqliteWaterStorageBackend(string connectionString = "Data Source=data/water_cache.db", DatabaseOperationMonitor? monitor = null)
     {
         _connectionString = connectionString;
         _logger = new Log4NetLogger(typeof(SqliteWaterStorageBackend));
+        _monitor = monitor ?? new DatabaseOperationMonitor(_logger);
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,

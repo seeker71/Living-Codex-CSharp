@@ -18,9 +18,11 @@ interface KnowledgeMapProps {
   selectedNodeId?: string;
   onNodeClick?: (nodeId: string) => void;
   className?: string;
+  // Optional explicit dimensions for deterministic sizing (useful in tests)
+  dimensions?: { width: number; height: number };
 }
 
-export const KnowledgeMap: React.FC<KnowledgeMapProps> = ({ nodes, selectedNodeId, onNodeClick, className = '' }) => {
+export const KnowledgeMap: React.FC<KnowledgeMapProps> = ({ nodes, selectedNodeId, onNodeClick, className = '', dimensions: dimensionsProp }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [isDragging, setIsDragging] = useState(false);
@@ -28,6 +30,11 @@ export const KnowledgeMap: React.FC<KnowledgeMapProps> = ({ nodes, selectedNodeI
 
   // Auto-resize canvas
   useEffect(() => {
+    if (dimensionsProp) {
+      setDimensions(dimensionsProp);
+      return;
+    }
+
     const updateDimensions = () => {
       const container = canvasRef.current?.parentElement;
       if (container) {
@@ -41,7 +48,7 @@ export const KnowledgeMap: React.FC<KnowledgeMapProps> = ({ nodes, selectedNodeI
     updateDimensions();
     window.addEventListener('resize', updateDimensions);
     return () => window.removeEventListener('resize', updateDimensions);
-  }, []);
+  }, [dimensionsProp]);
 
   // Draw the knowledge map
   useEffect(() => {
@@ -51,20 +58,22 @@ export const KnowledgeMap: React.FC<KnowledgeMapProps> = ({ nodes, selectedNodeI
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const active = dimensionsProp ?? dimensions;
+
     // Clear canvas
-    ctx.clearRect(0, 0, dimensions.width, dimensions.height);
+    ctx.clearRect(0, 0, active.width, active.height);
 
     // Set canvas size
-    canvas.width = dimensions.width;
-    canvas.height = dimensions.height;
+    canvas.width = active.width;
+    canvas.height = active.height;
 
     // Draw connections first (behind nodes)
-    drawConnections(ctx, nodes, dimensions);
+    drawConnections(ctx, nodes, active);
 
     // Draw nodes
-    drawNodes(ctx, nodes, dimensions, selectedNodeId);
+    drawNodes(ctx, nodes, active, selectedNodeId);
 
-  }, [nodes, dimensions, selectedNodeId]);
+  }, [nodes, dimensions, dimensionsProp, selectedNodeId]);
 
   const drawConnections = (ctx: CanvasRenderingContext2D, nodes: KnowledgeMapNode[], dimensions: { width: number; height: number }) => {
     const nodeMap = new Map(nodes.map(node => [node.id, node]));
@@ -73,7 +82,8 @@ export const KnowledgeMap: React.FC<KnowledgeMapProps> = ({ nodes, selectedNodeI
     ctx.lineWidth = 2;
 
     nodes.forEach(node => {
-      node.connections.forEach(connectedId => {
+      const connectionIds = Array.isArray(node.connections) ? node.connections : [];
+      connectionIds.forEach(connectedId => {
         const connectedNode = nodeMap.get(connectedId);
         if (connectedNode && node.id < connectedId) { // Avoid duplicate lines
           // Calculate connection strength based on resonance
@@ -90,42 +100,43 @@ export const KnowledgeMap: React.FC<KnowledgeMapProps> = ({ nodes, selectedNodeI
   };
 
   const drawNodes = (ctx: CanvasRenderingContext2D, nodes: KnowledgeMapNode[], dimensions: { width: number; height: number }, selectedNodeId?: string) => {
-    const domainColors: Record<string, string> = {
-      'Science & Tech': '#3B82F6',
-      'Arts & Culture': '#8B5CF6',
-      'Society': '#10B981',
-      'Nature': '#059669',
-      'Health': '#EF4444',
-      'Business': '#F59E0B',
-    };
+    try {
+      const domainColors: Record<string, string> = {
+        'Science & Tech': '#3B82F6',
+        'Arts & Culture': '#8B5CF6',
+        'Society': '#10B981',
+        'Nature': '#059669',
+        'Health': '#EF4444',
+        'Business': '#F59E0B',
+      };
 
-    nodes.forEach(node => {
-      const x = node.x * dimensions.width;
-      const y = node.y * dimensions.height;
-      const radius = Math.max(15, node.size * 8);
-      const isSelected = selectedNodeId === node.id;
+      nodes.forEach(node => {
+        const x = node.x * dimensions.width;
+        const y = node.y * dimensions.height;
+        const radius = Math.max(15, (node.size || 1) * 8);
+        const isSelected = selectedNodeId === node.id;
 
-      // Node shadow
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-      ctx.beginPath();
-      ctx.arc(x + 2, y + 2, radius, 0, 2 * Math.PI);
-      ctx.fill();
+        // Node shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+        ctx.beginPath();
+        ctx.arc(x + 2, y + 2, radius, 0, 2 * Math.PI);
+        ctx.fill();
 
-      // Node body
-      ctx.fillStyle = domainColors[node.domain] || '#6B7280';
-      ctx.beginPath();
-      ctx.arc(x, y, radius, 0, 2 * Math.PI);
-      ctx.fill();
+        // Node body
+        ctx.fillStyle = domainColors[node.domain] || '#6B7280';
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        ctx.fill();
 
-      // Node border for selected state
-      if (isSelected) {
-        ctx.strokeStyle = '#F59E0B';
-        ctx.lineWidth = 3;
-        ctx.stroke();
-      }
+        // Node border for selected state
+        if (isSelected) {
+          ctx.strokeStyle = '#F59E0B';
+          ctx.lineWidth = 3;
+          ctx.stroke();
+        }
 
-      // Node glow effect based on resonance
-      if (node.resonance > 70) {
+        // Node glow effect based on resonance
+        if (node.resonance > 70) {
         const gradient = ctx.createRadialGradient(x, y, radius, x, y, radius * 1.5);
         gradient.addColorStop(0, `${domainColors[node.domain]}40`);
         gradient.addColorStop(1, 'transparent');
@@ -149,6 +160,10 @@ export const KnowledgeMap: React.FC<KnowledgeMapProps> = ({ nodes, selectedNodeI
 
       ctx.fillText(displayTitle, x, y);
     });
+    } catch (error) {
+      console.warn('Canvas drawing error:', error);
+      // Continue rendering other elements even if canvas drawing fails
+    }
   };
 
   const handleCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
@@ -161,8 +176,9 @@ export const KnowledgeMap: React.FC<KnowledgeMapProps> = ({ nodes, selectedNodeI
 
     // Find clicked node
     const clickedNode = nodes.find(node => {
-      const nodeX = node.x * dimensions.width;
-      const nodeY = node.y * dimensions.height;
+      const active = dimensionsProp ?? dimensions;
+      const nodeX = node.x * active.width;
+      const nodeY = node.y * active.height;
       const distance = Math.sqrt((x - nodeX) ** 2 + (y - nodeY) ** 2);
       return distance <= Math.max(15, node.size * 8);
     });
@@ -187,7 +203,7 @@ export const KnowledgeMap: React.FC<KnowledgeMapProps> = ({ nodes, selectedNodeI
     setIsDragging(false);
   };
 
-  if (nodes.length === 0) {
+  if (!Array.isArray(nodes) || nodes.length === 0) {
     return (
       <div className={`flex items-center justify-center bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 ${className}`} style={{ height: '400px' }}>
         <div className="text-center">
@@ -205,6 +221,7 @@ export const KnowledgeMap: React.FC<KnowledgeMapProps> = ({ nodes, selectedNodeI
         className="border border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer"
         style={{ width: '100%', height: '400px' }}
         data-testid="map-canvas"
+        tabIndex={0}
         onClick={handleCanvasClick}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -250,6 +267,7 @@ export const KnowledgeMap: React.FC<KnowledgeMapProps> = ({ nodes, selectedNodeI
 
       {/* Stats */}
       <div className="absolute top-4 right-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 shadow-lg" data-testid="map-stats">
+        <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Stats</h4>
         <div className="text-xs text-gray-600 dark:text-gray-400">
           <div>Nodes: {nodes.length}</div>
           <div>Connections: {nodes.reduce((acc, node) => acc + ((node.connections && Array.isArray(node.connections)) ? node.connections.length : 0), 0) / 2}</div>

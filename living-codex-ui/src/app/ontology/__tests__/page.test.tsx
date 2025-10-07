@@ -134,9 +134,9 @@ jest.mock('../../../components/ui/SmartSearch', () => {
   }
 })
 
-// Mock the KnowledgeMap component
+// Mock the KnowledgeMap component and hook API expected by the page
 jest.mock('../../../components/ui/KnowledgeMap', () => {
-  return function MockKnowledgeMap({ nodes, className }: any) {
+  const MockKnowledgeMap = function MockKnowledgeMap({ nodes, className }: any) {
     return (
       <div className={className} data-testid="knowledge-map">
         <canvas data-testid="map-canvas" />
@@ -144,6 +144,23 @@ jest.mock('../../../components/ui/KnowledgeMap', () => {
         <div data-testid="map-stats">Stats</div>
       </div>
     )
+  }
+  const useMockKnowledgeNodes = (count: number = 24) =>
+    Array.from({ length: count }).map((_, i) => ({
+      id: `mock-node-${i}`,
+      title: `Concept ${i}`,
+      domain: i % 2 === 0 ? 'Science & Tech' : 'Arts & Culture',
+      x: (i % 10) / 10,
+      y: Math.floor(i / 10) / 10,
+      connections: [],
+      size: 1,
+      resonance: 70,
+    }))
+  return { 
+    __esModule: true, 
+    default: MockKnowledgeMap, 
+    useMockKnowledgeNodes,
+    KnowledgeMap: MockKnowledgeMap
   }
 })
 

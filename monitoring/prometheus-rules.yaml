@@ -160,6 +160,63 @@ groups:
       summary: "Suspicious API usage pattern"
       description: "API request rate is {{ $value }} requests per second."
 
+  # Memory Monitoring Rules (New)
+  - alert: LivingCodexHighMemoryUsage
+    expr: codex_memory_usage_mb > 1000
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Living Codex high memory usage"
+      description: "Memory usage is {{ $value }} MB, indicating potential memory pressure."
+
+  - alert: LivingCodexMemoryLeakDetected
+    expr: increase(codex_memory_usage_mb[30m]) > 200
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Potential memory leak detected"
+      description: "Memory usage increased by {{ $value }} MB in the last 30 minutes."
+
+  - alert: LivingCodexHighActiveSessions
+    expr: codex_active_sessions_total > 5000
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High number of active sessions"
+      description: "There are {{ $value }} active sessions, consider scaling."
+
+  - alert: LivingCodexHighRevokedTokens
+    expr: codex_revoked_tokens_total > 10000
+    for: 5m
+    labels:
+      severity: info
+    annotations:
+      summary: "High number of revoked tokens"
+      description: "There are {{ $value }} revoked tokens, cleanup may be needed."
+
+  # Graceful Shutdown Monitoring (New)
+  - alert: LivingCodexShutdownDurationHigh
+    expr: codex_shutdown_duration_seconds > 30
+    for: 0m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Graceful shutdown took longer than expected"
+      description: "Shutdown took {{ $value }} seconds, indicating background tasks may not be respecting cancellation tokens."
+
+  # Cleanup Event Monitoring (New)
+  - alert: LivingCodexCleanupEventsLow
+    expr: rate(codex_cleanup_events_total[15m]) < 0.1
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Low cleanup event rate"
+      description: "Cleanup events rate is {{ $value }} per second, modules may not be cleaning up properly."
+
   # Service Discovery Rules
   - alert: ServiceDiscoveryIssues
     expr: up{job="service-discovery"} == 0

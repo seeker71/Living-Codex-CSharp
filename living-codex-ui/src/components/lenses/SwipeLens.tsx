@@ -189,7 +189,7 @@ export function SwipeLens({ controls = {}, userId, className = '', readOnly = fa
           All caught up!
         </h3>
         <p className="text-gray-600 dark:text-gray-300">
-          You've seen all available items. Check back later for more discoveries.
+          You&apos;ve seen all available items. Check back later for more discoveries.
         </p>
       </div>
     );

@@ -6,8 +6,12 @@ import CodeEditor from './CodeEditor'
 
 interface FileNode {
   id: string
-  name?: string
-  type?: string
+  name: string
+  type: string
+  relativePath: string
+  absolutePath: string
+  size: number
+  lastModified: string
   title?: string
   content?: {
     externalUri?: string
@@ -28,12 +32,14 @@ interface CodeIDEProps {
   className?: string
   defaultSplitRatio?: number // 0.0 to 1.0, default 0.3 (30% for browser, 70% for editor)
   onFileSave?: (content: string, nodeId: string) => Promise<void>
+  initialFileNodes?: FileNode[]
 }
 
 export function CodeIDE({ 
   className = '',
   defaultSplitRatio = 0.3,
-  onFileSave
+  onFileSave,
+  initialFileNodes = []
 }: CodeIDEProps) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>()
   const [selectedFileNode, setSelectedFileNode] = useState<FileNode | undefined>()
@@ -98,6 +104,7 @@ export function CodeIDE({
           onFileSelect={handleFileSelect}
           selectedNodeId={selectedNodeId}
           className="h-full border-r border-gray-200 dark:border-gray-700"
+          initialFileNodes={initialFileNodes}
         />
       </div>
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Image from 'next/image';
 import { Heart, Share2, MessageCircle, Link2, Zap, Network, Users, TrendingUp, Clock, Star, Sparkles, ChevronDown, ChevronUp, ThumbsUp, ThumbsDown, Reply, MoreHorizontal, Bookmark, Flag } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/Card';
 import { useAttune, useAmplify } from '@/lib/hooks';
@@ -628,9 +629,11 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
                       title={`${contributor.name} - ${contributor.contribution}`}
                     >
                       {contributor.avatar ? (
-                        <img
+                        <Image
                           src={contributor.avatar}
                           alt={contributor.name}
+                          width={40}
+                          height={40}
                           className="w-full h-full rounded-full object-cover"
                         />
                       ) : (
@@ -714,7 +717,7 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
                           <div className="flex items-center space-x-2 mt-1">
                             <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-xs font-semibold">
                               {concept.lastEditedBy.avatar ? (
-                                <img src={concept.lastEditedBy.avatar} alt={concept.lastEditedBy.name} className="w-full h-full rounded-full object-cover" />
+                                <Image src={concept.lastEditedBy.avatar} alt={concept.lastEditedBy.name} width={24} height={24} className="w-full h-full rounded-full object-cover" />
                               ) : (
                                 concept.lastEditedBy.name.charAt(0).toUpperCase()
                               )}
@@ -741,7 +744,7 @@ export function ConceptStreamCard({ concept, userId, onAction }: ConceptStreamCa
                             <div key={collaborator.id} className="relative">
                               <div className="w-6 h-6 rounded-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center text-white text-xs font-semibold border-2 border-white dark:border-gray-800">
                                 {collaborator.avatar ? (
-                                  <img src={collaborator.avatar} alt={collaborator.name} className="w-full h-full rounded-full object-cover" />
+                                  <Image src={collaborator.avatar} alt={collaborator.name} width={24} height={24} className="w-full h-full rounded-full object-cover" />
                                 ) : (
                                   collaborator.name.charAt(0).toUpperCase()
                                 )}

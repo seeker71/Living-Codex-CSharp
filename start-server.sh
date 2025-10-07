@@ -139,7 +139,7 @@ wait_for_server() {
         fi
         
         # Check if server is responding
-        if curl -s "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
+        if curl -s --connect-timeout 2 --max-time 5 "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
             local end_time=$(date +%s)
             local startup_time=$((end_time - start_time))
             echo -e "\r✅ Server is ready! (startup time: ${startup_time}s)                                        "
@@ -162,6 +162,10 @@ wait_for_server() {
     echo "❌ Server failed to start within ${total_time} seconds"
     echo "📋 Checking logs for startup issues..."
     tail -n 30 "$LOG_FILE" 2>/dev/null || echo "No logs available"
+    echo "🔍 Debugging information:"
+    echo "   - Port $PORT status: $(lsof -Pi :$PORT -sTCP:LISTEN 2>/dev/null | wc -l) listeners"
+    echo "   - Server process status: $(kill -0 $server_pid 2>/dev/null && echo "running" || echo "not running")"
+    echo "   - Health endpoint test: $(curl -s --connect-timeout 2 --max-time 5 "http://127.0.0.1:$PORT/health" >/dev/null 2>&1 && echo "responding" || echo "not responding")"
     return 1
 }
 
@@ -170,28 +174,25 @@ test_server() {
     echo "🧪 Testing server endpoints..."
     
     # Test health endpoint
-    echo "Testing /health..."
-    if curl -s "http://127.0.0.1:$PORT/health" | jq '.registrationMetrics' >/dev/null 2>&1; then
-        echo "✅ Health endpoint working"
+    if curl -s --connect-timeout 5 --max-time 10 "http://127.0.0.1:$PORT/health" | jq '.registrationMetrics' >/dev/null 2>&1; then
+        echo "✅ /health endpoint working"
     else
-        echo "❌ Health endpoint failed"
+        echo "❌ /health endpoint failed"
         return 1
     fi
     
     # Test AI health endpoint (non-fatal)
-    echo "Testing /ai/health..."
-    if curl -s "http://127.0.0.1:$PORT/ai/health" >/dev/null 2>&1; then
-        echo "✅ AI health endpoint working"
+    if curl -s --connect-timeout 3 --max-time 5 "http://127.0.0.1:$PORT/ai/health" >/dev/null 2>&1; then
+        echo "✅ /ai/health endpoint working"
     else
-        echo "⚠️  AI health endpoint failed (continuing)"
+        echo "⚠️  /ai/health endpoint failed (continuing)"
     fi
     
     # Test spec endpoints (non-fatal)
-    echo "Testing /spec/modules..."
-    if curl -s "http://127.0.0.1:$PORT/spec/modules" >/dev/null 2>&1; then
-        echo "✅ Spec modules endpoint working"
+    if curl -s --connect-timeout 3 --max-time 5 "http://127.0.0.1:$PORT/spec/modules" >/dev/null 2>&1; then
+        echo "✅ /spec/modules endpoint working"
     else
-        echo "⚠️  Spec modules endpoint failed (continuing)"
+        echo "⚠️  /spec/modules endpoint failed (continuing)"
     fi
     
     echo "✅ All endpoint tests passed!"
@@ -362,48 +363,25 @@ main() {
     fi
     echo "✅ Build successful"
     
-    # Create binary directory and copy the built binary
-    echo "📦 Copying binary to top-level folder..."
-    mkdir -p "$BINARY_DIR"
-    
-    # Copy the entire output directory to avoid dependency issues
-    if [ -d "$PROJECT_DIR/bin/Release/net6.0" ]; then
-        echo "📁 Copying from: $PROJECT_DIR/bin/Release/net6.0"
-        echo "📁 Copying to: $BINARY_DIR"
-        cp -r "$PROJECT_DIR/bin/Release/net6.0/"* "$BINARY_DIR/"
-        echo "✅ Binary copied successfully"
-    else
-        echo "❌ Build output directory not found: $PROJECT_DIR/bin/Release/net6.0"
-        exit 1
-    fi
-    
-    # Change to binary directory to run from there
-    cd "$BINARY_DIR"
-    echo "📁 Changed to binary directory: $(pwd)"
+    # Stay in project directory for proper dependency resolution
+    echo "📁 Running from project directory for proper dependency resolution"
     
     # Start the server with logging
-    echo "🚀 Starting server on port $PORT..."
-    echo "📝 Logs will be written to: $LOG_FILE"
-    echo "📺 Use 'tail -f $LOG_FILE' to monitor logs"
+    echo "🚀 Starting server on port $PORT (logs: $LOG_FILE)..."
     
     # Start server with logging to file
-    # Run the copied binary directly to avoid build blocking
-    # Ensure correct content root for config/spec discovery
+    # Use dotnet run for proper dependency resolution
     export ASPNETCORE_CONTENTROOT="$PROJECT_DIR"
     if [ "$1" = "--watch" ] || [ "$1" = "-w" ]; then
         echo "🔄 Starting with hot-reload (development mode)..."
-        # For watch mode, we still need to go back to project directory
-        cd "$PROJECT_DIR"
-        dotnet watch run --hot-reload --urls "http://127.0.0.1:$PORT" --configuration Release -- --contentRoot "$PROJECT_DIR" > "$LOG_FILE" 2>&1 &
+        dotnet watch run --hot-reload --urls "http://127.0.0.1:$PORT" --configuration Release > "$LOG_FILE" 2>&1 &
     else
-        echo "🚀 Starting in production mode from copied binary..."
-        # Run the copied binary directly
-        dotnet CodexBootstrap.dll --urls "http://127.0.0.1:$PORT" --contentRoot "$PROJECT_DIR" > "$LOG_FILE" 2>&1 &
+        echo "🚀 Starting in production mode..."
+        dotnet run --urls "http://127.0.0.1:$PORT" --configuration Release > "$LOG_FILE" 2>&1 &
     fi
     SERVER_PID=$!
     
     echo "🆔 Server PID: $SERVER_PID"
-    echo "📝 Log file: $LOG_FILE"
     
     # Give the server a moment to start
     sleep 1
@@ -424,10 +402,8 @@ main() {
             echo "🤖 AI Health: http://127.0.0.1:$PORT/ai/health"
             echo "📋 Spec: http://127.0.0.1:$PORT/spec/modules"
             echo "📖 Swagger: http://127.0.0.1:$PORT/swagger"
-            echo "📝 Logs: $LOG_FILE"
             echo ""
-            echo "To stop the server: kill $SERVER_PID"
-            echo "To view logs: tail -f $LOG_FILE"
+            echo "To stop: kill $SERVER_PID | To view logs: tail -f $LOG_FILE"
             echo ""
             
             # Analyze startup logs for issues
@@ -440,11 +416,11 @@ main() {
             echo "   The script will now exit, leaving the server running."
             echo "   You can interact with the server immediately."
             echo ""
-        echo "📋 Note: Background initialization tasks are still running (current log only):"
-        echo "   - U-CORE ontology seeding"
-        echo "   - Reflection tree building"
-        echo "   - Edge ensurance processing"
-        echo "   Check logs for progress: tail -f $LOG_FILE"
+            echo "📋 Note: Background initialization tasks are still running:"
+            echo "   - U-CORE ontology seeding"
+            echo "   - Reflection tree building"
+            echo "   - Edge ensurance processing"
+            echo "   Check logs for progress: tail -f $LOG_FILE"
             echo ""
             
             # Server is running successfully in background - exit script

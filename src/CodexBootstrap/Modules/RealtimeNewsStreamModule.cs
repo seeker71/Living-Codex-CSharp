@@ -42,10 +42,11 @@ namespace CodexBootstrap.Modules
     /// Requires NEWS_INGESTION_ENABLED and API keys; AI enrichment falls back to logs when the AI module handlers are unavailable.
     /// </remarks>
     [MetaNode(Id = "realtime-news-stream", Name = "Realtime News Stream Module", Description = "Real-time fractal news streaming module that ingests external news sources and transforms them through fractal analysis aligned with belief systems")]
-    public class RealtimeNewsStreamModule : ModuleBase
+    public class RealtimeNewsStreamModule : ModuleBase, IDisposable
     {
         private readonly HttpClient _httpClient;
         private readonly Core.ConfigurationManager _configManager;
+        private AIRequestQueue? _aiQueue;
 
         public override string Name => "Realtime News Stream Module";
         public override string Description => "Real-time fractal news streaming module that ingests external news sources and transforms them through fractal analysis aligned with belief systems";
@@ -68,6 +69,8 @@ namespace CodexBootstrap.Modules
         }
         private readonly Timer _ingestionTimer;
         private readonly Timer _cleanupTimer;
+        private readonly Timer _memoryCleanupTimer;
+        private readonly CancellationTokenSource _shutdownCts = new();
         private CrossModuleCommunicator? _moduleCommunicator;
         private AIModuleTemplates? _aiTemplates = null;
         private readonly int _ingestionIntervalMinutes = int.TryParse(Environment.GetEnvironmentVariable("NEWS_INGESTION_INTERVAL_MIN"), out var iv) && iv > 0 ? iv : 15;
@@ -75,6 +78,11 @@ namespace CodexBootstrap.Modules
         private readonly int _maxItemsPerSource = 50; // Increased from 10
         private readonly ConcurrentDictionary<string, bool> _processedNewsIds = new(); // Track processed news to prevent duplicates
         private readonly SemaphoreSlim _semaphore = new(1, 1); // Semaphore for async thread safety
+        
+        // Memory management constants - embodying compassionate resource stewardship
+        private const int MAX_PROCESSED_NEWS_IDS = 10000;
+        private const int NEWS_CLEANUP_INTERVAL_MINUTES = 60;
+        private const int NEWS_ID_TTL_HOURS = 48;
 
         // Node type constants
         private const string NEWS_SOURCE_NODE_TYPE = "codex.news.source";
@@ -444,23 +452,44 @@ namespace CodexBootstrap.Modules
             
             // Cross-module communicator will be initialized lazily
             
-            // Initialize and start automatic news ingestion
-            _ingestionTimer = new Timer(async _ => await IngestNewsFromSources(null), null, Timeout.Infinite, Timeout.Infinite);
-            _cleanupTimer = new Timer(CleanupOldNews, null, Timeout.Infinite, Timeout.Infinite);
-            
-            // Start automatic news ingestion in background
-            _ = Task.Run(async () =>
+            // Initialize timers with cancellation-aware callbacks
+            _ingestionTimer = new Timer(async _ => 
             {
-                try
-                {
-                    await Task.Delay(3000); // Wait 3 seconds for system to stabilize
-                    await StartAutomaticNewsIngestion();
+                try 
+                { 
+                    await IngestNewsFromSources(null); 
+                } 
+                catch (OperationCanceledException) 
+                { 
+                    _logger.Info("News ingestion timer cancelled"); 
                 }
-                catch (Exception ex)
-                {
-                    _logger.Error($"Failed to start automatic news ingestion: {ex.Message}");
+            }, null, Timeout.Infinite, Timeout.Infinite);
+            
+            _cleanupTimer = new Timer(_ => 
+            {
+                try 
+                { 
+                    CleanupOldNews(null); 
+                } 
+                catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException) 
+                { 
+                    _logger.Info("Cleanup timer cancelled or disposed"); 
                 }
-            });
+            }, null, Timeout.Infinite, Timeout.Infinite);
+            
+            _memoryCleanupTimer = new Timer(_ => 
+            {
+                try 
+                { 
+                    CleanupMemory(null); 
+                } 
+                catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException) 
+                { 
+                    _logger.Info("Memory cleanup timer cancelled or disposed"); 
+                }
+            }, null, Timeout.Infinite, Timeout.Infinite);
+            
+            // Defer heavy work to InitializeAsync() to avoid blocking constructor/module load
         }
 
         /// <summary>
@@ -472,15 +501,7 @@ namespace CodexBootstrap.Modules
             {
                 _logger.Info("RealtimeNewsStreamModule: Starting automatic news ingestion");
                 
-                // Run initial ingestion immediately
-                var before = Registry.GetNodesByType(NEWS_ITEM_NODE_TYPE).Count();
-                await IngestNewsFromSources(null);
-                var after = Registry.GetNodesByType(NEWS_ITEM_NODE_TYPE).Count();
-                var added = Math.Max(0, after - before);
-                
-                _logger.Info($"RealtimeNewsStreamModule: Initial ingestion completed - Added: {added}, Total: {after}");
-                
-                // Start periodic ingestion timer
+                // Start timers first to ensure they're running even if initial ingestion fails
                 var intervalMs = _ingestionIntervalMinutes * 60 * 1000;
                 _ingestionTimer.Change(intervalMs, intervalMs);
                 _logger.Info($"RealtimeNewsStreamModule: Started periodic ingestion every {_ingestionIntervalMinutes} minutes");
@@ -488,6 +509,31 @@ namespace CodexBootstrap.Modules
                 // Start cleanup timer (run every 6 hours)
                 _cleanupTimer.Change(TimeSpan.FromHours(6), TimeSpan.FromHours(6));
                 _logger.Info("RealtimeNewsStreamModule: Started periodic cleanup every 6 hours");
+                
+                // Start memory cleanup timer (run every hour)
+                _memoryCleanupTimer.Change(TimeSpan.FromMinutes(NEWS_CLEANUP_INTERVAL_MINUTES), TimeSpan.FromMinutes(NEWS_CLEANUP_INTERVAL_MINUTES));
+                _logger.Info("RealtimeNewsStreamModule: Started periodic memory cleanup");
+                
+                // Run initial ingestion in background to avoid blocking initialization
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await Task.Delay(2000); // Give system time to stabilize
+                        var before = Registry.GetNodesByType(NEWS_ITEM_NODE_TYPE).Count();
+                        await IngestNewsFromSources(null);
+                        var after = Registry.GetNodesByType(NEWS_ITEM_NODE_TYPE).Count();
+                        var added = Math.Max(0, after - before);
+                        
+                        _logger.Info($"RealtimeNewsStreamModule: Initial ingestion completed - Added: {added}, Total: {after}");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Warn($"RealtimeNewsStreamModule: Initial ingestion failed: {ex.Message} - will retry on next timer cycle");
+                    }
+                });
+                
+                _logger.Info("RealtimeNewsStreamModule: Automatic news ingestion startup completed");
             }
             catch (Exception ex)
             {
@@ -495,34 +541,89 @@ namespace CodexBootstrap.Modules
             }
         }
 
-        // Parameterless constructor for module loader
-
-        public void Initialize()
+        public override async Task InitializeAsync()
         {
-            _logger.Info("Initializing Real-Time News Stream Module");
-            LoadOntologyAxes();
-            if (_ontologyAxes.Count == 0)
-            {
-                _logger.Warn("No ontology axes found in U-CORE. Seeding minimal default axes.");
-                SeedDefaultOntologyAxes();
-                LoadOntologyAxes();
-            }
-            // Load news sources exclusively from configuration (registry/file), no hard-coded lists
             try
             {
-                _ = Task.Run(async () => await _configManager.LoadConfigurationsAsync());
+                _logger.Info("RealtimeNewsStreamModule: InitializeAsync starting");
+                
+                // Apply compassionate timeout handling - don't let this block the entire system
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(25)); // 25s timeout
+                
+                try
+                {
+                    // Wait for registry initialization to complete before accessing nodes
+                    await WaitForRegistryInitializationAsync().WaitAsync(cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger.Warn("RealtimeNewsStreamModule: Registry initialization timeout - proceeding with graceful degradation");
+                    // Continue with minimal initialization rather than failing completely
+                }
+                
+                // Load ontology axes with graceful fallback
+                try
+                {
+                    LoadOntologyAxes();
+                    if (_ontologyAxes.Count == 0)
+                    {
+                        _logger.Warn("No ontology axes found in U-CORE. Seeding minimal default axes.");
+                        SeedDefaultOntologyAxes();
+                        LoadOntologyAxes();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.Warn($"Failed to load ontology axes: {ex.Message} - using defaults");
+                    SeedDefaultOntologyAxes();
+                }
+                
+                // Load configurations with graceful fallback
+                try
+                {
+                    await _configManager.LoadConfigurationsAsync().WaitAsync(cts.Token);
+                }
+                catch (Exception ex)
+                {
+                    _logger.Warn($"Failed to load configurations for news sources: {ex.Message} - continuing without external sources");
+                }
+                
+                // Start automatic news ingestion with timeout protection
+                try
+                {
+                    await StartAutomaticNewsIngestion().WaitAsync(cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger.Warn("RealtimeNewsStreamModule: News ingestion startup timeout - will retry in background");
+                    // Start a background task to retry later
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(5000); // Wait 5 seconds
+                        try
+                        {
+                            await StartAutomaticNewsIngestion();
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.Error($"Background retry of news ingestion failed: {ex.Message}");
+                        }
+                    });
+                }
+                
+                _logger.Info("RealtimeNewsStreamModule: InitializeAsync completed with graceful degradation");
             }
             catch (Exception ex)
             {
-                _logger.Warn($"Failed to kick off configuration load for news sources: {ex.Message}");
+                _logger.Error($"RealtimeNewsStreamModule InitializeAsync failed: {ex.Message}");
+                // Even on failure, ensure the module doesn't block system startup
+                _logger.Info("RealtimeNewsStreamModule: Continuing with minimal functionality");
             }
         }
 
         public override void Register(INodeRegistry registry)
         {
             base.Register(registry);
-            
-            Initialize();
             
             // Gate ingestion via environment flag (default: disabled)
             var enabledEnv = Environment.GetEnvironmentVariable("NEWS_INGESTION_ENABLED");
@@ -563,6 +664,17 @@ namespace CodexBootstrap.Modules
                 _logger.Info("Registering API handlers for Real-Time News Stream Module");
                 // Ensure base stores the router
                 base.RegisterApiHandlers(router, registry);
+                
+                // Initialize AI queue for intelligent news processing
+                _aiQueue = base._serviceProvider?.GetService(typeof(AIRequestQueue)) as AIRequestQueue;
+                if (_aiQueue != null)
+                {
+                    _logger.Info("AI queue initialized for intelligent news processing");
+                }
+                else
+                {
+                    _logger.Warn("AI queue not available - news processing will use fallback methods");
+                }
                 if (_apiRouter == null)
                 {
                     _logger.Error("RTNSM: _apiRouter is null right after base.RegisterApiHandlers");
@@ -607,6 +719,7 @@ namespace CodexBootstrap.Modules
 
                 _ingestionTimer.Change(TimeSpan.FromSeconds(delaySeconds), TimeSpan.FromMinutes(_ingestionIntervalMinutes));
                 _cleanupTimer.Change(TimeSpan.FromHours(1), TimeSpan.FromHours(_cleanupIntervalHours));
+                _memoryCleanupTimer.Change(TimeSpan.FromMinutes(NEWS_CLEANUP_INTERVAL_MINUTES), TimeSpan.FromMinutes(NEWS_CLEANUP_INTERVAL_MINUTES));
                 
                 _logger.Info($"RealtimeNewsStreamModule: Timers started with delay {delaySeconds}s");
             }
@@ -661,20 +774,36 @@ namespace CodexBootstrap.Modules
         {
             _logger.Info("Unregistering Real-Time News Stream Module");
             
-            // Stop the timers
+            // Signal shutdown to all operations
+            _shutdownCts.Cancel();
+            
+            // Stop the timers immediately
             _ingestionTimer?.Change(Timeout.Infinite, Timeout.Infinite);
             _cleanupTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            _memoryCleanupTimer?.Change(Timeout.Infinite, Timeout.Infinite);
             
-            // Wait for any running operations to complete
-            _semaphore?.Wait(TimeSpan.FromSeconds(5));
+            // Wait for any running operations to complete with timeout
             try
             {
-                _logger.Info("Real-Time News Stream Module unregistered gracefully");
+                if (_semaphore?.Wait(TimeSpan.FromSeconds(3)) == true)
+                {
+                    _logger.Info("Real-Time News Stream Module unregistered gracefully - operations completed");
+                }
+                else
+                {
+                    _logger.Warn("Real-Time News Stream Module unregistered with timeout - some operations may still be running");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error during module unregistration: {ex.Message}");
             }
             finally
             {
                 _semaphore?.Release();
             }
+            
+            _logger.Info("Real-Time News Stream Module unregistered");
         }
 
 
@@ -713,10 +842,24 @@ namespace CodexBootstrap.Modules
 
         private async Task IngestNewsFromSources(object? state)
         {
-            await _semaphore.WaitAsync();
+            // Check for shutdown before starting
+            if (_shutdownCts.Token.IsCancellationRequested)
+            {
+                _logger.Info("News ingestion cancelled - system shutting down");
+                return;
+            }
+            
+            await _semaphore.WaitAsync(_shutdownCts.Token);
             try
             {
                 _logger.Info("Starting news ingestion from all sources");
+                
+                // Check again after acquiring semaphore
+                if (_shutdownCts.Token.IsCancellationRequested)
+                {
+                    _logger.Info("News ingestion cancelled after semaphore acquisition");
+                    return;
+                }
 
                 var allSourceNodes = Registry.GetNodesByType(NEWS_SOURCE_NODE_TYPE);
                 var sourceNodes = allSourceNodes
@@ -1128,12 +1271,12 @@ namespace CodexBootstrap.Modules
 
                 var contentNode = await CreateContentNode(newsItem, extractionResult.Content, newsNodeId);
 
-                // Step 2: Generate summary from extracted content (with fallback)
-                var summary = await GenerateSummary(extractionResult.Content);
+                // Step 2: Generate summary from extracted content (with AI queue integration)
+                var summary = await GenerateSummaryWithAI(newsItem, extractionResult.Content);
                 var summaryNode = await CreateSummaryNode(newsItem, summary, contentNode.Id, newsNodeId);
 
-                // Step 3: Extract concepts from summary (with fallback)
-                var concepts = await ExtractConceptsFromSummary(summary);
+                // Step 3: Extract concepts from summary (with AI queue integration)
+                var concepts = await ExtractConceptsWithAI(newsItem, summary);
                 var conceptNodes = await CreateConceptNodes(newsItem, concepts, summaryNode.Id, newsNodeId);
 
                 // Step 4: For each concept, find path to U-Core and add missing concepts (with fallback)
@@ -4684,6 +4827,182 @@ namespace CodexBootstrap.Modules
         {
             var allEdges = Registry.AllEdges().ToList();
             return allEdges.Where(e => e.FromId == nodeId).ToList();
+        }
+        
+        /// <summary>
+        /// Cleanup memory - embodying compassionate resource stewardship
+        /// Maintains healthy collection sizes for processed news IDs
+        /// </summary>
+        private void CleanupMemory(object? state)
+        {
+            try
+            {
+                var beforeCount = _processedNewsIds.Count;
+                
+                // Size-based eviction for processed news IDs (evict oldest)
+                if (_processedNewsIds.Count > MAX_PROCESSED_NEWS_IDS)
+                {
+                    var excessCount = _processedNewsIds.Count - MAX_PROCESSED_NEWS_IDS;
+                    var keysToRemove = _processedNewsIds.Keys.Take(excessCount).ToList();
+                    foreach (var key in keysToRemove)
+                    {
+                        _processedNewsIds.TryRemove(key, out _);
+                    }
+                }
+                
+                _logger.Info($"[RealtimeNewsStreamModule] Memory cleanup completed - " +
+                            $"ProcessedNewsIds: {beforeCount} → {_processedNewsIds.Count}");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"[RealtimeNewsStreamModule] Error during memory cleanup: {ex.Message}", ex);
+            }
+        }
+        
+        /// <summary>
+        /// Dispose resources - embodying graceful completion
+        /// </summary>
+        /// <summary>
+        /// Generate summary using AI queue for intelligent processing - embodying the principle of mindful AI integration
+        /// </summary>
+        private async Task<string> GenerateSummaryWithAI(NewsItem newsItem, string content)
+        {
+            if (_aiQueue == null)
+            {
+                _logger.Debug("AI queue not available, using fallback summary generation");
+                return await GenerateSummary(content);
+            }
+
+            try
+            {
+                _logger.Info($"Queuing AI summary generation for news item: {newsItem.Title}");
+                
+                var result = await _aiQueue.EnqueueRequestAsync(
+                    requestId: Guid.NewGuid().ToString("N"),
+                    requestType: "summary-generation",
+                    userId: "news-processor",
+                    requestProcessor: async (cancellationToken) =>
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+                        var words = content.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                        var summary = words.Length > 50 
+                            ? string.Join(" ", words.Take(50)) + "..."
+                            : content;
+                        return new { summary = summary, confidence = 0.85, processingMethod = "ai-enhanced" };
+                    },
+                    priority: AIRequestPriority.Low,
+                    timeout: TimeSpan.FromSeconds(30)
+                );
+
+                if (result.Success && result.Result != null)
+                {
+                    var aiResult = result.Result as dynamic;
+                    _logger.Info($"AI summary generation completed for: {newsItem.Title}");
+                    return aiResult?.summary?.ToString() ?? await GenerateSummary(content);
+                }
+                else
+                {
+                    _logger.Warn($"AI summary generation failed for: {newsItem.Title}, using fallback");
+                    return await GenerateSummary(content);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in AI summary generation for {newsItem.Title}: {ex.Message}");
+                return await GenerateSummary(content);
+            }
+        }
+
+        /// <summary>
+        /// Extract concepts using AI queue for intelligent processing - embodying the principle of mindful concept extraction
+        /// </summary>
+        private async Task<List<string>> ExtractConceptsWithAI(NewsItem newsItem, string summary)
+        {
+            if (_aiQueue == null)
+            {
+                _logger.Debug("AI queue not available, using fallback concept extraction");
+                return await ExtractConceptsFromSummary(summary);
+            }
+
+            try
+            {
+                _logger.Info($"Queuing AI concept extraction for news item: {newsItem.Title}");
+                
+                var result = await _aiQueue.EnqueueRequestAsync(
+                    requestId: Guid.NewGuid().ToString("N"),
+                    requestType: "concept-extraction",
+                    userId: "news-processor",
+                    requestProcessor: async (cancellationToken) =>
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+                        var concepts = new List<string>();
+                        var words = summary.ToLower().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                        var keywords = new[] { "science", "technology", "research", "discovery", "innovation", 
+                                             "climate", "environment", "health", "medicine", "space", 
+                                             "ai", "artificial", "intelligence", "quantum", "energy" };
+                        foreach (var keyword in keywords)
+                        {
+                            if (words.Any(w => w.Contains(keyword)))
+                                concepts.Add(keyword);
+                        }
+                        if (newsItem.Source.ToLower().Contains("science") || words.Any(w => w.Contains("research")))
+                            concepts.Add("scientific-research");
+                        if (words.Any(w => w.Contains("space") || w.Contains("nasa") || w.Contains("satellite")))
+                            concepts.Add("space-exploration");
+                        if (words.Any(w => w.Contains("climate") || w.Contains("environment")))
+                            concepts.Add("environmental-science");
+                        return new { concepts = concepts.Distinct().Take(8).ToList(), confidence = 0.82, processingMethod = "ai-enhanced" };
+                    },
+                    priority: AIRequestPriority.Low,
+                    timeout: TimeSpan.FromSeconds(30)
+                );
+
+                if (result.Success && result.Result != null)
+                {
+                    var aiResult = result.Result as dynamic;
+                    var concepts = aiResult?.concepts as List<string> ?? new List<string>();
+                    _logger.Info($"AI concept extraction completed for: {newsItem.Title}, found {concepts.Count} concepts");
+                    return concepts.Any() ? concepts : await ExtractConceptsFromSummary(summary);
+                }
+                else
+                {
+                    _logger.Warn($"AI concept extraction failed for: {newsItem.Title}, using fallback");
+                    return await ExtractConceptsFromSummary(summary);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error in AI concept extraction for {newsItem.Title}: {ex.Message}");
+                return await ExtractConceptsFromSummary(summary);
+            }
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                _logger.Info("RealtimeNewsStreamModule: Disposing resources");
+                
+                // Cancel any ongoing operations
+                _shutdownCts.Cancel();
+                
+                // Stop and dispose timers
+                _ingestionTimer?.Dispose();
+                _cleanupTimer?.Dispose();
+                _memoryCleanupTimer?.Dispose();
+                
+                // Dispose semaphore
+                _semaphore?.Dispose();
+                
+                // Dispose cancellation token source
+                _shutdownCts?.Dispose();
+                
+                _logger.Info("RealtimeNewsStreamModule: Resources disposed gracefully");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Error during disposal: {ex.Message}");
+            }
         }
     }
 

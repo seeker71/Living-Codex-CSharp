@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication;
@@ -30,21 +31,38 @@ public sealed class IdentityModule : ModuleBase
     private readonly IdentityProviderRegistry _providerRegistry;
     private readonly string _jwtSecret;
     private readonly int _tokenExpirationHours;
-    private readonly Dictionary<string, UserSession> _activeSessions;
-    private readonly HashSet<string> _revokedTokens;
+    private readonly ConcurrentDictionary<string, UserSession> _activeSessions;
+    private readonly ConcurrentDictionary<string, DateTime> _revokedTokens; // Track revocation time for cleanup
+    private Timer? _cleanupTimer;
+    
+    // Memory management constants
+    private const int MAX_ACTIVE_SESSIONS = 10000;
+    private const int MAX_REVOKED_TOKENS = 50000;
+    private const int CLEANUP_INTERVAL_MINUTES = 15;
+    private const int REVOKED_TOKEN_TTL_HOURS = 48;
 
     public override string Name => "Identity Module";
     public override string Description => "Unified identity, authentication, and access management system";
     public override string Version => "2.0.0";
 
-    public IdentityModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
+    public IdentityModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient)
         : base(registry, logger)
     {
         _providerRegistry = new IdentityProviderRegistry(logger);
         _jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? "default-jwt-secret-key-for-development-only";
         _tokenExpirationHours = int.TryParse(Environment.GetEnvironmentVariable("JWT_EXPIRATION_HOURS"), out var hours) ? hours : 24;
-        _activeSessions = new Dictionary<string, UserSession>();
-        _revokedTokens = new HashSet<string>();
+        _activeSessions = new ConcurrentDictionary<string, UserSession>();
+        _revokedTokens = new ConcurrentDictionary<string, DateTime>();
+        
+        // Start cleanup timer to prevent memory leaks
+        _cleanupTimer = new Timer(
+            CleanupExpiredData,
+            null,
+            TimeSpan.FromMinutes(5), // First cleanup after 5 minutes
+            TimeSpan.FromMinutes(CLEANUP_INTERVAL_MINUTES)
+        );
+        
+        _logger.Info($"IdentityModule initialized with cleanup every {CLEANUP_INTERVAL_MINUTES} minutes");
     }
 
     /// <summary>
@@ -579,9 +597,9 @@ public sealed class IdentityModule : ModuleBase
                 return new { success = false, message = "Token is required" };
             }
 
-            // Revoke token
-            _revokedTokens.Add(request.Token);
-            _activeSessions.Remove(request.Token);
+            // Revoke token (track revocation time for cleanup)
+            _revokedTokens.TryAdd(request.Token, DateTime.UtcNow);
+            _activeSessions.TryRemove(request.Token, out _);
 
             // Update user's last activity
             var claims = ValidateJwtTokenSecure(request.Token);
@@ -614,7 +632,7 @@ public sealed class IdentityModule : ModuleBase
             }
 
             // Check if token is revoked
-            if (_revokedTokens.Contains(request.Token))
+            if (_revokedTokens.ContainsKey(request.Token))
             {
                 return new AuthTokenValidationResponse(false, null, "Token has been revoked");
             }
@@ -667,6 +685,62 @@ public sealed class IdentityModule : ModuleBase
         {
             _logger.Error($"Get profile error: {ex.Message}", ex);
             return new { success = false, message = "Failed to get user profile" };
+        }
+    }
+
+    [ApiRoute("PUT", "/auth/profile/{userId}", "UpdateAuthUserProfile", "Update user profile", "codex.identity")]
+    public async Task<object> UpdateAuthUserProfileAsync(
+        [ApiParameter("userId", "User ID", Location = "path")] string userId,
+        [ApiParameter("body", "Profile update data")] AuthProfileUpdateRequest request)
+    {
+        try
+        {
+            var userNode = Registry.GetNode(userId);
+            if (userNode == null)
+            {
+                return new { success = false, message = "User not found" };
+            }
+
+            // Update user node meta
+            var updatedMeta = new Dictionary<string, object>(userNode.Meta);
+            
+            if (request.DisplayName != null)
+                updatedMeta["displayName"] = request.DisplayName;
+            
+            if (request.Email != null)
+                updatedMeta["email"] = request.Email;
+            
+            if (request.Bio != null)
+                updatedMeta["bio"] = request.Bio;
+            
+            if (request.Location != null)
+                updatedMeta["location"] = request.Location;
+            
+            if (request.AvatarUrl != null)
+                updatedMeta["avatarUrl"] = request.AvatarUrl;
+            
+            if (request.CoverImageUrl != null)
+                updatedMeta["coverImageUrl"] = request.CoverImageUrl;
+            
+            if (request.Interests != null)
+                updatedMeta["interests"] = request.Interests;
+            
+            updatedMeta["lastModified"] = DateTimeOffset.UtcNow;
+
+            // Create updated node
+            var updatedNode = userNode with { Meta = updatedMeta };
+            
+            // Save to registry
+            Registry.Upsert(updatedNode);
+            
+            _logger.Info($"Updated auth profile for user {userId}");
+            
+            return new { success = true, message = "Profile updated successfully" };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Update profile error: {ex.Message}", ex);
+            return new { success = false, message = $"Failed to update profile: {ex.Message}" };
         }
     }
 
@@ -879,7 +953,11 @@ public sealed class IdentityModule : ModuleBase
             CreatedAt: userNode.Meta.ContainsKey("createdAt") ? (DateTime)userNode.Meta["createdAt"] : DateTime.MinValue,
             LastLoginAt: userNode.Meta.ContainsKey("lastLoginAt") ? (DateTime?)userNode.Meta["lastLoginAt"] : null,
             IsActive: userNode.Meta.ContainsKey("isActive") ? (bool)userNode.Meta["isActive"] : false,
-            Status: userNode.Meta["status"]?.ToString() ?? "unknown"
+            Status: userNode.Meta["status"]?.ToString() ?? "unknown",
+            Bio: userNode.Meta.ContainsKey("bio") ? userNode.Meta["bio"]?.ToString() : null,
+            Location: userNode.Meta.ContainsKey("location") ? userNode.Meta["location"]?.ToString() : null,
+            AvatarUrl: userNode.Meta.ContainsKey("avatarUrl") ? userNode.Meta["avatarUrl"]?.ToString() : null,
+            CoverImageUrl: userNode.Meta.ContainsKey("coverImageUrl") ? userNode.Meta["coverImageUrl"]?.ToString() : null
         );
     }
 
@@ -889,17 +967,30 @@ public sealed class IdentityModule : ModuleBase
                userNode.Meta.ContainsKey("status") && userNode.Meta["status"]?.ToString() == "active";
     }
 
+    /// <summary>
+    /// Hash password using BCrypt with automatic salt generation
+    /// Work factor of 12 provides good security/performance balance
+    /// </summary>
     private string HashPasswordSecure(string password)
     {
-        using var sha256 = SHA256.Create();
-        var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password + _jwtSecret));
-        return Convert.ToBase64String(hashedBytes);
+        return BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12);
     }
 
+    /// <summary>
+    /// Verify password against BCrypt hash
+    /// BCrypt automatically handles salt extraction
+    /// </summary>
     private bool VerifyPasswordSecure(string password, string storedHash)
     {
-        var hash = HashPasswordSecure(password);
-        return hash == storedHash;
+        try
+        {
+            return BCrypt.Net.BCrypt.Verify(password, storedHash);
+        }
+        catch
+        {
+            // Invalid hash format
+            return false;
+        }
     }
 
     private string GenerateJwtTokenSecure(string userId, string username, string email)
@@ -1013,8 +1104,8 @@ public sealed class IdentityModule : ModuleBase
         var userSessions = _activeSessions.Where(kvp => kvp.Value.UserId == userId).ToList();
         foreach (var session in userSessions)
         {
-            _revokedTokens.Add(session.Key);
-            _activeSessions.Remove(session.Key);
+            _revokedTokens.TryAdd(session.Key, DateTime.UtcNow);
+            _activeSessions.TryRemove(session.Key, out _);
         }
     }
 
@@ -1067,6 +1158,108 @@ public sealed class IdentityModule : ModuleBase
     private string GenerateSessionToken(string userId)
     {
         return $"session-{userId}-{DateTime.UtcNow.Ticks}";
+    }
+    
+    /// <summary>
+    /// Cleanup expired sessions and revoked tokens to prevent memory leaks
+    /// Runs every 15 minutes via timer
+    /// </summary>
+    private void CleanupExpiredData(object? state)
+    {
+        try
+        {
+            var now = DateTime.UtcNow;
+            var cleaned = 0;
+            
+            // Cleanup expired sessions
+            var expiredSessions = _activeSessions
+                .Where(kvp => kvp.Value.ExpiresAt < now)
+                .Select(kvp => kvp.Key)
+                .ToList();
+                
+            foreach (var sessionId in expiredSessions)
+            {
+                if (_activeSessions.TryRemove(sessionId, out _))
+                {
+                    cleaned++;
+                }
+            }
+            
+            // Cleanup old revoked tokens (older than 48 hours)
+            var tokenCutoff = now.AddHours(-REVOKED_TOKEN_TTL_HOURS);
+            var expiredTokens = _revokedTokens
+                .Where(kvp => kvp.Value < tokenCutoff)
+                .Select(kvp => kvp.Key)
+                .ToList();
+                
+            foreach (var token in expiredTokens)
+            {
+                if (_revokedTokens.TryRemove(token, out _))
+                {
+                    cleaned++;
+                }
+            }
+            
+            // Size-based eviction if collections too large (safety limit)
+            if (_activeSessions.Count > MAX_ACTIVE_SESSIONS)
+            {
+                var toRemove = _activeSessions
+                    .OrderBy(kvp => kvp.Value.LastActivity)
+                    .Take(_activeSessions.Count - MAX_ACTIVE_SESSIONS)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+                    
+                foreach (var key in toRemove)
+                {
+                    if (_activeSessions.TryRemove(key, out _))
+                    {
+                        cleaned++;
+                    }
+                }
+                
+                _logger.Warn($"Session limit exceeded ({MAX_ACTIVE_SESSIONS}), evicted {toRemove.Count} oldest sessions");
+            }
+            
+            if (_revokedTokens.Count > MAX_REVOKED_TOKENS)
+            {
+                var toRemove = _revokedTokens
+                    .OrderBy(kvp => kvp.Value)
+                    .Take(_revokedTokens.Count - MAX_REVOKED_TOKENS)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+                    
+                foreach (var key in toRemove)
+                {
+                    if (_revokedTokens.TryRemove(key, out _))
+                    {
+                        cleaned++;
+                    }
+                }
+                
+                _logger.Warn($"Revoked token limit exceeded ({MAX_REVOKED_TOKENS}), evicted {toRemove.Count} oldest tokens");
+            }
+            
+            // Log cleanup statistics
+            if (cleaned > 0 || _activeSessions.Count > 100 || _revokedTokens.Count > 100)
+            {
+                _logger.Info($"[MemoryCleanup] Removed {cleaned} expired entries. " +
+                            $"Active sessions: {_activeSessions.Count}, " +
+                            $"Revoked tokens: {_revokedTokens.Count}, " +
+                            $"Memory: {GC.GetTotalMemory(false) / 1024 / 1024} MB");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Cleanup error: {ex.Message}", ex);
+        }
+    }
+    
+    /// <summary>
+    /// Dispose cleanup timer
+    /// </summary>
+    public void Dispose()
+    {
+        _cleanupTimer?.Dispose();
     }
 }
 
@@ -1146,6 +1339,17 @@ public record AuthChangePasswordRequest(
     [property: JsonPropertyName("newPassword")] string NewPassword
 );
 
+[MetaNode(Id = "codex.auth.profile-update-request", Name = "Auth Profile Update Request", Description = "User profile update request")]
+public record AuthProfileUpdateRequest(
+    [property: JsonPropertyName("displayName")] string? DisplayName = null,
+    [property: JsonPropertyName("email")] string? Email = null,
+    [property: JsonPropertyName("bio")] string? Bio = null,
+    [property: JsonPropertyName("location")] string? Location = null,
+    [property: JsonPropertyName("interests")] string[]? Interests = null,
+    [property: JsonPropertyName("avatarUrl")] string? AvatarUrl = null,
+    [property: JsonPropertyName("coverImageUrl")] string? CoverImageUrl = null
+);
+
 [MetaNode(Id = "codex.auth.response", Name = "Auth Response", Description = "Generic authentication response")]
 public record AuthResponse(
     [property: JsonPropertyName("success")] bool Success,
@@ -1180,7 +1384,11 @@ public record AuthUserProfile(
     [property: JsonPropertyName("createdAt")] DateTime CreatedAt,
     [property: JsonPropertyName("lastLoginAt")] DateTime? LastLoginAt,
     [property: JsonPropertyName("isActive")] bool IsActive,
-    [property: JsonPropertyName("status")] string Status
+    [property: JsonPropertyName("status")] string Status,
+    [property: JsonPropertyName("bio")] string? Bio = null,
+    [property: JsonPropertyName("location")] string? Location = null,
+    [property: JsonPropertyName("avatarUrl")] string? AvatarUrl = null,
+    [property: JsonPropertyName("coverImageUrl")] string? CoverImageUrl = null
 );
 
 [MetaNode(Id = "codex.auth.user-session", Name = "User Session", Description = "User session information")]
