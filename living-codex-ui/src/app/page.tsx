@@ -48,9 +48,25 @@ export default function HomePage() {
           <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
             Meet people who amplify them. See the world&apos;s news through a living ontology.
           </p>
-          <p className="text-lg text-gray-500 dark:text-gray-400 mb-8">
+          <p className="text-lg text-gray-500 dark:text-gray-400 mb-6">
             Everything is a Node. Explore concepts, people, and moments connected by resonance.
           </p>
+          
+          {/* Quick Links */}
+          <div className="flex gap-4 justify-center mb-8">
+            <a
+              href="/graph"
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+            >
+              🌐 Explore Knowledge Graph
+            </a>
+            <a
+              href="/nodes"
+              className="px-6 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors font-semibold"
+            >
+              📊 Browse All Nodes
+            </a>
+          </div>
         </div>
 
         {/* Controls and Stream */}
