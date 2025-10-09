@@ -66,7 +66,7 @@ public class SystemMetricsModule : ModuleBase
     }
 
     [Get("/metrics", "Get System Metrics", "Get comprehensive system metrics", "metrics")]
-    public async Task<object> GetSystemMetricsAsync(JsonElement? request)
+    public async Task<IResult> GetSystemMetricsAsync(JsonElement? request)
     {
         try
         {
@@ -112,17 +112,17 @@ public class SystemMetricsModule : ModuleBase
                 }
             };
 
-            return metrics;
+            return Results.Ok(metrics);
         }
         catch (Exception ex)
         {
             _logger.Error("Error getting system metrics", ex);
-            return new { success = false, error = ex.Message };
+            return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
         }
     }
 
     [Get("/metrics/health", "Get System Health", "Get detailed system health status", "metrics")]
-    public async Task<object> GetSystemHealthAsync(JsonElement? request)
+    public async Task<IResult> GetSystemHealthAsync(JsonElement? request)
     {
         try
         {
@@ -149,17 +149,17 @@ public class SystemMetricsModule : ModuleBase
                 }
             };
 
-            return health;
+            return Results.Ok(health);
         }
         catch (Exception ex)
         {
             _logger.Error("Error getting system health", ex);
-            return new { success = false, error = ex.Message };
+            return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
         }
     }
 
     [Get("/metrics/performance", "Get Performance Metrics", "Get detailed performance metrics", "metrics")]
-    public async Task<object> GetPerformanceMetricsAsync(JsonElement? request)
+    public async Task<IResult> GetPerformanceMetricsAsync(JsonElement? request)
     {
         try
         {
@@ -215,17 +215,17 @@ public class SystemMetricsModule : ModuleBase
                 }
             };
 
-            return performance;
+            return Results.Ok(performance);
         }
         catch (Exception ex)
         {
             _logger.Error("Error getting performance metrics", ex);
-            return new { success = false, error = ex.Message };
+            return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
         }
     }
 
     [Get("/metrics/modules", "Get Module Metrics", "Get metrics for all loaded modules", "metrics")]
-    public async Task<object> GetModuleMetricsAsync(JsonElement? request)
+    public async Task<IResult> GetModuleMetricsAsync(JsonElement? request)
     {
         try
         {
@@ -258,17 +258,17 @@ public class SystemMetricsModule : ModuleBase
                 modules = modules
             };
 
-            return moduleMetrics;
+            return Results.Ok(moduleMetrics);
         }
         catch (Exception ex)
         {
             _logger.Error("Error getting module metrics", ex);
-            return new { success = false, error = ex.Message };
+            return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
         }
     }
 
     [Get("/metrics/prometheus", "Get Prometheus Metrics", "Get metrics in Prometheus format", "metrics")]
-    public async Task<object> GetPrometheusMetricsAsync(JsonElement? request)
+    public async Task<IResult> GetPrometheusMetricsAsync(JsonElement? request)
     {
         try
         {
@@ -320,19 +320,19 @@ public class SystemMetricsModule : ModuleBase
 
             var prometheusData = string.Join("\n", prometheusMetrics);
             
-            return new
+            return Results.Ok(new
             {
                 success = true,
                 message = "Prometheus metrics retrieved successfully",
                 timestamp = DateTime.UtcNow,
                 format = "prometheus",
                 data = prometheusData
-            };
+            });
         }
         catch (Exception ex)
         {
             _logger.Error("Error getting Prometheus metrics", ex);
-            return new { success = false, error = ex.Message };
+            return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
         }
     }
 
