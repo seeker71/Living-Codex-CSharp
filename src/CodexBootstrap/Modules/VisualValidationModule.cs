@@ -55,13 +55,13 @@ namespace CodexBootstrap.Modules
         /// Render UI component to image and store as node
         /// </summary>
         [ApiRoute("POST", "/visual-validation/render-component", "visual-render-component", "Render UI component to image", "visual-validation")]
-        public async Task<object> RenderComponentToImage([ApiParameter("request", "Render component request", Required = true, Location = "body")] RenderComponentRequest request)
+        public async Task<IResult> RenderComponentToImage([ApiParameter("request", "Render component request", Required = true, Location = "body")] RenderComponentRequest request)
         {
             try
             {
                 if (string.IsNullOrEmpty(request.ComponentId) || string.IsNullOrEmpty(request.ComponentCode))
                 {
-                    return new { success = false, error = "Component ID and code are required" };
+                    return Results.BadRequest(new { success = false, error = "Component ID and code are required" });
                 }
 
                 // Generate a temporary HTML file for rendering
@@ -104,7 +104,7 @@ namespace CodexBootstrap.Modules
 
                 _logger.Info($"Rendered component {request.ComponentId} to image");
 
-                return new
+                return Results.Ok(new
                 {
                     success = true,
                     data = new
@@ -115,12 +115,12 @@ namespace CodexBootstrap.Modules
                         renderedAt = DateTimeOffset.UtcNow,
                         message = $"Component {request.ComponentId} rendered successfully"
                     }
-                };
+                });
             }
             catch (Exception ex)
             {
                 _logger.Error($"Error rendering component to image: {ex.Message}", ex);
-                return new { success = false, error = ex.Message };
+                return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
             }
         }
 
@@ -128,19 +128,19 @@ namespace CodexBootstrap.Modules
         /// Analyze rendered image against spec vision using AI
         /// </summary>
         [ApiRoute("POST", "/visual-validation/analyze-image", "visual-analyze-image", "Analyze rendered image against spec vision", "visual-validation")]
-        public async Task<object> AnalyzeRenderedImage([ApiParameter("request", "Analyze image request", Required = true, Location = "body")] AnalyzeImageRequest request)
+        public async Task<IResult> AnalyzeRenderedImage([ApiParameter("request", "Analyze image request", Required = true, Location = "body")] AnalyzeImageRequest request)
         {
             try
             {
                 if (string.IsNullOrEmpty(request.ImageNodeId) || string.IsNullOrEmpty(request.SpecVision))
                 {
-                    return new { success = false, error = "Image node ID and spec vision are required" };
+                    return Results.BadRequest(new { success = false, error = "Image node ID and spec vision are required" });
                 }
 
                 // Get the rendered image node
                 if (!_registry.TryGet(request.ImageNodeId, out var imageNode))
                 {
-                    return new { success = false, error = $"Image node {request.ImageNodeId} not found" };
+                    return Results.BadRequest(new { success = false, error = $"Image node {request.ImageNodeId} not found" });
                 }
 
                 // Get base64 image data from the stored node
@@ -154,12 +154,12 @@ namespace CodexBootstrap.Modules
                     }
                     else
                     {
-                        return new { success = false, error = "Base64 image data not found in node content" };
+                        return Results.BadRequest(new { success = false, error = "Base64 image data not found in node content" });
                     }
                 }
                 else
                 {
-                    return new { success = false, error = "Node content is null" };
+                    return Results.BadRequest(new { success = false, error = "Node content is null" });
                 }
 
                 // Create visual analysis prompt
@@ -283,7 +283,7 @@ Return your analysis as JSON with scores and detailed feedback.
 
                 _logger.Info($"Analyzed rendered image {request.ImageNodeId} with overall score {analysisResult.OverallScore}");
 
-                return new
+                return Results.Ok(new
                 {
                     success = true,
                     data = new
@@ -291,12 +291,12 @@ Return your analysis as JSON with scores and detailed feedback.
                         analysis = analysisResult,
                         message = $"Image analysis completed with overall score {analysisResult.OverallScore}"
                     }
-                };
+                });
             }
             catch (Exception ex)
             {
                 _logger.Error($"Error analyzing rendered image: {ex.Message}", ex);
-                return new { success = false, error = ex.Message };
+                return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
             }
         }
 
@@ -304,13 +304,13 @@ Return your analysis as JSON with scores and detailed feedback.
         /// Validate component against spec and trigger re-generation if needed
         /// </summary>
         [ApiRoute("POST", "/visual-validation/validate-component", "visual-validate-component", "Validate component against spec and trigger re-generation if needed", "visual-validation")]
-        public async Task<object> ValidateComponentAgainstSpec([ApiParameter("request", "Validate component request", Required = true, Location = "body")] ValidateComponentRequest request)
+        public async Task<IResult> ValidateComponentAgainstSpec([ApiParameter("request", "Validate component request", Required = true, Location = "body")] ValidateComponentRequest request)
         {
             try
             {
                 if (string.IsNullOrEmpty(request.ComponentId))
                 {
-                    return new { success = false, error = "Component ID is required" };
+                    return Results.BadRequest(new { success = false, error = "Component ID is required" });
                 }
 
                 // Get the latest visual analysis for this component
@@ -322,7 +322,7 @@ Return your analysis as JSON with scores and detailed feedback.
 
                 if (!analysisNodes.Any())
                 {
-                    return new { success = false, error = $"No visual analysis found for component {request.ComponentId}" };
+                    return Results.BadRequest(new { success = false, error = $"No visual analysis found for component {request.ComponentId}" });
                 }
 
                 var latestAnalysis = JsonSerializer.Deserialize<VisualAnalysisResult>(
@@ -371,7 +371,7 @@ Return your analysis as JSON with scores and detailed feedback.
 
                 _logger.Info($"Validated component {request.ComponentId}: Passed={validationResult.Passed}, Score={validationResult.OverallScore}");
 
-                return new
+                return Results.Ok(new
                 {
                     success = true,
                     data = new
@@ -381,12 +381,12 @@ Return your analysis as JSON with scores and detailed feedback.
                             $"Component {request.ComponentId} passed validation" : 
                             $"Component {request.ComponentId} failed validation and should be regenerated"
                     }
-                };
+                });
             }
             catch (Exception ex)
             {
                 _logger.Error($"Error validating component: {ex.Message}", ex);
-                return new { success = false, error = ex.Message };
+                return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
             }
         }
 
@@ -394,7 +394,7 @@ Return your analysis as JSON with scores and detailed feedback.
         /// Execute full visual validation pipeline
         /// </summary>
         [ApiRoute("POST", "/visual-validation/pipeline", "visual-validation-pipeline", "Execute full visual validation pipeline", "visual-validation")]
-        public async Task<object> ExecuteVisualValidationPipeline([ApiParameter("request", "Visual validation pipeline request", Required = true, Location = "body")] VisualValidationPipelineRequest request)
+        public async Task<IResult> ExecuteVisualValidationPipeline([ApiParameter("request", "Visual validation pipeline request", Required = true, Location = "body")] VisualValidationPipelineRequest request)
         {
             try
             {
@@ -487,7 +487,7 @@ Return your analysis as JSON with scores and detailed feedback.
 
                 _logger.Info($"Executed visual validation pipeline for component {request.ComponentId}, success: {allSuccessful}");
 
-                return new
+                return Results.Ok(new
                 {
                     success = allSuccessful,
                     data = new
@@ -497,12 +497,12 @@ Return your analysis as JSON with scores and detailed feedback.
                         message = allSuccessful ? "Visual validation pipeline completed successfully" : "Visual validation pipeline completed with errors",
                         timestamp = DateTimeOffset.UtcNow
                     }
-                };
+                });
             }
             catch (Exception ex)
             {
                 _logger.Error($"Error executing visual validation pipeline: {ex.Message}", ex);
-                return new { success = false, error = ex.Message };
+                return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
             }
         }
 
