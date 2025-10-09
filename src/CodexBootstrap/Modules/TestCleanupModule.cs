@@ -51,14 +51,14 @@ public class TestCleanupModule : ModuleBase
     /// </summary>
     [ApiRoute("POST", "/test/cleanup/users", "CleanupTestUsers", "Delete test users by pattern", "codex.test.cleanup")]
     [AlwaysAvailable] // Allow in degraded mode
-    public async Task<object> CleanupTestUsersAsync([ApiParameter("body", "Cleanup request")] CleanupRequest request)
+    public async Task<IResult> CleanupTestUsersAsync([ApiParameter("body", "Cleanup request")] CleanupRequest request)
     {
         try
         {
             var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
             if (environment != "Testing" && environment != "Development")
             {
-                return new { success = false, error = "Test cleanup only available in Testing/Development environments" };
+                return Results.BadRequest(new { success = false, error = "Test cleanup only available in Testing/Development environments" });
             }
 
             var pattern = request.Pattern ?? "^(testuser|test_)";
@@ -85,12 +85,12 @@ public class TestCleanupModule : ModuleBase
                 }
             }
             
-            return new { success = true, deletedCount = deletedCount, pattern = pattern };
+            return Results.Ok(new { success = true, deletedCount = deletedCount, pattern = pattern });
         }
         catch (Exception ex)
         {
             _logger.Error($"Error cleaning up test users: {ex.Message}", ex);
-            return new { success = false, error = ex.Message };
+                return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
         }
     }
 
@@ -99,14 +99,14 @@ public class TestCleanupModule : ModuleBase
     /// </summary>
     [ApiRoute("POST", "/test/cleanup/concepts", "CleanupTestConcepts", "Delete test concepts by pattern", "codex.test.cleanup")]
     [AlwaysAvailable]
-    public async Task<object> CleanupTestConceptsAsync([ApiParameter("body", "Cleanup request")] CleanupRequest request)
+    public async Task<IResult> CleanupTestConceptsAsync([ApiParameter("body", "Cleanup request")] CleanupRequest request)
     {
         try
         {
             var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
             if (environment != "Testing" && environment != "Development")
             {
-                return new { success = false, error = "Test cleanup only available in Testing/Development environments" };
+                return Results.BadRequest(new { success = false, error = "Test cleanup only available in Testing/Development environments" });
             }
 
             var pattern = request.Pattern ?? "test";
@@ -134,12 +134,12 @@ public class TestCleanupModule : ModuleBase
                 }
             }
             
-            return new { success = true, deletedCount = deletedCount, pattern = pattern };
+            return Results.Ok(new { success = true, deletedCount = deletedCount, pattern = pattern });
         }
         catch (Exception ex)
         {
             _logger.Error($"Error cleaning up test concepts: {ex.Message}", ex);
-            return new { success = false, error = ex.Message };
+                return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
         }
     }
 
@@ -148,14 +148,14 @@ public class TestCleanupModule : ModuleBase
     /// </summary>
     [ApiRoute("POST", "/test/cleanup/edges", "CleanupTestEdges", "Delete test edges by pattern", "codex.test.cleanup")]
     [AlwaysAvailable]
-    public async Task<object> CleanupTestEdgesAsync([ApiParameter("body", "Cleanup request")] CleanupRequest request)
+    public async Task<IResult> CleanupTestEdgesAsync([ApiParameter("body", "Cleanup request")] CleanupRequest request)
     {
         try
         {
             var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
             if (environment != "Testing" && environment != "Development")
             {
-                return new { success = false, error = "Test cleanup only available in Testing/Development environments" };
+                return Results.BadRequest(new { success = false, error = "Test cleanup only available in Testing/Development environments" });
             }
 
             var pattern = request.Pattern ?? "test";
@@ -181,12 +181,12 @@ public class TestCleanupModule : ModuleBase
                 }
             }
             
-            return new { success = true, deletedCount = deletedCount, pattern = pattern };
+            return Results.Ok(new { success = true, deletedCount = deletedCount, pattern = pattern });
         }
         catch (Exception ex)
         {
             _logger.Error($"Error cleaning up test edges: {ex.Message}", ex);
-            return new { success = false, error = ex.Message };
+                return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
         }
     }
 
@@ -195,14 +195,14 @@ public class TestCleanupModule : ModuleBase
     /// </summary>
     [ApiRoute("POST", "/test/reset", "ResetTestDatabase", "Reset entire test database", "codex.test.cleanup")]
     [AlwaysAvailable]
-    public async Task<object> ResetTestDatabaseAsync()
+    public async Task<IResult> ResetTestDatabaseAsync()
     {
         try
         {
             var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
             if (environment != "Testing")
             {
-                return new { success = false, error = "Database reset only available in Testing environment" };
+                return Results.BadRequest(new { success = false, error = "Database reset only available in Testing environment" });
             }
 
             _logger.Warn("⚠️ RESETTING TEST DATABASE ⚠️");
@@ -212,18 +212,18 @@ public class TestCleanupModule : ModuleBase
             var conceptsResult = await CleanupTestConceptsAsync(new CleanupRequest { Pattern = ".*" });
             var edgesResult = await CleanupTestEdgesAsync(new CleanupRequest { Pattern = ".*" });
             
-            return new { 
+            return Results.Ok(new { 
                 success = true, 
                 message = "Test database reset complete",
                 users = usersResult,
                 concepts = conceptsResult,
                 edges = edgesResult
-            };
+            });
         }
         catch (Exception ex)
         {
             _logger.Error($"Error resetting test database: {ex.Message}", ex);
-            return new { success = false, error = ex.Message };
+                return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
         }
     }
 }
