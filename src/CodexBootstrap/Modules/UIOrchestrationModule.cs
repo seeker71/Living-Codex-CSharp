@@ -50,13 +50,13 @@ namespace CodexBootstrap.Modules
         /// Compose: Create minimal UI page atoms from user intent
         /// </summary>
         [ApiRoute("POST", "/ui-orchestration/compose-page", "ui-compose-page", "Create minimal UI page atoms from intent", "ui-orchestration")]
-        public async Task<object> ComposeUIPage([ApiParameter("request", "Compose page request", Required = true, Location = "body")] ComposePageRequest request)
+        public async Task<IResult> ComposeUIPage([ApiParameter("request", "Compose page request", Required = true, Location = "body")] ComposePageRequest request)
         {
             try
             {
                 if (string.IsNullOrEmpty(request.Intent))
                 {
-                    return new { success = false, error = "Intent is required" };
+                    return Results.BadRequest(new { success = false, error = "Intent is required" });
                 }
 
                 // Create minimal UI page atom based on intent
@@ -102,7 +102,7 @@ namespace CodexBootstrap.Modules
 
                 _logger.Info($"Composed UI page atom: {pageId}");
 
-                return new
+                return Results.Ok(new
                 {
                     success = true,
                     data = new
@@ -111,12 +111,12 @@ namespace CodexBootstrap.Modules
                         message = $"UI page atom composed for intent: {request.Intent}",
                         timestamp = DateTimeOffset.UtcNow
                     }
-                };
+                });
             }
             catch (Exception ex)
             {
                 _logger.Error($"Error composing UI page: {ex.Message}", ex);
-                return new { success = false, error = ex.Message };
+                return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
             }
         }
 
@@ -124,19 +124,19 @@ namespace CodexBootstrap.Modules
         /// Expand: Generate components via AI
         /// </summary>
         [ApiRoute("POST", "/ui-orchestration/expand-components", "ui-expand-components", "Generate components via AI", "ui-orchestration")]
-        public async Task<object> ExpandUIComponents([ApiParameter("request", "Expand components request", Required = true, Location = "body")] ExpandComponentsRequest request)
+        public async Task<IResult> ExpandUIComponents([ApiParameter("request", "Expand components request", Required = true, Location = "body")] ExpandComponentsRequest request)
         {
             try
             {
                 if (string.IsNullOrEmpty(request.PageId))
                 {
-                    return new { success = false, error = "Page ID is required" };
+                    return Results.BadRequest(new { success = false, error = "Page ID is required" });
                 }
 
                 // Get the page atom
                 if (!_registry.TryGet(request.PageId, out var pageNode))
                 {
-                    return new { success = false, error = $"Page atom {request.PageId} not found" };
+                    return Results.BadRequest(new { success = false, error = $"Page atom {request.PageId} not found" });
                 }
 
                 var pageAtom = JsonSerializer.Deserialize<JsonElement>(pageNode.Content?.InlineJson ?? "{}");
@@ -181,7 +181,7 @@ namespace CodexBootstrap.Modules
 
                 _logger.Info($"Expanded UI components for page: {request.PageId}, generated {generatedComponents.Count} components");
 
-                return new
+                return Results.Ok(new
                 {
                     success = true,
                     data = new
@@ -191,12 +191,12 @@ namespace CodexBootstrap.Modules
                         message = $"Generated {generatedComponents.Count} components for page {request.PageId}",
                         timestamp = DateTimeOffset.UtcNow
                     }
-                };
+                });
             }
             catch (Exception ex)
             {
                 _logger.Error($"Error expanding UI components: {ex.Message}", ex);
-                return new { success = false, error = ex.Message };
+                return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
             }
         }
 
@@ -204,13 +204,13 @@ namespace CodexBootstrap.Modules
         /// Validate: Test generated components with visual validation
         /// </summary>
         [ApiRoute("POST", "/ui-orchestration/validate-components", "ui-validate-components", "Test generated components with visual validation", "ui-orchestration")]
-        public async Task<object> ValidateUIComponents([ApiParameter("request", "Validate components request", Required = true, Location = "body")] ValidateComponentsRequest request)
+        public async Task<IResult> ValidateUIComponents([ApiParameter("request", "Validate components request", Required = true, Location = "body")] ValidateComponentsRequest request)
         {
             try
             {
                 if (string.IsNullOrEmpty(request.PageId))
                 {
-                    return new { success = false, error = "Page ID is required" };
+                    return Results.BadRequest(new { success = false, error = "Page ID is required" });
                 }
 
                 var validationResults = new List<object>();
@@ -298,7 +298,7 @@ namespace CodexBootstrap.Modules
 
                 _logger.Info($"Validated {validationResults.Count} components for page: {request.PageId}");
 
-                return new
+                return Results.Ok(new
                 {
                     success = true,
                     data = new
@@ -308,12 +308,12 @@ namespace CodexBootstrap.Modules
                         message = $"Validated {validationResults.Count} components",
                         timestamp = DateTimeOffset.UtcNow
                     }
-                };
+                });
             }
             catch (Exception ex)
             {
                 _logger.Error($"Error validating UI components: {ex.Message}", ex);
-                return new { success = false, error = ex.Message };
+                return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
             }
         }
 
@@ -321,7 +321,7 @@ namespace CodexBootstrap.Modules
         /// Execute full breath loop for UI generation
         /// </summary>
         [ApiRoute("POST", "/ui-orchestration/breath-loop", "ui-breath-loop", "Execute full breath loop for UI generation", "ui-orchestration")]
-        public async Task<object> ExecuteBreathLoop([ApiParameter("request", "Breath loop request", Required = true, Location = "body")] UIBreathLoopRequest request)
+        public async Task<IResult> ExecuteBreathLoop([ApiParameter("request", "Breath loop request", Required = true, Location = "body")] UIBreathLoopRequest request)
         {
             try
             {
@@ -383,7 +383,7 @@ namespace CodexBootstrap.Modules
 
                 _logger.Info($"Executed breath loop for intent: {request.Intent}, success: {allSuccessful}");
 
-                return new
+                return Results.Ok(new
                 {
                     success = allSuccessful,
                     data = new
@@ -393,12 +393,12 @@ namespace CodexBootstrap.Modules
                         message = allSuccessful ? "Breath loop completed successfully" : "Breath loop completed with errors",
                         timestamp = DateTimeOffset.UtcNow
                     }
-                };
+                });
             }
             catch (Exception ex)
             {
                 _logger.Error($"Error executing breath loop: {ex.Message}", ex);
-                return new { success = false, error = ex.Message };
+                return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
             }
         }
     }
