@@ -414,34 +414,34 @@ namespace CodexBootstrap.Modules
         /// Hot reloads a module
         /// </summary>
         [ApiRoute("POST", "/self-update/hot-reload", "hot-reload-module", "Hot reload a module with backup and rollback", "self-update")]
-        public async Task<object> HotReloadModuleAsync([ApiParameter("body", "Hot reload request")] HotReloadRequest request)
+        public async Task<IResult> HotReloadModuleAsync([ApiParameter("body", "Hot reload request")] HotReloadRequest request)
         {
             try
             {
                 if (_stableCore == null || _logger == null || _hotReloadManager == null)
                 {
-                    return new { success = false, error = "Self-update system not initialized - dependencies not injected" };
+                    return Results.Json(new { success = false, error = "Self-update system not initialized - dependencies not injected" }, statusCode: 503);
                 }
 
                 if (string.IsNullOrEmpty(request.ModuleName))
                 {
-                    return new { success = false, error = "Module name is required" };
+                    return Results.BadRequest(new { success = false, error = "Module name is required" });
                 }
 
                 if (string.IsNullOrEmpty(request.DllPath))
                 {
-                    return new { success = false, error = "DLL path is required" };
+                    return Results.BadRequest(new { success = false, error = "DLL path is required" });
                 }
 
                 if (!File.Exists(request.DllPath))
                 {
-                    return new { success = false, error = "DLL file not found" };
+                    return Results.NotFound(new { success = false, error = "DLL file not found" });
                 }
 
                 // Check if module is stable (core module)
                 if (_stableCore.IsModuleStable(request.ModuleName))
                 {
-                    return new { success = false, error = "Cannot hot reload stable core modules" };
+                    return Results.Json(new { success = false, error = "Cannot hot reload stable core modules" }, statusCode: 403);
                 }
 
                 _logger.Info($"Hot reloading module {request.ModuleName} from {request.DllPath}");
@@ -450,30 +450,30 @@ namespace CodexBootstrap.Modules
                 
                 if (hotReloadResult.Success)
                 {
-                    return new
+                    return Results.Ok(new
                     {
                         success = true,
                         message = "Module hot reloaded successfully",
                         timestamp = DateTime.UtcNow,
                         moduleName = request.ModuleName,
                         dllPath = hotReloadResult.DllPath
-                    };
+                    });
                 }
                 else
                 {
-                    return new
+                    return Results.Json(new
                     {
                         success = false,
                         error = hotReloadResult.ErrorMessage,
                         timestamp = DateTime.UtcNow,
                         moduleName = request.ModuleName
-                    };
+                    }, statusCode: 500);
                 }
             }
             catch (Exception ex)
             {
                 _logger.Error($"Error hot reloading module {request.ModuleName}", ex);
-                return new { success = false, error = ex.Message };
+                return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
             }
         }
 
@@ -481,13 +481,13 @@ namespace CodexBootstrap.Modules
         /// Gets module backups
         /// </summary>
         [Get("/self-update/backups", "Get Module Backups", "Get all module backups", "self-update")]
-        public async Task<object> GetModuleBackupsAsync()
+        public async Task<IResult> GetModuleBackupsAsync()
         {
             try
             {
                 if (_hotReloadManager == null)
                 {
-                    return new { success = false, error = "Self-update system not initialized - dependencies not injected" };
+                    return Results.Json(new { success = false, error = "Self-update system not initialized - dependencies not injected" }, statusCode: 503);
                 }
 
                 var backups = _hotReloadManager.GetAllBackups();
@@ -500,19 +500,19 @@ namespace CodexBootstrap.Modules
                     isEmpty = b.IsEmpty
                 }).ToList();
 
-                return new
+                return Results.Ok(new
                 {
                     success = true,
                     message = "Module backups retrieved successfully",
                     timestamp = DateTime.UtcNow,
                     backups = backupList,
                     totalCount = backupList.Count
-                };
+                });
             }
             catch (Exception ex)
             {
                 _logger.Error("Error getting module backups", ex);
-                return new { success = false, error = ex.Message };
+                return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
             }
         }
 
