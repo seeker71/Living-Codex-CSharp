@@ -27,13 +27,13 @@ public class MicrosoftOAuthProvider : IIdentityProvider
     public string ProviderName => "microsoft";
     public bool IsEnabled => false; // Disabled by default
 
-    public async Task<object> InitiateLogin(string? returnUrl = null)
+    public async Task<IResult> InitiateLogin(string? returnUrl = null)
     {
         try
         {
             if (!IsEnabled)
             {
-                return new { success = false, error = "Microsoft OAuth not configured" };
+                return Results.Json(new { success = false, error = "Microsoft OAuth not configured" }, statusCode: 503);
             }
 
             var state = Guid.NewGuid().ToString("N");
@@ -56,19 +56,19 @@ public class MicrosoftOAuthProvider : IIdentityProvider
 
             _logger.Info($"Microsoft OAuth: Initiated login with state {state}");
 
-            return new
+            return Results.Ok(new
             {
                 success = true,
                 provider = "microsoft",
                 loginUrl = authUrl,
                 state = state,
                 message = "Microsoft OAuth login initiated successfully"
-            };
+            });
         }
         catch (Exception ex)
         {
             _logger.Error($"Microsoft OAuth: Error initiating login: {ex.Message}", ex);
-            return new { success = false, error = "Failed to initiate Microsoft OAuth login" };
+            return Results.Json(new { success = false, error = "Failed to initiate Microsoft OAuth login" }, statusCode: 500);
         }
     }
 

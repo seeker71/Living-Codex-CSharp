@@ -84,7 +84,7 @@ public class IdentityProviderRegistry
 public interface IIdentityProvider
 {
     string ProviderName { get; }
-    Task<object> InitiateLogin(string? returnUrl = null);
+    Task<IResult> InitiateLogin(string? returnUrl = null);
     Task<IdentityCallbackResponse> HandleCallbackAsync(string code, string state, string? returnUrl = null);
     Task<object?> GetUserInfoAsync(string accessToken);
     bool IsEnabled { get; }
@@ -107,17 +107,17 @@ public class OAuthIdentityProvider : IIdentityProvider
     public string ProviderName => _providerName;
     public bool IsEnabled => true; // Would be configured based on environment
 
-    public async Task<object> InitiateLogin(string? returnUrl = null)
+    public async Task<IResult> InitiateLogin(string? returnUrl = null)
     {
         // This would integrate with actual OAuth providers
         // For now, return a placeholder response
-        return new
+        return Results.Ok(new
         {
             success = true,
             provider = _providerName,
             loginUrl = $"/oauth/{_providerName}/login?returnUrl={returnUrl}",
             message = $"OAuth login for {_providerName} not yet implemented"
-        };
+        });
     }
 
     public async Task<IdentityCallbackResponse> HandleCallbackAsync(string code, string state, string? returnUrl = null)

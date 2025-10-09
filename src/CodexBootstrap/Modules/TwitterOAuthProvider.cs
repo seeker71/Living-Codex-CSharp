@@ -27,13 +27,13 @@ public class TwitterOAuthProvider : IIdentityProvider
     public string ProviderName => "twitter";
     public bool IsEnabled => false; // Disabled by default
 
-    public async Task<object> InitiateLogin(string? returnUrl = null)
+    public async Task<IResult> InitiateLogin(string? returnUrl = null)
     {
         try
         {
             if (!IsEnabled)
             {
-                return new { success = false, error = "Twitter OAuth not configured" };
+                return Results.Json(new { success = false, error = "Twitter OAuth not configured" }, statusCode: 503);
             }
 
             var state = Guid.NewGuid().ToString("N");
@@ -57,19 +57,19 @@ public class TwitterOAuthProvider : IIdentityProvider
 
             _logger.Info($"Twitter OAuth: Initiated login with state {state}");
 
-            return new
+            return Results.Ok(new
             {
                 success = true,
                 provider = "twitter",
                 loginUrl = authUrl,
                 state = state,
                 message = "Twitter OAuth login initiated successfully"
-            };
+            });
         }
         catch (Exception ex)
         {
             _logger.Error($"Twitter OAuth: Error initiating login: {ex.Message}", ex);
-            return new { success = false, error = "Failed to initiate Twitter OAuth login" };
+            return Results.Json(new { success = false, error = "Failed to initiate Twitter OAuth login" }, statusCode: 500);
         }
     }
 

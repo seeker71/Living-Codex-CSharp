@@ -27,13 +27,13 @@ public class FacebookOAuthProvider : IIdentityProvider
     public string ProviderName => "facebook";
     public bool IsEnabled => false; // Disabled by default
 
-    public async Task<object> InitiateLogin(string? returnUrl = null)
+    public async Task<IResult> InitiateLogin(string? returnUrl = null)
     {
         try
         {
             if (!IsEnabled)
             {
-                return new { success = false, error = "Facebook OAuth not configured" };
+                return Results.Json(new { success = false, error = "Facebook OAuth not configured" }, statusCode: 503);
             }
 
             var state = Guid.NewGuid().ToString("N");
@@ -53,19 +53,19 @@ public class FacebookOAuthProvider : IIdentityProvider
 
             _logger.Info($"Facebook OAuth: Initiated login with state {state}");
 
-            return new
+            return Results.Ok(new
             {
                 success = true,
                 provider = "facebook",
                 loginUrl = authUrl,
                 state = state,
                 message = "Facebook OAuth login initiated successfully"
-            };
+            });
         }
         catch (Exception ex)
         {
             _logger.Error($"Facebook OAuth: Error initiating login: {ex.Message}", ex);
-            return new { success = false, error = "Failed to initiate Facebook OAuth login" };
+            return Results.Json(new { success = false, error = "Failed to initiate Facebook OAuth login" }, statusCode: 500);
         }
     }
 

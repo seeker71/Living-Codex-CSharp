@@ -27,13 +27,13 @@ public class GoogleOAuthProvider : IIdentityProvider
     public string ProviderName => "google";
     public bool IsEnabled => true; // Always enabled for testing
 
-    public async Task<object> InitiateLogin(string? returnUrl = null)
+    public async Task<IResult> InitiateLogin(string? returnUrl = null)
     {
         try
         {
             if (!IsEnabled)
             {
-                return new { success = false, error = "Google OAuth not configured" };
+                return Results.Json(new { success = false, error = "Google OAuth not configured" }, statusCode: 503);
             }
 
             var state = Guid.NewGuid().ToString("N");
@@ -58,19 +58,19 @@ public class GoogleOAuthProvider : IIdentityProvider
 
             _logger.Info($"Google OAuth: Initiated login with state {state}");
 
-            return new
+            return Results.Ok(new
             {
                 success = true,
                 provider = "google",
                 loginUrl = authUrl,
                 state = state,
                 message = "Google OAuth login initiated successfully"
-            };
+            });
         }
         catch (Exception ex)
         {
             _logger.Error($"Google OAuth: Error initiating login: {ex.Message}", ex);
-            return new { success = false, error = "Failed to initiate Google OAuth login" };
+            return Results.Json(new { success = false, error = "Failed to initiate Google OAuth login" }, statusCode: 500);
         }
     }
 
