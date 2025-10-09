@@ -445,7 +445,7 @@ public class ConceptModule : ModuleBase
                 updatedAt = DateTime.UtcNow
             };
 
-            return new { success = true, concept = concept, message = "Concept created successfully" };
+            return new { success = true, conceptId = conceptNode.Id, concept = concept, message = "Concept created successfully" };
         }
         catch (Exception ex)
         {
