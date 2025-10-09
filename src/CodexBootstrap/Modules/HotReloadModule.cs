@@ -96,13 +96,13 @@ public sealed class HotReloadModule : ModuleBase
 
     // Start watching for file changes
     [ApiRoute("POST", "/hot-reload/start", "hot-reload-start-watching", "Start hot-reload file watching", "codex.hot-reload")]
-    public async Task<object> StartWatching([ApiParameter("body", "Watch configuration", Required = true, Location = "body")] WatchConfig config)
+    public async Task<IResult> StartWatching([ApiParameter("body", "Watch configuration", Required = true, Location = "body")] WatchConfig config)
     {
         try
         {
             if (_isWatching)
             {
-                return new { success = false, error = "Already watching for changes" };
+                return Results.BadRequest(new { success = false, error = "Already watching for changes" });
             }
 
             var watchPaths = config.Paths ?? new List<string> 
@@ -149,24 +149,24 @@ public sealed class HotReloadModule : ModuleBase
             }
 
             _isWatching = true;
-            return new 
+            return Results.Ok(new 
             { 
                 success = true, 
                 message = "Hot-reload watching started",
                 watchedPaths = watchPaths.Count,
                 timestamp = DateTime.UtcNow
-            };
+            });
         }
         catch (Exception ex)
         {
             _logger.Error($"Error starting hot-reload watching: {ex.Message}", ex);
-            return new { success = false, error = ex.Message };
+            return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
         }
     }
 
     // Stop watching for file changes
     [ApiRoute("POST", "/hot-reload/stop", "hot-reload-stop-watching", "Stop hot-reload file watching", "codex.hot-reload")]
-    public async Task<object> StopWatching()
+    public async Task<IResult> StopWatching()
     {
         try
         {
@@ -178,27 +178,27 @@ public sealed class HotReloadModule : ModuleBase
             _watchers.Clear();
             _isWatching = false;
 
-            return new 
+            return Results.Ok(new 
             { 
                 success = true, 
                 message = "Hot-reload watching stopped",
                 timestamp = DateTime.UtcNow
-            };
+            });
         }
         catch (Exception ex)
         {
             _logger.Error($"Error stopping hot-reload watching: {ex.Message}", ex);
-            return new { success = false, error = ex.Message };
+            return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
         }
     }
 
     // Get hot-reload status
     [ApiRoute("GET", "/hot-reload/status", "hot-reload-get-status", "Get hot-reload status", "codex.hot-reload")]
-    public async Task<object> GetStatus()
+    public async Task<IResult> GetStatus()
     {
         try
         {
-            return new
+            return Results.Ok(new
             {
                 success = true,
                 isWatching = _isWatching,
@@ -206,24 +206,24 @@ public sealed class HotReloadModule : ModuleBase
                 componentCount = _componentRegistry.Count,
                 recentEvents = _reloadHistory.TakeLast(10).ToArray(),
                 timestamp = DateTime.UtcNow
-            };
+            });
         }
         catch (Exception ex)
         {
             _logger.Error($"Error getting hot-reload status: {ex.Message}", ex);
-            return new { success = false, error = ex.Message };
+            return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
         }
     }
 
     // Manually trigger component regeneration
     [ApiRoute("POST", "/hot-reload/regenerate", "hot-reload-regenerate-component", "AI-regenerate component from spec", "codex.hot-reload")]
-    public async Task<object> RegenerateComponent([ApiParameter("body", "Regeneration request", Required = true, Location = "body")] RegenerationRequest request)
+    public async Task<IResult> RegenerateComponent([ApiParameter("body", "Regeneration request", Required = true, Location = "body")] RegenerationRequest request)
     {
         try
         {
             if (string.IsNullOrEmpty(request.ComponentId))
             {
-                return new { success = false, error = "Component ID is required" };
+                return Results.BadRequest(new { success = false, error = "Component ID is required" });
             }
 
             // Call AI module to regenerate the component
@@ -267,7 +267,7 @@ public sealed class HotReloadModule : ModuleBase
                         if (_reloadHistory.Count > 100) _reloadHistory.Dequeue();
                     }
 
-                    return new
+                    return Results.Ok(new
                     {
                         success = true,
                         componentId = request.ComponentId,
@@ -275,34 +275,34 @@ public sealed class HotReloadModule : ModuleBase
                         aiProvider = request.Provider,
                         aiModel = request.Model,
                         timestamp = DateTime.UtcNow
-                    };
+                    });
                 }
             }
 
-            return new { success = false, error = "AI component generation failed" };
+            return Results.BadRequest(new { success = false, error = "AI component generation failed" });
         }
         catch (Exception ex)
         {
             _logger.Error($"Error regenerating component: {ex.Message}", ex);
-            return new { success = false, error = ex.Message };
+            return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
         }
     }
 
     // Hot-swap an existing component
     [ApiRoute("POST", "/hot-reload/swap", "hot-reload-hot-swap-component", "Hot-swap component code", "codex.hot-reload")]
-    public async Task<object> HotSwapComponent([ApiParameter("body", "Hot-swap request", Required = true, Location = "body")] HotSwapRequest request)
+    public async Task<IResult> HotSwapComponent([ApiParameter("body", "Hot-swap request", Required = true, Location = "body")] HotSwapRequest request)
     {
         try
         {
             if (string.IsNullOrEmpty(request.ComponentPath) || string.IsNullOrEmpty(request.NewCode))
             {
-                return new { success = false, error = "Component path and new code are required" };
+                return Results.BadRequest(new { success = false, error = "Component path and new code are required" });
             }
 
             var fullPath = Path.GetFullPath(request.ComponentPath);
             if (!File.Exists(fullPath))
             {
-                return new { success = false, error = "Component file not found" };
+                return Results.NotFound(new { success = false, error = "Component file not found" });
             }
 
             // Backup original
@@ -328,43 +328,43 @@ public sealed class HotReloadModule : ModuleBase
                 if (_reloadHistory.Count > 100) _reloadHistory.Dequeue();
             }
 
-            return new
+            return Results.Ok(new
             {
                 success = true,
                 componentPath = fullPath,
                 backupPath = backupPath,
                 timestamp = DateTime.UtcNow
-            };
+            });
         }
         catch (Exception ex)
         {
             _logger.Error($"Error hot-swapping component: {ex.Message}", ex);
-            return new { success = false, error = ex.Message };
+            return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
         }
     }
 
     // Get hot-reload history
     [ApiRoute("GET", "/hot-reload/history", "hot-reload-get-history", "Get hot-reload event history", "codex.hot-reload")]
-    public async Task<object> GetHistory([ApiParameter("limit", "Number of events to return", Required = false, Location = "query")] int limit = 50)
+    public async Task<IResult> GetHistory([ApiParameter("limit", "Number of events to return", Required = false, Location = "query")] int limit = 50)
     {
         try
         {
             lock (_lock)
             {
                 var events = _reloadHistory.TakeLast(limit).ToArray();
-                return new
+                return Results.Ok(new
                 {
                     success = true,
                     events = events,
                     totalEvents = _reloadHistory.Count,
                     timestamp = DateTime.UtcNow
-                };
+                });
             }
         }
         catch (Exception ex)
         {
             _logger.Error($"Error getting hot-reload history: {ex.Message}", ex);
-            return new { success = false, error = ex.Message };
+            return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
         }
     }
 
