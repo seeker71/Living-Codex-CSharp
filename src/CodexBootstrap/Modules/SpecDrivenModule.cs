@@ -52,18 +52,18 @@ namespace CodexBootstrap.Modules
         /// Gets the current architecture state (ice/water/gas)
         /// </summary>
         [Get("/spec-driven/architecture-state", "Get Architecture State", "Get the current state of the ice/water/gas architecture", "spec-driven")]
-        public async Task<object> GetArchitectureStateAsync()
+        public async Task<IResult> GetArchitectureStateAsync()
         {
             try
             {
                 if (_specDrivenArchitecture == null)
                 {
-                    return new { success = false, error = "Spec-driven architecture not initialized" };
+                    return Results.Json(new { success = false, error = "Spec-driven architecture not initialized" }, statusCode: 503);
                 }
 
                 var state = await _specDrivenArchitecture.GetArchitectureStateAsync();
                 
-                return new
+                return Results.Ok(new
                 {
                     success = true,
                     message = "Architecture state retrieved successfully",
@@ -104,12 +104,12 @@ namespace CodexBootstrap.Modules
                             })
                         }
                     }
-                };
+                });
             }
             catch (Exception ex)
             {
                 _logger?.Error("Error getting architecture state", ex);
-                return new { success = false, error = ex.Message };
+                return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
             }
         }
 
@@ -117,20 +117,20 @@ namespace CodexBootstrap.Modules
         /// Regenerates everything from specs (ice) - the ultimate rebuild
         /// </summary>
         [Post("/spec-driven/regenerate", "Regenerate from Specs", "Regenerate everything from specs (ice) - the ultimate rebuild", "spec-driven")]
-        public async Task<object> RegenerateFromSpecsAsync()
+        public async Task<IResult> RegenerateFromSpecsAsync()
         {
             try
             {
                 if (_specDrivenArchitecture == null)
                 {
-                    return new { success = false, error = "Spec-driven architecture not initialized" };
+                    return Results.Json(new { success = false, error = "Spec-driven architecture not initialized" }, statusCode: 503);
                 }
 
                 _logger?.Info("Starting complete regeneration from specs");
                 
                 var result = await _specDrivenArchitecture.RegenerateFromSpecsAsync();
                 
-                return new
+                return Results.Ok(new
                 {
                     success = result.Success,
                     message = result.Success ? "Complete regeneration successful" : "Regeneration failed",
@@ -144,12 +144,12 @@ namespace CodexBootstrap.Modules
                         details = s.Details
                     }),
                     error = result.ErrorMessage
-                };
+                });
             }
             catch (Exception ex)
             {
                 _logger?.Error("Error during regeneration from specs", ex);
-                return new { success = false, error = ex.Message };
+                return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
             }
         }
 
@@ -157,20 +157,20 @@ namespace CodexBootstrap.Modules
         /// Generates code from specs (ice -> water)
         /// </summary>
         [Post("/spec-driven/generate-code", "Generate Code from Specs", "Generate code from specs (ice -> water)", "spec-driven")]
-        public async Task<object> GenerateCodeFromSpecsAsync()
+        public async Task<IResult> GenerateCodeFromSpecsAsync()
         {
             try
             {
                 if (_specDrivenArchitecture == null)
                 {
-                    return new { success = false, error = "Spec-driven architecture not initialized" };
+                    return Results.Json(new { success = false, error = "Spec-driven architecture not initialized" }, statusCode: 503);
                 }
 
                 _logger?.Info("Starting code generation from specs");
                 
                 var result = await _specDrivenArchitecture.GenerateCodeFromSpecsAsync();
                 
-                return new
+                return Results.Ok(new
                 {
                     success = result.Success,
                     message = result.Success ? "Code generation successful" : "Code generation failed",
@@ -178,12 +178,12 @@ namespace CodexBootstrap.Modules
                     duration = result.Duration.TotalMilliseconds,
                     generatedFiles = result.GeneratedFiles,
                     error = result.ErrorMessage
-                };
+                });
             }
             catch (Exception ex)
             {
                 _logger?.Error("Error during code generation from specs", ex);
-                return new { success = false, error = ex.Message };
+                return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
             }
         }
 
@@ -191,20 +191,20 @@ namespace CodexBootstrap.Modules
         /// Compiles generated code to DLLs (water -> gas)
         /// </summary>
         [Post("/spec-driven/compile-code", "Compile Code to DLLs", "Compile generated code to DLLs (water -> gas)", "spec-driven")]
-        public async Task<object> CompileGeneratedCodeAsync()
+        public async Task<IResult> CompileGeneratedCodeAsync()
         {
             try
             {
                 if (_specDrivenArchitecture == null)
                 {
-                    return new { success = false, error = "Spec-driven architecture not initialized" };
+                    return Results.Json(new { success = false, error = "Spec-driven architecture not initialized" }, statusCode: 503);
                 }
 
                 _logger?.Info("Starting code compilation to DLLs");
                 
                 var result = await _specDrivenArchitecture.CompileGeneratedCodeAsync();
                 
-                return new
+                return Results.Ok(new
                 {
                     success = result.Success,
                     message = result.Success ? "Code compilation successful" : "Code compilation failed",
@@ -212,12 +212,12 @@ namespace CodexBootstrap.Modules
                     duration = result.Duration.TotalMilliseconds,
                     compiledDlls = result.CompiledDlls,
                     error = result.ErrorMessage
-                };
+                });
             }
             catch (Exception ex)
             {
                 _logger?.Error("Error during code compilation", ex);
-                return new { success = false, error = ex.Message };
+                return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
             }
         }
 
@@ -225,20 +225,20 @@ namespace CodexBootstrap.Modules
         /// Loads compiled modules into runtime
         /// </summary>
         [Post("/spec-driven/load-modules", "Load Compiled Modules", "Load compiled modules into runtime", "spec-driven")]
-        public async Task<object> LoadCompiledModulesAsync()
+        public async Task<IResult> LoadCompiledModulesAsync()
         {
             try
             {
                 if (_specDrivenArchitecture == null)
                 {
-                    return new { success = false, error = "Spec-driven architecture not initialized" };
+                    return Results.Json(new { success = false, error = "Spec-driven architecture not initialized" }, statusCode: 503);
                 }
 
                 _logger?.Info("Starting module loading");
                 
                 var result = await _specDrivenArchitecture.LoadCompiledModulesAsync();
                 
-                return new
+                return Results.Ok(new
                 {
                     success = result.Success,
                     message = result.Success ? "Module loading successful" : "Module loading failed",
@@ -246,12 +246,12 @@ namespace CodexBootstrap.Modules
                     duration = result.Duration.TotalMilliseconds,
                     loadedModules = result.LoadedModules,
                     error = result.ErrorMessage
-                };
+                });
             }
             catch (Exception ex)
             {
                 _logger?.Error("Error during module loading", ex);
-                return new { success = false, error = ex.Message };
+                return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
             }
         }
 
@@ -259,9 +259,9 @@ namespace CodexBootstrap.Modules
         /// Gets information about the spec-driven architecture
         /// </summary>
         [Get("/spec-driven/info", "Get Architecture Info", "Get information about the spec-driven architecture", "spec-driven")]
-        public async Task<object> GetArchitectureInfoAsync()
+        public async Task<IResult> GetArchitectureInfoAsync()
         {
-            return new
+            return Results.Ok(new
             {
                 success = true,
                 message = "Spec-driven architecture information",
@@ -311,7 +311,7 @@ namespace CodexBootstrap.Modules
                         "5. Repeat as needed - everything regeneratable"
                     }
                 }
-            };
+            });
         }
     }
 }
