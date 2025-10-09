@@ -1,4 +1,5 @@
 using System;
+using System.Text.Json.Serialization;
 
 namespace CodexBootstrap.Core;
 
@@ -218,26 +219,18 @@ public class ConceptDefineResponse
     name: "UserConceptLinkResponse",
     description: "Response for user-concept linking"
 )]
-public class UserConceptLinkResponse
+public record UserConceptLinkResponse(
+    [property: JsonPropertyName("success")] bool Success,
+    [property: JsonPropertyName("relationshipId")] string RelationshipId,
+    [property: JsonPropertyName("message")] string Message,
+    [property: JsonPropertyName("relationshipType")] string? RelationshipType = null,
+    [property: JsonPropertyName("weight")] double? Weight = null,
+    [property: JsonPropertyName("timestamp")] DateTime? Timestamp = null
+)
 {
-    [MetaNodeFieldAttribute("success", "boolean", Required = true, Description = "Whether linking succeeded")]
-    public bool Success { get; set; }
-
-    [MetaNodeFieldAttribute("relationshipId", "string", Required = true, Description = "Relationship identifier")]
-    public string RelationshipId { get; set; } = string.Empty;
-
-    [MetaNodeFieldAttribute("relationshipType", "string", Required = true, Description = "Type of relationship")]
-    public string RelationshipType { get; set; } = string.Empty;
-
-    [MetaNodeFieldAttribute("weight", "number", Required = true, Description = "Relationship weight")]
-    public double Weight { get; set; }
-
-    [MetaNodeFieldAttribute("message", "string", Required = true, Description = "Response message")]
-    public string Message { get; set; } = string.Empty;
-
-    [MetaNodeFieldAttribute("timestamp", "string", Required = true, Description = "Response timestamp")]
-    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
-}
+    public UserConceptLinkResponse(bool success, string relationshipId, string message)
+        : this(success, relationshipId, message, null, null, DateTime.UtcNow) { }
+};
 
 /// <summary>
 /// Breath loop response type

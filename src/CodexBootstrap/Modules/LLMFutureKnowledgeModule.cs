@@ -1148,13 +1148,17 @@ Please provide a thoughtful translation that adapts the concept to the {request.
     /// </summary>
     private void RegisterCrossServiceTranslationNodes(INodeRegistry registry)
     {
-        // Register Cross-Service Translation module node using CreateModuleNode
+        // VIRTUAL MODULE: Cross-Service Translation is a logical module (documentation/discovery node) that
+        // represents functionality integrated into LLMFutureKnowledgeModule. It doesn't have a separate C# class
+        // implementing IModule, but exists as a node for documentation, AI agent discovery, and
+        // architectural clarity. This creates an extra module node in the registry beyond the physical
+        // module count (70 C# classes vs 72+ nodes in registry).
         var crossServiceTranslationNode = CreateModuleNode(
             moduleId: "codex.llm.cross-service-translation",
             name: "Cross-Service Translation Module",
             version: "1.0.0",
             description: "Enhanced LLM translation capabilities for cross-service concept translation and validation",
-            tags: new[] { "translation", "cross-service", "llm", "validation" },
+            tags: new[] { "translation", "cross-service", "llm", "validation", "virtual-module" },
             capabilities: new[] { "cross-service-translation", "batch-translation", "translation-validation", "quality-assessment" },
             spec: "codex.spec.cross-service-translation"
         );

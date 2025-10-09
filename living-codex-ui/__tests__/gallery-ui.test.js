@@ -5,7 +5,7 @@ const { renderWithProviders } = require('../src/__tests__/test-utils');
 require('@testing-library/jest-dom');
 
 // Use real GalleryLens component - we want to test the real system
-const { GalleryLens } = require('../src/components/lenses/GalleryLens');
+const GalleryLens = require('../src/components/lenses/GalleryLens').default;
 
 describe('Gallery UI Tests', () => {
   
@@ -13,13 +13,32 @@ describe('Gallery UI Tests', () => {
     // Clear any existing mocks
     jest.clearAllMocks();
     
-    // Mock the fetch to return a successful response
+    // Mock the fetch to return a successful response with mock items
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
         success: true,
-        items: [],
-        totalCount: 0
+        items: [
+          {
+            id: 'test-1',
+            name: 'Quantum Computing',
+            title: 'Quantum Computing',
+            description: 'Computing based on quantum mechanical phenomena',
+            url: 'https://via.placeholder.com/300x200?text=Quantum',
+            thumbnail: 'https://via.placeholder.com/150x100?text=Quantum',
+            resonance: 0.85
+          },
+          {
+            id: 'test-2',
+            name: 'Consciousness',
+            title: 'Consciousness',
+            description: 'The state of being aware',
+            url: 'https://via.placeholder.com/300x200?text=Consciousness',
+            thumbnail: 'https://via.placeholder.com/150x100?text=Consciousness',
+            resonance: 0.92
+          }
+        ],
+        totalCount: 2
       })
     });
     

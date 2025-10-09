@@ -167,7 +167,7 @@ export default function NodesPage() {
                 <option value="all">All Types</option>
                 {topTypes.map(([type, count]) => (
                   <option key={type} value={type}>
-                    {type} ({count})
+                    {type} ({count as number})
                   </option>
                 ))}
               </select>

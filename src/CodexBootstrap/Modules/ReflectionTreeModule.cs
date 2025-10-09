@@ -17,7 +17,7 @@ public sealed class ReflectionTreeModule : ModuleBase
 
     // use ModuleBase._registry
 
-    public ReflectionTreeModule(INodeRegistry registry, ICodexLogger logger) : base(registry, logger)
+    public ReflectionTreeModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) : base(registry, logger)
     {
     }
 

@@ -14,7 +14,7 @@ public sealed class SharedMetadataModule : ModuleBase
     public override string Description => "Manages shared metadata as meta-nodes to avoid repetition";
     public override string Version => "1.0.0";
 
-    public SharedMetadataModule(INodeRegistry registry, ICodexLogger logger) : base(registry, logger)
+    public SharedMetadataModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) : base(registry, logger)
     {
     }
 

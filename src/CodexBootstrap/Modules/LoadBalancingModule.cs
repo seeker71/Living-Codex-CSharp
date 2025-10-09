@@ -73,18 +73,9 @@ public class LoadBalancingModule : ModuleBase
     /// </summary>
     private void RegisterLoadBalancingNodes(INodeRegistry registry)
     {
-        // Register Load Balancing module node using CreateModuleNode
-        var loadBalancingNode = CreateModuleNode(
-            moduleId: "codex.load-balancing",
-            name: "Load Balancing and Performance Optimization Module",
-            version: "1.0.0",
-            description: "Advanced load balancing, performance monitoring, and auto-scaling for distributed services",
-            tags: new[] { "load-balancing", "performance", "monitoring", "auto-scaling" },
-            capabilities: new[] { "load-balancing", "performance-monitoring", "auto-scaling", "resource-optimization", "health-monitoring" },
-            spec: "codex.spec.load-balancing"
-        );
-        registry.Upsert(loadBalancingNode);
-
+        // NOTE: Module node is already registered via GetModuleNode() during LoadModule()
+        // No need to register it again here to avoid duplicate node creation
+        
         // Register Load Balancing routes as nodes
         RegisterLoadBalancingRoutes(registry);
         

@@ -140,6 +140,17 @@ public sealed class ModuleLoader
             }
         }
 
+        // Log summary of module loading
+        _logger.Info($"[ModuleLoader] Module Loading Summary: Discovered={_discoveredModuleTypes}, Created={_createdModules}, Failed={_failedModuleLoads.Count}");
+        if (_failedModuleLoads.Count > 0)
+        {
+            _logger.Error($"[ModuleLoader] Failed modules:");
+            foreach (var failed in _failedModuleLoads)
+            {
+                _logger.Error($"[ModuleLoader]   - {failed}");
+            }
+        }
+
         // Phase 2: Initialize modules asynchronously (in background) with timeout per module
         _ = Task.Run(async () =>
         {
@@ -335,44 +346,101 @@ public sealed class ModuleLoader
     {
         try
         {
-            var logger = _serviceProvider.GetRequiredService<ICodexLogger>();
-            var httpClient = _serviceProvider.GetService<HttpClient>() ?? new HttpClient();
-            var shutdownCts = _serviceProvider.GetService<CancellationTokenSource>();
+            _logger.Info($"[CreateModule] Attempting to create module: {moduleType.Name}");
             
-            // Try constructor with AIPipelineTracker
-            var constructorWithAITracker = moduleType.GetConstructor(new[] { typeof(INodeRegistry), typeof(ICodexLogger), typeof(HttpClient), typeof(AIPipelineTracker) });
-            if (constructorWithAITracker != null)
+            // Get all public constructors, prefer ones with more parameters (more specific)
+            var constructors = moduleType.GetConstructors()
+                .OrderByDescending(c => c.GetParameters().Length)
+                .ToList();
+            
+            if (constructors.Count == 0)
             {
-                var aiTracker = _serviceProvider.GetService<AIPipelineTracker>();
-                if (aiTracker != null)
+                _logger.Error($"[CreateModule] No public constructors found for {moduleType.Name}");
+                _failedModuleLoads.Add($"{moduleType.Name}: No public constructors");
+                return null;
+            }
+            
+            // Try each constructor until one works
+            foreach (var constructor in constructors)
+            {
+                var parameters = constructor.GetParameters();
+                var args = new object?[parameters.Length];
+                bool canConstruct = true;
+                
+                for (int i = 0; i < parameters.Length; i++)
                 {
-                    _logger.Info($"Creating module {moduleType.Name} with AI pipeline tracker");
-                    return (IModule)constructorWithAITracker.Invoke(new object[] { _registry, logger, httpClient, aiTracker });
+                    var param = parameters[i];
+                    object? argValue = null;
+                    
+                    // Special handling for INodeRegistry - use our instance
+                    if (param.ParameterType == typeof(INodeRegistry))
+                    {
+                        argValue = _registry;
+                    }
+                    // Try to resolve from service provider
+                    else
+                    {
+                        argValue = _serviceProvider.GetService(param.ParameterType);
+                        
+                        // If not found and not optional, try creating a default instance
+                        if (argValue == null && !param.HasDefaultValue)
+                        {
+                            // Special case: HttpClient can be created if not in service provider
+                            if (param.ParameterType == typeof(HttpClient))
+                            {
+                                argValue = new HttpClient();
+                            }
+                            else
+                            {
+                                // Required parameter not available
+                                canConstruct = false;
+                                _logger.Debug($"[CreateModule] Constructor requires {param.ParameterType.Name} which is not available");
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Use resolved value or default
+                    args[i] = argValue ?? (param.HasDefaultValue ? param.DefaultValue : null);
+                }
+                
+                if (canConstruct)
+                {
+                    try
+                    {
+                        var paramSummary = string.Join(", ", parameters.Select((p, i) => 
+                            $"{p.ParameterType.Name}={args[i]?.GetType().Name ?? "null"}"));
+                        _logger.Info($"[CreateModule] Creating {moduleType.Name} with constructor({paramSummary})");
+                        
+                        var instance = constructor.Invoke(args);
+                        return (IModule)instance;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Warn($"[CreateModule] Constructor invocation failed for {moduleType.Name}: {ex.InnerException?.Message ?? ex.Message}");
+                        // Try next constructor
+                        continue;
+                    }
                 }
             }
             
-            // Try constructor with CancellationTokenSource first
-            var constructorWithShutdown = moduleType.GetConstructor(new[] { typeof(INodeRegistry), typeof(ICodexLogger), typeof(HttpClient), typeof(CancellationTokenSource) });
-            if (constructorWithShutdown != null)
+            // No constructor worked - log details
+            _logger.Error($"[CreateModule] FAILED: Could not instantiate {moduleType.Name} with any constructor");
+            _logger.Error($"[CreateModule] Available constructors for {moduleType.Name}:");
+            foreach (var ctor in constructors)
             {
-                _logger.Info($"Creating module {moduleType.Name} with shutdown cancellation token");
-                return (IModule)constructorWithShutdown.Invoke(new object[] { _registry, logger, httpClient, shutdownCts! });
+                var paramList = string.Join(", ", ctor.GetParameters().Select(p => 
+                    $"{p.ParameterType.Name} {p.Name}" + (p.HasDefaultValue ? " = default" : "")));
+                _logger.Error($"[CreateModule]   Constructor({paramList})");
             }
             
-            // Fallback to constructor without CancellationTokenSource
-            var constructor = moduleType.GetConstructor(new[] { typeof(INodeRegistry), typeof(ICodexLogger), typeof(HttpClient) });
-            if (constructor != null)
-            {
-                _logger.Info($"Creating module {moduleType.Name} with NodeRegistry instance: {_registry.GetHashCode()}");
-                return (IModule)constructor.Invoke(new object[] { _registry, logger, httpClient });
-            }
-            
-            _logger.Error($"No suitable constructor found for module {moduleType.Name}. Expected: (INodeRegistry, ICodexLogger, HttpClient) or (INodeRegistry, ICodexLogger, HttpClient, CancellationTokenSource)");
+            _failedModuleLoads.Add($"{moduleType.Name}: No suitable constructor could be invoked");
             return null;
         }
         catch (Exception ex)
         {
-            _logger.Error($"Failed to create module {moduleType.Name}: {ex.Message}", ex);
+            _logger.Error($"[CreateModule] EXCEPTION creating module {moduleType.Name}: {ex.Message}", ex);
+            _failedModuleLoads.Add($"{moduleType.Name}: {ex.Message}");
             return null;
         }
     }

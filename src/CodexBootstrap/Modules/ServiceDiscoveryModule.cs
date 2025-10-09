@@ -59,13 +59,17 @@ public class ServiceDiscoveryModule : ModuleBase
     /// </summary>
     private void RegisterApiGatewayNodes(INodeRegistry registry)
     {
-        // Register API Gateway module node using CreateModuleNode
+        // VIRTUAL MODULE: API Gateway is a logical module (documentation/discovery node) that represents
+        // functionality integrated into ServiceDiscoveryModule. It doesn't have a separate C# class
+        // implementing IModule, but exists as a node for documentation, AI agent discovery, and
+        // architectural clarity. This creates an extra module node in the registry beyond the physical
+        // module count (70 C# classes vs 72+ nodes in registry).
         var apiGatewayNode = CreateModuleNode(
             moduleId: "codex.api-gateway",
             name: "API Gateway Module",
             version: "1.0.0",
             description: "Integrated API Gateway functionality within Service Discovery Module - provides routing, load balancing, and service discovery",
-            tags: new[] { "api-gateway", "routing", "load-balancing", "service-discovery" },
+            tags: new[] { "api-gateway", "routing", "load-balancing", "service-discovery", "virtual-module" },
             capabilities: new[] { "service-discovery", "load-balancing", "routing", "health-monitoring", "circuit-breaker" },
             spec: "codex.spec.api-gateway"
         );

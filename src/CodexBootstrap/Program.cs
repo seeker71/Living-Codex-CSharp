@@ -75,76 +75,8 @@ else
         CodexBootstrap.Core.ICodexLogger logger = services.GetService<CodexBootstrap.Core.ICodexLogger>()
             ?? new CodexBootstrap.Core.Log4NetLogger(typeof(Program));
 
-        if (registry != null)
-        {
-            // ESSENTIAL: Initialize core identity module synchronously (fast)
-            try
-            {
-                var coreIdentity = new CodexBootstrap.Modules.CoreIdentityModule(registry, logger);
-                coreIdentity.Register(registry);
-                bootLogger.Info("[Startup] Core Identity Module initialized - core identity node ensured");
-            }
-            catch (Exception ex)
-            {
-                bootLogger.Warn($"[Startup] Core Identity Module initialization failed: {ex.Message}");
-            }
-
-            // BACKGROUND: Start expensive initialization tasks asynchronously
-            var shutdownCoordinator = services.GetService<CodexBootstrap.Runtime.ShutdownCoordinator>();
-            var shutdownToken = shutdownCoordinator?.ShutdownToken ?? CancellationToken.None;
-            
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    bootLogger.Info("[Background] Starting expensive initialization tasks...");
-                    var startTime = DateTime.UtcNow;
-
-                    // Check cancellation before each expensive operation
-                    if (shutdownToken.IsCancellationRequested)
-                    {
-                        bootLogger.Info("[Background] Initialization cancelled before starting");
-                        return;
-                    }
-
-                    // Build reflection tree for current AppDomain assemblies
-                    var reflection = new CodexBootstrap.Modules.ReflectionTreeModule(registry, logger);
-                    var buildTask = reflection.BuildCompleteReflectionTreeAsync();
-                    await (buildTask as System.Threading.Tasks.Task<object>);
-                    bootLogger.Info($"[Background] Reflection tree built in {(DateTime.UtcNow - startTime).TotalMilliseconds}ms");
-
-                    if (shutdownToken.IsCancellationRequested)
-                    {
-                        bootLogger.Info("[Background] Initialization cancelled after reflection tree");
-                        return;
-                    }
-
-                    // Ensure edges across the graph (meta-node links, shared metadata, U-CORE)
-                    try
-                    {
-                        var edgeEnsurance = new CodexBootstrap.Modules.EdgeEnsuranceModule(registry, logger);
-                        var ensureTask = edgeEnsurance.EnsureAllEdgesAsync();
-                        await (ensureTask as System.Threading.Tasks.Task<object>);
-                        bootLogger.Info($"[Background] Edge ensurance completed in {(DateTime.UtcNow - startTime).TotalMilliseconds}ms");
-                    }
-                    catch (Exception ex)
-                    {
-                        bootLogger.Warn($"[Background] EdgeEnsurance failed: {ex.Message}");
-                    }
-
-                    bootLogger.Info($"[Background] All initialization tasks completed in {(DateTime.UtcNow - startTime).TotalMilliseconds}ms");
-                }
-                catch (OperationCanceledException)
-                {
-                    bootLogger.Info("[Background] Initialization cancelled during shutdown");
-                }
-                catch (Exception ex)
-                {
-                    bootLogger.Error($"[Background] Background initialization failed: {ex.Message}");
-                    logger.Error($"Background initialization failed: {ex.Message}", ex);
-                }
-            }, shutdownToken);
-        }
+        // All modules (including CoreIdentity, ReflectionTree, EdgeEnsurance) are now loaded
+        // generically through ModuleLoader - no special casing needed
     }
     catch (Exception ex)
     {
@@ -187,75 +119,7 @@ static void InitializeModulesInTesting(WebApplication app, CodexBootstrap.Core.I
         CodexBootstrap.Core.ICodexLogger logger = services.GetService<CodexBootstrap.Core.ICodexLogger>()
             ?? new CodexBootstrap.Core.Log4NetLogger(typeof(Program));
 
-        if (registry != null)
-        {
-            // Initialize core identity module synchronously
-            try
-            {
-                var coreIdentity = new CodexBootstrap.Modules.CoreIdentityModule(registry, logger);
-                coreIdentity.Register(registry);
-                bootLogger.Info("[Testing] Core Identity Module initialized");
-            }
-            catch (Exception ex)
-            {
-                bootLogger.Warn($"[Testing] Core Identity Module initialization failed: {ex.Message}");
-            }
-
-            // Start background initialization tasks
-            var shutdownCoordinator = services.GetService<CodexBootstrap.Runtime.ShutdownCoordinator>();
-            var shutdownToken = shutdownCoordinator?.ShutdownToken ?? CancellationToken.None;
-            
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    bootLogger.Info("[Testing] Starting background initialization tasks...");
-                    var startTime = DateTime.UtcNow;
-
-                    if (shutdownToken.IsCancellationRequested)
-                    {
-                        bootLogger.Info("[Testing] Initialization cancelled before starting");
-                        return;
-                    }
-
-                    // Build reflection tree
-                    var reflection = new CodexBootstrap.Modules.ReflectionTreeModule(registry, logger);
-                    var buildTask = reflection.BuildCompleteReflectionTreeAsync();
-                    await (buildTask as System.Threading.Tasks.Task<object>);
-                    bootLogger.Info($"[Testing] Reflection tree built in {(DateTime.UtcNow - startTime).TotalMilliseconds}ms");
-
-                    if (shutdownToken.IsCancellationRequested)
-                    {
-                        bootLogger.Info("[Testing] Initialization cancelled after reflection tree");
-                        return;
-                    }
-
-                    // Ensure edges across the graph
-                    try
-                    {
-                        var edgeEnsurance = new CodexBootstrap.Modules.EdgeEnsuranceModule(registry, logger);
-                        var ensureTask = edgeEnsurance.EnsureAllEdgesAsync();
-                        await (ensureTask as System.Threading.Tasks.Task<object>);
-                        bootLogger.Info($"[Testing] Edge ensurance completed in {(DateTime.UtcNow - startTime).TotalMilliseconds}ms");
-                    }
-                    catch (Exception ex)
-                    {
-                        bootLogger.Warn($"[Testing] EdgeEnsurance failed: {ex.Message}");
-                    }
-
-                    bootLogger.Info($"[Testing] All initialization tasks completed in {(DateTime.UtcNow - startTime).TotalMilliseconds}ms");
-                }
-                catch (OperationCanceledException)
-                {
-                    bootLogger.Info("[Testing] Initialization cancelled during shutdown");
-                }
-                catch (Exception ex)
-                {
-                    bootLogger.Error($"[Testing] Background initialization failed: {ex.Message}");
-                    logger.Error($"Testing background initialization failed: {ex.Message}", ex);
-                }
-            }, shutdownToken);
-        }
+        // All modules loaded generically through ModuleLoader
     }
     catch (Exception ex)
     {

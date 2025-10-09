@@ -144,7 +144,7 @@ export async function apiCall<T = unknown>(
         }
 
         // Parse structured error response from backend
-        const errorMessage = errorData?.error || `HTTP ${response.status}: ${response.statusText}`;
+        const errorMessage = errorData?.error || errorData?.message || `HTTP ${response.status}: ${response.statusText}`;
         const errorCode = errorData?.code || `HTTP_${response.status}`;
         const technicalMessage = errorData?.technicalMessage || response.statusText;
         const userMessage = errorData?.userMessage || errorMessage;

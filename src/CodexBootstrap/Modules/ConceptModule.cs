@@ -432,11 +432,20 @@ public class ConceptModule : ModuleBase
             // Store the concept in the registry
             _registry.Upsert(conceptNode);
 
-            return ResponseHelpers.CreateConceptCreateResponse(
-                success: true,
-                conceptId: conceptNode.Id,
-                message: "Concept created successfully"
-            );
+            // Return full concept object for frontend integration
+            var concept = new
+            {
+                id = conceptNode.Id,
+                name = request.Name,
+                description = request.Description,
+                domain = request.Domain,
+                complexity = request.Complexity,
+                tags = request.Tags,
+                createdAt = DateTime.UtcNow,
+                updatedAt = DateTime.UtcNow
+            };
+
+            return new { success = true, concept = concept, message = "Concept created successfully" };
         }
         catch (Exception ex)
         {

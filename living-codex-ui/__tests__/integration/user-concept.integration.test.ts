@@ -29,20 +29,20 @@ describe('User-Concept Relationships - Integration Tests', () => {
     );
     
     expect(userResult.success).toBe(true);
-    userId = userResult.user.id;
-    authToken = userResult.token;
+    userId = userResult.data.user.id;
+    authToken = userResult.data.token;
 
     // Create test concepts
     const concepts = [
-      { name: `UC Test Concept A ${timestamp}`, domain: 'Testing' },
-      { name: `UC Test Concept B ${timestamp}`, domain: 'Testing' },
-      { name: `UC Test Concept C ${timestamp}`, domain: 'Testing' },
+      { name: `UC Test Concept A ${timestamp}`, description: 'Test A', domain: 'Testing', complexity: 1, tags: ['test'] },
+      { name: `UC Test Concept B ${timestamp}`, description: 'Test B', domain: 'Testing', complexity: 1, tags: ['test'] },
+      { name: `UC Test Concept C ${timestamp}`, description: 'Test C', domain: 'Testing', complexity: 1, tags: ['test'] },
     ];
 
     for (const concept of concepts) {
       const result = await endpoints.createConcept(concept);
       expect(result.success).toBe(true);
-      conceptIds.push(result.concept.id);
+      conceptIds.push(result.data.concept.id);
     }
   });
 
@@ -76,10 +76,11 @@ describe('User-Concept Relationships - Integration Tests', () => {
       const result = await endpoints.attuneToConcept(userId, conceptIds[0]);
 
       expect(result.success).toBe(true);
-      expect(result.relationship).toBeDefined();
-      expect(result.relationship.userId).toBe(userId);
-      expect(result.relationship.conceptId).toBe(conceptIds[0]);
-      expect(result.relationship.relationshipType).toBe('attuned');
+      expect(result.data).toBeDefined();
+      expect(result.data.relationship).toBeDefined();
+      expect(result.data.relationship.userId).toBe(userId);
+      expect(result.data.relationship.conceptId).toBe(conceptIds[0]);
+      expect(result.data.relationship.relationshipType).toBe('attuned');
     });
 
     it('should attune to multiple concepts', async () => {
@@ -118,10 +119,10 @@ describe('User-Concept Relationships - Integration Tests', () => {
       const result = await endpoints.attuneToConcept(userId, conceptIds[0]);
 
       expect(result.success).toBe(true);
-      if (result.relationship.strength !== undefined) {
-        expect(typeof result.relationship.strength).toBe('number');
-        expect(result.relationship.strength).toBeGreaterThan(0);
-        expect(result.relationship.strength).toBeLessThanOrEqual(1);
+      if (result.data && result.data.relationship && result.data.relationship.strength !== undefined) {
+        expect(typeof result.data.relationship.strength).toBe('number');
+        expect(result.data.relationship.strength).toBeGreaterThan(0);
+        expect(result.data.relationship.strength).toBeLessThanOrEqual(1);
       }
     });
   });
@@ -131,16 +132,17 @@ describe('User-Concept Relationships - Integration Tests', () => {
       const result = await endpoints.getUserConcepts(userId);
 
       expect(result.success).toBe(true);
-      expect(result.concepts).toBeDefined();
-      expect(Array.isArray(result.concepts)).toBe(true);
-      expect(result.concepts.length).toBeGreaterThan(0);
+      expect(result.data).toBeDefined();
+      expect(result.data.concepts).toBeDefined();
+      expect(Array.isArray(result.data.concepts)).toBe(true);
+      expect(result.data.concepts.length).toBeGreaterThan(0);
     });
 
     it('should include relationship metadata', async () => {
       const result = await endpoints.getUserConcepts(userId);
 
       expect(result.success).toBe(true);
-      const firstConcept = result.concepts[0];
+      const firstConcept = result.data.concepts[0];
       
       // Should have concept data
       expect(firstConcept.conceptId || firstConcept.id).toBeDefined();
@@ -159,11 +161,12 @@ describe('User-Concept Relationships - Integration Tests', () => {
         testPassword
       );
 
-      const result = await endpoints.getUserConcepts(newUser.user.id);
+      const result = await endpoints.getUserConcepts(newUser.data.user.id);
 
       expect(result.success).toBe(true);
-      expect(result.concepts).toBeDefined();
-      expect(result.concepts.length).toBe(0);
+      expect(result.data).toBeDefined();
+      expect(result.data.concepts).toBeDefined();
+      expect(result.data.concepts.length).toBe(0);
 
       // Cleanup
       await fetch('http://localhost:5002/test/cleanup/users', {
@@ -177,8 +180,8 @@ describe('User-Concept Relationships - Integration Tests', () => {
       const result = await endpoints.getUserConcepts('nonexistent-user-id');
 
       // Should return empty or error
-      if (result.success) {
-        expect(result.concepts.length).toBe(0);
+      if (result.success && result.data) {
+        expect(result.data.concepts.length).toBe(0);
       } else {
         expect(result.error).toBeDefined();
       }
@@ -244,7 +247,7 @@ describe('User-Concept Relationships - Integration Tests', () => {
       const result = await endpoints.getUserConcepts(userId);
 
       // Relationship should still exist
-      const hasRelationship = result.concepts.some((c: any) => 
+      const hasRelationship = result.data.concepts.some((c: any) => 
         c.conceptId === conceptIds[0] || c.id === conceptIds[0]
       );
       expect(hasRelationship).toBe(true);
@@ -255,21 +258,21 @@ describe('User-Concept Relationships - Integration Tests', () => {
       const concept1 = `Temporal Test 1 ${timestamp}`;
       const concept2 = `Temporal Test 2 ${timestamp}`;
 
-      const c1 = await endpoints.createConcept({ name: concept1 });
-      conceptIds.push(c1.concept.id);
+      const c1 = await endpoints.createConcept({ name: concept1, description: 'Temporal 1', domain: 'Testing', complexity: 1, tags: ['test'] });
+      conceptIds.push(c1.data.concept.id);
       
-      await endpoints.attuneToConcept(userId, c1.concept.id);
+      await endpoints.attuneToConcept(userId, c1.data.concept.id);
       await new Promise(resolve => setTimeout(resolve, 100)); // Small delay
       
-      const c2 = await endpoints.createConcept({ name: concept2 });
-      conceptIds.push(c2.concept.id);
+      const c2 = await endpoints.createConcept({ name: concept2, description: 'Temporal 2', domain: 'Testing', complexity: 1, tags: ['test'] });
+      conceptIds.push(c2.data.concept.id);
       
-      await endpoints.attuneToConcept(userId, c2.concept.id);
+      await endpoints.attuneToConcept(userId, c2.data.concept.id);
 
       const userConcepts = await endpoints.getUserConcepts(userId);
 
       // Should have both
-      expect(userConcepts.concepts.length).toBeGreaterThanOrEqual(2);
+      expect(userConcepts.data.concepts.length).toBeGreaterThanOrEqual(2);
     });
   });
 
@@ -278,15 +281,15 @@ describe('User-Concept Relationships - Integration Tests', () => {
       const result = await endpoints.attuneToConcept(userId, conceptIds[0]);
 
       expect(result.success).toBe(true);
-      expect(result.relationship.relationshipType).toBe('attuned');
+      expect(result.data.relationship.relationshipType).toBe('attuned');
     });
 
     it('should default to strength 1.0', async () => {
       const result = await endpoints.attuneToConcept(userId, conceptIds[0]);
 
       expect(result.success).toBe(true);
-      if (result.relationship.strength !== undefined) {
-        expect(result.relationship.strength).toBe(1.0);
+      if (result.data && result.data.relationship && result.data.relationship.strength !== undefined) {
+        expect(result.data.relationship.strength).toBe(1.0);
       }
     });
 
@@ -300,7 +303,7 @@ describe('User-Concept Relationships - Integration Tests', () => {
 
       // Both users attune to same concept
       const result1 = await endpoints.attuneToConcept(userId, conceptIds[0]);
-      const result2 = await endpoints.attuneToConcept(user2.user.id, conceptIds[0]);
+      const result2 = await endpoints.attuneToConcept(user2.data.user.id, conceptIds[0]);
 
       expect(result1.success).toBe(true);
       expect(result2.success).toBe(true);

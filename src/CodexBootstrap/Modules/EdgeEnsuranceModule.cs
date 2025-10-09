@@ -14,7 +14,7 @@ public sealed class EdgeEnsuranceModule : ModuleBase
     public override string Description => "Ensures all related nodes have proper edges in the system";
     public override string Version => "1.0.0";
 
-    public EdgeEnsuranceModule(INodeRegistry registry, ICodexLogger logger) : base(registry, logger)
+    public EdgeEnsuranceModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) : base(registry, logger)
     {
     }
 
@@ -191,7 +191,7 @@ public sealed class EdgeEnsuranceModule : ModuleBase
         try
         {
             var results = new List<string>();
-            var shared = new SharedMetadataModule(_registry, _logger);
+            var shared = new SharedMetadataModule(_registry, _logger, new HttpClient());
 
             // Keys to normalize: category->key resolvers
             var knownKeys = new (string Category, string Key, string MetaKey)[]

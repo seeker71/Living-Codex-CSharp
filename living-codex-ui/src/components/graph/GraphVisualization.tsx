@@ -35,7 +35,7 @@ export default function GraphVisualization({
   const [graphNodes, setGraphNodes] = useState<GraphNode[]>([]);
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number | null>(null);
 
   // Initialize graph nodes with physics properties
   useEffect(() => {

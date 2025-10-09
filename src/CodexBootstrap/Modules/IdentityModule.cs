@@ -486,7 +486,7 @@ public sealed class IdentityModule : ModuleBase
     // ===============================
 
     [ApiRoute("POST", "/auth/register", "RegisterUser", "Register a new user account", "codex.identity")]
-    public async Task<object> RegisterUserAsync([ApiParameter("request", "User registration request")] AuthRegisterRequest request)
+    public async Task<IResult> RegisterUserAsync([ApiParameter("request", "User registration request")] AuthRegisterRequest request)
     {
         try
         {
@@ -494,21 +494,21 @@ public sealed class IdentityModule : ModuleBase
             var validationResult = ValidateRegistrationRequest(request);
             if (!validationResult.IsValid)
             {
-                return new AuthResponse(false, null, null, validationResult.ErrorMessage);
+                return Results.BadRequest(new AuthResponse(false, null, null, validationResult.ErrorMessage));
             }
 
             // Check if user already exists
             var existingUser = Registry.GetNode($"user.{request.Username}");
             if (existingUser != null)
             {
-                return new AuthResponse(false, null, null, "Username already exists");
+                return Results.Conflict(new AuthResponse(false, null, null, "Username already exists"));
             }
 
             // Check if email is already registered
             var emailExists = await CheckEmailExistsAsync(request.Email);
             if (emailExists)
             {
-                return new AuthResponse(false, null, null, "Email already registered");
+                return Results.Conflict(new AuthResponse(false, null, null, "Email already registered"));
             }
 
             // Create user
@@ -526,37 +526,37 @@ public sealed class IdentityModule : ModuleBase
             var userProfile = CreateAuthUserProfile(userNode);
 
             _logger.Info($"User registered successfully: {request.Username} ({request.Email})");
-            return new AuthResponse(true, token, userProfile, "Registration successful");
+            return Results.Json(new AuthResponse(true, token, userProfile, "Registration successful"));
         }
         catch (Exception ex)
         {
             _logger.Error($"Registration error for {request.Username}: {ex.Message}", ex);
-            return new AuthResponse(false, null, null, "Registration failed due to system error");
+            return Results.Json(new AuthResponse(false, null, null, "Registration failed due to system error"), statusCode: 500);
         }
     }
 
     [ApiRoute("POST", "/auth/login", "LoginUser", "Authenticate user credentials", "codex.identity")]
-    public async Task<object> LoginUserAsync([ApiParameter("request", "User login request")] AuthLoginRequest request)
+    public async Task<IResult> LoginUserAsync([ApiParameter("request", "User login request")] AuthLoginRequest request)
     {
         try
         {
             // Validate request
             if (string.IsNullOrEmpty(request.UsernameOrEmail) || string.IsNullOrEmpty(request.Password))
             {
-                return new AuthResponse(false, null, null, "Username/email and password are required");
+                return Results.BadRequest(new AuthResponse(false, null, null, "Username/email and password are required"));
             }
 
             // Find user by username or email
             var userNode = await FindUserByUsernameOrEmailAsync(request.UsernameOrEmail);
             if (userNode == null)
             {
-                return new AuthResponse(false, null, null, "Invalid credentials");
+                return Results.Json(new AuthResponse(false, null, null, "Invalid credentials"), statusCode: 401);
             }
 
             // Check if account is active
             if (!IsUserActive(userNode))
             {
-                return new AuthResponse(false, null, null, "Account is disabled or inactive");
+                return Results.Json(new AuthResponse(false, null, null, "Account is disabled or inactive"), statusCode: 403);
             }
 
             // Verify password
@@ -564,7 +564,7 @@ public sealed class IdentityModule : ModuleBase
             if (storedHash == null || !VerifyPasswordSecure(request.Password, storedHash))
             {
                 await RecordFailedLoginAttempt(userNode.Id);
-                return new AuthResponse(false, null, null, "Invalid credentials");
+                return Results.Json(new AuthResponse(false, null, null, "Invalid credentials"), statusCode: 401);
             }
 
             // Update last login
@@ -578,23 +578,23 @@ public sealed class IdentityModule : ModuleBase
             var userProfile = CreateAuthUserProfile(userNode);
 
             _logger.Info($"User logged in successfully: {userNode.Meta["username"]}");
-            return new AuthResponse(true, token, userProfile, "Login successful");
+            return Results.Json(new AuthResponse(true, token, userProfile, "Login successful"));
         }
         catch (Exception ex)
         {
             _logger.Error($"Login error: {ex.Message}", ex);
-            return new AuthResponse(false, null, null, "Authentication failed due to system error");
+            return Results.Json(new AuthResponse(false, null, null, "Authentication failed due to system error"), statusCode: 500);
         }
     }
 
     [ApiRoute("POST", "/auth/logout", "LogoutUser", "Logout user and invalidate session", "codex.identity")]
-    public async Task<object> LogoutUserAsync([ApiParameter("request", "Logout request")] AuthLogoutRequest request)
+    public async Task<IResult> LogoutUserAsync([ApiParameter("request", "Logout request")] AuthLogoutRequest request)
     {
         try
         {
             if (string.IsNullOrEmpty(request.Token))
             {
-                return new { success = false, message = "Token is required" };
+                return Results.BadRequest(new { success = false, message = "Token is required" });
             }
 
             // Revoke token (track revocation time for cleanup)
@@ -612,84 +612,84 @@ public sealed class IdentityModule : ModuleBase
                 }
             }
 
-            return new { success = true, message = "Logout successful" };
+            return Results.Json(new { success = true, message = "Logout successful" });
         }
         catch (Exception ex)
         {
             _logger.Error($"Logout error: {ex.Message}", ex);
-            return new { success = false, message = "Logout failed" };
+            return Results.Json(new { success = false, message = "Logout failed" }, statusCode: 500);
         }
     }
 
     [ApiRoute("POST", "/auth/validate", "ValidateToken", "Validate JWT token", "codex.identity")]
-    public async Task<object> ValidateTokenAsync([ApiParameter("request", "Token validation request")] AuthTokenValidationRequest request)
+    public async Task<IResult> ValidateTokenAsync([ApiParameter("request", "Token validation request")] AuthTokenValidationRequest request)
     {
         try
         {
             if (string.IsNullOrEmpty(request.Token))
             {
-                return new AuthTokenValidationResponse(false, null, "Token is required");
+                return Results.BadRequest(new AuthTokenValidationResponse(false, null, "Token is required"));
             }
 
             // Check if token is revoked
             if (_revokedTokens.ContainsKey(request.Token))
             {
-                return new AuthTokenValidationResponse(false, null, "Token has been revoked");
+                return Results.Json(new AuthTokenValidationResponse(false, null, "Token has been revoked"), statusCode: 401);
             }
 
             // Validate JWT token
             var claims = ValidateJwtTokenSecure(request.Token);
             if (claims == null)
             {
-                return new AuthTokenValidationResponse(false, null, "Invalid or expired token");
+                return Results.Json(new AuthTokenValidationResponse(false, null, "Invalid or expired token"), statusCode: 401);
             }
 
             var userId = claims.FindFirst("userId")?.Value;
             if (string.IsNullOrEmpty(userId))
             {
-                return new AuthTokenValidationResponse(false, null, "Invalid token claims");
+                return Results.Json(new AuthTokenValidationResponse(false, null, "Invalid token claims"), statusCode: 401);
             }
 
             // Get user profile
             var userNode = Registry.GetNode(userId);
             if (userNode == null || !IsUserActive(userNode))
             {
-                return new AuthTokenValidationResponse(false, null, "User not found or inactive");
+                return Results.Json(new AuthTokenValidationResponse(false, null, "User not found or inactive"), statusCode: 401);
             }
 
             var userProfile = CreateAuthUserProfile(userNode);
-            return new AuthTokenValidationResponse(true, userProfile, "Token is valid");
+            return Results.Json(new AuthTokenValidationResponse(true, userProfile, "Token is valid"));
         }
         catch (Exception ex)
         {
             _logger.Error($"Token validation error: {ex.Message}", ex);
-            return new AuthTokenValidationResponse(false, null, "Token validation failed");
+            return Results.Json(new AuthTokenValidationResponse(false, null, "Token validation failed"), statusCode: 500);
         }
     }
 
     [ApiRoute("GET", "/auth/profile/{userId}", "GetAuthUserProfile", "Get user profile by ID", "codex.identity")]
-    public async Task<object> GetAuthUserProfileAsync([ApiParameter("userId", "User ID", Location = "path")] string userId)
+    public async Task<IResult> GetAuthUserProfileAsync([ApiParameter("userId", "User ID", Location = "path")] string userId)
     {
         try
         {
             var userNode = Registry.GetNode(userId);
             if (userNode == null)
             {
-                return new { success = false, message = "User not found" };
+                return Results.NotFound(new { success = false, message = "User not found" });
             }
 
             var profile = CreateAuthUserProfile(userNode);
-            return new { success = true, profile = profile };
+            return Results.Json(new { success = true, profile = profile });
         }
         catch (Exception ex)
         {
             _logger.Error($"Get profile error: {ex.Message}", ex);
-            return new { success = false, message = "Failed to get user profile" };
+            return Results.Json(new { success = false, message = "Failed to get user profile" }, statusCode: 500);
         }
     }
 
     [ApiRoute("PUT", "/auth/profile/{userId}", "UpdateAuthUserProfile", "Update user profile", "codex.identity")]
-    public async Task<object> UpdateAuthUserProfileAsync(
+    public async Task<IResult> UpdateAuthUserProfileAsync(
         [ApiParameter("userId", "User ID", Location = "path")] string userId,
         [ApiParameter("body", "Profile update data")] AuthProfileUpdateRequest request)
     {
@@ -698,7 +698,7 @@ public sealed class IdentityModule : ModuleBase
             var userNode = Registry.GetNode(userId);
             if (userNode == null)
             {
-                return new { success = false, message = "User not found" };
+                return Results.NotFound(new { success = false, message = "User not found" });
             }
 
             // Update user node meta
@@ -735,38 +735,38 @@ public sealed class IdentityModule : ModuleBase
             
             _logger.Info($"Updated auth profile for user {userId}");
             
-            return new { success = true, message = "Profile updated successfully" };
+            return Results.Json(new { success = true, message = "Profile updated successfully" });
         }
         catch (Exception ex)
         {
             _logger.Error($"Update profile error: {ex.Message}", ex);
-            return new { success = false, message = $"Failed to update profile: {ex.Message}" };
+            return Results.Json(new { success = false, message = $"Failed to update profile: {ex.Message}" }, statusCode: 500);
         }
     }
 
     [ApiRoute("POST", "/auth/change-password", "ChangePassword", "Change user password", "codex.identity")]
-    public async Task<object> ChangePasswordAsync([ApiParameter("request", "Change password request")] AuthChangePasswordRequest request)
+    public async Task<IResult> ChangePasswordAsync([ApiParameter("request", "Change password request")] AuthChangePasswordRequest request)
     {
         try
         {
             var userNode = Registry.GetNode(request.UserId);
             if (userNode == null)
             {
-                return new { success = false, message = "User not found" };
+                return Results.NotFound(new { success = false, message = "User not found" });
             }
 
             // Verify current password
             var storedHash = userNode.Meta["passwordHash"]?.ToString();
             if (storedHash == null || !VerifyPasswordSecure(request.CurrentPassword, storedHash))
             {
-                return new { success = false, message = "Current password is incorrect" };
+                return Results.Json(new { success = false, message = "Current password is incorrect" }, statusCode: 401);
             }
 
             // Validate new password
             var passwordValidation = ValidatePassword(request.NewPassword);
             if (!passwordValidation.IsValid)
             {
-                return new { success = false, message = passwordValidation.ErrorMessage };
+                return Results.BadRequest(new { success = false, message = passwordValidation.ErrorMessage });
             }
 
             // Update password
@@ -785,12 +785,12 @@ public sealed class IdentityModule : ModuleBase
             await RevokeAllUserSessionsAsync(request.UserId);
 
             _logger.Info($"Password changed for user: {userNode.Meta["username"]}");
-            return new { success = true, message = "Password changed successfully. Please login again." };
+            return Results.Json(new { success = true, message = "Password changed successfully. Please login again." });
         }
         catch (Exception ex)
         {
             _logger.Error($"Change password error: {ex.Message}", ex);
-            return new { success = false, message = "Failed to change password" };
+            return Results.Json(new { success = false, message = "Failed to change password" }, statusCode: 500);
         }
     }
 

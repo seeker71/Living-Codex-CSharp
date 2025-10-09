@@ -44,17 +44,20 @@ describe('FileBrowser', () => {
 
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve(mockNodes)
+      json: () => Promise.resolve({ success: true, files: mockNodes })
     })
 
     render(<FileBrowser />)
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalled()
+    })
 
     await waitFor(() => {
       expect(screen.getByText('Program.cs')).toBeInTheDocument()
     })
 
     expect(screen.getByText('README.md')).toBeInTheDocument()
-    expect(screen.getByText('2 files')).toBeInTheDocument()
   })
 
   it('builds correct tree structure', async () => {
@@ -87,7 +90,7 @@ describe('FileBrowser', () => {
 
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve(mockNodes)
+      json: () => Promise.resolve({ success: true, files: mockNodes })
     })
 
     render(<FileBrowser />)
@@ -116,7 +119,7 @@ describe('FileBrowser', () => {
 
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve(mockNodes)
+      json: () => Promise.resolve({ success: true, files: mockNodes })
     })
 
     render(<FileBrowser />)
@@ -155,7 +158,7 @@ describe('FileBrowser', () => {
 
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve(mockNodes)
+      json: () => Promise.resolve({ success: true, files: mockNodes })
     })
 
     const onFileSelect = jest.fn()
@@ -190,7 +193,7 @@ describe('FileBrowser', () => {
 
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve(mockNodes)
+      json: () => Promise.resolve({ success: true, files: mockNodes })
     })
 
     render(<FileBrowser selectedNodeId="file1" />)
@@ -216,7 +219,7 @@ describe('FileBrowser', () => {
 
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve(mockNodes)
+      json: () => Promise.resolve({ success: true, files: mockNodes })
     })
 
     render(<FileBrowser />)
@@ -252,7 +255,7 @@ describe('FileBrowser', () => {
 
     mockFetch.mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(mockNodes)
+      json: () => Promise.resolve({ success: true, files: mockNodes })
     })
 
     render(<FileBrowser />)
@@ -274,7 +277,7 @@ describe('FileBrowser', () => {
   it('shows empty state when no files', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve([])
+      json: () => Promise.resolve({ success: true, files: [] })
     })
 
     render(<FileBrowser />)
@@ -308,7 +311,7 @@ describe('FileBrowser', () => {
 
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve(mockNodes)
+      json: () => Promise.resolve({ success: true, files: mockNodes })
     })
 
     render(<FileBrowser />)

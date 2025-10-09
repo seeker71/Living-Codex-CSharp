@@ -56,18 +56,9 @@ public class IntelligentCachingModule : ModuleBase
     /// </summary>
     private void RegisterIntelligentCachingNodes(INodeRegistry registry)
     {
-        // Register Intelligent Caching module node
-        var intelligentCachingNode = CreateModuleNode(
-            moduleId: "codex.intelligent-caching",
-            name: "Intelligent Caching Module",
-            version: "1.0.0",
-            description: "Advanced caching system with predictive pre-loading and performance optimization",
-            tags: new[] { "caching", "performance", "optimization", "predictive" },
-            capabilities: new[] { "predictive-preloading", "usage-pattern-analysis", "cache-optimization", "performance-monitoring", "smart-invalidation" },
-            spec: "codex.spec.intelligent-caching"
-        );
-        registry.Upsert(intelligentCachingNode);
-
+        // NOTE: Module node is already registered via GetModuleNode() during LoadModule()
+        // No need to register it again here to avoid duplicate node creation
+        
         // Register Intelligent Caching routes as nodes
         RegisterIntelligentCachingRoutes(registry);
         

@@ -93,8 +93,8 @@ function FileBrowser({
     return Object.entries(tree)
       .sort(([nameA, itemA], [nameB, itemB]) => {
         // Sort folders first, then files
-        if (itemA.type === 'folder' && itemB.type !== 'folder') return -1
-        if (itemA.type !== 'folder' && itemB.type === 'folder') return 1
+        if ((itemA as any).type === 'folder' && (itemB as any).type !== 'folder') return -1
+        if ((itemA as any).type !== 'folder' && (itemB as any).type === 'folder') return 1
         
         // Within same type, sort alphabetically (case-insensitive)
         return nameA.toLowerCase().localeCompare(nameB.toLowerCase())

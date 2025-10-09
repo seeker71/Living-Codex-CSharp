@@ -23,7 +23,7 @@ public sealed class CoreIdentityModule : ModuleBase
     public override string Description => "Manages the core identity node and ensures all nodes can walk back to it";
     public override string Version => "1.0.0";
 
-    public CoreIdentityModule(INodeRegistry registry, ICodexLogger logger) 
+    public CoreIdentityModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) 
         : base(registry, logger)
     {
     }

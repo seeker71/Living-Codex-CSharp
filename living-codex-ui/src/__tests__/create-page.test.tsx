@@ -9,7 +9,7 @@ describe('Create Page - Content Creation', () => {
       renderWithProviders(<CreatePage />)
       
       await waitFor(() => {
-        expect(screen.getByText(/Create/i)).toBeInTheDocument()
+        expect(screen.getByText('✨ Concept Creation')).toBeInTheDocument()
       })
     })
 
@@ -17,14 +17,11 @@ describe('Create Page - Content Creation', () => {
       renderWithProviders(<CreatePage />)
       
       await waitFor(() => {
-        const hasCreationUI = 
-          screen.queryByText(/concept/i) ||
-          screen.queryByText(/thread/i) ||
-          screen.queryByText(/content/i) ||
-          screen.queryByRole('button') ||
-          screen.queryByRole('textbox')
-        
-        expect(hasCreationUI).toBeTruthy()
+        // Check for specific creation UI elements
+        expect(screen.getByText('✨ Concept Creation')).toBeInTheDocument()
+        expect(screen.getByText('Create new concepts with AI assistance and generate visual representations')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /create concept/i })).toBeInTheDocument()
+        expect(screen.getByRole('textbox', { name: /concept name/i })).toBeInTheDocument()
       })
     })
 

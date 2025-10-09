@@ -703,6 +703,9 @@ public static class ApiRouteDiscovery
         // If it's already an IResult, return it directly without unwrapping
         if (result is IResult iResult) return iResult;
         
+        // Handle Task<IResult>
+        if (result is Task<IResult> tiResult) return await tiResult;
+        
         if (result is Task<object> to) return await to;
         if (result is Task t)
         {

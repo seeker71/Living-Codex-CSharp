@@ -483,10 +483,11 @@ export default function ProfilePage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-medium-contrast mb-2">
+                <label htmlFor="displayName" className="block text-sm font-medium text-medium-contrast mb-2">
                   Display Name *
                 </label>
                 <input
+                  id="displayName"
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
@@ -496,10 +497,11 @@ export default function ProfilePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-medium-contrast mb-2">
+                <label htmlFor="email" className="block text-sm font-medium text-medium-contrast mb-2">
                   Email *
                 </label>
                 <input
+                  id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -510,10 +512,11 @@ export default function ProfilePage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-medium-contrast mb-2">
+              <label htmlFor="bio" className="block text-sm font-medium text-medium-contrast mb-2">
                 Bio
               </label>
               <textarea
+                id="bio"
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
                 rows={4}
@@ -670,11 +673,12 @@ export default function ProfilePage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-medium-contrast mb-2">
+              <label htmlFor="addInterest" className="block text-sm font-medium text-medium-contrast mb-2">
                 Add Interest
               </label>
               <div className="flex gap-2">
                 <input
+                  id="addInterest"
                   type="text"
                   value={newInterest}
                   onChange={(e) => setNewInterest(e.target.value)}
@@ -769,10 +773,11 @@ export default function ProfilePage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-medium-contrast mb-2">
+                <label htmlFor="beliefFramework" className="block text-sm font-medium text-medium-contrast mb-2">
                   Belief Framework
                 </label>
                 <input
+                  id="beliefFramework"
                   type="text"
                   value={framework}
                   onChange={(e) => setFramework(e.target.value)}
@@ -785,10 +790,11 @@ export default function ProfilePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-medium-contrast mb-2">
+                <label htmlFor="consciousnessLevel" className="block text-sm font-medium text-medium-contrast mb-2">
                   Consciousness Level
                 </label>
                 <select
+                  id="consciousnessLevel"
                   value={consciousnessLevel}
                   onChange={(e) => setConsciousnessLevel(e.target.value)}
                   className="input-standard w-full"
@@ -804,10 +810,11 @@ export default function ProfilePage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-medium-contrast mb-2">
+              <label htmlFor="culturalContext" className="block text-sm font-medium text-medium-contrast mb-2">
                 Cultural Context
               </label>
               <input
+                id="culturalContext"
                 type="text"
                 value={culturalContext}
                 onChange={(e) => setCulturalContext(e.target.value)}
@@ -818,10 +825,11 @@ export default function ProfilePage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-medium-contrast mb-2">
+                <label htmlFor="spiritualTradition" className="block text-sm font-medium text-medium-contrast mb-2">
                   Spiritual Tradition
                 </label>
                 <input
+                  id="spiritualTradition"
                   type="text"
                   value={spiritualTradition}
                   onChange={(e) => setSpiritualTradition(e.target.value)}
@@ -831,10 +839,11 @@ export default function ProfilePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-medium-contrast mb-2">
+                <label htmlFor="scientificBackground" className="block text-sm font-medium text-medium-contrast mb-2">
                   Scientific Background
                 </label>
                 <input
+                  id="scientificBackground"
                   type="text"
                   value={scientificBackground}
                   onChange={(e) => setScientificBackground(e.target.value)}
@@ -845,10 +854,11 @@ export default function ProfilePage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-medium-contrast mb-2">
+              <label htmlFor="resonanceThreshold" className="block text-sm font-medium text-medium-contrast mb-2">
                 Resonance Threshold: {resonanceThreshold}
               </label>
               <input
+                id="resonanceThreshold"
                 type="range"
                 min="0"
                 max="1"
@@ -965,10 +975,11 @@ export default function ProfilePage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-medium-contrast mb-2">
+              <label htmlFor="location" className="block text-sm font-medium text-medium-contrast mb-2">
                 Your Location
               </label>
               <input
+                id="location"
                 type="text"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}

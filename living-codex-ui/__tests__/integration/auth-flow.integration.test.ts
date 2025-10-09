@@ -45,15 +45,16 @@ describe('Authentication Flow - Integration Tests', () => {
       );
 
       expect(result.success).toBe(true);
-      expect(result.user).toBeDefined();
-      expect(result.user.username).toBe(testUsername);
-      expect(result.user.email).toBe(testEmail);
-      expect(result.user.id).toBeDefined();
-      expect(result.token).toBeDefined();
+      expect(result.data).toBeDefined();
+      expect(result.data.user).toBeDefined();
+      expect(result.data.user.username).toBe(testUsername);
+      expect(result.data.user.email).toBe(testEmail);
+      expect(result.data.user.id).toBeDefined();
+      expect(result.data.token).toBeDefined();
 
       // Save for subsequent tests
-      userId = result.user.id;
-      authToken = result.token;
+      userId = result.data.user.id;
+      authToken = result.data.token;
     });
 
     it('should reject duplicate username registration', async () => {
@@ -63,8 +64,9 @@ describe('Authentication Flow - Integration Tests', () => {
         testPassword
       );
 
+      // Backend now returns HTTP 409 Conflict, so result.success is false
       expect(result.success).toBe(false);
-      expect(result.error).toBeDefined();
+      expect(result.httpStatusCode).toBe(409);
       expect(result.error).toMatch(/already exists|duplicate/i);
     });
 
@@ -76,7 +78,8 @@ describe('Authentication Flow - Integration Tests', () => {
       );
 
       expect(result.success).toBe(false);
-      expect(result.error).toBeDefined();
+      expect(result.httpStatusCode).toBe(409);
+      expect(result.error).toMatch(/already|registered/i);
     });
 
     it('should reject weak passwords', async () => {
@@ -87,6 +90,7 @@ describe('Authentication Flow - Integration Tests', () => {
       );
 
       expect(result.success).toBe(false);
+      expect(result.httpStatusCode).toBe(400);
       expect(result.error).toBeDefined();
     });
   });
@@ -96,40 +100,43 @@ describe('Authentication Flow - Integration Tests', () => {
       const result = await endpoints.login(testUsername, testPassword, false);
 
       expect(result.success).toBe(true);
-      expect(result.user).toBeDefined();
-      expect(result.user.username).toBe(testUsername);
-      expect(result.token).toBeDefined();
+      expect(result.data).toBeDefined();
+      expect(result.data.user).toBeDefined();
+      expect(result.data.user.username).toBe(testUsername);
+      expect(result.data.token).toBeDefined();
     });
 
     it('should successfully login with email', async () => {
       const result = await endpoints.login(testEmail, testPassword, false);
 
       expect(result.success).toBe(true);
-      expect(result.user).toBeDefined();
-      expect(result.user.username).toBe(testUsername);
-      expect(result.token).toBeDefined();
+      expect(result.data).toBeDefined();
+      expect(result.data.user).toBeDefined();
+      expect(result.data.user.username).toBe(testUsername);
+      expect(result.data.token).toBeDefined();
     });
 
     it('should reject invalid password', async () => {
       const result = await endpoints.login(testUsername, 'WrongPassword123!', false);
 
       expect(result.success).toBe(false);
-      expect(result.error).toBeDefined();
-      expect(result.error).toMatch(/invalid|incorrect|password/i);
+      expect(result.httpStatusCode).toBe(401);
+      expect(result.error).toMatch(/invalid|incorrect|credentials/i);
     });
 
     it('should reject non-existent user', async () => {
       const result = await endpoints.login('nonexistentuser', testPassword, false);
 
       expect(result.success).toBe(false);
-      expect(result.error).toBeDefined();
+      expect(result.httpStatusCode).toBe(401);
     });
 
     it('should support remember me flag', async () => {
       const result = await endpoints.login(testUsername, testPassword, true);
 
       expect(result.success).toBe(true);
-      expect(result.token).toBeDefined();
+      expect(result.data).toBeDefined();
+      expect(result.data.token).toBeDefined();
       // Remember me tokens should have longer expiry (not directly testable here)
     });
   });
@@ -139,16 +146,16 @@ describe('Authentication Flow - Integration Tests', () => {
       const result = await endpoints.validateToken(authToken);
 
       expect(result.success).toBe(true);
-      expect(result.valid).toBe(true);
-      expect(result.user).toBeDefined();
-      expect(result.user.id).toBe(userId);
+      expect(result.data).toBeDefined();
+      expect(result.data.isValid).toBe(true);
+      expect(result.data.user).toBeDefined();
+      expect(result.data.user.id).toBe(userId);
     });
 
     it('should reject an invalid token', async () => {
       const result = await endpoints.validateToken('invalid-token-12345');
 
       expect(result.success).toBe(false);
-      expect(result.valid).toBe(false);
     });
 
     it('should reject an expired token', async () => {
@@ -157,7 +164,7 @@ describe('Authentication Flow - Integration Tests', () => {
       const expiredToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjB9.invalid';
       const result = await endpoints.validateToken(expiredToken);
 
-      expect(result.valid).toBe(false);
+      expect(result.success).toBe(false);
     });
   });
 
@@ -166,11 +173,12 @@ describe('Authentication Flow - Integration Tests', () => {
       const result = await endpoints.getUserProfile(userId);
 
       expect(result.success).toBe(true);
-      expect(result.profile).toBeDefined();
-      expect(result.profile.id).toBe(userId);
-      expect(result.profile.username).toBe(testUsername);
-      expect(result.profile.email).toBe(testEmail);
-      expect(result.profile.displayName).toBeDefined();
+      expect(result.data).toBeDefined();
+      expect(result.data.profile).toBeDefined();
+      expect(result.data.profile.id).toBe(userId);
+      expect(result.data.profile.username).toBe(testUsername);
+      expect(result.data.profile.email).toBe(testEmail);
+      expect(result.data.profile.displayName).toBeDefined();
     });
 
     it('should update user profile', async () => {
@@ -186,9 +194,9 @@ describe('Authentication Flow - Integration Tests', () => {
 
       // Verify updates persisted
       const profile = await endpoints.getUserProfile(userId);
-      expect(profile.profile.displayName).toBe(updates.displayName);
-      expect(profile.profile.bio).toBe(updates.bio);
-      expect(profile.profile.location).toBe(updates.location);
+      expect(profile.data.profile.displayName).toBe(updates.displayName);
+      expect(profile.data.profile.bio).toBe(updates.bio);
+      expect(profile.data.profile.location).toBe(updates.location);
     });
 
     it('should handle profile updates with partial data', async () => {
@@ -202,8 +210,8 @@ describe('Authentication Flow - Integration Tests', () => {
 
       // Verify only bio changed, displayName unchanged
       const profile = await endpoints.getUserProfile(userId);
-      expect(profile.profile.bio).toBe(updates.bio);
-      expect(profile.profile.displayName).toBe('Updated Test User'); // From previous test
+      expect(profile.data.profile.bio).toBe(updates.bio);
+      expect(profile.data.profile.displayName).toBe('Updated Test User'); // From previous test
     });
 
     it('should reject profile update for non-existent user', async () => {
@@ -226,8 +234,8 @@ describe('Authentication Flow - Integration Tests', () => {
       // Token should now be invalid
       const validation = await endpoints.validateToken(authToken);
 
-      // Depending on implementation, this might return false or throw
-      expect(validation.valid).toBe(false);
+      // Backend returns HTTP 401 for revoked token, so result.success is false
+      expect(validation.success).toBe(false);
     });
 
     it('should handle logout with invalid token gracefully', async () => {
@@ -244,7 +252,7 @@ describe('Authentication Flow - Integration Tests', () => {
     // Re-login to get a fresh token
     beforeAll(async () => {
       const loginResult = await endpoints.login(testUsername, testPassword, false);
-      authToken = loginResult.token;
+      authToken = loginResult.data.token;
     });
 
     it('should successfully change password', async () => {
@@ -257,7 +265,8 @@ describe('Authentication Flow - Integration Tests', () => {
       const result = await endpoints.login(testUsername, newPassword, false);
 
       expect(result.success).toBe(true);
-      expect(result.token).toBeDefined();
+      expect(result.data).toBeDefined();
+      expect(result.data.token).toBeDefined();
     });
 
     it('should reject login with old password', async () => {

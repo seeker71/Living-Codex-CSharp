@@ -1,16 +1,12 @@
-import React from 'react'
-import { screen, waitFor, fireEvent } from '@testing-library/react'
-import { renderWithProviders } from './test-utils'
-import NodeDetailPage from '@/app/node/[id]/page'
-import EdgeDetailPage from '@/app/edge/[fromId]/[toId]/page'
-
-// Mock Next.js navigation
+// Mock Next.js navigation BEFORE imports
 const mockPush = jest.fn()
 const mockBack = jest.fn()
 
 jest.mock('next/navigation', () => ({
-  useParams: () => ({ id: 'invalid-node-id' }),
+  useParams: () => ({ id: 'invalid-node-id', fromId: 'invalid-from', toId: 'invalid-to' }),
   useRouter: () => ({ push: mockPush, back: mockBack }),
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/node/invalid-node-id',
 }))
 
 // Mock the useAuth hook
@@ -32,6 +28,17 @@ jest.mock('@/lib/hooks', () => ({
 jest.mock('@/lib/config', () => ({
   buildApiUrl: (path: string) => `http://localhost:5002${path}`,
 }))
+
+// Mock Navigation component
+jest.mock('@/components/ui/Navigation', () => ({
+  Navigation: () => <div data-testid="navigation">Navigation</div>
+}))
+
+import React from 'react'
+import { screen, waitFor, fireEvent } from '@testing-library/react'
+import { renderWithProviders } from './test-utils'
+import NodeDetailPage from '@/app/node/[id]/page'
+import EdgeDetailPage from '@/app/edge/[fromId]/[toId]/page'
 
 describe('Error Handling Tests', () => {
   beforeEach(() => {

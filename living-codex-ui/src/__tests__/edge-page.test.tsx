@@ -1,15 +1,12 @@
-import React from 'react'
-import { screen, waitFor, fireEvent } from '@testing-library/react'
-import { renderWithProviders } from './test-utils'
-import EdgeDetailPage from '@/app/edge/[fromId]/[toId]/page'
-
-// Mock the useParams and useRouter hooks
+// Mock the useParams and useRouter hooks BEFORE imports
 const mockPush = jest.fn()
 const mockBack = jest.fn()
 
 jest.mock('next/navigation', () => ({
   useParams: () => ({ fromId: 'u-core-concept-kw-matter', toId: 'u-core-axis-water_states' }),
   useRouter: () => ({ push: mockPush, back: mockBack }),
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/edge/u-core-concept-kw-matter/u-core-axis-water_states',
 }))
 
 // Mock the useAuth hook
@@ -36,6 +33,11 @@ jest.mock('@/lib/config', () => ({
 jest.mock('@/components/ui/Navigation', () => ({
   Navigation: () => <div data-testid="navigation">Navigation</div>
 }))
+
+import React from 'react'
+import { screen, waitFor, fireEvent } from '@testing-library/react'
+import { renderWithProviders } from './test-utils'
+import EdgeDetailPage from '@/app/edge/[fromId]/[toId]/page'
 
 // Mock fetch responses
 const mockEdgeData = {

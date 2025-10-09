@@ -30,6 +30,36 @@ export const TEST_INFRASTRUCTURE = {
   }
 }
 
+// Mock next/navigation
+const mockPush = jest.fn();
+const mockBack = jest.fn();
+const mockRouter = {
+  push: mockPush,
+  back: mockBack,
+  forward: jest.fn(),
+  refresh: jest.fn(),
+  replace: jest.fn(),
+  prefetch: jest.fn(),
+};
+
+jest.mock('next/navigation', () => ({
+  useRouter: () => mockRouter,
+  usePathname: () => '/',
+  useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({}),
+}));
+
+// Mock next/image
+jest.mock('next/image', () => ({
+  __esModule: true,
+  default: function MockImage(props: any) {
+    // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
+    return <img {...props} />
+  },
+}));
+
+// Note: useTrackInteraction and other hooks should be mocked in individual test files as needed
+
 // Mock the config module
 jest.mock('@/lib/config', () => ({
   config: {

@@ -78,11 +78,18 @@ namespace CodexBootstrap.Modules;
             // Store the relationship in the registry
             _registry.Upsert(relationshipEdge);
 
-            return new UserConceptLinkResponse(
-                Success: true,
-                RelationshipId: relationshipId,
-                Message: "User-concept linked successfully"
-            );
+            // Return full relationship object for frontend integration
+            var relationship = new
+            {
+                relationshipId = relationshipId,
+                userId = request.UserId,
+                conceptId = request.ConceptId,
+                relationshipType = request.RelationshipType,
+                strength = request.Strength,
+                createdAt = DateTime.UtcNow
+            };
+
+            return new { success = true, relationship = relationship, message = "User-concept linked successfully" };
         }
         catch (Exception ex)
         {

@@ -55,18 +55,9 @@ public class ConceptRegistryModule : ModuleBase
     /// </summary>
     private void RegisterConceptRegistryNodes(INodeRegistry registry)
     {
-        // Register Concept Registry module node
-        var conceptRegistryNode = CreateModuleNode(
-            moduleId: "codex.concept-registry",
-            name: "Concept Registry Module",
-            version: "1.0.0",
-            description: "Central registry for all concepts across services with version management and cross-service synchronization",
-            tags: new[] { "concept", "registry", "cross-service", "version-management", "quality-assessment" },
-            capabilities: new[] { "concept-registration", "concept-discovery", "version-management", "cross-service-sync", "relationship-management", "quality-assessment" },
-            spec: "codex.spec.concept-registry"
-        );
-        registry.Upsert(conceptRegistryNode);
-
+        // NOTE: Module node is already registered via GetModuleNode() during LoadModule()
+        // No need to register it again here to avoid duplicate node creation
+        
         // Register Quality Assessment routes as nodes
         RegisterQualityAssessmentRoutes(registry);
         

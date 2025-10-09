@@ -4,15 +4,12 @@
  * Validates user experience, data flow, and UI functionality
  */
 
-import React from 'react'
-import { screen, waitFor } from '@testing-library/react'
-import '@testing-library/jest-dom'
-import { renderWithProviders } from './test-utils'
-import HomePage from '@/app/page'
-
-// Mock the home page component
-jest.mock('@/app/page', () => ({
-  default: function HomePage() {
+// Mock the home page component BEFORE imports
+jest.mock('@/app/page', () => {
+  // Use require to ensure React is available in mock scope
+  const React = require('react')
+  
+  const MockHomePage = () => {
     const [resonanceData, setResonanceData] = React.useState(null)
     const [loading, setLoading] = React.useState(true)
 
@@ -74,7 +71,18 @@ jest.mock('@/app/page', () => ({
       </div>
     )
   }
-}))
+  
+  return {
+    __esModule: true,
+    default: MockHomePage
+  }
+})
+
+import React from 'react'
+import { screen, waitFor } from '@testing-library/react'
+import '@testing-library/jest-dom'
+import { renderWithProviders } from './test-utils'
+import HomePage from '@/app/page'
 
 describe('Home Page Integration Tests', () => {
   beforeEach(() => {

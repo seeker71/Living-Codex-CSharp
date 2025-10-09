@@ -723,28 +723,28 @@ IMPORTANT: Return ONLY a valid JSON object with the evolved template, no markdow
         }
 
         [ApiRoute("POST", "/ai/extract-concepts", "ai-extract-concepts", "Extract concepts using configurable prompts", "ai-module")]
-        public async Task<object> HandleConceptExtractionAsync([ApiParameter("request", "Concept extraction request", Required = true, Location = "body")] ConceptExtractionRequest request)
+        public async Task<IResult> HandleConceptExtractionAsync([ApiParameter("request", "Concept extraction request", Required = true, Location = "body")] ConceptExtractionRequest request)
         {
             // Check if AI services are ready
             if (!_startupState.IsAIReady)
             {
                 var disabledConfig = LLMConfigurations.GetConfigForTask("concept-extraction", request.Provider, request.Model);
                 _logger.Warn($"AI_CALL extract-concepts NOT READY provider={disabledConfig.Provider} model={disabledConfig.Model} baseUrl={disabledConfig.BaseUrl} chars={request.Content.Length}");
-                return new
+                return Results.Json(new
                 {
                     success = false,
                     error = "AI services not ready",
                     message = "AI services are not yet ready. Please try again in a moment.",
                     details = "The system is still initializing. AI services will be available shortly.",
                     timestamp = DateTimeOffset.UtcNow
-                };
+                }, statusCode: 503); // Service Unavailable
             }
 
             try
             {
                 if (request == null || string.IsNullOrEmpty(request.Content))
                 {
-                    return new { success = false, error = "Content is required" };
+                    return Results.BadRequest(new { success = false, error = "Content is required" });
                 }
 
                 // Use the new resonance-aligned concept extraction system
@@ -760,12 +760,12 @@ IMPORTANT: Return ONLY a valid JSON object with the evolved template, no markdow
                 var resonanceResponse = await resonanceModule.ExtractAndIntegrateConceptsAsync(resonanceRequest);
 
                 // Return the enhanced response
-                return resonanceResponse;
+                return Results.Ok(resonanceResponse);
             }
             catch (Exception ex)
             {
                 _logger.Error($"Error in concept extraction: {ex.Message}", ex);
-                return new { success = false, error = ex.Message };
+                return Results.Json(new { success = false, error = ex.Message }, statusCode: 500);
             }
         }
 

@@ -325,10 +325,11 @@ export default function CreatePage() {
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Basic Information</h3>
                     
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="concept-name" className="block text-sm font-medium text-gray-700 mb-2">
                         Concept Name *
                       </label>
                       <input
+                        id="concept-name"
                         type="text"
                         value={conceptName}
                         onChange={(e) => setConceptName(e.target.value)}
@@ -338,10 +339,11 @@ export default function CreatePage() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="concept-description" className="block text-sm font-medium text-gray-700 mb-2">
                         Description *
                       </label>
                       <textarea
+                        id="concept-description"
                         value={conceptDescription}
                         onChange={(e) => setConceptDescription(e.target.value)}
                         placeholder="Describe your concept in detail..."
@@ -351,10 +353,11 @@ export default function CreatePage() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="concept-domain" className="block text-sm font-medium text-gray-700 mb-2">
                         Domain
                       </label>
                       <select
+                        id="concept-domain"
                         value={conceptDomain}
                         onChange={(e) => setConceptDomain(e.target.value)}
                         className="input-standard"
@@ -373,10 +376,11 @@ export default function CreatePage() {
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Advanced Properties</h3>
                     
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="concept-complexity" className="block text-sm font-medium text-gray-700 mb-2">
                         Complexity Level: {conceptComplexity}
                       </label>
                       <input
+                        id="concept-complexity"
                         type="range"
                         min="1"
                         max="10"
@@ -391,11 +395,12 @@ export default function CreatePage() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="tag-input" className="block text-sm font-medium text-gray-700 mb-2">
                         Tags
                       </label>
                       <div className="flex space-x-2 mb-2">
                         <input
+                          id="tag-input"
                           type="text"
                           value={tagInput}
                           onChange={(e) => setTagInput(e.target.value)}

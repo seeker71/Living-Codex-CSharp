@@ -4,7 +4,7 @@
  * Core principle: Everything is a Node
  */
 
-import config from './config';
+import { config } from './config';
 
 export interface Node {
   id: string;
@@ -57,7 +57,7 @@ export interface NodeStats {
  */
 export async function getNodes(limit = 100, offset = 0): Promise<Node[]> {
   const response = await fetch(
-    `${config.NEXT_PUBLIC_BACKEND_URL}/nodes?limit=${limit}&offset=${offset}`
+    `${config.backend.baseUrl}/nodes?limit=${limit}&offset=${offset}`
   );
   
   if (!response.ok) {
@@ -72,7 +72,7 @@ export async function getNodes(limit = 100, offset = 0): Promise<Node[]> {
  */
 export async function getNode(id: string): Promise<Node> {
   const response = await fetch(
-    `${config.NEXT_PUBLIC_BACKEND_URL}/nodes/${encodeURIComponent(id)}`
+    `${config.backend.baseUrl}/nodes/${encodeURIComponent(id)}`
   );
   
   if (!response.ok) {
@@ -87,7 +87,7 @@ export async function getNode(id: string): Promise<Node> {
  */
 export async function getEdgesFrom(nodeId: string): Promise<Edge[]> {
   const response = await fetch(
-    `${config.NEXT_PUBLIC_BACKEND_URL}/edges/from/${encodeURIComponent(nodeId)}`
+    `${config.backend.baseUrl}/edges/from/${encodeURIComponent(nodeId)}`
   );
   
   if (!response.ok) {
@@ -102,7 +102,7 @@ export async function getEdgesFrom(nodeId: string): Promise<Edge[]> {
  */
 export async function getEdgesTo(nodeId: string): Promise<Edge[]> {
   const response = await fetch(
-    `${config.NEXT_PUBLIC_BACKEND_URL}/edges/to/${encodeURIComponent(nodeId)}`
+    `${config.backend.baseUrl}/edges/to/${encodeURIComponent(nodeId)}`
   );
   
   if (!response.ok) {
@@ -117,7 +117,7 @@ export async function getEdgesTo(nodeId: string): Promise<Edge[]> {
  */
 export async function queryGraph(query: GraphQueryRequest): Promise<GraphQueryResponse> {
   const response = await fetch(
-    `${config.NEXT_PUBLIC_BACKEND_URL}/graph/query`,
+    `${config.backend.baseUrl}/graph/query`,
     {
       method: 'POST',
       headers: {

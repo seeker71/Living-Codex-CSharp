@@ -3,7 +3,7 @@
  * For creating and managing concepts in the Living Codex
  */
 
-import config from './config';
+import { config } from './config';
 
 export interface ConceptCreateRequest {
   name: string;
@@ -25,7 +25,7 @@ export interface ConceptCreateResponse {
  */
 export async function createConcept(request: ConceptCreateRequest): Promise<ConceptCreateResponse> {
   const response = await fetch(
-    `${config.NEXT_PUBLIC_BACKEND_URL}/concept/create`,
+    `${config.backend.baseUrl}/concept/create`,
     {
       method: 'POST',
       headers: {
