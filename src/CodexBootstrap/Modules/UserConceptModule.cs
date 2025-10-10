@@ -133,7 +133,7 @@ namespace CodexBootstrap.Modules;
             }
 
             // Find and remove the edge
-            var edges = _registry.GetEdges()
+            var edges = _registry.AllEdges().AsEnumerable()
                 .Where(e => e.FromId == request.UserId && e.ToId == request.ConceptId && e.Role == "attuned")
                 .ToList();
 
@@ -165,7 +165,7 @@ namespace CodexBootstrap.Modules;
         try
         {
             // Get all edges from this user
-            var userEdges = _registry.GetEdges()
+            var userEdges = _registry.AllEdges().AsEnumerable()
                 .Where(e => e.FromId == userId && e.Role == "attuned")
                 .ToList();
 

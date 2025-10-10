@@ -207,7 +207,7 @@ describe('User-Concept Relationships - Integration Tests', () => {
       const userConcepts = await endpoints.getUserConcepts(userId);
 
       // Concept 2 should not be in the list
-      const hasConceptTwo = userConcepts.concepts.some((c: any) => 
+      const hasConceptTwo = userConcepts.data.concepts.some((c: any) => 
         c.conceptId === conceptIds[2] || c.id === conceptIds[2]
       );
       expect(hasConceptTwo).toBe(false);
