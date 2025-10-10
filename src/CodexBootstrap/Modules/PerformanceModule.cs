@@ -49,12 +49,12 @@ public sealed class PerformanceModule : ModuleBase
     /// Get performance metrics for all operations
     /// </summary>
     [ApiRoute("GET", "/performance/metrics", "get-metrics", "Get performance metrics for all operations", "codex.performance")]
-    public async Task<object> GetMetricsAsync()
+    public async Task<IResult> GetMetricsAsync()
     {
         try
         {
             var allMetrics = _profiler.GetAllMetrics();
-            return await Task.FromResult<object>(new
+            return await Task.FromResult(Results.Ok(new
             {
                 success = true,
                 data = new
@@ -72,12 +72,12 @@ public sealed class PerformanceModule : ModuleBase
                         errorRate = Math.Round(m.ErrorRate * 100, 2)
                     }).OrderByDescending(m => m.callCount)
                 }
-            });
+            }));
         }
         catch (Exception ex)
         {
             _logger.Error($"Error getting performance metrics: {ex.Message}", ex);
-            return await Task.FromResult<object>(new { success = false, error = ex.Message });
+            return await Task.FromResult(Results.Json(new { success = false, error = ex.Message }, statusCode: 500));
         }
     }
 
@@ -85,12 +85,12 @@ public sealed class PerformanceModule : ModuleBase
     /// Get top slowest operations
     /// </summary>
     [ApiRoute("GET", "/performance/slowest", "get-slowest", "Get top slowest operations", "codex.performance")]
-    public async Task<object> GetSlowestOperationsAsync([ApiParameter("count", "Number of operations to return", Required = false)] int count = 10)
+    public async Task<IResult> GetSlowestOperationsAsync([ApiParameter("count", "Number of operations to return", Required = false)] int count = 10)
     {
         try
         {
             var slowest = _profiler.GetTopSlowOperations(count);
-            return await Task.FromResult<object>(new
+            return await Task.FromResult(Results.Ok(new
             {
                 success = true,
                 data = new
@@ -104,12 +104,12 @@ public sealed class PerformanceModule : ModuleBase
                         errorRate = Math.Round(m.ErrorRate * 100, 2)
                     })
                 }
-            });
+            }));
         }
         catch (Exception ex)
         {
             _logger.Error($"Error getting slowest operations: {ex.Message}", ex);
-            return await Task.FromResult<object>(new { success = false, error = ex.Message });
+            return await Task.FromResult(Results.Json(new { success = false, error = ex.Message }, statusCode: 500));
         }
     }
 
@@ -117,12 +117,12 @@ public sealed class PerformanceModule : ModuleBase
     /// Get most frequent operations
     /// </summary>
     [ApiRoute("GET", "/performance/frequent", "get-frequent", "Get most frequent operations", "codex.performance")]
-    public async Task<object> GetFrequentOperationsAsync([ApiParameter("count", "Number of operations to return", Required = false)] int count = 10)
+    public async Task<IResult> GetFrequentOperationsAsync([ApiParameter("count", "Number of operations to return", Required = false)] int count = 10)
     {
         try
         {
             var frequent = _profiler.GetTopFrequentOperations(count);
-            return await Task.FromResult<object>(new
+            return await Task.FromResult(Results.Ok(new
             {
                 success = true,
                 data = new
@@ -136,12 +136,12 @@ public sealed class PerformanceModule : ModuleBase
                         errorRate = Math.Round(m.ErrorRate * 100, 2)
                     })
                 }
-            });
+            }));
         }
         catch (Exception ex)
         {
             _logger.Error($"Error getting frequent operations: {ex.Message}", ex);
-            return await Task.FromResult<object>(new { success = false, error = ex.Message });
+            return await Task.FromResult(Results.Json(new { success = false, error = ex.Message }, statusCode: 500));
         }
     }
 
@@ -149,12 +149,12 @@ public sealed class PerformanceModule : ModuleBase
     /// Get operations with errors
     /// </summary>
     [ApiRoute("GET", "/performance/errors", "get-errors", "Get operations with errors", "codex.performance")]
-    public async Task<object> GetOperationsWithErrorsAsync([ApiParameter("count", "Number of operations to return", Required = false)] int count = 10)
+    public async Task<IResult> GetOperationsWithErrorsAsync([ApiParameter("count", "Number of operations to return", Required = false)] int count = 10)
     {
         try
         {
             var withErrors = _profiler.GetOperationsWithErrors(count);
-            return await Task.FromResult<object>(new
+            return await Task.FromResult(Results.Ok(new
             {
                 success = true,
                 data = new
@@ -169,12 +169,12 @@ public sealed class PerformanceModule : ModuleBase
                         averageDurationMs = Math.Round(m.AverageDurationMs, 2)
                     })
                 }
-            });
+            }));
         }
         catch (Exception ex)
         {
             _logger.Error($"Error getting operations with errors: {ex.Message}", ex);
-            return await Task.FromResult<object>(new { success = false, error = ex.Message });
+            return await Task.FromResult(Results.Json(new { success = false, error = ex.Message }, statusCode: 500));
         }
     }
 
@@ -182,7 +182,7 @@ public sealed class PerformanceModule : ModuleBase
     /// Get performance summary and recommendations
     /// </summary>
     [ApiRoute("GET", "/performance/summary", "get-summary", "Get performance summary and recommendations", "codex.performance")]
-    public async Task<object> GetPerformanceSummaryAsync()
+    public async Task<IResult> GetPerformanceSummaryAsync()
     {
         try
         {
@@ -218,7 +218,7 @@ public sealed class PerformanceModule : ModuleBase
                 recommendations.Add("Overall error rate is high - review system stability");
             }
 
-            return await Task.FromResult<object>(new
+            return await Task.FromResult(Results.Ok(new
             {
                 success = true,
                 data = new
@@ -247,12 +247,12 @@ public sealed class PerformanceModule : ModuleBase
                     }),
                     recommendations = recommendations
                 }
-            });
+            }));
         }
         catch (Exception ex)
         {
             _logger.Error($"Error getting performance summary: {ex.Message}", ex);
-            return await Task.FromResult<object>(new { success = false, error = ex.Message });
+            return await Task.FromResult(Results.Json(new { success = false, error = ex.Message }, statusCode: 500));
         }
     }
 }

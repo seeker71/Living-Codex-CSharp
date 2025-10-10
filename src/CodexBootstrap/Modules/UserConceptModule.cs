@@ -53,10 +53,22 @@ namespace CodexBootstrap.Modules;
     [Post("/userconcept/link", "userconcept-link", "Link user to concept", "codex.userconcept")]
     [ApiResponse(200, "Success")]
     [ApiResponse(400, "Bad request")]
-    public async Task<object> LinkUserConcept([ApiParameter("request", "User-concept link request", Required = true, Location = "body")] UserConceptLinkRequest request)
+    public async Task<IResult> LinkUserConcept([ApiParameter("request", "User-concept link request", Required = true, Location = "body")] UserConceptLinkRequest request)
     {
         try
         {
+            // Validate user exists
+            if (!_registry.TryGet(request.UserId, out var userNode) || !request.UserId.StartsWith("user."))
+            {
+                return Results.BadRequest(new { success = false, error = "Invalid user ID" });
+            }
+
+            // Validate concept exists
+            if (!_registry.TryGet(request.ConceptId, out var conceptNode) || conceptNode.TypeId != "codex.concept")
+            {
+                return Results.BadRequest(new { success = false, error = "Invalid concept ID" });
+            }
+
             var relationshipId = Guid.NewGuid().ToString();
             
             // Create relationship edge
@@ -89,11 +101,11 @@ namespace CodexBootstrap.Modules;
                 createdAt = DateTime.UtcNow
             };
 
-            return new { success = true, relationship = relationship, message = "User-concept linked successfully" };
+            return Results.Ok(new { success = true, relationship = relationship, message = "User-concept linked successfully" });
         }
         catch (Exception ex)
         {
-            return ResponseHelpers.CreateErrorResponse($"Failed to link user-concept: {ex.Message}", "LINK_ERROR");
+            return Results.Json(new { success = false, error = $"Failed to link user-concept: {ex.Message}" }, statusCode: 500);
         }
     }
 
@@ -104,18 +116,40 @@ namespace CodexBootstrap.Modules;
     [Post("/userconcept/unlink", "userconcept-unlink", "Unlink user from concept", "codex.userconcept")]
     [ApiResponse(200, "Success")]
     [ApiResponse(400, "Bad request")]
-    public async Task<object> UnlinkUserConcept([ApiParameter("request", "User-concept unlink request", Required = true, Location = "body")] UserConceptUnlinkRequest request)
+    public async Task<IResult> UnlinkUserConcept([ApiParameter("request", "User-concept unlink request", Required = true, Location = "body")] UserConceptUnlinkRequest request)
     {
         try
         {
-            return new UserConceptUnlinkResponse(
+            // Validate user exists
+            if (!_registry.TryGet(request.UserId, out var userNode) || !request.UserId.StartsWith("user."))
+            {
+                return Results.BadRequest(new { success = false, error = "Invalid user ID" });
+            }
+
+            // Validate concept exists
+            if (!_registry.TryGet(request.ConceptId, out var conceptNode) || conceptNode.TypeId != "codex.concept")
+            {
+                return Results.BadRequest(new { success = false, error = "Invalid concept ID" });
+            }
+
+            // Find and remove the edge
+            var edges = _registry.GetEdges()
+                .Where(e => e.FromId == request.UserId && e.ToId == request.ConceptId && e.Role == "attuned")
+                .ToList();
+
+            foreach (var edge in edges)
+            {
+                _registry.RemoveEdge(edge.FromId, edge.ToId);
+            }
+
+            return Results.Ok(new UserConceptUnlinkResponse(
                 Success: true,
                 Message: "User-concept unlinked successfully"
-            );
+            ));
         }
         catch (Exception ex)
         {
-            return ResponseHelpers.CreateErrorResponse($"Failed to unlink user-concept: {ex.Message}", "UNLINK_ERROR");
+            return Results.Json(new { success = false, error = $"Failed to unlink user-concept: {ex.Message}" }, statusCode: 500);
         }
     }
 
@@ -130,11 +164,35 @@ namespace CodexBootstrap.Modules;
     {
         try
         {
+            // Get all edges from this user
+            var userEdges = _registry.GetEdges()
+                .Where(e => e.FromId == userId && e.Role == "attuned")
+                .ToList();
+
+            // Get the concepts for these edges
+            var concepts = new List<object>();
+            foreach (var edge in userEdges)
+            {
+                if (_registry.TryGet(edge.ToId, out var conceptNode) && conceptNode.TypeId == "codex.concept")
+                {
+                    concepts.Add(new
+                    {
+                        id = conceptNode.Id,
+                        name = conceptNode.Meta?.GetValueOrDefault("name")?.ToString() ?? conceptNode.Title ?? "Unknown",
+                        description = conceptNode.Meta?.GetValueOrDefault("description")?.ToString() ?? conceptNode.Description ?? "",
+                        domain = conceptNode.Meta?.GetValueOrDefault("domain")?.ToString() ?? "General",
+                        relationshipType = edge.Role,
+                        strength = edge.Weight,
+                        createdAt = edge.Meta?.GetValueOrDefault("createdAt") ?? DateTime.UtcNow
+                    });
+                }
+            }
+
             return new UserConceptsResponse(
                 Success: true,
                 UserId: userId,
-                Concepts: new object[0],
-                TotalCount: 0,
+                Concepts: concepts.ToArray(),
+                TotalCount: concepts.Count,
                 Message: "User concepts retrieved successfully"
             );
         }
