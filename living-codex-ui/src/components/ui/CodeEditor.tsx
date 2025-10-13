@@ -119,6 +119,13 @@ function CodeEditor({
   const [showPreview, setShowPreview] = useState<boolean>(true)
   const effectiveReadOnly = readOnly || fileNode?.meta?.isReadOnly || false
 
+  // Auto-enable preview for previewable content
+  useEffect(() => {
+    if (mediaType && isPreviewable(mediaType)) {
+      setShowPreview(true)
+    }
+  }, [mediaType])
+
   // Load file content when nodeId changes
   useEffect(() => {
     if (!nodeId) {
@@ -344,9 +351,9 @@ function CodeEditor({
       )}
 
       {/* Editor + Preview */}
-      <div className="flex-1 relative">
+      <div className="flex-1 flex flex-col overflow-hidden">
         {showPreview && isPreviewable(mediaType) && (
-          <div className="border-b border-gray-200 dark:border-gray-700 p-3">
+          <div className="flex-shrink-0 border-b border-gray-200 dark:border-gray-700 p-4 overflow-y-auto max-h-96 bg-gray-50 dark:bg-gray-800">
             <ContentRenderer
               content={{ mediaType: mediaType || 'text/plain', inlineJson: content }}
               nodeId={nodeId || ''}
@@ -358,7 +365,7 @@ function CodeEditor({
           value={content}
           onChange={(e) => setContent(e.target.value)}
           readOnly={effectiveReadOnly}
-          className="w-full h-full p-4 font-mono text-sm bg-transparent border-none resize-none focus:outline-none focus:ring-0 text-gray-900 dark:text-gray-100"
+          className="flex-1 w-full p-4 font-mono text-sm bg-transparent border-none resize-none focus:outline-none focus:ring-0 text-gray-900 dark:text-gray-100 overflow-y-auto"
           placeholder={effectiveReadOnly ? "File content will appear here..." : "Start typing..."}
           spellCheck={false}
           style={{

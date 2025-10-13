@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ResonanceControls } from '@/components/ui/ResonanceControls';
 import { StreamLens } from '@/components/lenses/StreamLens';
+import { RecentDiscussions } from '@/components/widgets/RecentDiscussions';
 import { usePages, useLenses } from '@/lib/hooks';
 import { defaultAtoms } from '@/lib/atoms';
 import { bootstrapUI } from '@/lib/bootstrap';
@@ -72,11 +73,12 @@ export default function HomePage() {
         {/* Controls and Stream */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Resonance Controls */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 space-y-6">
             <ResonanceControls
               onControlsChange={handleControlsChange}
               className="sticky top-8"
             />
+            <RecentDiscussions limit={5} />
           </div>
 
           {/* Main Stream */}

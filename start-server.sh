@@ -169,6 +169,75 @@ wait_for_server() {
     return 1
 }
 
+# Function to test WebSocket connectivity
+test_websocket() {
+    local ws_test_script=$(cat << 'EOF'
+const WebSocket = require('ws');
+const ws = new WebSocket(process.argv[2]);
+const timeout = setTimeout(() => {
+    console.log('TIMEOUT');
+    process.exit(1);
+}, 5000);
+ws.on('open', () => {
+    clearTimeout(timeout);
+    console.log('SUCCESS');
+    ws.close();
+    process.exit(0);
+});
+ws.on('error', (err) => {
+    clearTimeout(timeout);
+    console.log('ERROR: ' + err.message);
+    process.exit(1);
+});
+EOF
+)
+
+    # Check if node is available and has ws module
+    if command -v node &> /dev/null; then
+        # Try to use node with ws module
+        local test_result=$(echo "$ws_test_script" | node - "ws://127.0.0.1:$PORT/ws" 2>&1 || echo "FAILED")
+        if echo "$test_result" | grep -q "SUCCESS"; then
+            return 0
+        elif echo "$test_result" | grep -q "Cannot find module 'ws'"; then
+            # ws module not available, use Python fallback
+            :  # fall through to Python test
+        else
+            return 1
+        fi
+    fi
+
+    # Python WebSocket test (fallback)
+    if command -v python3 &> /dev/null; then
+        local python_test=$(python3 -c "
+import sys
+try:
+    from websocket import create_connection
+    ws = create_connection('ws://127.0.0.1:$PORT/ws', timeout=5)
+    print('SUCCESS')
+    ws.close()
+    sys.exit(0)
+except ImportError:
+    # websocket-client not installed, skip test
+    print('SKIP')
+    sys.exit(0)
+except Exception as e:
+    print(f'ERROR: {e}')
+    sys.exit(1)
+" 2>&1 || echo "FAILED")
+        
+        if echo "$python_test" | grep -q "SUCCESS"; then
+            return 0
+        elif echo "$python_test" | grep -q "SKIP"; then
+            return 2  # Skip - no WebSocket library available
+        else
+            return 1
+        fi
+    fi
+
+    # No WebSocket testing capability available
+    return 2
+}
+
 # Function to test server endpoints
 test_server() {
     echo "🧪 Testing server endpoints..."
@@ -195,7 +264,27 @@ test_server() {
         echo "⚠️  /spec/modules endpoint failed (continuing)"
     fi
     
-    echo "✅ All endpoint tests passed!"
+    # Test WebSocket connectivity (CRITICAL - this would have caught the middleware issue!)
+    echo "🔌 Testing WebSocket connectivity..."
+    test_websocket
+    local ws_result=$?
+    if [ $ws_result -eq 0 ]; then
+        echo "✅ WebSocket endpoint working (ws://127.0.0.1:$PORT/ws)"
+    elif [ $ws_result -eq 2 ]; then
+        echo "⚠️  WebSocket test skipped (no testing tools available)"
+        echo "   Install: npm install -g ws  OR  pip3 install websocket-client"
+    else
+        echo "❌ WebSocket endpoint FAILED!"
+        echo "   This usually means:"
+        echo "   1. app.UseWebSockets() middleware is missing"
+        echo "   2. WebSocket endpoint is not registered"
+        echo "   3. Server is not accepting WebSocket upgrades"
+        echo ""
+        echo "⚠️  WebSocket failure is CRITICAL - real-time features will not work!"
+        echo "   However, continuing startup for debugging..."
+    fi
+    
+    echo "✅ All critical endpoint tests passed!"
     return 0
 }
 

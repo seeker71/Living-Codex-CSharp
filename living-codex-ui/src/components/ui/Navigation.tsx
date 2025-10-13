@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { useState, useEffect, useRef } from 'react';
+import { api } from '@/lib/api';
 
 export function Navigation() {
   const pathname = usePathname();
@@ -11,10 +12,32 @@ export function Navigation() {
   const [isClient, setIsClient] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement | null>(null);
+  const [userPoints, setUserPoints] = useState<{ totalPoints: number; level: number } | null>(null);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  // Load user gamification data
+  useEffect(() => {
+    if (isAuthenticated && user?.id) {
+      api.get(`/gamification/points/${user.id}`)
+        .then(response => {
+          if (response.success && response.data) {
+            setUserPoints({
+              totalPoints: response.data.totalPoints,
+              level: response.data.level
+            });
+          }
+        })
+        .catch(() => {
+          // Silently fail if gamification not available
+          setUserPoints(null);
+        });
+    } else {
+      setUserPoints(null);
+    }
+  }, [isAuthenticated, user]);
 
   // Close the more menu on route change and outside clicks
   useEffect(() => {
@@ -41,6 +64,7 @@ export function Navigation() {
     { href: '/code', label: 'Code', icon: '💻' },
     { href: '/graph', label: 'Graph', icon: '🕸️' },
     { href: '/resonance', label: 'Resonance', icon: '🌊' },
+    { href: '/analytics', label: 'Analytics', icon: '📈' },
     { href: '/about', label: 'About', icon: 'ℹ️' },
   ];
 
@@ -48,13 +72,23 @@ export function Navigation() {
     ...publicNavItems,
     { href: '/people', label: 'People', icon: '🌍' },
     { href: '/create', label: 'Create', icon: '✨' },
+    { href: '/achievements', label: 'Achievements', icon: '🏆' },
+    { href: '/activity', label: 'Activity', icon: '📊' },
+    { href: '/notifications', label: 'Notifications', icon: '🔔' },
+    { href: '/events', label: 'Events', icon: '📡' },
+    { href: '/security', label: 'Security', icon: '🔐' },
+    { href: '/predictions', label: 'Predictions', icon: '🔮' },
     { href: '/portals', label: 'Portals', icon: '🚪' },
+    { href: '/admin', label: 'Admin', icon: '🛡️' },
     { href: '/ai-dashboard', label: 'AI Dashboard', icon: '🧠' },
     { href: '/dev', label: 'Dev', icon: '🛠️' },
     // Expose Swagger for developers
     { href: process.env.NEXT_PUBLIC_BACKEND_BASE_URL ? `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/swagger` : 'http://127.0.0.1:5002/swagger', label: 'Swagger', icon: '📜' },
     { href: '/profile', label: 'Profile', icon: '👤' },
   ];
+
+  // Note: Reflect navigation requires a conceptId, so we don't add it to the main nav
+  // Instead, it's accessible from concept cards and detail pages
 
   let navItems = isAuthenticated ? authNavItems : publicNavItems;
   // Logical ordering: Explore → Create/Community → Dev/Code → About/Profile
@@ -65,9 +99,17 @@ export function Navigation() {
     '/ontology': 30,
     '/graph': 40,
     '/resonance': 50,
+    '/analytics': 55,
+    '/events': 57,
+    '/security': 58,
+    '/predictions': 59,
     '/people': 60,
     '/create': 70,
+    '/achievements': 75,
+    '/activity': 76,
+    '/notifications': 77,
     '/portals': 80,
+    '/admin': 82,
     '/ai-dashboard': 85,
     '/code': 90,
     '/dev': 100,
@@ -149,14 +191,30 @@ export function Navigation() {
         {!isClient || isLoading ? (
           <div className="w-16 h-8 bg-gray-200 dark:bg-gray-700/60 rounded animate-pulse"></div>
         ) : isAuthenticated && user ? (
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-3">
+            {/* Gamification Display */}
+            {userPoints && (
+              <Link 
+                href="/achievements" 
+                className="hidden sm:flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-purple-600/20 to-pink-600/20 border border-purple-500/30 rounded-lg hover:border-purple-500/50 transition-colors group"
+                title="View achievements"
+              >
+                <span className="text-lg group-hover:scale-110 transition-transform">🏆</span>
+                <div className="flex flex-col items-start">
+                  <div className="text-xs font-bold text-purple-400">Level {userPoints.level}</div>
+                  <div className="text-[10px] text-gray-400">{userPoints.totalPoints} pts</div>
+                </div>
+              </Link>
+            )}
+            
+            {/* User Profile */}
             <Link href="/profile" className="flex items-center space-x-2 group">
               <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center group-hover:opacity-90">
                 <span className="text-xs font-bold text-white">
                   {(user.displayName || user.username || 'U').charAt(0).toUpperCase()}
                 </span>
               </div>
-              <span className="text-sm text-gray-800 dark:text-gray-100 group-hover:underline">{user.displayName || user.username || 'User'}</span>
+              <span className="hidden md:inline text-sm text-gray-800 dark:text-gray-100 group-hover:underline">{user.displayName || user.username || 'User'}</span>
             </Link>
           </div>
         ) : (

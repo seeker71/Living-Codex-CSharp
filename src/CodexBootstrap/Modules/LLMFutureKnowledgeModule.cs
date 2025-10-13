@@ -123,7 +123,7 @@ public class LLMFutureKnowledgeModule : ModuleBase
     }
 
     [ApiRoute("POST", "/llm/future/query", "llm-future-query", "Query future knowledge using LLM", "codex.llm.future")]
-    public async Task<object> QueryFutureKnowledge([ApiParameter("request", "Future query request", Required = true, Location = "body")] FutureQueryRequest request)
+    public async Task<IResult> QueryFutureKnowledge([ApiParameter("request", "Future query request", Required = true, Location = "body")] FutureQueryRequest request)
     {
         try
         {
@@ -131,7 +131,7 @@ public class LLMFutureKnowledgeModule : ModuleBase
             var llmConfig = GetLLMConfig(request.LLMConfigId);
             if (llmConfig == null)
             {
-                return new ErrorResponse($"LLM configuration '{request.LLMConfigId}' not found");
+                return Results.NotFound(new ErrorResponse($"LLM configuration '{request.LLMConfigId}' not found"));
             }
 
             // Create future query
@@ -155,23 +155,23 @@ public class LLMFutureKnowledgeModule : ModuleBase
             _registry.Upsert(queryNode);
             _registry.Upsert(responseNode);
 
-            return new FutureQueryResponse(
+            return Results.Ok(new FutureQueryResponse(
                 Success: true,
                 Message: "Future knowledge generated successfully",
                 Query: futureQuery,
                 Response: futureResponse,
                 Insights: GenerateInsights(futureResponse),
                 NextSteps: GenerateNextSteps(futureResponse)
-            );
+            ));
         }
         catch (Exception ex)
         {
-            return new ErrorResponse($"Failed to query future knowledge: {ex.Message}");
+            return Results.Json(new ErrorResponse($"Failed to query future knowledge: {ex.Message}"), statusCode: 500);
         }
     }
 
     [ApiRoute("POST", "/llm/translate", "llm-translate-concept", "Translate concept through belief system using LLM", "codex.llm.future")]
-    public async Task<object> TranslateConcept([ApiParameter("request", "Translation request", Required = true, Location = "body")] TranslationRequest request)
+    public async Task<IResult> TranslateConcept([ApiParameter("request", "Translation request", Required = true, Location = "body")] TranslationRequest request)
     {
         try
         {
@@ -200,7 +200,7 @@ public class LLMFutureKnowledgeModule : ModuleBase
             
             if (llmResponse.Content.Contains("LLM unavailable"))
             {
-                return new TranslationResponse(
+                return Results.Json(new TranslationResponse(
                     Success: false,
                     OriginalConcept: request.ConceptName,
                     TranslatedConcept: "",
@@ -210,7 +210,7 @@ public class LLMFutureKnowledgeModule : ModuleBase
                     Explanation: "",
                     CulturalNotes: "",
                     Message: "AI translation failed: " + llmResponse.Content
-                );
+                ), statusCode: 503);
             }
             
             // Parse LLM response (simplified - in production would parse JSON)
@@ -218,7 +218,7 @@ public class LLMFutureKnowledgeModule : ModuleBase
             var resonanceScore = CalculateResonanceScore(request.UserBeliefSystem, request.TargetFramework);
             var unityAmplification = CalculateUnityAmplification(resonanceScore);
             
-            return new TranslationResponse(
+            return Results.Ok(new TranslationResponse(
                 Success: true,
                 OriginalConcept: request.ConceptName,
                 TranslatedConcept: translatedConcept,
@@ -228,11 +228,11 @@ public class LLMFutureKnowledgeModule : ModuleBase
                 Explanation: $"Translated using {request.TargetFramework} framework with real AI",
                 CulturalNotes: $"Adapted for {request.UserBeliefSystem.GetValueOrDefault("culturalContext", "Unknown")} context",
                 Message: "Real AI translation completed successfully"
-            );
+            ));
         }
         catch (Exception ex)
         {
-            return new TranslationResponse(
+            return Results.Json(new TranslationResponse(
                 Success: false,
                 OriginalConcept: request.ConceptName,
                 TranslatedConcept: "",
@@ -242,12 +242,12 @@ public class LLMFutureKnowledgeModule : ModuleBase
                 Explanation: "",
                 CulturalNotes: "",
                 Message: $"Translation failed: {ex.Message}"
-            );
+            ), statusCode: 500);
         }
     }
 
     [ApiRoute("POST", "/llm/config", "llm-config-create", "Create or update LLM configuration", "codex.llm.future")]
-    public async Task<object> CreateLLMConfig([ApiParameter("request", "LLM config request", Required = true, Location = "body")] LLMConfigRequest request)
+    public async Task<IResult> CreateLLMConfig([ApiParameter("request", "LLM config request", Required = true, Location = "body")] LLMConfigRequest request)
     {
         try
         {
@@ -268,7 +268,7 @@ public class LLMFutureKnowledgeModule : ModuleBase
             var validation = await ValidateLLMConfig(config);
             if (!validation.IsValid)
             {
-                return new ErrorResponse($"LLM configuration validation failed: {validation.ErrorMessage}");
+                return Results.BadRequest(new ErrorResponse($"LLM configuration validation failed: {validation.ErrorMessage}"));
             }
 
             // Store configuration
@@ -276,39 +276,39 @@ public class LLMFutureKnowledgeModule : ModuleBase
             var configNode = CreateLLMConfigNode(config);
             _registry.Upsert(configNode);
 
-            return new LLMConfigResponse(
+            return Results.Ok(new LLMConfigResponse(
                 Success: true,
                 Config: config,
                 Message: "LLM configuration created successfully",
                 Timestamp: DateTimeOffset.UtcNow
-            );
+            ));
         }
         catch (Exception ex)
         {
-            return new ErrorResponse($"Failed to create LLM configuration: {ex.Message}");
+            return Results.Json(new ErrorResponse($"Failed to create LLM configuration: {ex.Message}"), statusCode: 500);
         }
     }
 
     [ApiRoute("GET", "/llm/configs", "llm-configs", "Get all LLM configurations", "codex.llm.future")]
-    public async Task<object> GetLLMConfigs()
+    public async Task<IResult> GetLLMConfigs()
     {
         try
         {
             var configs = _llmConfigs.Values.ToList();
-            return new LLMConfigsResponse(
+            return Results.Ok(new LLMConfigsResponse(
                 Success: true,
                 Message: $"Retrieved {configs.Count} LLM configurations",
                 Configs: configs
-            );
+            ));
         }
         catch (Exception ex)
         {
-            return new ErrorResponse($"Failed to get LLM configurations: {ex.Message}");
+            return Results.Json(new ErrorResponse($"Failed to get LLM configurations: {ex.Message}"), statusCode: 500);
         }
     }
 
     [ApiRoute("POST", "/llm/future/batch", "llm-future-batch", "Batch query future knowledge", "codex.llm.future")]
-    public async Task<object> BatchQueryFutureKnowledge([ApiParameter("request", "Batch query request", Required = true, Location = "body")] BatchFutureQueryRequest request)
+    public async Task<IResult> BatchQueryFutureKnowledge([ApiParameter("request", "Batch query request", Required = true, Location = "body")] BatchFutureQueryRequest request)
     {
         try
         {
@@ -317,7 +317,7 @@ public class LLMFutureKnowledgeModule : ModuleBase
 
             if (llmConfig == null)
             {
-                return new ErrorResponse($"LLM configuration '{request.LLMConfigId}' not found");
+                return Results.NotFound(new ErrorResponse($"LLM configuration '{request.LLMConfigId}' not found"));
             }
 
             foreach (var query in request.Queries)
@@ -364,22 +364,22 @@ public class LLMFutureKnowledgeModule : ModuleBase
                 }
             }
 
-            return new BatchFutureQueryResponse(
+            return Results.Ok(new BatchFutureQueryResponse(
                 Success: true,
                 Message: $"Processed {results.Count} queries",
                 Results: results,
                 SuccessCount: results.Count(r => r.Success),
                 FailureCount: results.Count(r => !r.Success)
-            );
+            ));
         }
         catch (Exception ex)
         {
-            return new ErrorResponse($"Failed to process batch query: {ex.Message}");
+            return Results.Json(new ErrorResponse($"Failed to process batch query: {ex.Message}"), statusCode: 500);
         }
     }
 
     [ApiRoute("POST", "/llm/future/analyze", "llm-future-analyze", "Analyze future knowledge patterns", "codex.llm.future")]
-    public async Task<object> AnalyzeFutureKnowledge([ApiParameter("request", "Analysis request", Required = true, Location = "body")] FutureAnalysisRequest request)
+    public async Task<IResult> AnalyzeFutureKnowledge([ApiParameter("request", "Analysis request", Required = true, Location = "body")] FutureAnalysisRequest request)
     {
         try
         {
@@ -404,23 +404,23 @@ public class LLMFutureKnowledgeModule : ModuleBase
 
             if (!responses.Any())
             {
-                return new ErrorResponse("No future knowledge responses found for analysis");
+                return Results.NotFound(new ErrorResponse("No future knowledge responses found for analysis"));
             }
 
             // Analyze patterns
             var analysis = AnalyzePatterns(responses, request.AnalysisType);
             
-            return new FutureAnalysisResponse(
+            return Results.Ok(new FutureAnalysisResponse(
                 Success: true,
                 Message: "Future knowledge analysis completed",
                 Analysis: analysis,
                 ResponseCount: responses.Count,
                 Insights: GenerateAnalysisInsights(analysis)
-            );
+            ));
         }
         catch (Exception ex)
         {
-            return new ErrorResponse($"Failed to analyze future knowledge: {ex.Message}");
+            return Results.Json(new ErrorResponse($"Failed to analyze future knowledge: {ex.Message}"), statusCode: 500);
         }
     }
 
@@ -883,7 +883,7 @@ Please provide a thoughtful translation that adapts the concept to the {request.
     // Cross-Service Translation Methods
 
     [ApiRoute("POST", "/llm/translate/cross-service", "llm-translate-cross-service", "Translate concept across multiple services", "codex.llm.future")]
-    public async Task<object> TranslateCrossService([ApiParameter("request", "Cross-service translation request", Required = true, Location = "body")] CrossServiceTranslationRequest request)
+    public async Task<IResult> TranslateCrossService([ApiParameter("request", "Cross-service translation request", Required = true, Location = "body")] CrossServiceTranslationRequest request)
     {
         try
         {
@@ -921,22 +921,22 @@ Please provide a thoughtful translation that adapts the concept to the {request.
                 }
             }
 
-            return new CrossServiceTranslationResponse(
+            return Results.Ok(new CrossServiceTranslationResponse(
                 Success: true,
                 Message: $"Translated concept across {results.Count} services",
                 Results: results,
                 SuccessCount: results.Count(r => r.Success),
                 FailureCount: results.Count(r => !r.Success)
-            );
+            ));
         }
         catch (Exception ex)
         {
-            return new ErrorResponse($"Cross-service translation failed: {ex.Message}");
+            return Results.Json(new ErrorResponse($"Cross-service translation failed: {ex.Message}"), statusCode: 500);
         }
     }
 
     [ApiRoute("POST", "/llm/translate/batch", "llm-translate-batch", "Batch translate multiple concepts", "codex.llm.future")]
-    public async Task<object> BatchTranslateConcepts([ApiParameter("request", "Batch translation request", Required = true, Location = "body")] BatchTranslationRequest request)
+    public async Task<IResult> BatchTranslateConcepts([ApiParameter("request", "Batch translation request", Required = true, Location = "body")] BatchTranslationRequest request)
     {
         try
         {
@@ -974,43 +974,43 @@ Please provide a thoughtful translation that adapts the concept to the {request.
                 }
             }
 
-            return new BatchTranslationResponse(
+            return Results.Ok(new BatchTranslationResponse(
                 Success: true,
                 Message: $"Processed {results.Count} concept translations",
                 Results: results,
                 SuccessCount: results.Count(r => r.Success),
                 FailureCount: results.Count(r => !r.Success)
-            );
+            ));
         }
         catch (Exception ex)
         {
-            return new ErrorResponse($"Batch translation failed: {ex.Message}");
+            return Results.Json(new ErrorResponse($"Batch translation failed: {ex.Message}"), statusCode: 500);
         }
     }
 
     [ApiRoute("GET", "/llm/translate/status/{translationId}", "llm-translate-status", "Get translation status", "codex.llm.future")]
-    public async Task<object> GetTranslationStatus([ApiParameter("translationId", "Translation ID", Required = true, Location = "path")] string translationId)
+    public async Task<IResult> GetTranslationStatus([ApiParameter("translationId", "Translation ID", Required = true, Location = "path")] string translationId)
     {
         try
         {
             // In a real implementation, this would check a translation queue or database
-            return new TranslationStatusResponse(
+            return Results.Ok(new TranslationStatusResponse(
                 TranslationId: translationId,
                 Status: "completed",
                 Progress: 100,
                 Message: "Translation completed successfully",
                 CreatedAt: DateTime.UtcNow.AddMinutes(-5),
                 CompletedAt: DateTime.UtcNow
-            );
+            ));
         }
         catch (Exception ex)
         {
-            return new ErrorResponse($"Failed to get translation status: {ex.Message}");
+            return Results.Json(new ErrorResponse($"Failed to get translation status: {ex.Message}"), statusCode: 500);
         }
     }
 
     [ApiRoute("POST", "/llm/translate/validate", "llm-translate-validate", "Validate translation quality", "codex.llm.future")]
-    public async Task<object> ValidateTranslation([ApiParameter("request", "Translation validation request", Required = true, Location = "body")] TranslationValidationRequest request)
+    public async Task<IResult> ValidateTranslation([ApiParameter("request", "Translation validation request", Required = true, Location = "body")] TranslationValidationRequest request)
     {
         try
         {
@@ -1018,7 +1018,7 @@ Please provide a thoughtful translation that adapts the concept to the {request.
             var culturalAccuracy = await AssessCulturalAccuracy(request.TranslatedConcept, request.CulturalContext);
             var resonanceScore = CalculateResonanceScore(request.UserBeliefSystem, request.TargetFramework);
 
-            return new TranslationValidationResponse(
+            return Results.Ok(new TranslationValidationResponse(
                 Success: true,
                 TranslationId: request.TranslationId,
                 QualityScore: qualityScore,
@@ -1027,11 +1027,11 @@ Please provide a thoughtful translation that adapts the concept to the {request.
                 OverallScore: (qualityScore + culturalAccuracy + resonanceScore) / 3.0,
                 Recommendations: GenerateValidationRecommendations(qualityScore, culturalAccuracy, resonanceScore),
                 Message: "Translation validation completed"
-            );
+            ));
         }
         catch (Exception ex)
         {
-            return new ErrorResponse($"Translation validation failed: {ex.Message}");
+            return Results.Json(new ErrorResponse($"Translation validation failed: {ex.Message}"), statusCode: 500);
         }
     }
 
@@ -1439,7 +1439,7 @@ Please provide a thoughtful translation that adapts the concept to the {request.
     /// Translate concept (for compatibility with test expectations)
     /// </summary>
     [ApiRoute("POST", "/translation/translate", "TranslateConcept", "Translate concept between languages", "codex.llm.future")]
-    public async Task<object> TranslateConceptSimple([ApiParameter("body", "Simple translation request")] SimpleTranslationRequest request)
+    public async Task<IResult> TranslateConceptSimple([ApiParameter("body", "Simple translation request")] SimpleTranslationRequest request)
     {
         try
         {
@@ -1452,14 +1452,14 @@ Please provide a thoughtful translation that adapts the concept to the {request.
                 if (DateTime.UtcNow - cachedResult.cachedAt < _cacheExpiry)
                 {
                     // Return cached result
-                    return new
+                    return Results.Ok(new
                     {
                         success = true,
                         data = cachedResult.response,
                         timestamp = DateTimeOffset.UtcNow,
                         cached = true,
                         cacheAge = DateTime.UtcNow - cachedResult.cachedAt
-                    };
+                    });
                 }
                 else
                 {
@@ -1507,13 +1507,13 @@ Please provide a natural, culturally appropriate translation that maintains the 
                     Message: "AI translation failed: " + llmResponse.Content
                 );
 
-                return new
+                return Results.Json(new
                 {
                     success = false,
                     data = errorResponse,
                     timestamp = DateTimeOffset.UtcNow,
                     cached = false
-                };
+                }, statusCode: 503);
             }
             
             var response = new SimpleTranslationResponse(
@@ -1528,13 +1528,13 @@ Please provide a natural, culturally appropriate translation that maintains the 
             // Cache the successful translation
             _translationCache[cacheKey] = (response, DateTime.UtcNow);
 
-            return new
+            return Results.Ok(new
             {
                 success = true,
                 data = response,
                 timestamp = DateTimeOffset.UtcNow,
                 cached = false
-            };
+            });
         }
         catch (Exception ex)
         {
@@ -1547,13 +1547,13 @@ Please provide a natural, culturally appropriate translation that maintains the 
                 Message: $"Translation failed: {ex.Message}"
             );
 
-            return new
+            return Results.Json(new
             {
                 success = false,
                 data = errorResponse,
                 timestamp = DateTimeOffset.UtcNow,
                 cached = false
-            };
+            }, statusCode: 500);
         }
     }
 
@@ -1561,7 +1561,7 @@ Please provide a natural, culturally appropriate translation that maintains the 
     /// Get translation history (for compatibility with test expectations)
     /// </summary>
     [ApiRoute("GET", "/translation/history", "GetTranslationHistory", "Get translation history", "codex.llm.future")]
-    public async Task<object> GetTranslationHistory()
+    public async Task<IResult> GetTranslationHistory()
     {
         try
         {
@@ -1590,11 +1590,11 @@ Please provide a natural, culturally appropriate translation that maintains the 
                 }
             };
 
-            return new { success = true, translations = history, totalCount = history.Count };
+            return Results.Ok(new { success = true, translations = history, totalCount = history.Count });
         }
         catch (Exception ex)
         {
-            return new ErrorResponse($"Failed to get translation history: {ex.Message}");
+            return Results.Json(new ErrorResponse($"Failed to get translation history: {ex.Message}"), statusCode: 500);
         }
     }
 }

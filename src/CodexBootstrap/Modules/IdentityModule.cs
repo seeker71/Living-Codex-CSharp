@@ -722,8 +722,11 @@ public sealed class IdentityModule : ModuleBase
             if (request.CoverImageUrl != null)
                 updatedMeta["coverImageUrl"] = request.CoverImageUrl;
             
-            if (request.Interests != null)
-                updatedMeta["interests"] = request.Interests;
+            // Handle interests - convert array to List for storage
+            if (request.Interests != null && request.Interests.Length > 0)
+            {
+                updatedMeta["interests"] = request.Interests.ToList();
+            }
             
             updatedMeta["lastModified"] = DateTimeOffset.UtcNow;
 
@@ -945,6 +948,25 @@ public sealed class IdentityModule : ModuleBase
 
     private AuthUserProfile CreateAuthUserProfile(Node userNode)
     {
+        // Parse interests from meta - could be List<string> or string
+        List<string>? interests = null;
+        if (userNode.Meta.ContainsKey("interests"))
+        {
+            var interestsValue = userNode.Meta["interests"];
+            if (interestsValue is List<string> interestsList)
+            {
+                interests = interestsList;
+            }
+            else if (interestsValue is System.Text.Json.JsonElement jsonElement && jsonElement.ValueKind == System.Text.Json.JsonValueKind.Array)
+            {
+                interests = System.Text.Json.JsonSerializer.Deserialize<List<string>>(jsonElement.GetRawText());
+            }
+            else if (interestsValue is string interestsStr && !string.IsNullOrEmpty(interestsStr))
+            {
+                interests = interestsStr.Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)).ToList();
+            }
+        }
+
         return new AuthUserProfile(
             Id: userNode.Id,
             Username: userNode.Meta["username"]?.ToString() ?? "",
@@ -957,7 +979,8 @@ public sealed class IdentityModule : ModuleBase
             Bio: userNode.Meta.ContainsKey("bio") ? userNode.Meta["bio"]?.ToString() : null,
             Location: userNode.Meta.ContainsKey("location") ? userNode.Meta["location"]?.ToString() : null,
             AvatarUrl: userNode.Meta.ContainsKey("avatarUrl") ? userNode.Meta["avatarUrl"]?.ToString() : null,
-            CoverImageUrl: userNode.Meta.ContainsKey("coverImageUrl") ? userNode.Meta["coverImageUrl"]?.ToString() : null
+            CoverImageUrl: userNode.Meta.ContainsKey("coverImageUrl") ? userNode.Meta["coverImageUrl"]?.ToString() : null,
+            Interests: interests
         );
     }
 
@@ -1387,6 +1410,7 @@ public record AuthUserProfile(
     [property: JsonPropertyName("status")] string Status,
     [property: JsonPropertyName("bio")] string? Bio = null,
     [property: JsonPropertyName("location")] string? Location = null,
+    [property: JsonPropertyName("interests")] List<string>? Interests = null,
     [property: JsonPropertyName("avatarUrl")] string? AvatarUrl = null,
     [property: JsonPropertyName("coverImageUrl")] string? CoverImageUrl = null
 );

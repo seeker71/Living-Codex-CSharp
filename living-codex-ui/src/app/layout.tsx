@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
+import { AchievementNotificationSystem } from '@/components/ui/AchievementNotification';
 import { GlobalControls } from '@/components/controls/GlobalControls';
 import { Navigation } from '@/components/ui/Navigation';
 import { cn } from '@/lib/utils';
@@ -32,6 +33,7 @@ export default function RootLayout({
           </header>
           {children}
           <GlobalControls />
+          <AchievementNotificationSystem />
         </Providers>
       </body>
     </html>

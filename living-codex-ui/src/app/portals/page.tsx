@@ -47,9 +47,30 @@ export default function PortalsPage() {
   const [explorationSessions, setExplorationSessions] = useState<ExplorationSession[]>([]);
   
   // UI state
-  const [activeTab, setActiveTab] = useState<'portals' | 'temporal' | 'explorations'>('portals');
+  const [activeTab, setActiveTab] = useState<'portals' | 'temporal' | 'explorations' | 'health' | 'schedule' | 'dataflow' | 'timeline'>('portals');
   const [loading, setLoading] = useState(true);
   const [showCreatePortal, setShowCreatePortal] = useState(false);
+  
+  // Health monitoring state
+  const [portalHealth, setPortalHealth] = useState<Record<string, any>>({});
+  const [healthMetrics, setHealthMetrics] = useState<any[]>([]);
+  
+  // Scheduling state
+  const [scheduledSyncs, setScheduledSyncs] = useState<any[]>([]);
+  const [showScheduler, setShowScheduler] = useState(false);
+  const [newSchedule, setNewSchedule] = useState({
+    portalId: '',
+    cronExpression: '0 */6 * * *', // Every 6 hours
+    enabled: true
+  });
+  
+  // Data flow state
+  const [dataFlows, setDataFlows] = useState<any[]>([]);
+  const [activeFlow, setActiveFlow] = useState<any | null>(null);
+  
+  // Timeline state
+  const [temporalTimeline, setTemporalTimeline] = useState<any[]>([]);
+  const [timelineRange, setTimelineRange] = useState({ start: '', end: '' });
   
   // Portal creation state
   const [newPortal, setNewPortal] = useState({

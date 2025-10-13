@@ -664,6 +664,18 @@ public class NodeRegistry : INodeRegistry
             return gasNode;
         }
 
+        // Check Ice nodes in memory cache (they might be cached from Upsert but not yet persisted)
+        if (_iceNodes.TryGetValue(id, out var cachedIceNode))
+        {
+            return cachedIceNode;
+        }
+
+        // Check Water nodes in memory cache
+        if (_waterNodes.TryGetValue(id, out var cachedWaterNode))
+        {
+            return cachedWaterNode;
+        }
+
         // Try Water storage (semi-persistent cache)
         var waterNode = await _waterStorage.GetWaterNodeAsync(id);
         if (waterNode != null)

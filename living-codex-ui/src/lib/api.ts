@@ -350,6 +350,22 @@ export const endpoints = {
   // User-concept relationships
   getUserConcepts: (userId: string) => api.get(`/userconcept/user-concepts/${userId}`),
   
+  // Concept collaboration
+  getConceptCollaborators: (conceptId: string) => 
+    api.get(`/concept/${conceptId}/collaborators`),
+  getConceptActivity: (conceptId: string, limit = 50, skip = 0) =>
+    api.get(`/concept/${conceptId}/activity?limit=${limit}&skip=${skip}`),
+  getConceptDiscussions: (conceptId: string, limit = 20, skip = 0) =>
+    api.get(`/concept/${conceptId}/discussions?limit=${limit}&skip=${skip}`),
+  createConceptDiscussion: (conceptId: string, userId: string, title: string, content: string, discussionType = 'general') =>
+    api.post(`/concept/${conceptId}/discussion`, { userId, title, content, discussionType }),
+  getDiscussionReplies: (discussionId: string) =>
+    api.get(`/discussion/${discussionId}/replies`),
+  replyToDiscussion: (discussionId: string, userId: string, content: string) =>
+    api.post(`/discussion/${discussionId}/reply`, { userId, content }),
+  getConceptProposals: (conceptId: string) =>
+    api.get(`/concept/${conceptId}/proposals`),
+  
   // Contributions
   recordContribution: (contribution: {
     userId: string;

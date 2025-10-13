@@ -453,6 +453,10 @@ public static class CodexBootstrapHost
             .AllowAnyOrigin()
             .AllowAnyMethod()
             .AllowAnyHeader());
+        
+        // Enable WebSocket support
+        app.UseWebSockets();
+        
         app.UseAuthentication();
         app.UseAuthorization();
 

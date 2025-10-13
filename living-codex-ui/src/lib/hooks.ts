@@ -484,3 +484,105 @@ export function useApiError() {
     hasError: !!error,
   };
 }
+
+// Concept Collaboration Hooks
+
+export function useConceptCollaborators(conceptId: string) {
+  return useQuery({
+    queryKey: ['concept', conceptId, 'collaborators'],
+    queryFn: () => endpoints.getConceptCollaborators(conceptId),
+    enabled: !!conceptId,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+}
+
+export function useConceptActivity(conceptId: string, limit = 50, skip = 0) {
+  return useQuery({
+    queryKey: ['concept', conceptId, 'activity', limit, skip],
+    queryFn: () => endpoints.getConceptActivity(conceptId, limit, skip),
+    enabled: !!conceptId,
+    staleTime: 1 * 60 * 1000, // 1 minute
+  });
+}
+
+export function useConceptDiscussions(conceptId: string, limit = 20, skip = 0) {
+  return useQuery({
+    queryKey: ['concept', conceptId, 'discussions', limit, skip],
+    queryFn: () => endpoints.getConceptDiscussions(conceptId, limit, skip),
+    enabled: !!conceptId,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+}
+
+export function useDiscussionReplies(discussionId: string) {
+  return useQuery({
+    queryKey: ['discussion', discussionId, 'replies'],
+    queryFn: () => endpoints.getDiscussionReplies(discussionId),
+    enabled: !!discussionId,
+    staleTime: 1 * 60 * 1000, // 1 minute
+  });
+}
+
+export function useConceptProposals(conceptId: string) {
+  return useQuery({
+    queryKey: ['concept', conceptId, 'proposals'],
+    queryFn: () => endpoints.getConceptProposals(conceptId),
+    enabled: !!conceptId,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+}
+
+export function useCreateDiscussion() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ 
+      conceptId, 
+      userId, 
+      title, 
+      content, 
+      discussionType 
+    }: { 
+      conceptId: string; 
+      userId: string; 
+      title: string; 
+      content: string; 
+      discussionType?: string;
+    }) => {
+      const response = await endpoints.createConceptDiscussion(conceptId, userId, title, content, discussionType);
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to create discussion');
+      }
+      return response.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['concept', variables.conceptId, 'discussions'] });
+      queryClient.invalidateQueries({ queryKey: ['concept', variables.conceptId, 'activity'] });
+    },
+  });
+}
+
+export function useReplyToDiscussion() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ 
+      discussionId, 
+      userId, 
+      content 
+    }: { 
+      discussionId: string; 
+      userId: string; 
+      content: string;
+    }) => {
+      const response = await endpoints.replyToDiscussion(discussionId, userId, content);
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to reply to discussion');
+      }
+      return response.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['discussion', variables.discussionId, 'replies'] });
+    },
+  });
+}

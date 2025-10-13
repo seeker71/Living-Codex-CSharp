@@ -102,17 +102,31 @@ export default function NodeDetailPage() {
           </button>
           
           <div className="flex justify-between items-start">
-            <div>
+            <div className="flex-1">
               <h1 className="text-4xl font-bold mb-2">{node.title}</h1>
               <p className="text-gray-300">{node.description}</p>
             </div>
-            <span className={`px-3 py-1 rounded-lg text-sm font-semibold ${
-              node.state === 'ice' ? 'bg-blue-900 text-blue-300' :
-              node.state === 'water' ? 'bg-green-900 text-green-300' :
-              'bg-red-900 text-red-300'
-            }`}>
-              {node.state}
-            </span>
+            <div className="flex items-center gap-3 ml-4">
+              {node.typeId === 'codex.concept' && (
+                <button
+                  onClick={() => router.push(`/reflect/${node.id}`)}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-semibold"
+                  title="Open Reflect collaboration space"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  Reflect
+                </button>
+              )}
+              <span className={`px-3 py-1 rounded-lg text-sm font-semibold ${
+                node.state === 'ice' ? 'bg-blue-900 text-blue-300' :
+                node.state === 'water' ? 'bg-green-900 text-green-300' :
+                'bg-red-900 text-red-300'
+              }`}>
+                {node.state}
+              </span>
+            </div>
           </div>
         </div>
 

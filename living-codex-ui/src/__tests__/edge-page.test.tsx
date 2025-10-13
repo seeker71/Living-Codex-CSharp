@@ -90,25 +90,25 @@ describe('EdgeDetailPage', () => {
         if (url.includes('/storage-endpoints/edges/u-core-concept-kw-matter/u-core-axis-water_states')) {
           return Promise.resolve({
             ok: true,
-            json: () => Promise.resolve(mockEdgeData)
-          })
+            json: async () => mockEdgeData
+          } as Response)
         }
         if (url.includes('/storage-endpoints/nodes/u-core-concept-kw-matter')) {
           return Promise.resolve({
             ok: true,
-            json: () => Promise.resolve(mockFromNodeData)
-          })
+            json: async () => mockFromNodeData
+          } as Response)
         }
         if (url.includes('/storage-endpoints/nodes/u-core-axis-water_states')) {
           return Promise.resolve({
             ok: true,
-            json: () => Promise.resolve(mockToNodeData)
-          })
+            json: async () => mockToNodeData
+          } as Response)
         }
         return Promise.resolve({
           ok: false,
           status: 404
-        })
+        } as Response)
       })
   })
 

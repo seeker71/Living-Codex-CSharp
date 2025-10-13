@@ -163,7 +163,7 @@ export function WeaveAction({
   );
 }
 
-// Reflect Primitive - Deep contemplation and insight generation
+// Reflect Primitive - Navigate to collaboration space for a concept
 export function ReflectAction({
   contentId,
   onReflect,
@@ -175,120 +175,28 @@ export function ReflectAction({
 }) {
   const { user } = useAuth();
   const trackInteraction = useTrackInteraction();
-  const [isReflecting, setIsReflecting] = useState(false);
-  const [showReflectDialog, setShowReflectDialog] = useState(false);
-  const [reflectConfig, setReflectConfig] = useState({
-    reflectionType: 'insight',
-    depth: 3
-  });
 
-  const performReflect = useCallback(async () => {
-    if (!user?.id) return;
-
-    setIsReflecting(true);
-    try {
-      const response = await fetch(buildApiUrl('/reflect/generate'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contentId,
-          reflectionType: reflectConfig.reflectionType,
-          depth: reflectConfig.depth,
-          userId: user.id
-        })
+  const handleReflect = useCallback(() => {
+    // Track the interaction
+    if (user?.id) {
+      trackInteraction(contentId, 'reflect', {
+        description: `User opened Reflect collaboration for: ${contentId}`,
       });
-
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success && result.reflection) {
-          onReflect?.(result);
-          setShowReflectDialog(false);
-          
-          // Show reflection result
-          alert(`💭 Reflection:\n\n${result.reflection.insight}\n\n🎯 Guidance: ${result.reflection.guidance}`);
-          
-          // Track reflect action
-          trackInteraction(contentId, 'reflect', {
-            description: `User reflected on content: ${contentId}`,
-            reflectionType: reflectConfig.reflectionType,
-            depth: reflectConfig.depth
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error performing reflection:', error);
-    } finally {
-      setIsReflecting(false);
     }
-  }, [user?.id, contentId, reflectConfig, onReflect, trackInteraction]);
+    
+    // Navigate to Reflect collaboration page
+    window.open(`/reflect/${contentId}`, '_blank');
+    onReflect?.({ conceptId: contentId });
+  }, [user?.id, contentId, onReflect, trackInteraction]);
 
   return (
-    <>
-      <button
-        onClick={() => setShowReflectDialog(true)}
-        disabled={isReflecting}
-        className={`inline-flex items-center px-3 py-1 text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors disabled:opacity-50 ${className}`}
-      >
-        {isReflecting ? '💭 Reflecting...' : '💭 Reflect'}
-      </button>
-
-      {/* Reflect Configuration Dialog */}
-      {showReflectDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96 max-w-full">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">💭 Deep Reflection</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Reflection Type</label>
-                <select
-                  value={reflectConfig.reflectionType}
-                  onChange={(e) => setReflectConfig({...reflectConfig, reflectionType: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="insight">💡 Insight Generation</option>
-                  <option value="wisdom">🧘 Wisdom Extraction</option>
-                  <option value="connection">🔗 Connection Discovery</option>
-                  <option value="transformation">🦋 Transformation Potential</option>
-                  <option value="resonance">🌊 Resonance Analysis</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Reflection Depth: {reflectConfig.depth}
-                </label>
-                <input
-                  type="range"
-                  min="1"
-                  max="10"
-                  value={reflectConfig.depth}
-                  onChange={(e) => setReflectConfig({...reflectConfig, depth: parseInt(e.target.value)})}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-gray-500 mt-1">
-                  <span>Surface</span>
-                  <span>Deep</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex space-x-3 mt-6">
-              <button
-                onClick={performReflect}
-                disabled={isReflecting}
-                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {isReflecting ? 'Reflecting...' : 'Begin Reflection'}
-              </button>
-              <button
-                onClick={() => setShowReflectDialog(false)}
-                className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+    <button
+      onClick={handleReflect}
+      className={`inline-flex items-center px-3 py-1 text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors ${className}`}
+      title="Open Reflect collaboration space"
+    >
+      💭 Reflect
+    </button>
   );
 }
 

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { api } from '@/lib/api'
+import { useRouter } from 'next/navigation'
 
 interface UserProfile {
   userId: string
@@ -75,16 +76,18 @@ const DEFAULT_PROFILE_SECTIONS: ProfileSection[] = [
   { id: 'avatar', title: 'Profile Picture', description: 'Add a profile photo to personalize your presence', icon: '📸', completed: false, required: false, points: 5 },
   { id: 'interests', title: 'Interests & Passions', description: 'Share what resonates with you', icon: '💫', completed: false, required: false, points: 15 },
   { id: 'beliefs', title: 'Belief Framework', description: 'Your personal philosophy and worldview', icon: '🧠', completed: false, required: false, points: 20 },
-  { id: 'location', title: 'Location', description: 'Help others find you in the resonance network', icon: '🌍', completed: false, required: false, points: 5 }
+  { id: 'location', title: 'Location', description: 'Help others find you in the resonance network', icon: '🌍', completed: false, required: false, points: 5 },
+  { id: 'security', title: 'Security & Privacy', description: 'Password, account settings, and data management', icon: '🔒', completed: false, required: false, points: 5 }
 ]
 
 export default function ProfilePage() {
+  const router = useRouter()
   const auth = useAuth()
   const user = auth?.user
   const authLoading = auth?.isLoading ?? false
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [beliefSystem, setBeliefSystem] = useState<BeliefSystem | null>(null)
-  // const [pointsData, setPointsData] = useState<UserPointsData | null>(null)
+  const [pointsData, setPointsData] = useState<UserPointsData | null>(null)
   const [loading, setLoading] = useState<boolean>(authLoading || !!user?.id)
   const [saving, setSaving] = useState(false)
   const [activeSection, setActiveSection] = useState('overview')
@@ -107,6 +110,12 @@ export default function ProfilePage() {
   const [scientificBackground, setScientificBackground] = useState('')
   const [resonanceThreshold, setResonanceThreshold] = useState(0.7)
   const [consciousnessLevel, setConsciousnessLevel] = useState('')
+
+  // Security & account management states
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
 
   // Profile sections for completion tracking
   const [profileSections, setProfileSections] = useState<ProfileSection[]>(DEFAULT_PROFILE_SECTIONS)
@@ -162,7 +171,8 @@ export default function ProfilePage() {
       try {
         await Promise.allSettled([
           loadUserProfile(),
-          loadBeliefSystem()
+          loadBeliefSystem(),
+          loadGamificationData()
         ])
       } finally {
         if (!isCancelled) {
@@ -178,6 +188,19 @@ export default function ProfilePage() {
       isCancelled = true
     }
   }, [user?.id, authLoading])
+
+  const loadGamificationData = async () => {
+    try {
+      if (!user?.id) return
+      const res = await api.get(`/gamification/points/${user.id}`)
+      if (res.success && res.data) {
+        setPointsData(res.data)
+      }
+    } catch (error) {
+      // Silently fail if gamification not available
+      console.log('Gamification data not available')
+    }
+  }
 
   const loadUserProfile = async () => {
     try {
@@ -268,6 +291,7 @@ export default function ProfilePage() {
       case 'interests': return !!(profile?.interests && profile.interests.length > 0)
       case 'beliefs': return !!(beliefSystem?.framework && beliefSystem?.principles && beliefSystem.principles.length > 0)
       case 'location': return !!(profile?.location)
+      case 'security': return true // Always mark as available
       default: return false
     }
   }
@@ -341,7 +365,47 @@ export default function ProfilePage() {
       const response = await api.put(`/auth/profile/${user.id}`, profileData)
 
       if (response.success) {
-        setMessage({ type: 'success', text: 'Profile updated successfully!' })
+        // Create updated profile object to check completion
+        const updatedProfile = {
+          ...profile,
+          displayName: displayName || profile?.displayName || '',
+          email: email || profile?.email || '',
+          bio: bio || profile?.bio || '',
+          location: location || profile?.location || '',
+          interests: interests || profile?.interests || []
+        } as UserProfile
+        
+        // Check if section was just completed with the new data
+        const sectionInfo = profileSections.find(s => s.id === activeSection)
+        const sectionPoints = sectionInfo?.points || 0
+        const wasSectionIncomplete = !getSectionCompletion(activeSection, profile, beliefSystem)
+        const isSectionNowComplete = getSectionCompletion(activeSection, updatedProfile, beliefSystem)
+        
+        // Award points if section was just completed
+        if (sectionPoints > 0 && wasSectionIncomplete && isSectionNowComplete) {
+          try {
+            const pointsResponse = await api.post('/gamification/award-points', {
+              userId: user.id,
+              points: sectionPoints,
+              reason: `Completed profile section: ${sectionInfo?.title || activeSection}`,
+              category: 'profile_completion'
+            })
+            
+            if (pointsResponse.success) {
+              setMessage({ type: 'success', text: `Profile updated successfully! +${sectionPoints} points earned! 🎉` })
+            } else {
+              setMessage({ type: 'success', text: 'Profile updated successfully!' })
+            }
+          } catch (pointsError) {
+            console.error('Error awarding points:', pointsError)
+            setMessage({ type: 'success', text: 'Profile updated successfully! (Points system unavailable)' })
+          }
+        } else {
+          setMessage({ type: 'success', text: 'Profile updated successfully!' })
+        }
+        
+        // Update local state and reload from server
+        setProfile(updatedProfile)
         await loadUserProfile()
       } else {
         setMessage({ type: 'error', text: `Failed to update profile: ${response.error}` })
@@ -422,6 +486,61 @@ export default function ProfilePage() {
     )
   }, [profile, beliefSystem])
 
+  // Handler functions for buttons
+  const handleShareProfile = async () => {
+    const profileUrl = `${window.location.origin}/profile/${user?.id}`
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: `${profile?.displayName}'s Living Codex Profile`,
+          text: `Check out my resonance profile on Living Codex!`,
+          url: profileUrl
+        })
+      } else {
+        // Fallback to clipboard copy
+        await navigator.clipboard.writeText(profileUrl)
+        setMessage({ type: 'success', text: 'Profile link copied to clipboard!' })
+      }
+    } catch (error) {
+      console.error('Error sharing profile:', error)
+      setMessage({ type: 'error', text: 'Failed to share profile' })
+    }
+  }
+
+  const handleUploadPhoto = async () => {
+    // TODO: Image upload endpoint not yet implemented in backend
+    setMessage({ type: 'error', text: 'Profile picture upload is not yet available. This feature requires a backend image upload endpoint.' })
+  }
+
+  const handleConnectPortal = () => {
+    router.push('/portals')
+  }
+
+  const handleCreateConcept = () => {
+    router.push('/create')
+  }
+
+  const handleExploreResonance = () => {
+    router.push('/discover')
+  }
+
+  const handleViewAnalytics = () => {
+    router.push('/ai-dashboard')
+  }
+
+  const handleEditProfile = () => {
+    // Scroll to the first incomplete section or basic section
+    const firstIncomplete = profileSections.find(s => !s.completed)
+    setActiveSection(firstIncomplete?.id || 'basic')
+    // Scroll to the form section
+    setTimeout(() => {
+      const formSection = document.querySelector('[data-profile-form-section]')
+      if (formSection) {
+        formSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    }, 100)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-page text-foreground flex items-center justify-center">
@@ -438,10 +557,17 @@ export default function ProfilePage() {
   }
 
   if (!user) {
+    // Redirect to auth page
+    router.push('/auth')
     return (
       <div className="min-h-screen bg-page text-foreground flex items-center justify-center">
         <div className="text-center">
-          <p className="text-medium-contrast">Please log in to view your profile.</p>
+          <div 
+            className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"
+            role="progressbar"
+            aria-label="Redirecting to sign in"
+          ></div>
+          <p className="text-medium-contrast">Redirecting to sign in...</p>
         </div>
       </div>
     )
@@ -584,7 +710,10 @@ export default function ProfilePage() {
                     </div>
                   )}
                 </div>
-                <button className="absolute -bottom-2 -right-2 w-8 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow-lg hover-lift">
+                <button 
+                  onClick={handleUploadPhoto}
+                  className="absolute -bottom-2 -right-2 w-8 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow-lg hover-lift"
+                >
                   📷
                 </button>
               </div>
@@ -596,7 +725,10 @@ export default function ProfilePage() {
                 </p>
 
                 <div className="space-y-3">
-                  <button className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg flex items-center gap-2 mx-auto transition-all duration-200 hover-lift">
+                  <button 
+                    onClick={handleUploadPhoto}
+                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg flex items-center gap-2 mx-auto transition-all duration-200 hover-lift"
+                  >
                     <span>📤</span>
                     Upload New Photo
                   </button>
@@ -1038,6 +1170,235 @@ export default function ProfilePage() {
           </div>
         )
 
+      case 'security':
+        return (
+          <div className="space-y-8">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="text-4xl">🔒</div>
+              <div>
+                <h2 className="text-2xl font-bold text-high-contrast">Security & Privacy</h2>
+                <p className="text-medium-contrast">Manage your account security and data</p>
+              </div>
+            </div>
+
+            {/* Change Password */}
+            <div className="p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-high-contrast mb-4 flex items-center gap-2">
+                <span>🔑</span>
+                Change Password
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-medium-contrast mb-2">
+                    Current Password
+                  </label>
+                  <input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="input-standard w-full"
+                    placeholder="Enter current password"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-medium-contrast mb-2">
+                    New Password
+                  </label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="input-standard w-full"
+                    placeholder="Enter new password"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-medium-contrast mb-2">
+                    Confirm New Password
+                  </label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="input-standard w-full"
+                    placeholder="Confirm new password"
+                  />
+                </div>
+                <button
+                  onClick={async () => {
+                    if (!newPassword || newPassword !== confirmPassword) {
+                      alert('Passwords do not match');
+                      return;
+                    }
+                    try {
+                      setSaving(true);
+                      const res = await api.post('/auth/change-password', {
+                        userId: user?.id,
+                        currentPassword,
+                        newPassword
+                      });
+                      if (res.success) {
+                        setMessage({ type: 'success', text: 'Password changed successfully' });
+                        setCurrentPassword('');
+                        setNewPassword('');
+                        setConfirmPassword('');
+                      } else {
+                        setMessage({ type: 'error', text: res.error || 'Failed to change password' });
+                      }
+                    } catch (error) {
+                      setMessage({ type: 'error', text: 'Failed to change password' });
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                  disabled={!currentPassword || !newPassword || newPassword !== confirmPassword || saving}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {saving ? 'Updating...' : 'Update Password'}
+                </button>
+              </div>
+            </div>
+
+            {/* Export Data */}
+            <div className="p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-high-contrast mb-4 flex items-center gap-2">
+                <span>📦</span>
+                Export Your Data
+              </h3>
+              <p className="text-sm text-medium-contrast mb-4">
+                Download all your data including profile, concepts, contributions, and activity history.
+              </p>
+              <button
+                onClick={async () => {
+                  try {
+                    setSaving(true);
+                    const exportData = {
+                      profile,
+                      beliefSystem,
+                      pointsData,
+                      exportedAt: new Date().toISOString()
+                    };
+                    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `living-codex-export-${user?.id}-${Date.now()}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    setMessage({ type: 'success', text: 'Data exported successfully' });
+                  } catch (error) {
+                    setMessage({ type: 'error', text: 'Failed to export data' });
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+                disabled={saving}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg disabled:opacity-50 flex items-center gap-2"
+              >
+                <span>⬇️</span>
+                Download My Data
+              </button>
+            </div>
+
+            {/* Privacy Settings */}
+            <div className="p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-high-contrast mb-4 flex items-center gap-2">
+                <span>👁️</span>
+                Privacy Settings
+              </h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded">
+                  <div>
+                    <div className="font-medium text-high-contrast">Profile Visibility</div>
+                    <div className="text-sm text-medium-contrast">Who can see your profile</div>
+                  </div>
+                  <select className="input-standard py-1">
+                    <option>Public</option>
+                    <option>Connections Only</option>
+                    <option>Private</option>
+                  </select>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded">
+                  <div>
+                    <div className="font-medium text-high-contrast">Show Activity</div>
+                    <div className="text-sm text-medium-contrast">Display your activity in feeds</div>
+                  </div>
+                  <input type="checkbox" defaultChecked className="w-4 h-4" />
+                </div>
+                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded">
+                  <div>
+                    <div className="font-medium text-high-contrast">Location Sharing</div>
+                    <div className="text-sm text-medium-contrast">Share location for discovery</div>
+                  </div>
+                  <input type="checkbox" defaultChecked className="w-4 h-4" />
+                </div>
+              </div>
+            </div>
+
+            {/* Delete Account */}
+            <div className="p-6 bg-red-50 dark:bg-red-900/20 rounded-lg border-2 border-red-300 dark:border-red-700">
+              <h3 className="text-lg font-semibold text-red-600 dark:text-red-400 mb-4 flex items-center gap-2">
+                <span>⚠️</span>
+                Danger Zone
+              </h3>
+              <p className="text-sm text-red-600 dark:text-red-400 mb-4">
+                Deleting your account is permanent and cannot be undone. All your data, concepts, and contributions will be removed.
+              </p>
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="Type DELETE to confirm"
+                  className="input-standard w-full border-red-300 dark:border-red-700 focus:border-red-500"
+                />
+                <button
+                  onClick={async () => {
+                    if (deleteConfirmText !== 'DELETE') {
+                      alert('Please type DELETE to confirm');
+                      return;
+                    }
+                    if (!confirm('Are you absolutely sure? This action cannot be undone!')) {
+                      return;
+                    }
+                    try {
+                      setSaving(true);
+                      // Backend doesn't have delete endpoint yet, but we set it up
+                      const res = await api.delete(`/auth/profile/${user?.id}`);
+                      if (res.success) {
+                        alert('Account deleted. You will be logged out.');
+                        auth.logout();
+                        router.push('/');
+                      } else {
+                        setMessage({ type: 'error', text: 'Failed to delete account' });
+                      }
+                    } catch (error) {
+                      setMessage({ type: 'error', text: 'Delete account feature not yet available' });
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                  disabled={deleteConfirmText !== 'DELETE' || saving}
+                  className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                >
+                  {saving ? 'Deleting...' : 'Delete My Account'}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center pt-6 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => setActiveSection('overview')}
+                className="px-4 py-2 text-medium-contrast hover:text-high-contrast transition-colors"
+              >
+                ← Back to Overview
+              </button>
+            </div>
+          </div>
+        )
+
       default:
         return (
           <div className="text-center py-8">
@@ -1125,10 +1486,16 @@ export default function ProfilePage() {
 
               {/* Quick Actions */}
               <div className="flex gap-3 pb-4">
-                <button className="px-4 py-2 bg-white dark:bg-gray-800 text-high-contrast rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 hover-lift">
+                <button 
+                  onClick={handleEditProfile}
+                  className="px-4 py-2 bg-white dark:bg-gray-800 text-high-contrast rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 hover-lift"
+                >
                   Edit Profile
                 </button>
-                <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-lg hover:shadow-xl transition-all duration-200">
+                <button 
+                  onClick={handleShareProfile}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+                >
                   Share Profile
                 </button>
               </div>
@@ -1232,7 +1599,16 @@ export default function ProfilePage() {
                 <button
                   onClick={() => {
                     const nextIncomplete = profileSections.find(s => !s.completed)
-                    if (nextIncomplete) setActiveSection(nextIncomplete.id)
+                    if (nextIncomplete) {
+                      setActiveSection(nextIncomplete.id)
+                      // Scroll to the form section
+                      setTimeout(() => {
+                        const formSection = document.querySelector('[data-profile-form-section]')
+                        if (formSection) {
+                          formSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                        }
+                      }, 100)
+                    }
                   }}
                   className="bg-white text-indigo-600 px-6 py-2 rounded-lg font-medium hover:bg-indigo-50 transition-colors"
                 >
@@ -1353,18 +1729,69 @@ export default function ProfilePage() {
             <div className="flex items-center gap-3 mb-6">
               <div className="text-3xl">🏆</div>
               <div>
-                <h3 className="font-semibold text-purple-800 dark:text-purple-200">Consciousness Badges</h3>
-                <p className="text-sm text-purple-600 dark:text-purple-300">Your journey of self-discovery</p>
+                <h3 className="font-semibold text-purple-800 dark:text-purple-200">Achievements & Badges</h3>
+                <p className="text-sm text-purple-600 dark:text-purple-300">
+                  {pointsData ? `Level ${pointsData.level} • ${pointsData.totalPoints} points` : 'Your journey of self-discovery'}
+                </p>
               </div>
               <div className="ml-auto">
-                <div className="bg-purple-100 dark:bg-purple-800/30 text-purple-800 dark:text-purple-200 px-3 py-1 rounded-full text-sm font-medium">
-                  {profileSections.filter(s => s.completed).length}/{profileSections.length} Earned
-                </div>
+                {pointsData ? (
+                  <a 
+                    href="/achievements"
+                    className="bg-purple-100 dark:bg-purple-800/30 text-purple-800 dark:text-purple-200 px-3 py-1 rounded-full text-sm font-medium hover:bg-purple-200 dark:hover:bg-purple-700/30 transition-colors"
+                  >
+                    {pointsData.badges.length} Badges →
+                  </a>
+                ) : (
+                  <div className="bg-purple-100 dark:bg-purple-800/30 text-purple-800 dark:text-purple-200 px-3 py-1 rounded-full text-sm font-medium">
+                    {profileSections.filter(s => s.completed).length}/{profileSections.length} Earned
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Badge Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {pointsData && pointsData.badges.length > 0 ? (
+              <div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  {pointsData.badges.slice(0, 4).map((badge) => {
+                    const getRarityColor = (rarity: string) => {
+                      switch (rarity.toLowerCase()) {
+                        case 'common': return 'border-gray-400 dark:border-gray-500'
+                        case 'uncommon': return 'border-green-400 dark:border-green-500'
+                        case 'rare': return 'border-blue-400 dark:border-blue-500'
+                        case 'epic': return 'border-purple-400 dark:border-purple-500'
+                        case 'legendary': return 'border-yellow-400 dark:border-yellow-500'
+                        default: return 'border-gray-400 dark:border-gray-500'
+                      }
+                    }
+
+                    return (
+                      <div
+                        key={badge.badgeId}
+                        className={`bg-white dark:bg-gray-800 rounded-xl p-4 border-2 ${getRarityColor(badge.rarity)} flex flex-col items-center text-center transition-transform hover:scale-105`}
+                      >
+                        <div className="text-4xl mb-2">{badge.icon}</div>
+                        <div className="font-semibold text-sm text-high-contrast">{badge.name}</div>
+                        <div className="text-xs text-medium-contrast mt-1 capitalize">{badge.rarity}</div>
+                        <div className="text-xs text-purple-600 dark:text-purple-400 mt-1">+{badge.points} pts</div>
+                      </div>
+                    )
+                  })}
+                </div>
+                {pointsData.badges.length > 4 && (
+                  <div className="text-center">
+                    <a
+                      href="/achievements"
+                      className="text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium"
+                    >
+                      View all {pointsData.badges.length} badges →
+                    </a>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
                 {
                   id: 'newcomer',
@@ -1478,7 +1905,6 @@ export default function ProfilePage() {
                   )}
                 </div>
               ))}
-            </div>
 
             {/* Progress to Next Badge */}
             {(() => {
@@ -1487,7 +1913,7 @@ export default function ProfilePage() {
                 { threshold: 50, badge: 'Resonance Seeker' },
                 { threshold: 75, badge: 'Consciousness Explorer' },
                 { threshold: 100, badge: 'Master Resonator' },
-              ].find(b => completion < b.threshold)
+              ].find(b => completion < b.threshold);
 
               return nextBadge && (
                 <div className="mt-6 p-4 bg-purple-100 dark:bg-purple-800/30 rounded-lg border border-purple-200 dark:border-purple-700">
@@ -1509,6 +1935,8 @@ export default function ProfilePage() {
               )
             })()}
           </div>
+        )}
+        </div>
         </div>
 
         {/* Profile Sections */}
@@ -1558,7 +1986,7 @@ export default function ProfilePage() {
 
         {/* Detailed Section Forms */}
         {activeSection !== 'overview' && (
-          <div className="bg-card rounded-2xl p-8 shadow-xl border border-card mb-8">
+          <div data-profile-form-section className="bg-card rounded-2xl p-8 shadow-xl border border-card mb-8">
             {renderActiveSection()}
           </div>
         )}
@@ -1618,19 +2046,31 @@ export default function ProfilePage() {
         <div className="bg-card rounded-2xl p-6 shadow-xl border border-card">
           <h2 className="text-xl font-semibold text-high-contrast mb-4">Quick Actions</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <button className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors text-center">
+            <button 
+              onClick={handleConnectPortal}
+              className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors text-center"
+            >
               <div className="text-2xl mb-2">🔗</div>
               <div className="text-sm font-medium text-high-contrast">Connect Portal</div>
             </button>
-            <button className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors text-center">
+            <button 
+              onClick={handleCreateConcept}
+              className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors text-center"
+            >
               <div className="text-2xl mb-2">📝</div>
               <div className="text-sm font-medium text-high-contrast">Create Concept</div>
             </button>
-            <button className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-700 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors text-center">
+            <button 
+              onClick={handleExploreResonance}
+              className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-700 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors text-center"
+            >
               <div className="text-2xl mb-2">🔮</div>
               <div className="text-sm font-medium text-high-contrast">Explore Resonance</div>
             </button>
-            <button className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-700 hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors text-center">
+            <button 
+              onClick={handleViewAnalytics}
+              className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-700 hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors text-center"
+            >
               <div className="text-2xl mb-2">📊</div>
               <div className="text-sm font-medium text-high-contrast">View Analytics</div>
             </button>

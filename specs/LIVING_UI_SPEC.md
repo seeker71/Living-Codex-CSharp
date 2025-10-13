@@ -1,6 +1,7 @@
 # Living Codex UI Specification — Grounded in Current Implementation
 
-_Last reviewed: 2025-09-24_
+_Last reviewed: 2025-10-13_
+_Last updated: Added analysis of 3 new backend modules and 10+ missing UI pages_
 
 ## How to read this spec
 - This file mirrors the concrete Next.js implementation; defer to the main spec’s Status Ledger for readiness and to Appendix B for the full route catalog.
@@ -226,6 +227,41 @@ Every endpoint call already implements optimistic logging and error capture; unh
 - Forms consistently use the `input-standard` Tailwind utility for styling.
 
 ## 9. Known gaps & follow-ups
+
+### 🆕 NEW Backend Modules (No UI Yet)
+Three major backend modules have been implemented but have NO UI representation:
+
+1. **GamificationModule** (4 endpoints) - Points, badges, achievements, levels
+   - Missing: `/achievements` page, points display in nav, badge showcase, notifications
+   
+2. **SpatialGraphModule** (4 endpoints) - Scalable graph with clustering for millions of nodes
+   - Missing: Spatial clustering in `/graph`, zoom-based LOD, viewport culling
+   
+3. **ConceptCollaborationModule** (7 endpoints) - Discussions, activity feeds, collaboration
+   - Partial: `/reflect/[conceptId]` exists but missing threads, replies, activity feed, collaborators
+
+### Missing UI Pages (Backend Ready)
+10+ pages need to be created:
+- `/admin` - System administration (AccessControlModule: 20+ endpoints)
+- `/notifications` - Notification center (PushNotificationModule: 7 endpoints)
+- `/activity` - Global activity feed (ConceptCollaborationModule)
+- `/analytics` - Usage insights and metrics
+- `/events` - Event streams browser (EventStreamingModule: 9+ endpoints)
+- `/security` - Security settings (DigitalSignatureModule: 8 endpoints)
+- `/predictions` - Future knowledge (FutureKnowledgeModule: 7 endpoints)
+- `/gamification` or `/achievements` - Points, badges, levels
+
+### Existing Page Enhancements Needed
+- `/profile` - Missing password change, delete account, export, privacy settings, gamification display
+- `/graph` - Missing spatial clustering, query builder, save/share, export
+- `/reflect/[conceptId]` - Missing discussions, activity feed, collaborators, proposals
+- `/create` - Missing templates, drafts, version history, relationship editor
+- `/news` - Missing source preferences, translations, save, reliability scoring
+- `/portals` - Missing health monitoring, scheduling, temporal timeline
+- `/ontology` - Missing editing, frequency viz, chakra mapping, import/export
+- `/resonance` - Missing real-time updates, historical trends, comparison, heatmap
+
+### Technical Gaps
 - Discover tabs other than Stream show metadata but do not yet render their dedicated lenses within the page.
 - Many endpoints assume backend implementations that may not exist; failures fall back silently. The specification recommends surfacing inline errors before production use.
 - `StreamLens` ranking expects each item to expose `timestamp`; backend responses should supply it to avoid NaN results.
@@ -236,10 +272,62 @@ Every endpoint call already implements optimistic logging and error capture; unh
 - Accessibility: navigation relies on horizontal scroll; additional keyboard focus handling may be required.
 - i18n: the UI is single-language; placeholders for localisation are not present.
 
+### Real-time Features Not Connected
+Backend has WebSocket/SignalR infrastructure but UI doesn't use it:
+- Real-time resonance updates
+- Live concept updates
+- Real-time collaboration
+- Push notifications
+- Live discussion updates
+- Event streaming
+
+**See `/MISSING_UI_FEATURES_ANALYSIS.md` for complete breakdown.**
+
 ## 10. Test coverage snapshot
-- Jest tests exist for core UI primitives (`CodeEditor`, `FileBrowser`, `RouteStatusBadge`) and multiple integration scenarios under `src/__tests__` (dark theme accessibility, backend integration smoke, minimal UI bootstrap).
-- Tests expect backend endpoints to be available or mocked; see each spec for exact fixtures.
-- No Playwright/E2E runner is bundled; manual verification remains necessary for multi-step flows.
+
+### Current Test Status
+- **Total Tests**: 477+ tests across UI
+- **Test Framework**: Jest + React Testing Library
+- **Coverage**: ~40% of implemented UI features
+
+### Well-Tested Areas
+- Basic page rendering (home, about, discover, profile)
+- Authentication flow (login, register)
+- Concept CRUD operations
+- Gallery functionality
+- Basic graph display
+- Profile viewing
+
+### Partially Tested Areas
+- Profile functionality (missing deletion, export tests)
+- News integration (missing filtering, source management tests)
+- Ontology browser (missing editing tests)
+- Graph visualization (missing advanced features tests)
+- Reflect/collaboration (missing discussion tests)
+
+### Not Tested (0 tests)
+- Gamification features 🆕
+- Spatial graph features 🆕
+- Concept collaboration discussions 🆕
+- Access control UI
+- Load balancing UI
+- Intelligent caching UI
+- Service discovery UI
+- Push notifications UI
+- Event streaming UI
+- Digital signatures UI
+- Future knowledge/predictions UI
+- Admin functionality
+- Real-time features (WebSocket)
+
+### Testing Priorities
+1. **Critical**: Write tests for 3 new modules (Gamification, Spatial Graph, Collaboration)
+2. **High**: Admin functionality tests
+3. **High**: Notification system tests
+4. **Medium**: Complete existing page feature tests
+5. **Low**: Advanced prediction/analytics tests
+
+**Note**: No Playwright/E2E runner is bundled; manual verification remains necessary for multi-step flows.
 
 ---
 

@@ -23,6 +23,9 @@ public class FileSystemModule : ModuleBase, IDisposable
 
     public FileSystemModule(INodeRegistry registry, ICodexLogger logger, HttpClient httpClient) : base(registry, logger)
     {
+        Console.WriteLine("=== FileSystemModule: Constructor called ===");
+        logger.Info("=== FileSystemModule: Constructor called ===");
+        
         // Determine project root (allow override via env var for tests), else find .sln
         var overrideRoot = Environment.GetEnvironmentVariable("FILESYSTEM_PROJECT_ROOT");
         if (!string.IsNullOrWhiteSpace(overrideRoot) && Directory.Exists(overrideRoot))
@@ -34,12 +37,18 @@ public class FileSystemModule : ModuleBase, IDisposable
             _projectRoot = FindProjectRoot() ?? Environment.CurrentDirectory;
         }
         
+        Console.WriteLine($"=== FileSystemModule: Project root set to: {_projectRoot} ===");
+        logger.Info($"=== FileSystemModule: Project root set to: {_projectRoot} ===");
+        
         // Define patterns to exclude from file system nodes
         _excludePatterns = new HashSet<string>
         {
             "bin", "obj", "node_modules", ".git", ".vs", ".vscode",
             "logs", "*.log", "*.tmp", "*.cache", ".next", "dist"
         };
+        
+        Console.WriteLine($"=== FileSystemModule: Exclude patterns configured: {string.Join(", ", _excludePatterns)} ===");
+        logger.Info($"=== FileSystemModule: Exclude patterns configured: {string.Join(", ", _excludePatterns)} ===");
 
         // Set up file system watcher for automatic node updates
         try
@@ -74,14 +83,22 @@ public class FileSystemModule : ModuleBase, IDisposable
     {
         try
         {
-            _logger.Info("FileSystemModule: Starting async initialization");
+            Console.WriteLine("=== FileSystemModule: InitializeAsync called - STARTING ===");
+            _logger.Info("=== FileSystemModule: InitializeAsync called - STARTING ===");
             await Task.Delay(2000); // Wait 2 seconds for system to stabilize
+            Console.WriteLine("=== FileSystemModule: About to call InitializeFileSystemInBackground ===");
+            _logger.Info("=== FileSystemModule: About to call InitializeFileSystemInBackground ===");
             await InitializeFileSystemInBackground();
-            _logger.Info("FileSystemModule: Async initialization completed");
+            Console.WriteLine("=== FileSystemModule: InitializeFileSystemInBackground completed ===");
+            _logger.Info("=== FileSystemModule: InitializeFileSystemInBackground completed ===");
+            Console.WriteLine("=== FileSystemModule: Async initialization completed SUCCESSFULLY ===");
+            _logger.Info("=== FileSystemModule: Async initialization completed SUCCESSFULLY ===");
         }
         catch (Exception ex)
         {
-            _logger.Error($"FileSystemModule: Async initialization failed: {ex.Message}");
+            Console.WriteLine($"=== FileSystemModule: Async initialization FAILED: {ex.Message} ===");
+            _logger.Error($"=== FileSystemModule: Async initialization FAILED: {ex.Message} ===");
+            _logger.Error($"Stack trace: {ex.StackTrace}");
         }
     }
 
@@ -1089,18 +1106,57 @@ public class FileSystemModule : ModuleBase, IDisposable
 
     private bool ShouldExcludeDirectory(string path)
     {
-        var dirName = Path.GetFileName(path);
-        return _excludePatterns.Any(pattern => 
-            dirName.Equals(pattern, StringComparison.OrdinalIgnoreCase) ||
-            (pattern.Contains("*") && MatchesPattern(dirName, pattern)));
+        // Check if the relative path starts with or contains any excluded directory
+        var relativePath = Path.GetRelativePath(_projectRoot, path).Replace('\\', '/');
+        
+        foreach (var pattern in _excludePatterns)
+        {
+            if (pattern.Contains("*"))
+            {
+                // Skip wildcard patterns for directory exclusion
+                continue;
+            }
+            
+            // Check if path starts with excluded directory or contains it as a path component
+            if (relativePath.Equals(pattern, StringComparison.OrdinalIgnoreCase) ||
+                relativePath.StartsWith(pattern + "/", StringComparison.OrdinalIgnoreCase) ||
+                relativePath.Contains("/" + pattern + "/", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+        
+        return false;
     }
 
     private bool ShouldExcludeFile(string path)
     {
-        var fileName = Path.GetFileName(path);
-        return _excludePatterns.Any(pattern => 
-            fileName.Equals(pattern, StringComparison.OrdinalIgnoreCase) ||
-            (pattern.Contains("*") && MatchesPattern(fileName, pattern)));
+        // First check if file is in an excluded directory
+        var relativePath = Path.GetRelativePath(_projectRoot, path).Replace('\\', '/');
+        
+        foreach (var pattern in _excludePatterns)
+        {
+            if (!pattern.Contains("*"))
+            {
+                // Directory pattern - check if file path contains it
+                if (relativePath.StartsWith(pattern + "/", StringComparison.OrdinalIgnoreCase) ||
+                    relativePath.Contains("/" + pattern + "/", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            else
+            {
+                // Wildcard pattern - check filename
+                var fileName = Path.GetFileName(path);
+                if (MatchesPattern(fileName, pattern))
+                {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
     }
 
     private bool MatchesPattern(string input, string pattern)

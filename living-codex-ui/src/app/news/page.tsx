@@ -51,6 +51,23 @@ export default function NewsPage() {
   const [selectedNewsId, setSelectedNewsId] = useState<string | null>(null);
   const [summaries, setSummaries] = useState<Record<string, { text: string; status: string }>>({});
   const [summaryLoading, setSummaryLoading] = useState(false);
+  
+  // Source preferences state
+  const [showSourcePrefs, setShowSourcePrefs] = useState(false);
+  const [preferredSources, setPreferredSources] = useState<string[]>([]);
+  const [blockedSources, setBlockedSources] = useState<string[]>([]);
+  
+  // Belief translation state
+  const [showTranslations, setShowTranslations] = useState(false);
+  const [selectedArticleForTranslation, setSelectedArticleForTranslation] = useState<NewsItem | null>(null);
+  const [translations, setTranslations] = useState<any[]>([]);
+  
+  // Saved articles state
+  const [savedArticles, setSavedArticles] = useState<string[]>([]);
+  const [showSaved, setShowSaved] = useState(false);
+  
+  // Source reliability state
+  const [sourceReliability, setSourceReliability] = useState<Record<string, number>>({});
 
   const getNewsNodeId = (item: NewsItem): string | undefined => {
     const candidates = [
@@ -72,8 +89,119 @@ export default function NewsPage() {
   useEffect(() => {
     if (user?.id) {
       trackInteraction('news-page', 'page-visit', { description: 'User visited news page' });
+      loadUserPreferences();
+      loadSourceReliability();
     }
   }, [user?.id, trackInteraction]);
+
+  const loadUserPreferences = () => {
+    const prefs = localStorage.getItem('news-preferences');
+    if (prefs) {
+      const data = JSON.parse(prefs);
+      setPreferredSources(data.preferred || []);
+      setBlockedSources(data.blocked || []);
+    }
+    const saved = localStorage.getItem('saved-articles');
+    if (saved) {
+      setSavedArticles(JSON.parse(saved));
+    }
+  };
+
+  const savePreferences = () => {
+    localStorage.setItem('news-preferences', JSON.stringify({
+      preferred: preferredSources,
+      blocked: blockedSources
+    }));
+  };
+
+  const togglePreferredSource = (source: string) => {
+    if (preferredSources.includes(source)) {
+      setPreferredSources(preferredSources.filter(s => s !== source));
+    } else {
+      setPreferredSources([...preferredSources, source]);
+      setBlockedSources(blockedSources.filter(s => s !== source));
+    }
+  };
+
+  const toggleBlockedSource = (source: string) => {
+    if (blockedSources.includes(source)) {
+      setBlockedSources(blockedSources.filter(s => s !== source));
+    } else {
+      setBlockedSources([...blockedSources, source]);
+      setPreferredSources(preferredSources.filter(s => s !== source));
+    }
+  };
+
+  const loadSourceReliability = async () => {
+    try {
+      const response = await fetch(buildApiUrl('/news/source-reliability'));
+      if (response.ok) {
+        const data = await response.json();
+        setSourceReliability(data.sources || {});
+      }
+    } catch (error) {
+      console.error('Error loading source reliability:', error);
+    }
+  };
+
+  const getReliabilityScore = (source: string): number => {
+    return sourceReliability[source] || 0.5;
+  };
+
+  const getReliabilityColor = (score: number): string => {
+    if (score >= 0.8) return 'text-green-600 dark:text-green-400';
+    if (score >= 0.6) return 'text-yellow-600 dark:text-yellow-400';
+    if (score >= 0.4) return 'text-orange-600 dark:text-orange-400';
+    return 'text-red-600 dark:text-red-400';
+  };
+
+  const loadBeliefTranslations = async (article: NewsItem) => {
+    try {
+      const response = await fetch(buildApiUrl('/news/belief-translations'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: article.title,
+          content: article.description,
+          url: article.url
+        })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setTranslations(data.translations || []);
+      }
+    } catch (error) {
+      console.error('Error loading translations:', error);
+    }
+  };
+
+  const saveArticle = (newsId: string) => {
+    const updated = savedArticles.includes(newsId)
+      ? savedArticles.filter(id => id !== newsId)
+      : [...savedArticles, newsId];
+    setSavedArticles(updated);
+    localStorage.setItem('saved-articles', JSON.stringify(updated));
+  };
+
+  const shareToConceptNetwork = async (article: NewsItem) => {
+    try {
+      const response = await fetch(buildApiUrl('/news/share-to-network'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user?.id,
+          newsUrl: article.url,
+          title: article.title,
+          description: article.description
+        })
+      });
+      if (response.ok) {
+        alert('Article shared to your concept network!');
+      }
+    } catch (error) {
+      console.error('Error sharing article:', error);
+    }
+  };
 
   const loadNewsData = useCallback(async () => {
     setLoading(true);
@@ -297,10 +425,28 @@ export default function NewsPage() {
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">📰 News Feed</h1>
-          <p className="text-gray-600 dark:text-gray-300">
-            Personalized news based on your concept interactions and interests
-          </p>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">📰 News Feed</h1>
+              <p className="text-gray-600 dark:text-gray-300">
+                Personalized news based on your concept interactions and interests
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowSourcePrefs(true)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm"
+              >
+                ⚙️ Sources
+              </button>
+              <button
+                onClick={() => setShowSaved(true)}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm"
+              >
+                💾 Saved ({savedArticles.length})
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Controls */}
@@ -454,22 +600,46 @@ export default function NewsPage() {
                             />
                             <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
                               <div className="flex items-center space-x-4">
-                                <span>📰 {item.source}</span>
+                                <span className="flex items-center gap-1">
+                                  📰 {item.source}
+                                  <span className={`ml-1 ${getReliabilityColor(getReliabilityScore(item.source))}`}>
+                                    ⭐ {(getReliabilityScore(item.source) * 100).toFixed(0)}%
+                                  </span>
+                                </span>
                                 {item.author && <span>✍️ {item.author}</span>}
                                 <span>🕒 {formatTimeAgo(item.publishedAt)}</span>
                               </div>
                               <div className="flex items-center space-x-2">
                                 <button
-                                  onClick={() => resolveAndOpenNode(item)}
-                                  className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 transition-colors"
+                                  onClick={() => {
+                                    setSelectedArticleForTranslation(item);
+                                    loadBeliefTranslations(item);
+                                    setShowTranslations(true);
+                                  }}
+                                  className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 transition-colors"
+                                  title="View belief translations"
                                 >
-                                  🔎 View Node
+                                  🔄
                                 </button>
                                 <button
-                                  onClick={() => markAsRead(item)}
+                                  onClick={() => saveArticle(summaryKey)}
+                                  className={`${savedArticles.includes(summaryKey) ? 'text-yellow-600' : 'text-gray-600'} hover:text-yellow-800 transition-colors`}
+                                  title={savedArticles.includes(summaryKey) ? 'Unsave article' : 'Save article'}
+                                >
+                                  {savedArticles.includes(summaryKey) ? '⭐' : '☆'}
+                                </button>
+                                <button
+                                  onClick={() => shareToConceptNetwork(item)}
+                                  className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 transition-colors"
+                                  title="Share to concept network"
+                                >
+                                  🔗
+                                </button>
+                                <button
+                                  onClick={() => resolveAndOpenNode(item)}
                                   className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
                                 >
-                                  Mark as Read
+                                  🔎
                                 </button>
                               </div>
                             </div>
@@ -675,6 +845,143 @@ export default function NewsPage() {
             )}
           </div>
         </div>
+
+        {/* Source Preferences Modal */}
+        {showSourcePrefs && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">⚙️ News Source Preferences</h3>
+                <button onClick={() => {setShowSourcePrefs(false); savePreferences();}} className="text-gray-500 hover:text-gray-700">✕</button>
+              </div>
+              <div className="p-6">
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Available Sources</h4>
+                    <div className="space-y-2">
+                      {Object.keys(sourceStats).map((source) => (
+                        <div key={source} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <span className="text-gray-900 dark:text-gray-100">{source}</span>
+                            <span className={`text-sm ${getReliabilityColor(getReliabilityScore(source))}`}>
+                              ⭐ {(getReliabilityScore(source) * 100).toFixed(0)}% reliability
+                            </span>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => togglePreferredSource(source)}
+                              className={`px-3 py-1 text-sm rounded-md ${
+                                preferredSources.includes(source)
+                                  ? 'bg-green-600 text-white'
+                                  : 'bg-gray-300 text-gray-700'
+                              }`}
+                            >
+                              {preferredSources.includes(source) ? '✓ Preferred' : 'Prefer'}
+                            </button>
+                            <button
+                              onClick={() => toggleBlockedSource(source)}
+                              className={`px-3 py-1 text-sm rounded-md ${
+                                blockedSources.includes(source)
+                                  ? 'bg-red-600 text-white'
+                                  : 'bg-gray-300 text-gray-700'
+                              }`}
+                            >
+                              {blockedSources.includes(source) ? '✓ Blocked' : 'Block'}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Belief Translations Modal */}
+        {showTranslations && selectedArticleForTranslation && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg max-w-3xl w-full max-h-[80vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">🔄 Belief System Translations</h3>
+                <button onClick={() => setShowTranslations(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+              </div>
+              <div className="p-6">
+                <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Original Article</h4>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">{selectedArticleForTranslation.title}</p>
+                </div>
+                <div className="space-y-4">
+                  {translations.length > 0 ? (
+                    translations.map((trans, index) => (
+                      <div key={index} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-400 text-xs rounded">
+                            {trans.perspective || trans.beliefSystem}
+                          </span>
+                          {trans.confidence && (
+                            <span className="text-xs text-gray-500">
+                              {(trans.confidence * 100).toFixed(0)}% confidence
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-gray-700 dark:text-gray-300 text-sm">{trans.translation || trans.interpretation}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-center text-gray-500 py-4">Loading translations...</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Saved Articles Modal */}
+        {showSaved && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg max-w-3xl w-full max-h-[80vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">💾 Saved Articles ({savedArticles.length})</h3>
+                <button onClick={() => setShowSaved(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+              </div>
+              <div className="p-6">
+                {savedArticles.length > 0 ? (
+                  <div className="space-y-3">
+                    {newsItems
+                      .filter(item => savedArticles.includes(getNewsNodeId(item) ?? item.url))
+                      .map((item, index) => (
+                        <div key={index} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600">
+                          <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-1">{item.title}</h4>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{item.description?.substring(0, 120)}...</p>
+                          <div className="flex items-center justify-between text-xs text-gray-500">
+                            <span>📰 {item.source}</span>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => resolveAndOpenNode(item)}
+                                className="text-blue-600 hover:text-blue-800"
+                              >
+                                View
+                              </button>
+                              <button
+                                onClick={() => saveArticle(getNewsNodeId(item) ?? item.url)}
+                                className="text-red-600 hover:text-red-800"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-gray-500 py-8">No saved articles yet. Click the ☆ icon on any article to save it.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

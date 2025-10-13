@@ -32,10 +32,11 @@ export default function GraphVisualization({
   height = 600,
 }: GraphVisualizationProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [graphNodes, setGraphNodes] = useState<GraphNode[]>([]);
+  const graphNodesRef = useRef<GraphNode[]>([]);
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const animationRef = useRef<number | null>(null);
+  const edgeMapRef = useRef<Map<string, string[]>>(new Map());
 
   // Initialize graph nodes with physics properties
   useEffect(() => {
@@ -46,12 +47,22 @@ export default function GraphVisualization({
       vx: 0,
       vy: 0,
     }));
-    setGraphNodes(initialized);
-  }, [nodes, width, height]);
+    graphNodesRef.current = initialized;
+    
+    // Build edge map once
+    const edgeMap = new Map<string, string[]>();
+    edges.forEach(edge => {
+      if (!edgeMap.has(edge.fromId)) {
+        edgeMap.set(edge.fromId, []);
+      }
+      edgeMap.get(edge.fromId)!.push(edge.toId);
+    });
+    edgeMapRef.current = edgeMap;
+  }, [nodes, edges, width, height]);
 
   // Physics simulation
   useEffect(() => {
-    if (graphNodes.length === 0) return;
+    if (graphNodesRef.current.length === 0) return;
 
     const animate = () => {
       const canvas = canvasRef.current;
@@ -60,20 +71,14 @@ export default function GraphVisualization({
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
+      const graphNodes = graphNodesRef.current;
+      const edgeMap = edgeMapRef.current;
+
       // Clear canvas
       ctx.clearRect(0, 0, width, height);
 
       // Apply forces
       const alpha = 0.3;
-      const edgeMap = new Map<string, string[]>();
-      
-      // Build edge map
-      edges.forEach(edge => {
-        if (!edgeMap.has(edge.fromId)) {
-          edgeMap.set(edge.fromId, []);
-        }
-        edgeMap.get(edge.fromId)!.push(edge.toId);
-      });
 
       // Update node positions with simple physics
       graphNodes.forEach((node, i) => {
@@ -174,7 +179,6 @@ export default function GraphVisualization({
         }
       });
 
-      setGraphNodes([...graphNodes]);
       animationRef.current = requestAnimationFrame(animate);
     };
 
@@ -185,7 +189,7 @@ export default function GraphVisualization({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [graphNodes, edges, hoveredNode, selectedNode, width, height]);
+  }, [edges, hoveredNode, selectedNode, width, height]);
 
   // Mouse interaction
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -196,7 +200,7 @@ export default function GraphVisualization({
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    const found = graphNodes.find(node => {
+    const found = graphNodesRef.current.find(node => {
       const dx = node.x - x;
       const dy = node.y - y;
       return Math.sqrt(dx * dx + dy * dy) < 10;

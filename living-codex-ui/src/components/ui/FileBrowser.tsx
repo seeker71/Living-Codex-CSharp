@@ -34,23 +34,41 @@ function FileBrowser({
       setLoading(true)
       setError(null)
       
-      const response = await fetch('http://localhost:5002/filesystem/files?limit=1000', {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' },
-        mode: 'cors'
-      })
+      const allFiles: FileNode[] = []
+      let offset = 0
+      const limit = 1000
+      let hasMoreFiles = true
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      // Paginate through all files
+      while (hasMoreFiles) {
+        const response = await fetch(`http://localhost:5002/filesystem/files?limit=${limit}&offset=${offset}`, {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' },
+          mode: 'cors'
+        })
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+
+        const data = await response.json()
+        
+        if (data && data.success && Array.isArray(data.files)) {
+          allFiles.push(...data.files)
+          
+          // If we got fewer files than the limit, we've reached the end
+          if (data.files.length < limit) {
+            hasMoreFiles = false
+          } else {
+            offset += limit
+          }
+        } else {
+          setError('Invalid data format received from server')
+          break
+        }
       }
-
-      const data = await response.json()
       
-      if (data && data.success && Array.isArray(data.files)) {
-        setFileNodes(data.files)
-      } else {
-        setError('Invalid data format received from server')
-      }
+      setFileNodes(allFiles)
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to load files')
     } finally {
@@ -69,6 +87,8 @@ function FileBrowser({
     const tree: any = {}
     
     nodes.forEach(node => {
+      if (!node.relativePath) return // Skip nodes without relativePath
+      
       const pathParts = node.relativePath.split('/')
       let current = tree
       
@@ -177,7 +197,7 @@ function FileBrowser({
 
   // Count files and folders
   const fileCount = fileNodes.filter(n => n.type && n.type.startsWith('codex.file')).length
-  const folderCount = new Set(fileNodes.map(n => n.relativePath.split('/')[0])).size
+  const folderCount = new Set(fileNodes.filter(n => n.relativePath).map(n => n.relativePath.split('/')[0])).size
   const tree = buildTreeStructure(fileNodes)
   const treeArray = treeToArray(tree)
 
@@ -186,10 +206,20 @@ function FileBrowser({
       <div className="flex-shrink-0 p-3 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Files</h3>
-          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-            <span>{fileCount} files</span>
-            <span>•</span>
-            <span>{folderCount} folders</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={loadFileNodes}
+              disabled={loading}
+              className="px-2 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="Refresh file list"
+            >
+              🔄 Refresh
+            </button>
+            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+              <span>{fileCount} files</span>
+              <span>•</span>
+              <span>{folderCount} folders</span>
+            </div>
           </div>
         </div>
       </div>

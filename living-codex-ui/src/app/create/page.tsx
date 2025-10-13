@@ -68,13 +68,252 @@ export default function CreatePage() {
   const [activeTab, setActiveTab] = useState('concept');
   const [loading, setLoading] = useState(false);
   const [creationResult, setCreationResult] = useState<any>(null);
+  
+  // Draft and template state
+  const [savedDrafts, setSavedDrafts] = useState<any[]>([]);
+  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
+  const [showDrafts, setShowDrafts] = useState(false);
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [showTemplates, setShowTemplates] = useState(false);
+  
+  // Version history state
+  const [versionHistory, setVersionHistory] = useState<any[]>([]);
+  const [showVersions, setShowVersions] = useState(false);
+  
+  // Relationship editor state
+  const [relationships, setRelationships] = useState<any[]>([]);
+  const [showRelationships, setShowRelationships] = useState(false);
+  const [searchNodes, setSearchNodes] = useState('');
+  const [foundNodes, setFoundNodes] = useState<any[]>([]);
+  
+  // Import state
+  const [showImport, setShowImport] = useState(false);
+  const [importUrl, setImportUrl] = useState('');
+  const [importLoading, setImportLoading] = useState(false);
 
   // Track page visit
   useEffect(() => {
     if (user?.id) {
       trackInteraction('create-page', 'page-visit', { description: 'User visited concept creation page' });
+      loadDrafts();
+      loadTemplates();
     }
   }, [user?.id, trackInteraction]);
+
+  // Auto-save draft every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (conceptName || conceptDescription) {
+        saveDraft(true); // Auto-save
+      }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [conceptName, conceptDescription, conceptDomain, conceptComplexity, conceptTags]);
+
+  const loadDrafts = () => {
+    const drafts = localStorage.getItem('concept-drafts');
+    if (drafts) {
+      setSavedDrafts(JSON.parse(drafts));
+    }
+  };
+
+  const saveDraft = (auto = false) => {
+    const draft = {
+      id: currentDraftId || `draft-${Date.now()}`,
+      name: conceptName,
+      description: conceptDescription,
+      domain: conceptDomain,
+      complexity: conceptComplexity,
+      tags: conceptTags,
+      timestamp: new Date().toISOString(),
+      auto
+    };
+
+    const existingDrafts = JSON.parse(localStorage.getItem('concept-drafts') || '[]');
+    const draftIndex = existingDrafts.findIndex((d: any) => d.id === draft.id);
+    
+    if (draftIndex >= 0) {
+      existingDrafts[draftIndex] = draft;
+    } else {
+      existingDrafts.push(draft);
+      setCurrentDraftId(draft.id);
+    }
+
+    localStorage.setItem('concept-drafts', JSON.stringify(existingDrafts));
+    setSavedDrafts(existingDrafts);
+    
+    if (!auto) {
+      setCreationResult({ success: true, message: 'Draft saved successfully!' });
+      setTimeout(() => setCreationResult(null), 2000);
+    }
+  };
+
+  const loadDraft = (draft: any) => {
+    setConceptName(draft.name);
+    setConceptDescription(draft.description);
+    setConceptDomain(draft.domain);
+    setConceptComplexity(draft.complexity);
+    setConceptTags(draft.tags);
+    setCurrentDraftId(draft.id);
+    setShowDrafts(false);
+  };
+
+  const deleteDraft = (draftId: string) => {
+    const updatedDrafts = savedDrafts.filter(d => d.id !== draftId);
+    localStorage.setItem('concept-drafts', JSON.stringify(updatedDrafts));
+    setSavedDrafts(updatedDrafts);
+  };
+
+  const loadTemplates = async () => {
+    try {
+      // TODO: Connect to actual template API endpoint
+      const builtInTemplates = [
+        {
+          id: 'consciousness-bridge',
+          name: 'Consciousness Bridge',
+          description: 'A concept connecting different states of awareness',
+          domain: 'consciousness',
+          complexity: 7,
+          tags: ['awareness', 'bridge', 'states'],
+          category: 'Consciousness'
+        },
+        {
+          id: 'unity-fractal',
+          name: 'Unity Fractal',
+          description: 'Self-similar patterns that represent universal unity',
+          domain: 'unity',
+          complexity: 8,
+          tags: ['fractal', 'patterns', 'universal'],
+          category: 'Unity'
+        },
+        {
+          id: 'abundance-flow',
+          name: 'Abundance Flow',
+          description: 'Dynamic system for manifesting abundance in all forms',
+          domain: 'abundance',
+          complexity: 6,
+          tags: ['flow', 'manifestation', 'dynamic'],
+          category: 'Abundance'
+        },
+        {
+          id: 'resonance-field',
+          name: 'Resonance Field',
+          description: 'Harmonic field that amplifies coherent vibrations',
+          domain: 'energy',
+          complexity: 9,
+          tags: ['resonance', 'harmony', 'field'],
+          category: 'Energy'
+        },
+        {
+          id: 'wisdom-spiral',
+          name: 'Wisdom Spiral',
+          description: 'Evolutionary pattern of expanding understanding',
+          domain: 'wisdom',
+          complexity: 7,
+          tags: ['evolution', 'spiral', 'growth'],
+          category: 'Wisdom'
+        }
+      ];
+      setTemplates(builtInTemplates);
+    } catch (error) {
+      console.error('Error loading templates:', error);
+    }
+  };
+
+  const applyTemplate = (template: any) => {
+    setConceptName(template.name);
+    setConceptDescription(template.description);
+    setConceptDomain(template.domain);
+    setConceptComplexity(template.complexity);
+    setConceptTags(template.tags);
+    setShowTemplates(false);
+    setActiveTab('concept');
+  };
+
+  const saveVersion = () => {
+    const version = {
+      id: `version-${Date.now()}`,
+      name: conceptName,
+      description: conceptDescription,
+      domain: conceptDomain,
+      complexity: conceptComplexity,
+      tags: conceptTags,
+      timestamp: new Date().toISOString()
+    };
+
+    setVersionHistory([version, ...versionHistory]);
+  };
+
+  const restoreVersion = (version: any) => {
+    setConceptName(version.name);
+    setConceptDescription(version.description);
+    setConceptDomain(version.domain);
+    setConceptComplexity(version.complexity);
+    setConceptTags(version.tags);
+    setShowVersions(false);
+  };
+
+  const searchNodesForRelationship = async () => {
+    if (!searchNodes.trim()) return;
+
+    try {
+      const response = await fetch(`http://localhost:5002/nodes/search?query=${encodeURIComponent(searchNodes)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setFoundNodes(data.nodes || []);
+      }
+    } catch (error) {
+      console.error('Error searching nodes:', error);
+    }
+  };
+
+  const addRelationship = (node: any, relationshipType: string) => {
+    const relationship = {
+      id: node.id,
+      title: node.title || node.id,
+      type: relationshipType,
+      timestamp: new Date().toISOString()
+    };
+
+    if (!relationships.find(r => r.id === node.id)) {
+      setRelationships([...relationships, relationship]);
+    }
+  };
+
+  const removeRelationship = (relationshipId: string) => {
+    setRelationships(relationships.filter(r => r.id !== relationshipId));
+  };
+
+  const importFromUrl = async () => {
+    if (!importUrl.trim()) return;
+
+    setImportLoading(true);
+    try {
+      // TODO: Connect to actual import API endpoint
+      const response = await fetch('http://localhost:5002/import/url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: importUrl })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.concept) {
+          setConceptName(data.concept.title || data.concept.name);
+          setConceptDescription(data.concept.description || data.concept.content);
+          setConceptDomain(data.concept.domain || 'consciousness');
+          setConceptTags(data.concept.tags || []);
+          setShowImport(false);
+          setCreationResult({ success: true, message: 'Content imported successfully!' });
+        }
+      }
+    } catch (error) {
+      console.error('Error importing:', error);
+      setCreationResult({ success: false, error: 'Failed to import content' });
+    } finally {
+      setImportLoading(false);
+    }
+  };
 
   const addTag = () => {
     if (tagInput.trim() && !conceptTags.includes(tagInput.trim())) {
@@ -264,10 +503,40 @@ export default function CreatePage() {
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">✨ Concept Creation</h1>
-          <p className="text-gray-600 dark:text-gray-300">
-            Create new concepts with AI assistance and generate visual representations
-          </p>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">✨ Concept Creation</h1>
+              <p className="text-gray-600 dark:text-gray-300">
+                Create new concepts with AI assistance and generate visual representations
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowDrafts(true)}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm"
+              >
+                📝 Drafts ({savedDrafts.length})
+              </button>
+              <button
+                onClick={() => setShowTemplates(true)}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm"
+              >
+                📋 Templates
+              </button>
+              <button
+                onClick={() => saveDraft(false)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+              >
+                💾 Save Draft
+              </button>
+              <button
+                onClick={() => setShowImport(true)}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+              >
+                📥 Import
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Success/Error Message */}
@@ -435,7 +704,29 @@ export default function CreatePage() {
                   </div>
                 </div>
 
-                <div className="flex justify-center pt-6">
+                <div className="flex items-center justify-between pt-6">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowRelationships(true)}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm"
+                    >
+                      🔗 Relationships ({relationships.length})
+                    </button>
+                    <button
+                      onClick={saveVersion}
+                      className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm"
+                    >
+                      📚 Save Version
+                    </button>
+                    {versionHistory.length > 0 && (
+                      <button
+                        onClick={() => setShowVersions(true)}
+                        className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm"
+                      >
+                        📜 History ({versionHistory.length})
+                      </button>
+                    )}
+                  </div>
                   <button
                     onClick={createConceptHandler}
                     disabled={loading || !conceptName.trim() || !conceptDescription.trim()}
@@ -634,56 +925,254 @@ export default function CreatePage() {
           </div>
         </div>
 
-        {/* Quick Start Templates */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">🚀 Quick Start Templates</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              {
-                name: 'Consciousness Bridge',
-                description: 'A concept connecting different states of awareness',
-                domain: 'consciousness',
-                tags: ['awareness', 'bridge', 'states']
-              },
-              {
-                name: 'Unity Fractal',
-                description: 'Self-similar patterns that represent universal unity',
-                domain: 'unity',
-                tags: ['fractal', 'patterns', 'universal']
-              },
-              {
-                name: 'Abundance Flow',
-                description: 'Dynamic system for manifesting abundance in all forms',
-                domain: 'abundance',
-                tags: ['flow', 'manifestation', 'dynamic']
-              }
-            ].map((template, index) => (
-              <div key={index} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
-                <h4 className="font-medium text-gray-900 mb-2">{template.name}</h4>
-                <p className="text-sm text-gray-600 mb-3">{template.description}</p>
-                <div className="flex flex-wrap gap-1 mb-3">
-                  {template.tags.map((tag, idx) => (
-                    <span key={idx} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
-                      {tag}
-                    </span>
+        {/* Drafts Modal */}
+        {showDrafts && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">📝 Saved Drafts</h3>
+                <button onClick={() => setShowDrafts(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+              </div>
+              <div className="p-6 space-y-3">
+                {savedDrafts.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">No saved drafts yet</p>
+                ) : (
+                  savedDrafts.map((draft) => (
+                    <div key={draft.id} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-gray-900 dark:text-gray-100">{draft.name || 'Untitled'}</h4>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{draft.description?.substring(0, 100)}...</p>
+                          <p className="text-xs text-gray-500 mt-2">
+                            {new Date(draft.timestamp).toLocaleDateString()} {draft.auto && '(auto-saved)'}
+                          </p>
+                        </div>
+                        <div className="flex gap-2 ml-4">
+                          <button
+                            onClick={() => loadDraft(draft)}
+                            className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+                          >
+                            Load
+                          </button>
+                          <button
+                            onClick={() => deleteDraft(draft.id)}
+                            className="px-3 py-1 bg-red-600 text-white text-sm rounded-md hover:bg-red-700"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Templates Modal */}
+        {showTemplates && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[80vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">📋 Concept Templates</h3>
+                <button onClick={() => setShowTemplates(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {templates.map((template) => (
+                    <div key={template.id} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <div className="flex items-start justify-between mb-2">
+                        <h4 className="font-medium text-gray-900 dark:text-gray-100">{template.name}</h4>
+                        <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-400 text-xs rounded">
+                          {template.category}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">{template.description}</p>
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {template.tags.map((tag: string, idx: number) => (
+                          <span key={idx} className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs rounded">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">Complexity: {template.complexity}/10</span>
+                        <button
+                          onClick={() => applyTemplate(template)}
+                          className="px-3 py-1 bg-purple-600 text-white text-sm rounded-md hover:bg-purple-700"
+                        >
+                          Use Template
+                        </button>
+                      </div>
+                    </div>
                   ))}
                 </div>
-                <button
-                  onClick={() => {
-                    setConceptName(template.name);
-                    setConceptDescription(template.description);
-                    setConceptDomain(template.domain);
-                    setConceptTags(template.tags);
-                    setActiveTab('concept');
-                  }}
-                  className="w-full px-3 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
-                >
-                  Use Template
-                </button>
               </div>
-            ))}
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Version History Modal */}
+        {showVersions && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">📜 Version History</h3>
+                <button onClick={() => setShowVersions(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+              </div>
+              <div className="p-6 space-y-3">
+                {versionHistory.map((version, index) => (
+                  <div key={version.id} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-medium text-gray-900 dark:text-gray-100">{version.name}</h4>
+                          {index === 0 && (
+                            <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 text-xs rounded">
+                              Latest
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{version.description?.substring(0, 80)}...</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {new Date(version.timestamp).toLocaleString()}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => restoreVersion(version)}
+                        className="px-3 py-1 bg-orange-600 text-white text-sm rounded-md hover:bg-orange-700 ml-4"
+                      >
+                        Restore
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Relationships Modal */}
+        {showRelationships && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg max-w-3xl w-full max-h-[80vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">🔗 Concept Relationships</h3>
+                <button onClick={() => setShowRelationships(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Search for concepts to connect
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={searchNodes}
+                      onChange={(e) => setSearchNodes(e.target.value)}
+                      placeholder="Search concepts..."
+                      className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    />
+                    <button
+                      onClick={searchNodesForRelationship}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                    >
+                      Search
+                    </button>
+                  </div>
+                </div>
+
+                {foundNodes.length > 0 && (
+                  <div>
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Search Results</h4>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {foundNodes.map((node) => (
+                        <div key={node.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                          <span className="text-gray-900 dark:text-gray-100">{node.title || node.id}</span>
+                          <select
+                            onChange={(e) => addRelationship(node, e.target.value)}
+                            className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
+                            defaultValue=""
+                          >
+                            <option value="" disabled>Add as...</option>
+                            <option value="related">Related</option>
+                            <option value="influences">Influences</option>
+                            <option value="depends-on">Depends On</option>
+                            <option value="extends">Extends</option>
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {relationships.length > 0 && (
+                  <div>
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Connected Concepts</h4>
+                    <div className="space-y-2">
+                      {relationships.map((rel) => (
+                        <div key={rel.id} className="flex items-center justify-between p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+                          <div>
+                            <span className="text-gray-900 dark:text-gray-100">{rel.title}</span>
+                            <span className="text-sm text-indigo-600 dark:text-indigo-400 ml-2">({rel.type})</span>
+                          </div>
+                          <button
+                            onClick={() => removeRelationship(rel.id)}
+                            className="text-red-600 hover:text-red-700 text-sm"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Import Modal */}
+        {showImport && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg max-w-lg w-full">
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">📥 Import Content</h3>
+                <button onClick={() => setShowImport(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Import from URL
+                  </label>
+                  <input
+                    type="text"
+                    value={importUrl}
+                    onChange={(e) => setImportUrl(e.target.value)}
+                    placeholder="https://example.com/article"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => setShowImport(false)}
+                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={importFromUrl}
+                    disabled={importLoading || !importUrl.trim()}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                  >
+                    {importLoading ? 'Importing...' : 'Import'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

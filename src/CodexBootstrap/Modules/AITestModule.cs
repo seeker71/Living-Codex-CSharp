@@ -75,7 +75,7 @@ public sealed class AITestModule : ModuleBase
     /// Simulate an AI request - embodying the principle of mindful testing
     /// </summary>
     [Post("/ai/test/simulate", "Simulate AI Request", "Simulate an AI request for monitoring demonstration", "codex.ai.test")]
-    public async Task<object> SimulateAIRequestAsync(JsonElement? request)
+    public async Task<IResult> SimulateAIRequestAsync(JsonElement? request)
     {
         try
         {
@@ -86,13 +86,13 @@ public sealed class AITestModule : ModuleBase
             // if (aiTracker == null)
             // {
             //     base._logger.Error("[AITest] AIPipelineTracker is null!");
-            //     return new { success = false, error = "AIPipelineTracker not initialized" };
+            //     return Results.Json(new { success = false, error = "AIPipelineTracker not initialized" }, statusCode: 503);
             // }
             
             if (request == null)
             {
                 base._logger.Error("[AITest] Request is null!");
-                return new { success = false, error = "Request is null" };
+                return Results.BadRequest(new { success = false, error = "Request is null" });
             }
             
             var requestType = request.Value.GetProperty("requestType").GetString() ?? "text-generation";
@@ -110,7 +110,7 @@ public sealed class AITestModule : ModuleBase
             await Task.Delay(processingTime);
             base._logger.Info($"[AITest] Completed processing delay: {processingTime}ms");
             
-            return new
+            return Results.Ok(new
             {
                 success = true,
                 message = "AI request simulated successfully",
@@ -120,12 +120,12 @@ public sealed class AITestModule : ModuleBase
                 model = model,
                 processingTime = processingTime,
                 timestamp = DateTime.UtcNow
-            };
+            });
         }
         catch (Exception ex)
         {
             base._logger.Error($"Error simulating AI request: {ex.Message}", ex);
-            return new { success = false, error = $"Failed to simulate AI request: {ex.Message}" };
+            return Results.Json(new { success = false, error = $"Failed to simulate AI request: {ex.Message}" }, statusCode: 500);
         }
     }
 
@@ -133,7 +133,7 @@ public sealed class AITestModule : ModuleBase
     /// Simulate a slow AI request - embodying the principle of mindful testing
     /// </summary>
     [Post("/ai/test/slow", "Simulate Slow AI Request", "Simulate a slow AI request for monitoring demonstration", "codex.ai.test")]
-    public async Task<object> SimulateSlowAIRequestAsync(JsonElement request)
+    public async Task<IResult> SimulateSlowAIRequestAsync(JsonElement request)
     {
         try
         {
@@ -141,7 +141,7 @@ public sealed class AITestModule : ModuleBase
             if (aiTracker == null)
             {
                 base._logger.Error("[AITest] AIPipelineTracker is null!");
-                return new { success = false, error = "AIPipelineTracker not initialized" };
+                return Results.Json(new { success = false, error = "AIPipelineTracker not initialized" }, statusCode: 503);
             }
             
             var requestType = request.GetProperty("requestType").GetString() ?? "complex-analysis";
@@ -162,7 +162,7 @@ public sealed class AITestModule : ModuleBase
             // Complete the request (simulate success)
             aiTracker.CompleteRequest(requestId, true, processingTime);
             
-            return new
+            return Results.Ok(new
             {
                 success = true,
                 message = "Slow AI request simulated successfully",
@@ -173,12 +173,12 @@ public sealed class AITestModule : ModuleBase
                 processingTime = processingTime,
                 timestamp = DateTime.UtcNow,
                 note = "This request was intentionally slow for monitoring demonstration"
-            };
+            });
         }
         catch (Exception ex)
         {
             base._logger.Error("Error simulating slow AI request", ex);
-            return new { success = false, error = "Failed to simulate slow AI request" };
+            return Results.Json(new { success = false, error = "Failed to simulate slow AI request" }, statusCode: 500);
         }
     }
 
@@ -186,7 +186,7 @@ public sealed class AITestModule : ModuleBase
     /// Simulate a failed AI request - embodying the principle of mindful testing
     /// </summary>
     [Post("/ai/test/fail", "Simulate Failed AI Request", "Simulate a failed AI request for monitoring demonstration", "codex.ai.test")]
-    public async Task<object> SimulateFailedAIRequestAsync(JsonElement request)
+    public async Task<IResult> SimulateFailedAIRequestAsync(JsonElement request)
     {
         try
         {
@@ -194,7 +194,7 @@ public sealed class AITestModule : ModuleBase
             if (aiTracker == null)
             {
                 base._logger.Error("[AITest] AIPipelineTracker is null!");
-                return new { success = false, error = "AIPipelineTracker not initialized" };
+                return Results.Json(new { success = false, error = "AIPipelineTracker not initialized" }, statusCode: 503);
             }
             
             var requestType = request.GetProperty("requestType").GetString() ?? "error-prone-task";
@@ -216,7 +216,7 @@ public sealed class AITestModule : ModuleBase
             // Complete the request (simulate failure)
             aiTracker.CompleteRequest(requestId, false, processingTime, errorMessage);
             
-            return new
+            return Results.Json(new
             {
                 success = false,
                 message = "AI request failed as simulated",
@@ -228,12 +228,12 @@ public sealed class AITestModule : ModuleBase
                 errorMessage = errorMessage,
                 timestamp = DateTime.UtcNow,
                 note = "This request was intentionally failed for monitoring demonstration"
-            };
+            }, statusCode: 500);
         }
         catch (Exception ex)
         {
             base._logger.Error("Error simulating failed AI request", ex);
-            return new { success = false, error = "Failed to simulate failed AI request" };
+            return Results.Json(new { success = false, error = "Failed to simulate failed AI request" }, statusCode: 500);
         }
     }
 
@@ -241,7 +241,7 @@ public sealed class AITestModule : ModuleBase
     /// Get AI pipeline test metrics - embodying the principle of holistic testing awareness
     /// </summary>
     [Get("/ai/test/metrics", "Get AI Test Metrics", "Get current AI pipeline test metrics", "codex.ai.test")]
-    public async Task<object> GetAITestMetricsAsync()
+    public async Task<IResult> GetAITestMetricsAsync()
     {
         try
         {
@@ -249,14 +249,14 @@ public sealed class AITestModule : ModuleBase
             if (aiTracker == null)
             {
                 base._logger.Error("[AITest] AIPipelineTracker is null!");
-                return new { success = false, error = "AIPipelineTracker not initialized" };
+                return Results.Json(new { success = false, error = "AIPipelineTracker not initialized" }, statusCode: 503);
             }
             
             var metrics = aiTracker.GetMetrics();
             var activeRequests = aiTracker.GetActiveRequests();
             var recentRequests = aiTracker.GetRecentRequests();
             
-            return new
+            return Results.Ok(new
             {
                 success = true,
                 message = "AI test metrics retrieved successfully",
@@ -280,12 +280,12 @@ public sealed class AITestModule : ModuleBase
                         processingTime = 2000
                     }
                 }
-            };
+            });
         }
         catch (Exception ex)
         {
             base._logger.Error("Error getting AI test metrics", ex);
-            return new { success = false, error = "Failed to get AI test metrics" };
+            return Results.Json(new { success = false, error = "Failed to get AI test metrics" }, statusCode: 500);
         }
     }
 }

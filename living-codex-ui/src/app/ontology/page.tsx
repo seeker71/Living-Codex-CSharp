@@ -134,24 +134,134 @@ function normalizeTitle(node: OntologyNode): string {
 
 function matchDomain(node: OntologyNode): string {
   const keywords = (node.meta?.keywords || []).map((k) => k.toLowerCase());
+  const axes = (node.meta?.axes || []).map((a: string) => a.toLowerCase());
   const description = (node.description || node.meta?.description || '').toLowerCase();
+  const title = (node.title || node.meta?.name || '').toLowerCase();
 
+  // Track domain match scores to find best fit
+  const domainScores: Record<string, number> = {};
+  
   for (const definition of domainDefinitions) {
-    if (
-      definition.keywords.some((kw) =>
-        keywords.some((k) => k.includes(kw)) || description.includes(kw)
-      )
-    ) {
-      return definition.id;
+    let score = 0;
+    const defKeywords = definition.keywords.map(k => k.toLowerCase());
+    
+    // Check keywords (highest weight)
+    for (const keyword of keywords) {
+      for (const defKeyword of defKeywords) {
+        if (keyword.includes(defKeyword) || defKeyword.includes(keyword)) {
+          score += 3;
+        }
+      }
+    }
+    
+    // Check description
+    for (const defKeyword of defKeywords) {
+      if (description.includes(defKeyword)) {
+        score += 2;
+      }
+    }
+    
+    // Check title
+    for (const defKeyword of defKeywords) {
+      if (title.includes(defKeyword)) {
+        score += 2;
+      }
+    }
+    
+    // Check axes (U-CORE axes indicate domain affinity)
+    if (definition.id === 'science' && (
+      axes.includes('physical') || axes.includes('empirical') || 
+      axes.includes('technological') || axes.includes('scientific')
+    )) {
+      score += 2;
+    } else if (definition.id === 'arts' && (
+      axes.includes('aesthetic') || axes.includes('spiritual') || 
+      axes.includes('philosophical') || axes.includes('creative')
+    )) {
+      score += 2;
+    } else if (definition.id === 'society' && (
+      axes.includes('social') || axes.includes('ethical') || 
+      axes.includes('political') || axes.includes('historical')
+    )) {
+      score += 2;
+    } else if (definition.id === 'nature' && (
+      axes.includes('ecological') || axes.includes('biological') || 
+      axes.includes('environmental')
+    )) {
+      score += 2;
+    } else if (definition.id === 'health' && (
+      axes.includes('medical') || axes.includes('psychological') || 
+      axes.includes('physiological') || axes.includes('wellness')
+    )) {
+      score += 2;
+    } else if (definition.id === 'business' && (
+      axes.includes('economic') || axes.includes('financial') || 
+      axes.includes('commercial')
+    )) {
+      score += 2;
+    }
+    
+    domainScores[definition.id] = score;
+  }
+  
+  // Find domain with highest score
+  let bestDomain = 'science';
+  let bestScore = 0;
+  
+  for (const [domain, score] of Object.entries(domainScores)) {
+    if (score > bestScore) {
+      bestScore = score;
+      bestDomain = domain;
     }
   }
-
-  return 'science';
+  
+  // If no good match found (score 0), try to infer from typeId
+  if (bestScore === 0) {
+    const typeId = node.typeId.toLowerCase();
+    if (typeId.includes('philosophical') || typeId.includes('spiritual')) {
+      return 'arts';
+    } else if (typeId.includes('social') || typeId.includes('ethical')) {
+      return 'society';
+    } else if (typeId.includes('biological') || typeId.includes('ecological')) {
+      return 'nature';
+    } else if (typeId.includes('medical') || typeId.includes('psychological')) {
+      return 'health';
+    } else if (typeId.includes('economic') || typeId.includes('commercial')) {
+      return 'business';
+    }
+  }
+  
+  return bestDomain;
 }
 
 function buildConceptSummaries(nodes: OntologyNode[]): ConceptSummary[] {
   return nodes
-    .filter((node) => node.typeId.includes('concept') || node.typeId.includes('axis'))
+    .filter((node) => {
+      // Include: U-CORE concepts, ontology axes, and domain/fundamental concepts
+      const includeTypes = [
+        'codex.ucore',
+        'codex.concept.domain',
+        'codex.concept.fundamental',
+        'codex.concept.cognitive',
+        'codex.concept.systems',
+        'codex.ontology',
+        'codex.axis'
+      ];
+      
+      // Check if node typeId matches any include pattern
+      const hasValidType = includeTypes.some(type => node.typeId.includes(type));
+      
+      // Also include if it has meaningful metadata (keywords or axes)
+      const hasMetadata = (node.meta?.keywords && node.meta.keywords.length > 0) || 
+                          (node.meta?.axes && node.meta.axes.length > 0);
+      
+      // Filter out news-extracted concepts without metadata (generic single-word concepts)
+      const isNewsExtractedBare = node.typeId === 'codex.concept' && 
+                                  !hasMetadata && 
+                                  node.id.startsWith('codex.concept.');
+      
+      return (hasValidType || hasMetadata) && !isNewsExtractedBare;
+    })
     .map((node) => ({
       id: node.id,
       title: normalizeTitle(node),

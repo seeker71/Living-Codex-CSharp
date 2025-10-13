@@ -3,6 +3,7 @@ export const config = {
   // Backend API configuration
   backend: {
     baseUrl: process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5002',
+    wsUrl: process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:5002',
     timeout: parseInt(process.env.NEXT_PUBLIC_API_TIMEOUT || '10000'),
   },
   
